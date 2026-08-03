@@ -6,6 +6,67 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [1.9.0] — 2026-08-04
+
+### Added
+- **More equipment types: eight new, genuinely distinct warehouse objects in
+  the palette.** Each carries an honest domain schema **and** a **distinct 2D
+  top-down glyph plus a distinct 2.5D isometric form** (one source of truth,
+  `WT.shapes`) — none is a plain rectangle. Additive and non-breaking: the
+  existing 21 types and every saved layout / example / generated plant load and
+  render **unchanged**; the new types route through the **same generic**
+  place / select / drag / overlap / compliance / capacity paths. All
+  in-browser, offline, no dependencies, no cost.
+  - **Two storage systems** (they carry pallet positions and form working
+    aisles like the other racking):
+    - **Pick-to-light rack** — small-parts shelving with light-directed pick
+      modules; fully selective each/carton pick faces, capacity stated in
+      pallet-equivalents (`pickFace`), fast confirmed picks (−3 s/line in the
+      sim). *Glyph:* shelf grid + a lit module dot per bay. *Form:* low
+      see-through shelf frame + lit pick-face displays.
+    - **VNA narrow-aisle racking** — very-narrow-aisle, guided man-up turret
+      racking; near-drive-in floor density with **100 % selectivity** across
+      full height, at a slower man-up cycle (+4 s/line) and a guided ~1.6–1.8 m
+      aisle (informed by DIN 15185). *Glyph:* dense narrow bays + a guided-aisle
+      rail. *Form:* tall many-level rack frame + a floor guide rail.
+  - **Six handling / support / boundary elements** — all **0 storage capacity**
+    (movement/processing equipment, like RGV/AGV):
+    - **Forklift / reach truck** — a materials-handling truck at its operating
+      spot (the working aisle it needs is placed separately as a gap).
+    - **Charging station** — a battery/opportunity charging point for the
+      AGV/AMR or truck fleet.
+    - **Sorter loop (tilt-tray)** — a **closed-loop** tilt-tray/cross-belt
+      sortation system with divert chutes (distinct from a straight conveyor
+      *segment* — a routing **loop**, not a point-to-point link). *Animated:* a
+      tray circulates the loop while the flow plays.
+    - **Stretch-wrap / palletiser** — an end-of-line pallet-wrapping turntable.
+      *Animated:* the wrap mast orbits the load while the flow plays.
+    - **Returns / QA station** — a bench for returns processing and quality
+      inspection (grade → re-label → restock or scrap).
+    - **Gate / sectional door** — an internal zone-segregation barrier (fire /
+      security / temperature), **distinct from a loading dock door** (no vehicle
+      bay, no inbound/outbound flow direction).
+  - **Honest categorisation + safe integration.** The two storage types are
+    `category:"storage"` (non-zero `elementCapacity`, aisle-aware); the six
+    handling/support types are `category:"flow"` with **0** capacity, so they
+    never inflate storage or misfire the aisle/route logic. The 2.5D height
+    table (`iso.js` `HEIGHTS`) and the editable KB densities auto-mirror the
+    domain model. Illustrative schematics of a **synthetic** model — **NOT**
+    CAD/BIM, no real brands or vendor models.
+- **`verify_shapes.js` extended** (now **17 checks**): the eight new types are
+  in the domain, the shape registry (2D **and** 3D) and the palette; their
+  `elementCapacity` is **0** for the six handling/support types and **> 0** for
+  the two storage types; a focused draw smoke covers every new type in
+  2D + 3D × light/dark × small/large with **no throw**, **all-finite** coords
+  and **no mutation**; and the two new animatable forms (sorter loop,
+  stretch-wrap arm) visibly **move** their part across animation phases.
+
+### Changed
+- **Offline PWA cache** bumped `wt-v37` → `wt-v38` (`domain.js`, `shapes.js`,
+  `iso.js`, `app.js` changed; nothing added to the shell). Fully offline; no new
+  dependencies; no external references. (The `wt-v37` cache-version assertions
+  in `verify_animation.js` and `verify_hardening.js` were updated to `wt-v38`.)
+
 ## [1.8.0] — 2026-08-04
 
 ### Added

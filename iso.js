@@ -101,6 +101,15 @@
     "pack-station": 1.1,
     "rgv": 1.2,
     "agv": 0.8,
+    // v1.9 "more equipment types".
+    "pick-to-light": 2.2,
+    "vna": 10.0,
+    "forklift": 2.5,
+    "charging-station": 1.4,
+    "sorter": 1.2,
+    "stretch-wrap": 2.6,
+    "returns-station": 1.1,
+    "gate": 4.0,
   };
 
   // Fallback used when a type is unknown to BOTH the domain model and the

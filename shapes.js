@@ -151,6 +151,23 @@
   // Triangle wave 0 -> 1 -> 0 over p in [0,1): a body that travels a lane
   // and returns (rail-guided back-and-forth, crane carriage, lift).
   function tri(p) { const x = ((p % 1) + 1) % 1; return 1 - Math.abs(2 * x - 1); }
+  // A point on the perimeter of rect (lx,ly,lw,lh) at fraction t in [0,1),
+  // walking clockwise from the top-left corner. Used to circulate a load
+  // around a CLOSED LOOP (the sorter tray). Finite for any finite input;
+  // degenerate (zero-perimeter) rects return the corner rather than divide.
+  function rectPerim(lx, ly, lw, lh, t) {
+    const W = Math.max(0, lw), H = Math.max(0, lh);
+    const per = 2 * (W + H);
+    if (!(per > 0)) return { x: lx, y: ly };
+    let dd = ((((Number(t) || 0) % 1) + 1) % 1) * per;
+    if (dd < W) return { x: lx + dd, y: ly };
+    dd -= W;
+    if (dd < H) return { x: lx + W, y: ly + dd };
+    dd -= H;
+    if (dd < W) return { x: lx + W - dd, y: ly + H };
+    dd -= W;
+    return { x: lx, y: ly + H - dd };
+  }
 
   /* ==================================================================
    * PER-TYPE 2D GLYPHS. Signature: (ctx, x, y, w, d, cell, gc, color).
@@ -506,6 +523,160 @@
     if (typeof anim === "number" && isFinite(anim)) laneRunner2D(ctx, gc, ix, iy, iw, ih, horiz, ((anim % 1) + 1) % 1);
   }
 
+  /* ------------------------------------------------------------------
+   * NEW EQUIPMENT GLYPHS (v1.9 "more equipment types"). Same drawing
+   * conventions as above; each keeps the type colour and stays inside
+   * its [x,y,w,d] footprint.
+   * ------------------------------------------------------------------ */
+
+  // Pick-to-light rack: a fine shelf grid with a lit light-module dot per bay.
+  function d2PickToLight(ctx, x, y, w, d, cell, gc) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const bays = clampN(Math.round(iw / cell), 2, 12);
+    const shelves = clampN(Math.round(ih / (cell * 0.5)), 1, 3);
+    for (let i = 0; i <= bays; i++) { const gx = ix + iw * i / bays; seg(ctx, gx, iy, gx, iy + ih); }
+    for (let j = 0; j <= shelves; j++) { const gy = iy + ih * j / shelves; seg(ctx, ix, gy, ix + iw, gy); }
+    // a lit pick-to-light module dot centred in each bay
+    for (let i = 0; i < bays; i++) disc(ctx, ix + iw * (i + 0.5) / bays, iy + ih * 0.5, clampN(cell * 0.08, 1.5, 3));
+  }
+
+  // VNA narrow-aisle racking: dense narrow bays + a dashed centre guide rail.
+  function d2Vna(ctx, x, y, w, d, cell, gc) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.14, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const bays = clampN(Math.round(iw / (cell * 0.5)), 3, 18);
+    for (let i = 0; i <= bays; i++) { const gx = ix + iw * i / bays; seg(ctx, gx, iy, gx, iy + ih); }
+    seg(ctx, ix, iy, ix + iw, iy);
+    seg(ctx, ix, iy + ih, ix + iw, iy + ih);
+    // the wire/rail guidance line down the aisle (dashed, bolder)
+    ctx.save();
+    ctx.setLineDash([clampN(cell * 0.24, 3, 7), clampN(cell * 0.16, 2, 4)]);
+    ctx.lineWidth = clampN(cell * 0.08, 1.5, 3);
+    seg(ctx, ix, iy + ih / 2, ix + iw, iy + ih / 2);
+    ctx.restore();
+  }
+
+  // Forklift / reach truck: a truck body + a mast bar + two projecting forks.
+  function d2Forklift(ctx, x, y, w, d, cell, gc) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const bw = iw * 0.5, bh = ih * 0.62;
+    const bx = ix, by = iy + (ih - bh) / 2;
+    ctx.fillRect(bx, by, bw, bh);      // truck body
+    ctx.strokeRect(bx, by, bw, bh);
+    const mx = bx + bw;                 // the mast at the body front
+    ctx.lineWidth = clampN(cell * 0.09, 1.5, 3);
+    seg(ctx, mx, by, mx, by + bh);
+    ctx.lineWidth = clampN(cell * 0.05, 1, 2.2);
+    seg(ctx, mx, iy + ih * 0.34, ix + iw, iy + ih * 0.34); // fork tines
+    seg(ctx, mx, iy + ih * 0.66, ix + iw, iy + ih * 0.66);
+  }
+
+  // Charging station: a dashed charge pad + a post + a lightning bolt.
+  function d2Charging(ctx, x, y, w, d, cell, gc) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 2, 5);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const pad = clampN(Math.min(iw, ih) * 0.7, 4, 30);
+    ctx.save();
+    ctx.setLineDash([clampN(cell * 0.2, 2, 5), clampN(cell * 0.16, 2, 4)]);
+    ctx.strokeRect(ix, iy + (ih - pad) / 2, pad, pad); // the charge pad on the floor
+    ctx.restore();
+    const px = ix + iw * 0.72;                          // the charge post
+    ctx.lineWidth = clampN(cell * 0.08, 1.5, 3);
+    seg(ctx, px, iy, px, iy + ih);
+    ctx.lineWidth = clampN(cell * 0.05, 1, 2.2);
+    const by = iy + ih * 0.5, s = clampN(Math.min(iw, ih) * 0.28, 3, 9); // lightning bolt
+    ctx.beginPath();
+    ctx.moveTo(px - s * 0.2, by - s);
+    ctx.lineTo(px + s * 0.4, by - s * 0.1);
+    ctx.lineTo(px - s * 0.1, by + s * 0.1);
+    ctx.lineTo(px + s * 0.4, by + s);
+    ctx.stroke();
+  }
+
+  // Sorter loop: a closed racetrack track + tray ticks + divert chutes +
+  // a circulation arrow. Animatable: a tray circulates the loop.
+  function d2Sorter(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 3, 10);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const tk = clampN(Math.min(iw, ih) * 0.22, 4, 16);
+    ctx.strokeRect(ix, iy, iw, ih);                                   // outer track
+    ctx.strokeRect(ix + tk, iy + tk, Math.max(1, iw - 2 * tk), Math.max(1, ih - 2 * tk)); // inner edge
+    const cols = clampN(Math.round(iw / cell), 2, 12);
+    for (let i = 1; i < cols; i++) {                                  // tray ticks
+      const gx = ix + iw * i / cols;
+      seg(ctx, gx, iy, gx, iy + tk);
+      seg(ctx, gx, iy + ih - tk, gx, iy + ih);
+    }
+    const diverts = clampN(Math.round(iw / (cell * 1.5)), 1, 5);
+    for (let i = 0; i < diverts; i++) {                              // divert chutes
+      const gx = ix + iw * (i + 0.5) / diverts;
+      seg(ctx, gx, iy + ih - tk, gx - clampN(cell * 0.2, 2, 5), iy + ih);
+    }
+    arr(ctx, ix + iw * 0.3, iy + tk / 2, ix + iw * 0.7, iy + tk / 2, clampN(cell * 0.24, 3, 6));
+    if (typeof anim === "number" && isFinite(anim)) {
+      const p = rectPerim(ix + tk / 2, iy + tk / 2, Math.max(1, iw - tk), Math.max(1, ih - tk), anim);
+      const ts = clampN(tk * 0.5, 2, 8);
+      ctx.fillStyle = gc.stroke;
+      ctx.fillRect(p.x - ts / 2, p.y - ts / 2, ts, ts);
+    }
+  }
+
+  // Stretch-wrap / palletiser: a turntable ring + a pallet + a wrap arm.
+  // Animatable: the wrap arm rotates around the load.
+  function d2StretchWrap(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const cx = x + w / 2, cy = y + d / 2;
+    const R = clampN(Math.min(w, d) * 0.4, 6, 4000);
+    ring(ctx, cx, cy, R);                              // the turntable
+    const s = clampN(R * 0.7, 4, 4000);                // the pallet load
+    ctx.strokeRect(cx - s / 2, cy - s / 2, s, s);
+    seg(ctx, cx, cy - s / 2, cx, cy + s / 2);
+    const ang = (typeof anim === "number" && isFinite(anim)) ? anim * TAU : -Math.PI / 2;
+    const ax = cx + Math.cos(ang) * R, ay = cy + Math.sin(ang) * R;
+    seg(ctx, cx + Math.cos(ang) * s * 0.5, cy + Math.sin(ang) * s * 0.5, ax, ay); // the film mast/arm
+    ctx.fillStyle = gc.stroke;
+    disc(ctx, ax, ay, clampN(R * 0.16, 2, 4000));      // the film-roll head
+  }
+
+  // Returns / QA station: a bench + a "return" arrow + a QA inspection lens.
+  function d2Returns(ctx, x, y, w, d, cell, gc) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.18, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const bh = clampN(ih * 0.4, 4, 16);
+    ctx.fillRect(ix, iy + (ih - bh) / 2, iw, bh);      // bench top
+    ctx.strokeRect(ix, iy + (ih - bh) / 2, iw, bh);
+    const cy = iy + ih / 2;
+    arr(ctx, ix + iw * 0.72, cy, ix + iw * 0.3, cy, clampN(cell * 0.26, 3, 7)); // return arrow
+    const lr = clampN(Math.min(iw, ih) * 0.14, 3, 8);  // QA lens
+    const lx = ix + iw * 0.82;
+    ring(ctx, lx, cy, lr);
+    seg(ctx, lx + lr * 0.7, cy + lr * 0.7, lx + lr * 1.4, cy + lr * 1.4);
+  }
+
+  // Gate / sectional door: side posts + horizontal roller-door slats + a latch.
+  function d2Gate(ctx, x, y, w, d, cell, gc) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 2, 5);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    ctx.lineWidth = clampN(cell * 0.08, 1.5, 3);
+    seg(ctx, ix, iy, ix, iy + ih);                     // side posts
+    seg(ctx, ix + iw, iy, ix + iw, iy + ih);
+    ctx.lineWidth = clampN(cell * 0.05, 1, 2.2);
+    const slats = clampN(Math.round(ih / (cell * 0.28)), 2, 6);
+    for (let j = 1; j < slats; j++) { const gy = iy + ih * j / slats; seg(ctx, ix, gy, ix + iw, gy); } // slats
+    seg(ctx, ix, iy, ix + iw, iy);
+    seg(ctx, ix, iy + ih, ix + iw, iy + ih);
+    disc(ctx, ix + iw / 2, iy + ih / 2, clampN(cell * 0.06, 1.2, 2.6)); // latch
+  }
+
   /* ==================================================================
    * TINY LOD ICONS. Drawn centred at (cx,cy) with radius r when a
    * footprint is too small on-screen for the full glyph. Cheap (a few
@@ -527,6 +698,14 @@
   function icDoor(ctx, cx, cy, r) { ctx.strokeRect(cx - r * 0.6, cy - r, r * 1.2, r * 2); arr(ctx, cx, cy + r * 0.6, cx, cy - r * 0.6, r * 0.5); }
   function icDash(ctx, cx, cy, r) { ctx.save(); ctx.setLineDash([r * 0.5, r * 0.4]); ctx.strokeRect(cx - r, cy - r * 0.7, r * 2, r * 1.4); ctx.restore(); }
   function icArm(ctx, cx, cy, r) { seg(ctx, cx - r * 0.7, cy - r, cx - r * 0.7, cy + r); seg(ctx, cx - r * 0.7, cy - r * 0.5, cx + r, cy - r * 0.5); seg(ctx, cx - r * 0.7, cy + r * 0.3, cx + r, cy + r * 0.3); }
+  // v1.9 equipment icons.
+  function icForklift(ctx, cx, cy, r) { ctx.fillRect(cx - r, cy - r * 0.5, r, r); seg(ctx, cx, cy - r * 0.5, cx + r, cy - r * 0.5); seg(ctx, cx, cy + r * 0.5, cx + r, cy + r * 0.5); }
+  function icBolt(ctx, cx, cy, r) { ctx.beginPath(); ctx.moveTo(cx + r * 0.2, cy - r); ctx.lineTo(cx - r * 0.4, cy); ctx.lineTo(cx + r * 0.1, cy); ctx.lineTo(cx - r * 0.2, cy + r); ctx.stroke(); }
+  function icLoop(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r * 0.7, r * 2, r * 1.4); ctx.strokeRect(cx - r * 0.5, cy - r * 0.3, r, r * 0.6); }
+  function icWrap(ctx, cx, cy, r) { ctx.beginPath(); ctx.arc(cx, cy, r * 0.9, 0, TAU); ctx.stroke(); ctx.strokeRect(cx - r * 0.4, cy - r * 0.4, r * 0.8, r * 0.8); }
+  function icReturn(ctx, cx, cy, r) { arr(ctx, cx + r, cy, cx - r, cy, r * 0.6); }
+  function icGate(ctx, cx, cy, r) { ctx.strokeRect(cx - r * 0.8, cy - r, r * 1.6, r * 2); seg(ctx, cx - r * 0.8, cy - r * 0.4, cx + r * 0.8, cy - r * 0.4); seg(ctx, cx - r * 0.8, cy + r * 0.3, cx + r * 0.8, cy + r * 0.3); }
+  function icLight(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r, r * 2, r * 2); disc(ctx, cx, cy, r * 0.35); }
 
   /* ==================================================================
    * 3D PRIMITIVES (world cells -> px via the caller-supplied P). All
@@ -836,6 +1015,114 @@
     }
   }
 
+  /* ------------------------------------------------------------------
+   * NEW EQUIPMENT FORMS (v1.9 "more equipment types"). Reuse the same
+   * primitives (box3d/colBox/frame3d/edge/quad); every form is extruded
+   * by the domain heightM so a taller element rises on screen.
+   * ------------------------------------------------------------------ */
+
+  // Pick-to-light rack: a low see-through shelf frame + lit pick-face displays.
+  function d3PickToLight(ctx, P, x, y, w, d, h, color, theme) {
+    frame3d(ctx, P, x, y, w, d, h, color, theme, { levels: 4, bays: Math.max(1, Math.round(w / 1.2)) });
+    const lit = lighten(color, 0.34);
+    const bays = clampN(Math.round(w / 1.2), 2, 8);
+    for (let b = 0; b < bays; b++) {
+      const bx0 = x + w * (b + 0.3) / bays, bx1 = x + w * (b + 0.7) / bays;
+      const z0 = h * 0.45, z1 = h * 0.62;
+      quad(ctx, P(bx0, y + d, z0), P(bx1, y + d, z0), P(bx1, y + d, z1), P(bx0, y + d, z1), lit, shade(color, 0.5), 1);
+    }
+  }
+
+  // VNA narrow-aisle racking: a tall, many-level narrow rack frame + a floor
+  // guide rail along the front (the guided VNA aisle).
+  function d3Vna(ctx, P, x, y, w, d, h, color, theme) {
+    frame3d(ctx, P, x, y, w, d, h, color, theme, { levels: 5, bays: Math.max(2, Math.round(w / 0.9)) });
+    const bm = beamColor(color, theme);
+    edge(ctx, P, x, y + d, 0, x + w, y + d, 0, bm, 2.2);
+  }
+
+  // Forklift / reach truck: a vehicle body, a vertical mast to full height,
+  // and two fork tines projecting forward at the floor.
+  function d3Forklift(ctx, P, x, y, w, d, h, color, theme) {
+    const bw = w * 0.5, bd = d * 0.6;
+    const bx = x + w * 0.05, by = y + (d - bd) / 2;
+    box3d(ctx, P, bx, by, bw, bd, h * 0.5, color);       // truck body
+    const mx = bx + bw;
+    const bm = beamColor(color, theme);
+    const t = clampN(Math.min(w, d) * 0.12, 0.08, 0.3);
+    colBox(ctx, P, mx, y + d / 2, t, h, shade(color, 0.85)); // the mast (full height)
+    edge(ctx, P, mx, y + d * 0.34, 0.05, x + w, y + d * 0.34, 0.05, bm, 1.8); // fork tines
+    edge(ctx, P, mx, y + d * 0.66, 0.05, x + w, y + d * 0.66, 0.05, bm, 1.8);
+  }
+
+  // Charging station: a low floor pad + a charge post + a cable to the pad.
+  function d3Charging(ctx, P, x, y, w, d, h, color, theme) {
+    box3d(ctx, P, x, y, w, d, h * 0.14, shade(color, 0.7)); // the floor pad
+    const t = clampN(Math.min(w, d) * 0.34, 0.15, 0.7);
+    colBox(ctx, P, x + w * 0.74, y + d / 2, t, h, color);   // the charge post (full height)
+    const bm = beamColor(color, theme);
+    edge(ctx, P, x + w * 0.74, y + d / 2, h * 0.85, x + w * 0.2, y + d / 2, h * 0.4, bm, 1.6); // the cable
+  }
+
+  // Sorter loop: a low sortation deck + a loop channel + tray ticks. Animatable:
+  // a tray circulates the loop.
+  function d3Sorter(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h, color); // the low deck
+    const bm = beamColor(color, theme);
+    const inx = clampN(Math.min(w, d) * 0.22, 0.3, 2);
+    edge(ctx, P, x + inx, y + inx, h, x + w - inx, y + inx, h, bm);
+    edge(ctx, P, x + w - inx, y + inx, h, x + w - inx, y + d - inx, h, bm);
+    edge(ctx, P, x + w - inx, y + d - inx, h, x + inx, y + d - inx, h, bm);
+    edge(ctx, P, x + inx, y + d - inx, h, x + inx, y + inx, h, bm);
+    const cols = clampN(Math.round(w / 1.0), 2, 12);
+    for (let i = 1; i < cols; i++) {
+      const gx = x + w * i / cols;
+      edge(ctx, P, gx, y, h, gx, y + inx, h, bm);
+      edge(ctx, P, gx, y + d - inx, h, gx, y + d, h, bm);
+    }
+    if (typeof anim === "number" && isFinite(anim)) {
+      const p = rectPerim(x + inx, y + inx, Math.max(0.2, w - 2 * inx), Math.max(0.2, d - 2 * inx), anim);
+      const ts = clampN(inx * 0.8, 0.2, 1.2);
+      box3d(ctx, P, p.x - ts / 2, p.y - ts / 2, ts, ts, h + clampN(h * 0.6, 0.3, 1), lighten(color, 0.26));
+    }
+  }
+
+  // Stretch-wrap / palletiser: a turntable base + a pallet + a wrap mast that
+  // orbits the load. Animatable: the mast rotates around.
+  function d3StretchWrap(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h * 0.12, shade(color, 0.72)); // the turntable base
+    const pw = w * 0.5, pd = d * 0.5;
+    box3d(ctx, P, x + (w - pw) / 2, y + (d - pd) / 2, pw, pd, h * 0.55, lighten(color, 0.1)); // the pallet load
+    const cxw = x + w / 2, cyw = y + d / 2, R = Math.min(w, d) * 0.42;
+    const ang = (typeof anim === "number" && isFinite(anim)) ? anim * TAU : -Math.PI / 2;
+    const t = clampN(Math.min(w, d) * 0.12, 0.08, 0.3);
+    colBox(ctx, P, cxw + Math.cos(ang) * R, cyw + Math.sin(ang) * R, t, h, color); // the wrap mast (full height)
+  }
+
+  // Returns / QA station: a bench on legs + an upright inspection screen.
+  function d3Returns(ctx, P, x, y, w, d, h, color, theme) {
+    const topZ = h * 0.66, topT = clampN(h * 0.16, 0.08, 0.3);
+    const t = clampN(Math.min(w, d) * 0.12, 0.08, 0.25);
+    colBox(ctx, P, x + t, y + t, t, topZ, color);
+    colBox(ctx, P, x + w - t, y + t, t, topZ, color);
+    colBox(ctx, P, x + t, y + d - t, t, topZ, color);
+    colBox(ctx, P, x + w - t, y + d - t, t, topZ, color);
+    box3d(ctx, P, x, y, w, d, topZ + topT, color); // the bench top
+    const pw = w * 0.3, pd = clampN(d * 0.1, 0.08, 0.3);
+    box3d(ctx, P, x + w * 0.2, y + d * 0.3, pw, pd, topZ + topT + h * 0.35, lighten(color, 0.12)); // inspection screen
+  }
+
+  // Gate / sectional door: a tall wall / door frame + horizontal roller slats.
+  function d3Gate(ctx, P, x, y, w, d, h, color, theme) {
+    box3d(ctx, P, x, y, w, d, h, color); // the door frame / wall
+    const bm = beamColor(color, theme);
+    const slats = 4;
+    for (let j = 1; j < slats; j++) {
+      const z = h * j / slats;
+      edge(ctx, P, x, y + d, z, x + w, y + d, z, bm, 1.4); // the slats on the front face
+    }
+  }
+
   /* ==================================================================
    * THE REGISTRY. Exactly the domain.ELEMENTS types (no orphans). Each
    * entry has a 2D glyph (d2), a 3D form (d3) and an LOD icon (icon).
@@ -862,6 +1149,14 @@
     "pack-station": { d2: d2Pack, d3: d3Pack, icon: icBench, g2: "workbench + parcel with tape", f3: "bench on legs + a parcel on top" },
     "rgv": { d2: d2Rgv, d3: d3Rgv, icon: icCart, g2: "twin rails + cart body + heading", f3: "floor rails + a cart body" },
     "agv": { d2: d2Agv, d3: d3Agv, icon: icRobot, g2: "dashed guide path + robot body", f3: "dashed guide path + a robot body" },
+    "pick-to-light": { d2: d2PickToLight, d3: d3PickToLight, icon: icLight, g2: "shelf grid + lit pick-to-light module dots", f3: "low shelf frame + lit pick-face displays" },
+    "vna": { d2: d2Vna, d3: d3Vna, icon: icGrid, g2: "narrow tall bays + guided-aisle rail", f3: "tall narrow rack frame + floor guide rail" },
+    "forklift": { d2: d2Forklift, d3: d3Forklift, icon: icForklift, g2: "truck body + mast + fork tines", f3: "vehicle body + vertical mast + forks" },
+    "charging-station": { d2: d2Charging, d3: d3Charging, icon: icBolt, g2: "charge pad + post + lightning bolt", f3: "floor pad + charge post + cable" },
+    "sorter": { d2: d2Sorter, d3: d3Sorter, icon: icLoop, g2: "closed loop track + trays + divert chutes", f3: "low sortation deck + loop channel + trays" },
+    "stretch-wrap": { d2: d2StretchWrap, d3: d3StretchWrap, icon: icWrap, g2: "turntable ring + pallet + rotating wrap arm", f3: "turntable base + pallet + orbiting wrap mast" },
+    "returns-station": { d2: d2Returns, d3: d3Returns, icon: icReturn, g2: "bench + return arrow + QA lens", f3: "bench on legs + inspection screen" },
+    "gate": { d2: d2Gate, d3: d3Gate, icon: icGate, g2: "side posts + horizontal door slats + latch", f3: "wall / door frame + roller-door slats" },
   };
 
   /* ==================================================================

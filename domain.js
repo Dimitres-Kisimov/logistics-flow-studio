@@ -227,6 +227,24 @@
       handlingDeltaSec: 5,
       desc: "A steel platform doubling the floor for small-parts shelving above/below. Capacity in pallet-equivalents across both levels; +5 s/line in the sim for the level change (stairs/lift).",
     },
+    // SMALL-PARTS / NARROW-AISLE STORAGE (v1.9 "more equipment types").
+    // Both are STORAGE systems (category "storage"): they contribute pallet
+    // positions via elementCapacity() and form working aisles like the other
+    // racking. Honest, synthetic teaching values - no vendor spec, no brand.
+    "pick-to-light": {
+      id: "pick-to-light", label: "Pick-to-light rack", category: "storage",
+      w: 4, d: 1, color: "#ca8a04", resizable: true, pickFace: true,
+      density: 1.8, levels: 4, selectivity: 1.0, rotation: "FIFO", costIndex: 5, heightM: 2.2,
+      handlingDeltaSec: -3,
+      desc: "Small-parts shelving whose bays carry light modules that direct the operator to the location and quantity - light-directed picking. Fully selective each/carton pick faces (capacity in pallet-equivalents), fast confirmed picks (-3 s/line in the sim). Replenished from behind/above.",
+    },
+    "vna": {
+      id: "vna", label: "VNA narrow-aisle racking", category: "storage",
+      w: 6, d: 1, color: "#1d4ed8", resizable: true,
+      density: 4.0, levels: 5, selectivity: 1.0, rotation: "FIFO/LIFO", costIndex: 6, heightM: 10.0,
+      handlingDeltaSec: 4,
+      desc: "Very-narrow-aisle racking served by a guided man-up turret truck. A ~1.6-1.8 m guided aisle gives near-drive-in floor density with 100% selectivity across full height, but the man-up turret cycle is slower per line (+4 s/line in the sim) and the aisle must be wire/rail guided. Informed by DIN 15185 VNA aisle guidance (not certified).",
+    },
     "dock-in": {
       id: "dock-in", label: "Dock door (inbound)", category: "flow",
       w: 2, d: 1, color: "#22c55e", resizable: false, io: "receiving", heightM: 4.5,
@@ -292,6 +310,43 @@
       // "auto.agv.movesPerHr". Synthetic teaching value, NOT a vendor spec.
       movesPerHr: 30,
       desc: "Automated-guided-vehicle / autonomous-mobile-robot travel lane. Transport ONLY: 0 storage capacity; occupies floor as a reserved robot path between zones. Synthetic teaching element, not a vendor spec.",
+    },
+    // HANDLING VEHICLES + SUPPORT / PROCESS / BOUNDARY EQUIPMENT (v1.9 "more
+    // equipment types"). All MOVEMENT / handling / processing / boundary
+    // elements, NOT storage: they hold ZERO pallet positions (elementCapacity()
+    // returns 0 because category !== "storage") but occupy floor cells like a
+    // working position would. Category "flow" so the palette groups them with
+    // the other movement/support elements. Honest, synthetic teaching elements
+    // - no vendor spec, no real brand or model.
+    "forklift": {
+      id: "forklift", label: "Forklift / reach truck", category: "flow",
+      w: 2, d: 2, color: "#d97706", resizable: false, heightM: 2.5,
+      desc: "A materials-handling truck (counterbalance or reach) shown at an operating / parking spot. Handling equipment only: 0 storage capacity; it occupies floor like a working position. The working aisle a real truck needs is placed separately as a gap. Illustrative, not a vendor spec.",
+    },
+    "charging-station": {
+      id: "charging-station", label: "Charging station", category: "flow",
+      w: 2, d: 1, color: "#84cc16", resizable: false, heightM: 1.4,
+      desc: "A battery / opportunity charging point for the AGV/AMR or truck fleet. Support equipment: 0 storage capacity; a fixed servicing position on the floor. Synthetic teaching element, not a vendor spec.",
+    },
+    "sorter": {
+      id: "sorter", label: "Sorter loop (tilt-tray)", category: "flow",
+      w: 6, d: 4, color: "#f43f5e", resizable: true, heightM: 1.2,
+      desc: "A closed-loop tilt-tray / cross-belt sortation system that carries items past divert chutes to their destination lane. Movement only: 0 storage capacity; occupies floor as a reserved sortation footprint. Distinct from a straight conveyor segment (a routing LOOP, not a point-to-point link). Synthetic teaching element.",
+    },
+    "stretch-wrap": {
+      id: "stretch-wrap", label: "Stretch-wrap / palletiser", category: "flow",
+      w: 2, d: 2, color: "#be185d", resizable: false, heightM: 2.6,
+      desc: "An end-of-line station that builds and stretch-wraps a pallet on a rotating turntable before dispatch. Processing equipment: 0 storage capacity; a fixed working position. Synthetic teaching element, not a vendor spec.",
+    },
+    "returns-station": {
+      id: "returns-station", label: "Returns / QA station", category: "flow",
+      w: 3, d: 2, color: "#0d9488", resizable: true, heightM: 1.1,
+      desc: "A bench for processing customer returns and quality inspection - grade, re-label, then restock or scrap. Processing equipment: 0 storage capacity; a working bench position. Synthetic teaching element.",
+    },
+    "gate": {
+      id: "gate", label: "Gate / sectional door", category: "flow",
+      w: 2, d: 1, color: "#78716c", resizable: false, heightM: 4.0,
+      desc: "An internal sectional door / barrier that segregates zones (fire, security or temperature separation) - distinct from a loading dock door (no vehicle bay, no inbound/outbound flow direction). Boundary element: 0 storage capacity. Synthetic teaching element.",
     },
   };
 
@@ -676,9 +731,12 @@
       "selective-racking", "block-stack", "drive-in", "double-deep",
       "push-back", "pallet-flow", "carton-flow", "mobile-racking",
       "cantilever", "asrs", "shuttle", "mezzanine",
+      "pick-to-light", "vna",
       "dock-in", "dock-out", "staging", "conveyor",
       "push-station", "pull-station", "pack-station",
       "rgv", "agv",
+      "forklift", "charging-station", "sorter", "stretch-wrap",
+      "returns-station", "gate",
     ],
   };
 })();

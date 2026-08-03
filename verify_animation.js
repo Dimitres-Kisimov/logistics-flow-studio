@@ -37,7 +37,7 @@
  *      flow MUs/stations via projPx -> WT.iso.project) AND the equipment
  *      anim is seeded from the sim tick, gated on playing, threaded into
  *      draw2D + drawScene(animFor)
- *  14. shipped wiring: index.html isoBtn mentions "P", sw.js is wt-v37,
+ *  14. shipped wiring: index.html isoBtn mentions "P", sw.js is wt-v38,
  *      selftest.js has the P-toggle check, run-all.mjs lists this harness
  *
  * Usage:  node verify_animation.js
@@ -356,10 +356,10 @@ console.log("");
 /* ---- 14. shipped wiring: button hint, sw bump, selftest, runner --- */
 (() => {
   const btnHint = /id="isoBtn"[^>]*aria-label="[^"]*\bP\b[^"]*"/.test(INDEX_SRC) && /Press P to switch/.test(INDEX_SRC);
-  const swBump = /CACHE_VERSION\s*=\s*"wt-v37"/.test(SW_SRC);
+  const swBump = /CACHE_VERSION\s*=\s*"wt-v38"/.test(SW_SRC);
   const selftestP = /key-p-toggles-view-mode/.test(SELFTEST_SRC) && /dispatchEvent/.test(SELFTEST_SRC) && /KeyboardEvent/.test(SELFTEST_SRC);
   const inRunner = /verify_animation\.js/.test(RUNALL_SRC);
-  check("shipped wiring: isoBtn advertises P, sw.js is wt-v37, selftest has the P-toggle check, run-all lists verify_animation",
+  check("shipped wiring: isoBtn advertises P, sw.js is wt-v38, selftest has the P-toggle check, run-all lists verify_animation",
     btnHint && swBump && selftestP && inRunner,
     "btnHint=" + btnHint + " sw=" + swBump + " selftest=" + selftestP + " runner=" + inRunner);
 })();

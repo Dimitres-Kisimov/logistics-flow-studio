@@ -262,8 +262,112 @@ console.log("");
   check("offline: shapes.js references no external asset (no http(s) URL)", !ext, ext ? "external ref found" : "clean");
 })();
 
+/* =====================================================================
+ * v1.9 "more equipment types" - focused checks for the eight NEW types.
+ * The smoke tests above already cover them (they iterate every domain
+ * type); these assert the NEW set specifically: registered + palette-
+ * listed, honest capacity (0 for the handling/support types, > 0 for the
+ * storage ones), a focused non-mutating draw smoke, and that the two new
+ * ANIMATABLE forms actually move their part across phases.
+ * ===================================================================== */
+const NEW_TYPES = ["pick-to-light", "vna", "forklift", "charging-station", "sorter", "stretch-wrap", "returns-station", "gate"];
+const STORAGE_NEW = ["pick-to-light", "vna"];
+const FLOW_NEW = ["forklift", "charging-station", "sorter", "stretch-wrap", "returns-station", "gate"];
+
+/* ---- 13. new types are in the domain, the shape registry + palette -- */
+(() => {
+  const inDomain = NEW_TYPES.filter((t) => !D.ELEMENTS[t]);
+  const noShape = NEW_TYPES.filter((t) => S.has(t) !== true);
+  const notInPalette = NEW_TYPES.filter((t) => (D.paletteOrder || []).indexOf(t) < 0);
+  check("v1.9 new equipment types are in the domain, the shape registry (2D+3D) and the palette",
+    inDomain.length === 0 && noShape.length === 0 && notInPalette.length === 0,
+    (inDomain.length ? "not in domain: " + inDomain.join(",") : "") +
+    (noShape.length ? " no shape: " + noShape.join(",") : "") +
+    (notInPalette.length ? " not in palette: " + notInPalette.join(",") : "") ||
+    NEW_TYPES.length + " new types covered");
+})();
+
+/* ---- 14. honest capacity (0 handling/support, > 0 storage) --------- */
+(() => {
+  let fail = null;
+  for (const t of FLOW_NEW) {
+    const def = D.ELEMENTS[t];
+    const cap = D.elementCapacity({ type: t, w: def.w, d: def.d });
+    if (cap !== 0) { fail = t + " (flow) capacity=" + cap + " (must be 0)"; break; }
+  }
+  if (!fail) for (const t of STORAGE_NEW) {
+    const def = D.ELEMENTS[t];
+    const cap = D.elementCapacity({ type: t, w: def.w, d: def.d });
+    if (!(cap > 0)) { fail = t + " (storage) capacity=" + cap + " (must be > 0)"; break; }
+  }
+  check("v1.9 new types: elementCapacity is 0 for the six handling/support types and > 0 for the two storage types",
+    fail === null, fail || "6 flow @ 0 positions, 2 storage > 0");
+})();
+
+/* ---- 15. focused new-type draw smoke + no mutation ---------------- */
+(() => {
+  const P = makeP();
+  const cell = 20;
+  let bad = null, notFinite = null, mutated = null;
+  for (const t of NEW_TYPES) {
+    const def = D.ELEMENTS[t];
+    for (const theme of THEMES) {
+      for (const lod of [3, 44]) {
+        const g = { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme, lod };
+        const before = JSON.stringify(g);
+        const c = makeCtx();
+        try { if (S.draw2D(c, t, g) !== true) bad = bad || t + " draw2D returned non-true"; }
+        catch (e) { bad = bad || t + " 2D/" + theme + "/" + lod + ": " + e.message; }
+        if (c._bad.length) notFinite = notFinite || t + " 2D " + c._bad[0];
+        if (JSON.stringify(g) !== before) mutated = mutated || t + " (2D)";
+      }
+      const o = { cx: 4, cy: 3, w: def.w, d: def.d, heightM: def.heightM, color: def.color, theme, selected: true, selColor: "#38bdf8" };
+      const beforeO = JSON.stringify(o);
+      const c3 = makeCtx();
+      try { if (S.draw3D(c3, t, P, o) !== true) bad = bad || t + " draw3D returned non-true"; }
+      catch (e) { bad = bad || t + " 3D/" + theme + ": " + e.message; }
+      if (c3._bad.length) notFinite = notFinite || t + " 3D " + c3._bad[0];
+      if (JSON.stringify(o) !== beforeO) mutated = mutated || t + " (3D)";
+    }
+  }
+  check("v1.9 new types: every new type draws 2D+3D x light/dark x small/large - no throw, all finite, no mutation",
+    bad === null && notFinite === null && mutated === null,
+    bad || notFinite || (mutated ? "mutated " + mutated : NEW_TYPES.length + " new types x themes x scales clean"));
+})();
+
+/* ---- 16. new ANIMATABLE forms move their part across phases -------- */
+(() => {
+  // A minimal recording context: captures every drawn coordinate so two
+  // phases can be compared. If a moving part exists, the coords differ.
+  function recCtx() {
+    const pts = [];
+    const rec = (x, y) => { if (typeof x === "number" && typeof y === "number" && isFinite(x) && isFinite(y)) pts.push(Math.round(x * 100) + "," + Math.round(y * 100)); };
+    return {
+      _pts: pts,
+      save() {}, restore() {}, beginPath() {}, closePath() {}, fill() {}, stroke() {},
+      moveTo(x, y) { rec(x, y); }, lineTo(x, y) { rec(x, y); }, arc(x, y) { rec(x, y); }, arcTo() {},
+      rect(x, y) { rec(x, y); }, fillRect(x, y) { rec(x, y); }, strokeRect(x, y) { rec(x, y); },
+      setLineDash() {}, measureText(t) { return { width: String(t).length * 6 }; }, fillText() {}, strokeText() {},
+      fillStyle: "", strokeStyle: "", lineWidth: 1, lineJoin: "", font: "", textAlign: "", textBaseline: "", globalAlpha: 1,
+    };
+  }
+  const cell = 20;
+  let fail = null;
+  for (const t of ["sorter", "stretch-wrap"]) {
+    const def = D.ELEMENTS[t];
+    const draw = (anim) => {
+      const c = recCtx();
+      S.draw2D(c, t, { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod: 44, anim });
+      return c._pts.join("|");
+    };
+    if (draw(0.05) === draw(0.55)) fail = t + " did not move between phases";
+  }
+  check("v1.9 new animatable types (sorter loop, stretch-wrap arm) move their part across anim phases",
+    fail === null, fail || "sorter + stretch-wrap animate");
+})();
+
 console.log("");
 console.log(failures === 0
-  ? "ALL SHAPES CHECKS PASSED (13 checks)"
+  ? "ALL SHAPES CHECKS PASSED (17 checks)"
   : failures + " SHAPES CHECK(S) FAILED");
 process.exit(failures === 0 ? 0 : 1);

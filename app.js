@@ -257,7 +257,7 @@
   // frame). One source of truth (WT.shapes.equipmentPhase) drives BOTH the
   // top-down glyph and the 2.5D form. Equipment animates ONLY while the flow
   // is actively PLAYING (not on Step/Pause) and never under reduced-motion.
-  const ANIMATABLE_TYPES = { conveyor: 1, rgv: 1, agv: 1, asrs: 1, shuttle: 1 };
+  const ANIMATABLE_TYPES = { conveyor: 1, rgv: 1, agv: 1, asrs: 1, shuttle: 1, sorter: 1, "stretch-wrap": 1 };
   // A stable per-element seed from its (integer) floor position: deterministic
   // and allocation-free, so identical equipment at different spots is out of
   // phase (the plant doesn't move in lockstep).
