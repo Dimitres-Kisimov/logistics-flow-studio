@@ -249,6 +249,28 @@
     return state.elements.reduce((s, e) => s + D.elementCapacity(e), 0);
   }
 
+  // ----- Living-plant equipment animation (v1.8) -----------------------
+  // The moving equipment (conveyor belts, RGV/AGV vehicles, AS/RS + shuttle
+  // carriages) is animated by a DETERMINISTIC phase seeded from the flow
+  // sim's tick - NOT Date/Math.random - so it is reproducible and PAUSES
+  // exactly when the sim is paused (the tick stops advancing -> a static
+  // frame). One source of truth (WT.shapes.equipmentPhase) drives BOTH the
+  // top-down glyph and the 2.5D form. Equipment animates ONLY while the flow
+  // is actively PLAYING (not on Step/Pause) and never under reduced-motion.
+  const ANIMATABLE_TYPES = { conveyor: 1, rgv: 1, agv: 1, asrs: 1, shuttle: 1 };
+  // A stable per-element seed from its (integer) floor position: deterministic
+  // and allocation-free, so identical equipment at different spots is out of
+  // phase (the plant doesn't move in lockstep).
+  function elemAnimSeed(e) { return ((e.x | 0) * 73856093) ^ ((e.y | 0) * 19349663); }
+  // Whether equipment should animate this frame + the continuous sim TIME to
+  // seed the phase (tick + fractional accumulator). Frozen when paused.
+  function flowAnimContext() {
+    const on = !!(state.flow && state.flow.on && state.flow.playing && WT.shapes &&
+      typeof WT.shapes.equipmentPhase === "function" && !prefersReducedMotion());
+    const t = (on && state.flow.sim) ? (state.flow.sim.tick + (state.flow.sim.tickAccum || 0)) : 0;
+    return { on: on, t: t };
+  }
+
   // ================================================================
   // CANVAS RENDERING
   // ================================================================
@@ -360,6 +382,10 @@
       ? V.cullToView(state.elements, _vb, 2)
       : state.elements;
 
+    // Living-plant equipment animation context (computed once per frame,
+    // not per element - the per-element cost is just equipmentPhase()).
+    const fa = flowAnimContext();
+
     // elements
     for (const e of drawList) {
       const def = ELEMENTS[e.type];
@@ -378,6 +404,9 @@
         WT.shapes.draw2D(ctx, e.type, {
           x: px, y: py, w: pw, d: ph,
           cellPx: cellPx, color: def.color, theme: themeName, lod: cellPx * view.scale,
+          // Deterministic moving part while the flow plays (draw2D itself
+          // skips it on the tiny LOD-icon path, so this stays legible + cheap).
+          anim: (fa.on && ANIMATABLE_TYPES[e.type]) ? WT.shapes.equipmentPhase(fa.t, elemAnimSeed(e)) : undefined,
         });
       } else {
         drawGlyph(e, def, px, py, pw, ph);
@@ -551,6 +580,17 @@
     const org = computeIsoOrigin();
     isoOx = org.x;
     isoOy = org.y;
+    // Living-plant equipment animation for the 2.5D view: the SAME
+    // deterministic phase as the top-down path (WT.shapes.equipmentPhase),
+    // so equipment moves identically in both. LOD-safe: skip when the
+    // element reads too small on-screen. Null while not playing (static).
+    const fa = flowAnimContext();
+    const onScreenCell = cellPx * view.scale; // px per cell at the current zoom
+    const animFor = fa.on ? function (el) {
+      if (!ANIMATABLE_TYPES[el.type]) return undefined;
+      if (Math.min(el.w, el.d) * onScreenCell < 9) return undefined; // too tiny to read
+      return WT.shapes.equipmentPhase(fa.t, elemAnimSeed(el));
+    } : null;
     WT.iso.drawScene(ctx, {
       elements: state.elements,
       gridW: GRID_W,
@@ -562,6 +602,7 @@
       elementDefs: ELEMENTS,
       selectedId: state.selectedId,
       shortLabel,
+      animFor: animFor,
     });
     // Live material-flow overlay, projected into the iso scene. Drawn
     // AFTER the blocks so the animation stays visible (an honest,
@@ -2112,6 +2153,16 @@
       if (e.target && /button|^a$/i.test(e.target.tagName)) return;
       if (!spaceHeld) { spaceHeld = true; canvas.style.cursor = viewCursor(); }
       e.preventDefault(); // keep the page from scrolling
+      return;
+    }
+    // "P" switches the whole view 2D <-> 3D-ish (the SAME 2.5D toggle the
+    // toolbar's "2.5D view" button fires). The input guard above already
+    // ignores typing in fields; here we also ignore any modifier combo so it
+    // never hijacks a browser/OS shortcut. Pan keeps its own affordances
+    // (the Pan button + Space + middle-mouse drag) - P is the view switch.
+    if ((e.key === "p" || e.key === "P") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      toggleViewMode();
       return;
     }
     if (e.key === "Escape") { setTool(null); return; }

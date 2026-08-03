@@ -126,6 +126,33 @@
   const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
   /* ==================================================================
+   * DETERMINISTIC EQUIPMENT-ANIMATION PHASE (one source of truth for the
+   * moving parts drawn by BOTH the 2D glyph and the 3D form). It is a
+   * PURE function of a continuous sim TIME `t` (the caller passes the
+   * flow sim's tick + fractional accumulator) and a per-element `seed`.
+   * NO Date, NO Math.random - so the animation is reproducible and
+   * PAUSES exactly when the sim is paused (the caller stops advancing t,
+   * so the phase - and every moving part - freezes into a static frame).
+   * Returns a value in [0,1); periodic in t with period ANIM_PERIOD ticks;
+   * the seed gives each element a stable phase offset so the plant does
+   * not move in lockstep. ILLUSTRATIVE motion only - labels/data unaffected.
+   * ================================================================== */
+  const ANIM_PERIOD = 2.4; // sim ticks per full animation cycle
+  function equipmentPhase(t, seed) {
+    let tt = Number(t);
+    if (!isFinite(tt)) tt = 0;
+    let s = Number(seed);
+    if (!isFinite(s)) s = 0;
+    const off = (Math.abs(Math.floor(s)) % 1000) / 1000; // stable seed offset in [0,1)
+    let p = (tt / ANIM_PERIOD + off) % 1;
+    if (p < 0) p += 1;
+    return p;
+  }
+  // Triangle wave 0 -> 1 -> 0 over p in [0,1): a body that travels a lane
+  // and returns (rail-guided back-and-forth, crane carriage, lift).
+  function tri(p) { const x = ((p % 1) + 1) % 1; return 1 - Math.abs(2 * x - 1); }
+
+  /* ==================================================================
    * PER-TYPE 2D GLYPHS. Signature: (ctx, x, y, w, d, cell, gc, color).
    * `cell` = px per grid cell (feature density); `gc` = {stroke,fill}.
    * Each keeps the type's colour and draws only inside [x,y,w,d].
@@ -266,8 +293,10 @@
     }
   }
 
-  // Tall double-sided high bay: rack hatch each side + a crane aisle.
-  function d2Asrs(ctx, x, y, w, d, cell, gc) {
+  // Tall double-sided high bay: rack hatch each side + a crane aisle. When
+  // `anim` is supplied the stacker trolley TRAVELS the crane aisle (back-and-
+  // forth); omit it for the static form.
+  function d2Asrs(ctx, x, y, w, d, cell, gc, color, theme, anim) {
     pen(ctx, gc, cell);
     const m = clampN(Math.min(w, d) * 0.12, 2, 6);
     const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
@@ -284,11 +313,15 @@
     // crane aisle centre line + trolley
     const midY = iy + topH + aisle / 2;
     seg(ctx, ix, midY, ix + iw, midY);
-    ctx.fillRect(ix + iw * 0.44, midY - clampN(aisle * 0.18, 2, 5), clampN(iw * 0.12, 6, 20), clampN(aisle * 0.36, 4, 10));
+    const tw = clampN(iw * 0.12, 6, 20), th = clampN(aisle * 0.36, 4, 10);
+    const tx = (typeof anim === "number" && isFinite(anim)) ? ix + tri(anim) * (iw - tw) : ix + iw * 0.44;
+    ctx.fillRect(tx, midY - th / 2, tw, th);
   }
 
-  // Deep channels served by shuttle carts + a lift at the head.
-  function d2Shuttle(ctx, x, y, w, d, cell, gc) {
+  // Deep channels served by shuttle carts + a lift at the head. When `anim`
+  // is supplied a shuttle cart RUNS a channel (back-and-forth); omit it for
+  // the static form.
+  function d2Shuttle(ctx, x, y, w, d, cell, gc, color, theme, anim) {
     pen(ctx, gc, cell);
     const m = clampN(Math.min(w, d) * 0.14, 2, 6);
     const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
@@ -299,7 +332,13 @@
     ctx.fillRect(ix + iw * 0.55, iy + ih * 0.18, cw, chh);
     ctx.fillRect(ix + iw * 0.28, iy + ih * 0.6, cw, chh);
     // lift shaft at the head
-    ctx.strokeRect(ix, iy, clampN(cell * 0.4, 4, 10), ih);
+    const lift = clampN(cell * 0.4, 4, 10);
+    ctx.strokeRect(ix, iy, lift, ih);
+    if (typeof anim === "number" && isFinite(anim)) {
+      const sx = ix + lift + tri(anim) * (iw - lift - cw);
+      ctx.fillStyle = gc.stroke;
+      ctx.fillRect(sx, iy + ih * 0.4 - chh / 2, cw, chh);
+    }
   }
 
   // Raised platform outline + corner posts (a second pick level).
@@ -351,8 +390,11 @@
     ctx.restore();
   }
 
-  // Powered conveyor: belt side lines + rollers + a direction arrow.
-  function d2Conveyor(ctx, x, y, w, d, cell, gc) {
+  // Powered conveyor: belt side lines + rollers + a direction arrow. When
+  // `anim` (a phase in [0,1)) is supplied, a few unit-loads SCROLL along the
+  // belt in the flow direction (the belt visibly runs); omit it for the
+  // static form.
+  function d2Conveyor(ctx, x, y, w, d, cell, gc, color, theme, anim) {
     pen(ctx, gc, cell);
     const m = clampN(Math.min(w, d) * 0.18, 2, 5);
     const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
@@ -369,6 +411,15 @@
       const n = clampN(Math.round(ih / (cell * 0.5)), 2, 24);
       for (let i = 1; i < n; i++) { const gy = iy + ih * i / n; seg(ctx, ix, gy, ix + iw, gy); }
       arr(ctx, ix + iw / 2, iy + ih * 0.28, ix + iw / 2, iy + ih * 0.72, clampN(cell * 0.3, 3, 7));
+    }
+    if (typeof anim === "number" && isFinite(anim)) {
+      const items = 3, isz = clampN(Math.min(iw, ih) * 0.5, 3, 10);
+      ctx.fillStyle = gc.stroke;
+      for (let i = 0; i < items; i++) {
+        const frac = ((i / items) + anim) % 1;
+        if (horiz) ctx.fillRect(ix + frac * (iw - isz), iy + ih / 2 - isz / 2, isz, isz);
+        else ctx.fillRect(ix + iw / 2 - isz / 2, iy + frac * (ih - isz), isz, isz);
+      }
     }
   }
 
@@ -395,8 +446,22 @@
   function d2Pull(ctx, x, y, w, d, cell, gc) { d2Station(ctx, x, y, w, d, cell, gc, "pull"); }
   function d2Pack(ctx, x, y, w, d, cell, gc) { d2Station(ctx, x, y, w, d, cell, gc, "pack"); }
 
-  // Rail-guided vehicle: twin rails + a cart body + direction.
-  function d2Rgv(ctx, x, y, w, d, cell, gc) {
+  // A small filled vehicle marker running along a lane at `travel` (0..1),
+  // used for the animated RGV/AGV motion (one shared drawer for both).
+  function laneRunner2D(ctx, gc, ix, iy, iw, ih, horiz, travel) {
+    const mr = clampN(Math.min(iw, ih) * 0.18, 2.5, 8);
+    const mx = horiz ? ix + mr + travel * (iw - 2 * mr) : ix + iw / 2;
+    const my = horiz ? iy + ih / 2 : iy + mr + travel * (ih - 2 * mr);
+    ctx.save();
+    ctx.fillStyle = gc.stroke;
+    ctx.beginPath(); ctx.arc(mx, my, mr, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  // Rail-guided vehicle: twin rails + a cart body + direction. When `anim`
+  // is supplied a vehicle marker travels the rail BACK-AND-FORTH (triangle
+  // wave); omit it for the static form.
+  function d2Rgv(ctx, x, y, w, d, cell, gc, color, theme, anim) {
     pen(ctx, gc, cell);
     const m = clampN(Math.min(w, d) * 0.2, 2, 5);
     const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
@@ -416,10 +481,13 @@
       ctx.strokeRect(ix + iw * 0.24, iy + ih * 0.12, iw * 0.52, chh);
       arr(ctx, ix + iw / 2, iy + ih * 0.55, ix + iw / 2, iy + ih * 0.9, clampN(cell * 0.28, 3, 7));
     }
+    if (typeof anim === "number" && isFinite(anim)) laneRunner2D(ctx, gc, ix, iy, iw, ih, horiz, tri(anim));
   }
 
-  // Free-roaming AGV/AMR: a dashed guide path + a rounded robot body.
-  function d2Agv(ctx, x, y, w, d, cell, gc) {
+  // Free-roaming AGV/AMR: a dashed guide path + a rounded robot body. When
+  // `anim` is supplied a vehicle marker LOOPS along the guide path (one
+  // direction); omit it for the static form.
+  function d2Agv(ctx, x, y, w, d, cell, gc, color, theme, anim) {
     pen(ctx, gc, cell);
     const m = clampN(Math.min(w, d) * 0.2, 2, 5);
     const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
@@ -435,6 +503,7 @@
     const br = clampN(Math.min(iw, ih) * 0.26, 4, 12);
     ctx.beginPath(); ctx.arc(bx, by, br, 0, TAU); ctx.fill(); ctx.stroke();
     disc(ctx, horiz ? bx + br * 0.55 : bx, horiz ? by : by + br * 0.55, clampN(br * 0.25, 1.2, 3));
+    if (typeof anim === "number" && isFinite(anim)) laneRunner2D(ctx, gc, ix, iy, iw, ih, horiz, ((anim % 1) + 1) % 1);
   }
 
   /* ==================================================================
@@ -491,6 +560,15 @@
     quad(ctx, P(x, y + d, z0), P(x + w, y + d, z0), P(x + w, y + d, z1), P(x, y + d, z1), shade(color, FACE.left), shade(color, FACE.left * 0.7));
     quad(ctx, P(x + w, y, z0), P(x + w, y + d, z0), P(x + w, y + d, z1), P(x + w, y, z1), shade(color, FACE.right), shade(color, FACE.right * 0.7));
     quad(ctx, P(x, y, z1), P(x + w, y, z1), P(x + w, y + d, z1), P(x, y + d, z1), shade(color, FACE.top), shade(color, 0.85));
+  }
+  // A small solid load/carriage of footprint rw x rd + height h that travels
+  // a footprint lane at `along01` (0..1) along the long axis (`horiz` picks
+  // x vs y), centred on the short axis. One drawer for the animated conveyor
+  // loads and the RGV/AGV/crane/shuttle carriages (only drawn when animating).
+  function runner3D(ctx, P, x, y, w, d, along01, horiz, rw, rd, h, color) {
+    const bx = horiz ? x + along01 * (w - rw) : x + (w - rw) / 2;
+    const by = horiz ? y + (d - rd) / 2 : y + along01 * (d - rd);
+    box3d(ctx, P, bx, by, rw, rd, h, color);
   }
 
   // An open rack FRAME (see-through shelving): solid corner posts + beam
@@ -606,7 +684,7 @@
     }
   }
 
-  function d3Asrs(ctx, P, x, y, w, d, h, color, theme) {
+  function d3Asrs(ctx, P, x, y, w, d, h, color, theme, anim) {
     // double-sided high bay: a rack block each side of a central crane aisle
     const side = w * 0.4, aisle = w - 2 * side;
     frame3d(ctx, P, x, y, side, d, h, color, theme, { levels: 6, bays: Math.max(2, Math.round(side / 1.2)) });
@@ -615,13 +693,25 @@
     const mcx = x + w / 2;
     colBox(ctx, P, mcx, y + d / 2, clampN(aisle * 0.4, 0.2, 0.6), h * 1.02, shade(color, 0.85));
     box3d(ctx, P, mcx - aisle * 0.25, y + d * 0.3, aisle * 0.5, d * 0.4, h * 0.5 + 0.6, color);
+    // Animated: the crane carriage runs the aisle (down its depth) and lifts.
+    if (typeof anim === "number" && isFinite(anim)) {
+      const cw = clampN(aisle * 0.6, 0.2, 1.0), cd = clampN(d * 0.3, 0.3, 2);
+      const lift = tri((anim * 2) % 1);
+      box3d(ctx, P, mcx - cw / 2, y + tri(anim) * (d - cd), cw, cd, h * (0.3 + 0.6 * lift), lighten(color, 0.24));
+    }
   }
 
-  function d3Shuttle(ctx, P, x, y, w, d, h, color, theme) {
+  function d3Shuttle(ctx, P, x, y, w, d, h, color, theme, anim) {
     frame3d(ctx, P, x, y, w, d, h, color, theme, { levels: 6, bays: Math.round(w / 1.4) });
     // the lift shaft at the head (a tall thin solid tower)
     const lw = clampN(w * 0.14, 0.4, 1.2);
     box3d(ctx, P, x, y, lw, d, h, shade(color, 0.82));
+    // Animated: a shuttle carriage runs a channel (past the lift) + a lift.
+    if (typeof anim === "number" && isFinite(anim)) {
+      const cw = clampN(w * 0.16, 0.3, 1.4), cd = clampN(d * 0.5, 0.3, 2);
+      const lift = tri((anim * 2) % 1);
+      box3d(ctx, P, x + lw + tri(anim) * (w - lw - cw), y + (d - cd) / 2, cw, cd, h * (0.35 + 0.5 * lift), lighten(color, 0.24));
+    }
   }
 
   function d3Mezzanine(ctx, P, x, y, w, d, h, color, theme) {
@@ -643,7 +733,7 @@
     edge(ctx, P, x + w, y, deckZ + deckT, x + w, y, railZ, bm);
   }
 
-  function d3Conveyor(ctx, P, x, y, w, d, h, color, theme) {
+  function d3Conveyor(ctx, P, x, y, w, d, h, color, theme, anim) {
     box3d(ctx, P, x, y, w, d, h, color); // the low belt bed
     const bm = beamColor(color, theme);
     const horiz = w >= d;
@@ -652,6 +742,17 @@
       const t = i / n;
       if (horiz) edge(ctx, P, x + w * t, y, h, x + w * t, y + d, h, bm); // rollers across the belt
       else edge(ctx, P, x, y + d * t, h, x + w, y + d * t, h, bm);
+    }
+    // Animated: unit-loads riding the belt, scrolling in the flow direction.
+    if (typeof anim === "number" && isFinite(anim)) {
+      const items = 3;
+      const rw = horiz ? clampN(w * 0.16, 0.3, 1.4) : clampN(w * 0.5, 0.3, 2);
+      const rd = horiz ? clampN(d * 0.5, 0.3, 2) : clampN(d * 0.16, 0.3, 1.4);
+      const litc = lighten(color, 0.26);
+      const top = h + clampN(h * 0.9, 0.4, 1.3);
+      for (let i = 0; i < items; i++) {
+        runner3D(ctx, P, x, y, w, d, ((i / items) + anim) % 1, horiz, rw, rd, top, litc);
+      }
     }
   }
 
@@ -693,7 +794,7 @@
     edge(ctx, P, x, y + d / 2, h, x + w, y + d / 2, h, bm);
   }
 
-  function d3Rgv(ctx, P, x, y, w, d, h, color, theme) {
+  function d3Rgv(ctx, P, x, y, w, d, h, color, theme, anim) {
     const bm = beamColor(color, theme);
     const horiz = w >= d;
     if (horiz) {
@@ -706,9 +807,15 @@
     // the cart body riding the rail
     const cw = horiz ? w * 0.3 : w * 0.6, cd = horiz ? d * 0.6 : d * 0.3;
     box3d(ctx, P, x + (w - cw) / 2, y + (d - cd) / 2, cw, cd, h, color);
+    // Animated: a carriage travelling the rail back-and-forth.
+    if (typeof anim === "number" && isFinite(anim)) {
+      const rw = horiz ? clampN(w * 0.2, 0.4, 2) : clampN(w * 0.55, 0.4, 3);
+      const rd = horiz ? clampN(d * 0.55, 0.4, 3) : clampN(d * 0.2, 0.4, 2);
+      runner3D(ctx, P, x, y, w, d, tri(anim), horiz, rw, rd, h * 1.1, lighten(color, 0.24));
+    }
   }
 
-  function d3Agv(ctx, P, x, y, w, d, h, color, theme) {
+  function d3Agv(ctx, P, x, y, w, d, h, color, theme, anim) {
     const bm = beamColor(color, theme);
     const horiz = w >= d;
     // a dashed guide path on the floor
@@ -721,6 +828,12 @@
     // a small robot body
     const cw = clampN(w * 0.4, 0.6, 3), cd = clampN(d * 0.4, 0.6, 3);
     box3d(ctx, P, x + (w - cw) / 2, y + (d - cd) / 2, cw, cd, h, color);
+    // Animated: the robot body loops along the guide path (one direction).
+    if (typeof anim === "number" && isFinite(anim)) {
+      const rw = horiz ? clampN(w * 0.28, 0.5, 3) : clampN(w * 0.5, 0.5, 3);
+      const rd = horiz ? clampN(d * 0.5, 0.5, 3) : clampN(d * 0.28, 0.5, 3);
+      runner3D(ctx, P, x, y, w, d, ((anim % 1) + 1) % 1, horiz, rw, rd, h * 1.1, lighten(color, 0.24));
+    }
   }
 
   /* ==================================================================
@@ -788,11 +901,15 @@
     ctx.lineWidth = clampN(cell * 0.05, 1, 2.2);
     if (w * scale < LOD_MIN_W || d * scale < LOD_MIN_H) {
       // LOD path: a single tiny centred icon (the tinted footprint is
-      // already drawn by the caller), so it stays cheap + legible.
+      // already drawn by the caller), so it stays cheap + legible. The
+      // animation is intentionally SKIPPED here (too small to read) - LOD-safe.
       const rr = clampN(Math.min(w, d) * 0.3, 3, Math.min(w, d) * 0.5);
       r.icon(ctx, x + w / 2, y + d / 2, rr);
     } else {
-      r.d2(ctx, x, y, w, d, cell, gc, color, theme);
+      // Optional animation phase (a number in [0,1)); animatable types draw
+      // their moving part, all others ignore the extra argument.
+      const anim = (isFinite(g.anim) && g.anim >= 0) ? g.anim : undefined;
+      r.d2(ctx, x, y, w, d, cell, gc, color, theme, anim);
     }
     ctx.restore();
     return true;
@@ -809,10 +926,11 @@
     const h = isFinite(o.heightM) && o.heightM > 0 ? o.heightM : 1;
     const color = o.color || "#8b5cf6";
     const theme = o.theme === "dark" ? "dark" : "light";
+    const anim = (isFinite(o.anim) && o.anim >= 0) ? o.anim : undefined;
     ctx.save();
     ctx.lineJoin = "round";
     ctx.lineWidth = 1;
-    r.d3(ctx, P, x, y, w, d, h, color, theme);
+    r.d3(ctx, P, x, y, w, d, h, color, theme, anim);
     if (o.selected) selOutline(ctx, P, x, y, w, d, h, o.selColor || "#38bdf8");
     ctx.restore();
     return true;
@@ -834,6 +952,12 @@
     draw3D,
     ICONS,
     meta,
+    // Deterministic equipment-animation phase (pure; seeded from the sim
+    // tick, so it pauses when the sim pauses). Bounded in [0,1), periodic
+    // with period ANIM_PERIOD. Exposed so the renderer + tests share ONE
+    // source of truth for the moving-equipment timing.
+    equipmentPhase,
+    ANIM_PERIOD,
     // Exposed for reuse/tests; illustrative schematic drawing only.
     colors: { rgba, shade, lighten },
   };

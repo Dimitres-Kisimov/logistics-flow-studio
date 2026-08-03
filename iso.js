@@ -239,6 +239,11 @@
    *   elementDefs,   // WT.domain.ELEMENTS (for per-type colour)
    *   selectedId,    // highlighted (for parity with top-down selection)
    *   shortLabel,    // optional (type)->string for on-top labels
+   *   animFor,       // optional (el)->phase01|undefined: when the material
+   *                  //   flow is playing, returns a deterministic animation
+   *                  //   phase so animatable equipment (conveyor/rgv/agv/
+   *                  //   asrs/shuttle) shows its moving part in the 3D view
+   *                  //   too (one source of truth: WT.shapes). Omit = static.
    * }
    * ------------------------------------------------------------------ */
   function drawScene(ctx, opts) {
@@ -247,6 +252,7 @@
     const ox = o.originX || 0, oy = o.originY || 0;
     const colors = o.colors || {};
     const defs = o.elementDefs || {};
+    const animFor = typeof o.animFor === "function" ? o.animFor : null;
 
     // World (cell/metre) -> canvas base-px, through the iso projection.
     const P = (cx, cy, cz) => {
@@ -303,6 +309,7 @@
         WT.shapes.draw3D(ctx, e.type, P, {
           cx: e.x, cy: e.y, w: e.w, d: e.d, heightM: h, color: color, theme: theme,
           selected: e.id === o.selectedId, selColor: colors.sel,
+          anim: animFor ? animFor(e) : undefined,
         });
       } else {
         drawBox(ctx, P, e.x, e.y, e.w, e.d, h, color, {

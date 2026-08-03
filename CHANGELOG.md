@@ -6,6 +6,70 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [1.8.0] — 2026-08-04
+
+### Added
+- **A "living plant": press `P` to switch 2D ⇄ 3D, material flow now runs in
+  the 3D view too, and the equipment itself is animated.** Additive and
+  non-breaking — a normal load looks and behaves exactly as before, and when
+  the flow isn't playing every element renders in its static form as today.
+  All in-browser, offline, no dependencies, no cost.
+  - **`P` toggles the whole view 2D ⇄ 2.5D.** A keyboard shortcut fires the
+    **same** view-mode toggle the toolbar's "2.5D view" button uses (no
+    re-implementation). It is **input-guarded** (ignored while typing in an
+    `input`/`select`/`textarea`) and **modifier-guarded** (ignored when Ctrl/
+    ⌘/Alt is held, so it never hijacks a browser/OS shortcut). Pan keeps its
+    own affordances — the **Pan** button, **Space**, and **middle-mouse drag**
+    — so `P` is unambiguously the view switch. The 2.5D button now advertises
+    the shortcut in its label/title.
+  - **Material flow renders in the 2.5D (3D) view too.** The animated flow
+    handling-units (MUs) and the pick/put/pack **station rings + queue badges**
+    are projected through the isometric projection (`WT.iso.project`, lifted a
+    little off the floor) and drawn stage-coloured **inside the 2.5D scene** —
+    not just top-down. It composes with zoom / pan / Fit exactly like the
+    top-down overlay.
+  - **The equipment is animated in both views.** While the flow is **playing**:
+    **conveyors** scroll unit-loads along the belt in the flow direction;
+    **RGV/AGV** vehicles travel their lane (rail-guided back-and-forth,
+    free-roaming loop); **AS/RS** and **shuttle** carriages run the aisle and
+    lift. It is driven by a **deterministic animation phase seeded from the
+    flow sim's tick** — `WT.shapes.equipmentPhase(t, seed)`, a pure function
+    with **no `Date`/`Math.random`**, bounded in `[0,1)` and periodic — passed
+    as **one source of truth** into `WT.shapes.draw2D`/`draw3D` so the top-down
+    glyph and the 2.5D form move **identically**. It **pauses with the sim**
+    (the tick stops advancing → a static frame — Step/Pause show equipment
+    still), is **LOD-aware** (skipped when an element reads too small on
+    screen), honours **prefers-reduced-motion**, and allocates nothing new in
+    the per-element hot loop.
+  - **Honest scope.** This is **illustrative** animation of a **synthetic**
+    teaching model — the moving parts do **not** change any KPI, label or the
+    flow model; the 2.5D heights remain illustrative defaults (not a survey,
+    not a BIM model — the real geometry path is the separate IFC export). No
+    real brands; every motif is a generic material-handling schematic.
+- **New harness** `verify_animation.js` (**31st**, 14 checks): `equipmentPhase`
+  is bounded/deterministic/periodic/garbage-safe; a mock-context smoke draws
+  every animatable type (conveyor/rgv/agv/asrs/shuttle) in **2D and 3D** across
+  a range of phases + themes with **no throw** and **all-finite** coords; a
+  distinct phase visibly **moves** the part (while a non-animatable type
+  ignores `anim` and the static no-anim path is byte-identical); the 2D
+  animation is **LOD-skipped** when tiny; neither draw mutates its inputs;
+  `WT.iso.project` maps an MU world position to finite coords; and the shipped
+  wiring is asserted (the `p`/`P` keydown → view toggle, input- + modifier-
+  guarded; flow-in-3D via `projPx` → `WT.iso.project`; the anim tick-seeded,
+  playing-gated, threaded into `draw2D` + `drawScene(animFor)`; the button
+  hint; the `sw` bump; the self-test check; the runner entry).
+- **Self-test extended** (`selftest.js`, now **47** checks): a live check that
+  dispatching a real `KeyboardEvent("keydown", {key:"p"})` on the window
+  **toggles the view mode** `top → iso → top` through the same handler a real
+  keypress uses.
+
+### Changed
+- **Offline PWA cache** bumped `wt-v36` → `wt-v37`. `shapes.js` (the animation
+  phase + moving parts) and `iso.js` (the `animFor` pass-through) already ship
+  in the precache; nothing added to the shell. Fully offline; no new
+  dependencies; no external references. (`verify_hardening.js`'s cache-version
+  assertion updated `wt-v36` → `wt-v37`.)
+
 ## [1.7.0] — 2026-08-03
 
 ### Added

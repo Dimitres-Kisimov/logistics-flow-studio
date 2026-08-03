@@ -294,6 +294,27 @@
  *      bare key without throwing. The DOM wiring (boot precedence + modal
  *      suppression) is added by app.js and not headless-testable; the pure
  *      parser + a live ?scenario= self-test check cover it.
+ *  31. verify_animation.js  - "living plant" animation (v1.8): the "P" key
+ *      switches the whole view 2D <-> 2.5D (the SAME toggle the toolbar
+ *      button fires, input- + modifier-guarded); the animated material flow
+ *      renders in the 2.5D view too (MUs/stations projected through the iso
+ *      projection); and the EQUIPMENT is animated in BOTH views by a
+ *      DETERMINISTIC phase seeded from the flow sim's tick (WT.shapes.
+ *      equipmentPhase - NO Date/Math.random, bounded [0,1), periodic),
+ *      passed as ONE source of truth into WT.shapes.draw2D/draw3D. Asserts
+ *      equipmentPhase is bounded/deterministic/periodic/garbage-safe, a mock-
+ *      context smoke draws every animatable type (conveyor/rgv/agv/asrs/
+ *      shuttle) in 2D + 3D across a range of phases + themes with no throw
+ *      and all-finite coords, a distinct phase MOVES the part (while a non-
+ *      animatable type ignores anim and the static no-anim path is byte-
+ *      identical), the 2D animation is LOD-skipped when tiny, neither draw
+ *      mutates its inputs, WT.iso.project maps an MU world position to finite
+ *      coords, and the shipped wiring is present (the p/P keydown -> view
+ *      toggle input- + modifier-guarded, flow-in-3D via projPx, the anim
+ *      tick-seeded + playing-gated + threaded into draw2D + drawScene, the
+ *      isoBtn advertising P, sw wt-v37, the self-test P check, the runner).
+ *      The live pixels + the live keypress run in the browser (?selftest=1);
+ *      every draw + wiring PATH is covered here.
  *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
@@ -334,6 +355,7 @@ const HARNESSES = [
   { name: "Production hardening: error boundary + self-test + CSP (verify_hardening.js)", args: ["verify_hardening.js"] },
   { name: "Accessibility + large-layout performance (verify_a11y_perf.js)", args: ["verify_a11y_perf.js"] },
   { name: "Scenario deep-link parser (verify_deeplink.js)", args: ["verify_deeplink.js"] },
+  { name: "Living-plant animation: P toggle + flow-in-3D + animated equipment (verify_animation.js)", args: ["verify_animation.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

@@ -12,8 +12,8 @@
  * boot. It writes a MACHINE-READABLE result into a #wt-selftest element
  * (created here) and console.log()s it, in one of two exact formats:
  *
- *     WT-SELFTEST: PASS 46/46
- *     WT-SELFTEST: FAIL 44/46 :: <comma-separated failed check names>
+ *     WT-SELFTEST: PASS 47/47
+ *     WT-SELFTEST: FAIL 45/47 :: <comma-separated failed check names>
  *
  * A maintainer runs it headlessly (e.g. headless Edge) and reads the
  * #wt-selftest text / the console line.
@@ -250,6 +250,33 @@
       var backTop = API.state.viewMode === "top";
       var same = JSON.stringify(API.state.elements) === snapshot;
       return { ok: inIso && backTop && same, detail: "iso=" + inIso + " top=" + backTop + " layout-unchanged=" + same };
+    });
+
+    // ---- v1.8: pressing "P" switches the whole view 2D <-> 2.5D ---------
+    // Dispatch a REAL KeyboardEvent so the live window keydown handler runs
+    // (the SAME code path a keypress takes). From a top view, one "P" must
+    // flip to iso and a second "P" must flip back - proving the shortcut is
+    // wired to the view-mode toggle and is not swallowed.
+    check("key-p-toggles-view-mode", function () {
+      if (!haveApi) return { ok: false, detail: "no test API" };
+      API.setViewMode("top");
+      var start = API.state.viewMode;
+      function pressP() {
+        var ev;
+        try { ev = new KeyboardEvent("keydown", { key: "p", bubbles: true }); }
+        catch (e) {
+          ev = document.createEvent("Event");
+          ev.initEvent("keydown", true, true);
+          try { ev.key = "p"; } catch (_) { /* read-only in some engines */ }
+        }
+        window.dispatchEvent(ev);
+      }
+      pressP();
+      var afterOne = API.state.viewMode;
+      pressP();
+      var afterTwo = API.state.viewMode;
+      var ok = start === "top" && afterOne === "iso" && afterTwo === "top";
+      return { ok: ok, detail: start + " -> " + afterOne + " -> " + afterTwo };
     });
 
     // ---- Report builds with the expected sections ----------------------
