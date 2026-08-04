@@ -359,6 +359,7 @@
         <span id="chainBadge" class="badge muted">Flow: manual</span>
         <span id="dataBadge" class="badge muted" title="Which dataset the simulation runs on: the seeded synthetic demo catalogue, or your own imported CSVs (Import your data, left panel)">Data: synthetic demo</span>
         <button id="heatBtn" class="btn small" type="button" aria-pressed="false" title="Shade the floor by metres walked in the last run's pick tours. Goods-to-person picks (AS/RS, shuttle) add no walking, so they leave no trace.">Heatmap</button>
+        <button id="measureBtn" class="btn small" type="button" aria-pressed="true" title="Measurements: a metre scale ruler along the top and left floor edges, the selected element's dimensions (w x d m), and faint floor markings (facility perimeter, aisle centre guides, dock-approach hatching, functional zone tints). Illustrative — the measurements are the model's own metre grid (1 cell = 1 m), not a site survey.">Measure</button>
       </div>
       <div class="canvas-toolbar view-toolbar">
         <div class="zoom-group" role="group" aria-label="Zoom and pan the warehouse view">
@@ -776,6 +777,7 @@
         flags from tiers.js, the share-link codec from share.js, the IFC
         writer from ifc.js and the CSV import parser from data.js.) -->
   <script src="view.js"></script>
+  <script src="floor.js"></script>
   <script src="domain.js"></script>
   <script src="knowledge.js"></script>
   <script src="tiers.js"></script>

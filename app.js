@@ -18,6 +18,9 @@
   // Mutable so the warehouse can be resized (view.js clamps the range).
   // The classic floor is 40 x 24 m; layouts may carry their own size.
   const V = WT.view;
+  // v1.12 realistic-floor geometry helpers (pure, DOM-free). Fallback-safe:
+  // every use is guarded so the app still runs if the module is absent.
+  const F = WT.floor;
   let GRID_W = V.FLOOR_DEFAULT_W; // cells across (metres)
   let GRID_H = V.FLOOR_DEFAULT_H; // cells down (metres)
 
@@ -91,6 +94,13 @@
     preview: null, // optimizer proposal: [{id,type,x,y,w,d}] shown as ghosts
     complianceHighlight: null, // element ids highlighted from a Compliance Check finding
     showHeat: false, // pick-traffic heatmap overlay toggle
+    // v1.12 realistic floor: the "Measurements" layer (edge scale ruler +
+    // metre labels + selected-element dimensions + faint floor markings:
+    // perimeter, aisle centre guides, dock-approach hatching, functional
+    // zone tints). Purely additive RENDERING - the element model is
+    // untouched. Default ON so a big plant reads like a real facility; the
+    // fine detail is LOD-gated so it stays subtle + smooth. Toggle: measureBtn.
+    showMeasure: true,
     // P4 storage & inventory (storage.js): the current physical slotting
     // assignment (SKUs -> storage locations). `storageAssignmentSig` is the
     // layout signature it was built for, so a stale assignment is never fed
@@ -347,22 +357,45 @@
     // image (FileReader), so the canvas is never tainted.
     drawUnderlay();
 
-    // grid
+    // v1.12: faint functional-zone tint wash (receiving/storage/picking/
+    // packing/shipping), drawn UNDER the grid + elements so it colours the
+    // floor without obscuring anything. Only when Measurements is on and the
+    // layout actually has zone-bearing elements. World transform -> zoom/pan safe.
+    if (state.showMeasure) drawZoneTints();
+
+    // grid (v1.12 two-tier LOD): major 5 m lines always; minor 1 m lines
+    // only when a cell reads big enough on screen (WT.floor.minorGridVisible)
+    // - a huge floor zoomed out isn't a smear and the per-line cost is
+    // skipped. At normal zooms the minor lines show, so the base look is
+    // unchanged. Fallback-safe if WT.floor is absent (draw every line).
+    const _onCell = cellPx * view.scale; // px per 1 m cell on screen
+    const _majorStep = F ? F.MAJOR_STEP_M : 5;
+    const _showMinor = F ? F.minorGridVisible(_onCell) : true;
     ctx.lineWidth = 1;
     for (let x = 0; x <= GRID_W; x++) {
-      ctx.strokeStyle = x % 5 === 0 ? COLORS.gridStrong : COLORS.grid;
+      const major = x % _majorStep === 0;
+      if (!major && !_showMinor) continue;
+      ctx.strokeStyle = major ? COLORS.gridStrong : COLORS.grid;
       ctx.beginPath();
       ctx.moveTo(Math.round(x * cellPx) + 0.5, 0);
       ctx.lineTo(Math.round(x * cellPx) + 0.5, cssH);
       ctx.stroke();
     }
     for (let y = 0; y <= GRID_H; y++) {
-      ctx.strokeStyle = y % 5 === 0 ? COLORS.gridStrong : COLORS.grid;
+      const major = y % _majorStep === 0;
+      if (!major && !_showMinor) continue;
+      ctx.strokeStyle = major ? COLORS.gridStrong : COLORS.grid;
       ctx.beginPath();
       ctx.moveTo(0, Math.round(y * cellPx) + 0.5);
       ctx.lineTo(cssW, Math.round(y * cellPx) + 0.5);
       ctx.stroke();
     }
+
+    // v1.12: faint floor markings - facility perimeter outline, aisle centre
+    // guides between facing rack rows, and dock-approach hatching in front of
+    // dock/gate doors. Drawn over the grid but UNDER the elements (so they
+    // never obscure content), in the world transform, LOD-gated. Measurements-only.
+    if (state.showMeasure) drawFloorMarkings(_onCell);
 
     // pick-traffic heatmap (under the elements — pickers walk the aisles)
     if (state.showHeat) drawHeat();
@@ -565,7 +598,176 @@
     // P3: live material-flow legend (screen space, pinned to the corner).
     if (state.flow && state.flow.on) drawFlowLegend();
 
+    // v1.12: the scale RULER (metre ticks + labels along the top + left
+    // floor edges) and the SELECTED element's dimension readout. Drawn in
+    // SCREEN space (fixed pixel size, crisp at any zoom) but positioned via
+    // worldToScreen, so they track pan/zoom/Fit. Measurements-toggle gated.
+    if (state.showMeasure) { drawMeasureRuler(); drawSelectedDimension(); }
+
     updateBadges(viol, chains);
+  }
+
+  /* ==================================================================
+   * v1.12 REALISTIC FLOOR - measurements, markings & finer grid.
+   * All rendering-only + additive. Geometry comes from the pure, DOM-free
+   * WT.floor helpers (tested by verify_floor.js); the element data model
+   * (integer-metre cells) is untouched, so compliance/capacity/sim are
+   * unaffected. Everything below is drawn UNDER the elements (zone tint,
+   * perimeter, aisle guides, dock hatch) or as a fixed-size SCREEN overlay
+   * (ruler, dimension readout) positioned via the same worldToScreen the
+   * hit-test uses, so zoom/pan/Fit all keep working.
+   * ================================================================== */
+
+  // Faint functional-zone wash: one tint per zone-bearing element footprint,
+  // coloured from the theme flow-stage palette. Empty when the layout has no
+  // zone-bearing elements (so "zone tint only applies when zones exist").
+  function drawZoneTints() {
+    if (!F || typeof F.zoneTints !== "function") return;
+    const tints = F.zoneTints(state.elements);
+    if (!tints.length) return;
+    const stageColors = COLORS.flowStages || {};
+    ctx.save();
+    for (const t of tints) {
+      const c = stageColors[t.stage];
+      if (!c) continue;
+      ctx.fillStyle = hexA(c, 0.09);
+      ctx.fillRect(t.x * cellPx, t.y * cellPx, t.w * cellPx, t.h * cellPx);
+    }
+    ctx.restore();
+  }
+
+  // Facility perimeter outline (always, cheap) + LOD-gated fine markings:
+  // aisle centre guides between facing rack rows (reusing the SAME facing-
+  // pair model the compliance aisle check uses, so they can never disagree)
+  // and dock-approach hatching in front of dock doors. `onCell` = on-screen
+  // px per 1 m cell. Drawn over the grid, under the elements.
+  function drawFloorMarkings(onCell) {
+    if (!F) return;
+    ctx.save();
+    const per = F.perimeter(GRID_W, GRID_H);
+    if (per) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = COLORS.gridStrong;
+      ctx.strokeRect(per.x * cellPx + 1, per.y * cellPx + 1, per.w * cellPx - 2, per.h * cellPx - 2);
+    }
+    if (F.markingsVisible(onCell)) {
+      const pairs = (typeof D.facingAislePairs === "function") ? D.facingAislePairs(state.elements) : [];
+      const guides = F.aisleGuides(pairs);
+      if (guides.length) {
+        ctx.save();
+        ctx.strokeStyle = COLORS.dim;
+        ctx.globalAlpha = 0.32;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        for (const g of guides) {
+          ctx.beginPath();
+          ctx.moveTo(g.x0 * cellPx, g.y0 * cellPx);
+          ctx.lineTo(g.x1 * cellPx, g.y1 * cellPx);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      ctx.save();
+      ctx.strokeStyle = COLORS.io;
+      ctx.globalAlpha = 0.26;
+      ctx.lineWidth = 1;
+      for (const e of state.elements) {
+        if (e.type !== "dock-in" && e.type !== "dock-out") continue;
+        const ap = F.dockApproach(e, GRID_W, GRID_H, 3);
+        if (!ap || !ap.lines.length) continue;
+        for (const ln of ap.lines) {
+          ctx.beginPath();
+          ctx.moveTo(ln.x0 * cellPx, ln.y0 * cellPx);
+          ctx.lineTo(ln.x1 * cellPx, ln.y1 * cellPx);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // Scale ruler: metre ticks + labels along the top and left floor edges,
+  // pinned to the viewport (fixed pixel size, crisp at any zoom) but placed
+  // by worldToScreen so they track pan/zoom/Fit. The LABEL step widens when
+  // zoomed out (WT.floor.rulerLabelStepM) so labels never collide.
+  function drawMeasureRuler() {
+    if (!F || typeof F.rulerTicks !== "function") return;
+    const onCell = cellPx * view.scale;
+    const stepM = F.rulerLabelStepM(onCell);
+    const barT = 16, barL = 22; // ruler thickness (screen px)
+    ctx.save();
+    ctx.globalAlpha = 0.82;
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, viewCssW, barT);
+    ctx.fillRect(0, 0, barL, viewCssH);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = COLORS.gridStrong;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, barT + 0.5); ctx.lineTo(viewCssW, barT + 0.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(barL + 0.5, 0); ctx.lineTo(barL + 0.5, viewCssH); ctx.stroke();
+    ctx.fillStyle = COLORS.dim;
+    ctx.strokeStyle = COLORS.dim;
+    ctx.font = "600 9px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    // top ruler (X metres)
+    ctx.textBaseline = "alphabetic";
+    for (const t of F.rulerTicks(GRID_W, stepM)) {
+      const sx = worldToScreen(t.m, 0).x;
+      if (sx < barL || sx > viewCssW) continue;
+      ctx.beginPath(); ctx.moveTo(Math.round(sx) + 0.5, barT - 5); ctx.lineTo(Math.round(sx) + 0.5, barT); ctx.stroke();
+      ctx.fillText(t.label, sx, barT - 6);
+    }
+    // left ruler (Y metres) - labels rotated to read up the edge
+    for (const t of F.rulerTicks(GRID_H, stepM)) {
+      const sy = worldToScreen(0, t.m).y;
+      if (sy < barT || sy > viewCssH) continue;
+      ctx.beginPath(); ctx.moveTo(barL - 5, Math.round(sy) + 0.5); ctx.lineTo(barL, Math.round(sy) + 0.5); ctx.stroke();
+      ctx.save();
+      ctx.translate(barL - 7, sy);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(t.label, 0, 0);
+      ctx.restore();
+    }
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("m", 3, 3);
+    ctx.restore();
+  }
+
+  // The selected element's dimensions ("w x d m") in a small pill anchored
+  // above (or below) its on-screen box. Screen space, fixed size.
+  function drawSelectedDimension() {
+    if (!F || typeof F.dimensionLabel !== "function") return;
+    const el = state.elements.find((e) => e.id === state.selectedId);
+    if (!el) return;
+    const label = F.dimensionLabel(el, CELL_M);
+    if (!label) return;
+    const a = worldToScreen(el.x, el.y);
+    const b = worldToScreen(el.x + el.w, el.y + el.d);
+    const cx = (a.x + b.x) / 2, top = Math.min(a.y, b.y), bottom = Math.max(a.y, b.y);
+    ctx.save();
+    ctx.font = "600 11px system-ui, sans-serif";
+    const boxW = ctx.measureText(label).width + 12, h = 16;
+    let bx = cx - boxW / 2;
+    let by = top - h - 6;
+    if (by < 20) by = bottom + 6;
+    bx = Math.max(2, Math.min(viewCssW - boxW - 2, bx));
+    by = Math.max(2, Math.min(viewCssH - h - 2, by));
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = COLORS.bg;
+    roundRect(bx, by, boxW, h, 5);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = COLORS.sel;
+    roundRect(bx + 0.5, by + 0.5, boxW - 1, h - 1, 5);
+    ctx.stroke();
+    ctx.fillStyle = COLORS.text;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, bx + boxW / 2, by + h / 2 + 0.5);
+    ctx.restore();
   }
 
   /* ------------------------------------------------------------------
@@ -756,6 +958,23 @@
           (state.resultStale ? " Stale: layout/settings changed since — Run again." : "")
         : "Heatmap on — Run the simulation to see where the pickers walk."
     );
+  }
+
+  // v1.12: the Measurements layer toggle (ruler + dimensions + floor
+  // markings). Mirrors the heatmap toggle pattern; rendering-only.
+  function toggleMeasure() {
+    state.showMeasure = !state.showMeasure;
+    syncMeasureBtn();
+    render();
+    status(state.showMeasure
+      ? "Measurements on — metre ruler on the top/left edges, dimensions on the selected element, and faint floor markings (perimeter, aisle guides, dock approaches). Illustrative: the metre grid is the model's own, not a site survey."
+      : "Measurements off.");
+  }
+  function syncMeasureBtn() {
+    const b = $("measureBtn");
+    if (!b) return;
+    b.classList.toggle("active", state.showMeasure);
+    b.setAttribute("aria-pressed", String(state.showMeasure));
   }
 
   /* ==================================================================
@@ -5671,6 +5890,7 @@
     $("tierBtn").addEventListener("click", toggleTier);
     $("runBtn").addEventListener("click", () => runSimulation("run"));
     $("heatBtn").addEventListener("click", toggleHeat);
+    if ($("measureBtn")) { $("measureBtn").addEventListener("click", toggleMeasure); syncMeasureBtn(); }
     $("histClearBtn").addEventListener("click", clearHistory);
     $("adviseBtn").addEventListener("click", runAdvisor);
     $("complBtn").addEventListener("click", runCompliance);

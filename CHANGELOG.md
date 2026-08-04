@@ -6,6 +6,63 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [1.12.0] — 2026-08-04
+
+### Added
+- **Realistic floor: measurements, markings & a finer grid.** A
+  **rendering-only, additive** facility layer on top of the rich objects
+  (v1.11) so a big plant reads like a real facility — the *floor* now, not just
+  the equipment. All geometry is a **pure, deterministic** function of the floor
+  size + the element list in a new **DOM-free `floor.js` (`WT.floor`)** module
+  (no `Date`, no RNG), consumed by `app.js` for the actual canvas strokes.
+  - **Two-tier grid with LOD.** Major **5 m** grid lines always draw; the minor
+    **1 m** lines are **level-of-detail-gated** — they appear only once a cell
+    reads at least **14 px** on screen (`WT.floor.minorGridVisible`), so a
+    400 × 250 m hall zoomed out isn't an unreadable smear and the wasted
+    per-line cost is skipped. At normal zooms on any ordinary floor the 1 m
+    lines show exactly as before, so the base look is unchanged.
+  - **Scale ruler + dimensions.** A metre **ruler** runs along the **top and
+    left** floor edges — ticks + labels from a pure `rulerTicks(floorMetres,
+    stepM)` that always closes on the true floor edge — with the **label step
+    widening** when zoomed out (`rulerLabelStepM`) so labels never collide. When
+    an element is **selected**, its **dimensions** (`w × d m`, from
+    `dimensionLabel`) show in a small pill beside it. The ruler + dimensions
+    ride in **screen space** (crisp at any zoom) but are positioned via the
+    **same `worldToScreen`** the hit-test uses, so they track pan/zoom/Fit.
+  - **Floor markings (faint, theme-aware, under the elements).** A facility
+    **perimeter** outline; **aisle centre guides** down the working aisle
+    between facing rack rows — derived from the **same `WT.domain.facingAisle-
+    Pairs`** model the Compliance Check uses, so a guide can never disagree with
+    the aisle rule; **dock-approach hatching** in front of dock doors
+    (`dockApproach`, clamped in-bounds); and functional **zone tints**
+    (receiving / storage / picking / packing / shipping, coloured from the
+    theme's flow-stage palette) that appear **only when zone-bearing elements
+    exist**. The fine markings are LOD-gated (`markingsVisible`); the perimeter
+    + tints are cheap and draw whenever the layer is on.
+  - **A "Measure" toolbar toggle** (default **on**) shows/hides the ruler,
+    dimensions and markings; the two-tier grid LOD is always on. Off, the view
+    is essentially as before.
+  - **The element data model is UNCHANGED** — positions and sizes stay
+    **integer-metre cells**, so compliance, capacity and the simulation are
+    untouched; the whole feature is view-culled + LOD-gated so 400 × 250 m maps
+    stay smooth, with no per-frame allocation in the hot loops.
+  - **Honest scope.** This is an **illustrative facility rendering of a
+    synthetic model** — the "measurements" are the model's own **metre grid
+    (1 cell = 1 m)**, **not** a site survey and **not** CAD/BIM (the real
+    geometry path remains the IFC export). No real brands.
+  - `floor.js` (new) + `app.js` (two-tier grid, zone tints, markings, ruler,
+    dimension readout, the Measure toggle); `index.html` loads `floor.js` +
+    gains the `measureBtn` control; `sw.js` precaches `floor.js` and bumps the
+    cache **wt-v40 → wt-v41**. **New `verify_floor.js` harness (33rd):**
+    `rulerTicks` positions/labels/edge-close (garbage → `[]`, deterministic,
+    non-mutating), the grid tiers + minor-grid px/cell threshold, the ruler
+    label-step widening, `dimensionLabel` text, `perimeter`/`dockApproach`/
+    `aisleGuides` finite + in-bounds + non-mutating on every edge/axis,
+    `zoneTints` only when zones exist (right stage, skips transport/boundary),
+    the illustrative / not-a-survey / not-CAD-BIM honesty label, and the shipped
+    wiring. The live pixels are verified in the browser; every geometry path is
+    covered here.
+
 ## [1.11.0] — 2026-08-04
 
 ### Added

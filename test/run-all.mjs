@@ -333,6 +333,26 @@
  *      NOT-CAD-BIM honesty labels. The live pixels are verified in the
  *      browser; every draw PATH is covered here.
  *
+ *  33. verify_floor.js     - realistic-floor rendering geometry (v1.12):
+ *      the pure, DOM-free WT.floor helpers app.js paints the facility layer
+ *      from. Asserts rulerTicks returns correct/ordered/labelled metre tick
+ *      positions that always close on the true floor edge (garbage -> [],
+ *      deterministic, non-mutating); the grid tiers + LOD (major 5 m always,
+ *      minor 1 m ONLY at/above the px/cell threshold); the ruler LABEL step
+ *      widening (whole multiple of 5) when zoomed out; dimensionLabel giving
+ *      the correct "w x d m" metre text (whole values un-decimalled, garbage
+ *      -> ""); perimeter as the origin-anchored floor rect with in-bounds
+ *      corners; dockApproach returning an in-bounds apron + hatch lines fully
+ *      inside it on every edge WITHOUT mutating the element; aisleGuides a
+ *      centre line between a facing pair (both axes, in bounds, non-mutating,
+ *      [] on empty); zoneTints yielding tints ONLY when zone-bearing elements
+ *      exist (mapping types to the right functional stage, skipping transport/
+ *      boundary, non-mutating); the illustrative / not-a-survey / not-CAD-BIM
+ *      honesty label; and the shipped wiring (floor.js loaded + precached at
+ *      wt-v41, the measureBtn Measurements toggle present + wired via WT.floor,
+ *      the runner listing it). The live pixels are verified in the browser;
+ *      every geometry PATH is covered here.
+ *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
  * ===================================================================== */
@@ -370,6 +390,7 @@ const HARNESSES = [
   { name: "Live order pool (verify_orderpool.js)", args: ["verify_orderpool.js"] },
   { name: "Per-type 2D+3D shape registry (verify_shapes.js)", args: ["verify_shapes.js"] },
   { name: "Progressive-LOD rich high-detail tier (verify_detail.js)", args: ["verify_detail.js"] },
+  { name: "Realistic floor: measurements/markings/finer grid (verify_floor.js)", args: ["verify_floor.js"] },
   { name: "Production hardening: error boundary + self-test + CSP (verify_hardening.js)", args: ["verify_hardening.js"] },
   { name: "Accessibility + large-layout performance (verify_a11y_perf.js)", args: ["verify_a11y_perf.js"] },
   { name: "Scenario deep-link parser (verify_deeplink.js)", args: ["verify_deeplink.js"] },
