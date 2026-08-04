@@ -6,6 +6,41 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [1.10.0] — 2026-08-04
+
+### Changed
+- **Larger maps + wider zoom range — fit MORE items on the floor.** The
+  editable warehouse now scales up to a **400 × 250 m** hall (was 120 × 80 m),
+  and the interactive zoom clamp widens to **0.04× – 8×** (was 0.2× – 5×) so the
+  **whole** largest floor can be **framed with Fit** and then zoomed in for
+  detail.
+  - **Fit actually frames the max floor now.** Because the viewport keeps the
+    reference aspect, `fitView` computes a scale of **≈0.092×** for the full
+    400 × 250 m floor — which used to be clamped up to the old 0.2× minimum
+    (cutting the floor off). The new 0.04× minimum sits comfortably below that,
+    so the clamp no longer floors the Fit scale and the entire hall is visible.
+    Zooming out past Fit is still allowed for breathing room; **100%** still
+    resets to a centred 1:1, and wheel / `+` / `−` keys work across the wider
+    range.
+  - **Still smooth at size.** Rendering and navigation only — **no change to the
+    simulation, logic, compliance, IFC or isometric projection** (fully
+    deterministic). The existing view-culling (`WT.view.cullToView`) means a big
+    floor with many items only draws the elements whose footprint is on screen,
+    and the per-type shapes LOD collapses to a single icon when zoomed out, so a
+    large hall stays responsive.
+  - A very large but **sparse** floor is honestly just extra empty space — the
+    bigger maximum only gives complex layouts more room; it invents nothing.
+  - `view.js` `FLOOR_MAX_W`/`FLOOR_MAX_H` and `SCALE_MIN`/`SCALE_MAX` raised;
+    `index.html` floor-size input `max` attributes raised to match;
+    `verify_view.js` extended with checks that `normalizeFloor` accepts the large
+    max (and clamps beyond it), that `fitView` frames the max floor **within** the
+    new clamp at any reference viewport, that the wider `clampScale` bounds hold,
+    that a large-floor `cullToView` returns only on-screen elements, and a
+    set-max-floor-then-Fit round-trip whose bounds cover the whole floor. Service
+    worker cache bumped `wt-v38` → `wt-v39`. Offline, no dependencies, no cost.
+  - Illustrative schematic of a synthetic model, **not** CAD/BIM; no real brands
+    or vendor models; the sizes are order-of-magnitude teaching values.
+
 ## [1.9.0] — 2026-08-04
 
 ### Added

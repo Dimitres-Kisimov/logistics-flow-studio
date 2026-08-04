@@ -29,19 +29,31 @@
   /* ------------------------------------------------------------------
    * Zoom bounds (multiplier; 1.0 = 100%). Clamped so the user can never
    * zoom into a blur or out into an invisible speck.
+   *
+   * The MIN is deliberately low so Fit can FRAME the whole largest floor.
+   * The viewport always keeps the reference aspect (the default 40 x 24
+   * floor spans it at scale 1), so the Fit scale for a gridW-wide floor is
+   * purely width-/height-bound and independent of the pixel size:
+   *   fitScale = min( REF_W*(1-pad)/gridW , REF_H*(1-pad)/gridH ).
+   * For the LARGEST floor (400 x 250) with the usual 4% pad that is
+   *   min( 40*0.96/400 , 24*0.96/250 ) = min(0.096, 0.0922) ~= 0.092.
+   * SCALE_MIN sits comfortably BELOW that, so fitView is never floored by
+   * the clamp: the entire max floor is always framable. Zooming further
+   * out than Fit is still allowed for extra breathing room.
    * ------------------------------------------------------------------ */
-  const SCALE_MIN = 0.2; // 20%
-  const SCALE_MAX = 5.0; // 500%
+  const SCALE_MIN = 0.04; // 4% - low enough to frame the largest floor (~0.092 to fit)
+  const SCALE_MAX = 8.0; // 800% - detail zoom-in
 
   /* ------------------------------------------------------------------
    * Configurable floor size, in metres (= cells). The classic floor is
    * 40 x 24 m; the editor now accepts anything from FLOOR_MIN up to a
-   * large hall so complex layouts have room. Bigger-than-viewport floors
-   * are navigated with zoom + pan.
+   * large hall (400 x 250 m) so complex layouts have room. Bigger-than-
+   * viewport floors are navigated with zoom + pan and framed with Fit.
+   * A very large but sparse floor is simply extra empty space - honest.
    * ------------------------------------------------------------------ */
   const FLOOR_MIN = 8; // fits the widest single element (AS/RS is 8 m)
-  const FLOOR_MAX_W = 120;
-  const FLOOR_MAX_H = 80;
+  const FLOOR_MAX_W = 400;
+  const FLOOR_MAX_H = 250;
   const FLOOR_DEFAULT_W = 40;
   const FLOOR_DEFAULT_H = 24;
 

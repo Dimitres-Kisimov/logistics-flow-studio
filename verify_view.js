@@ -22,6 +22,12 @@
  *   - elementAt resolves the RIGHT element after a pan+zoom, returns the
  *     topmost on overlap, and null on empty floor
  *   - clampPan keeps the content in view; centerPan centres it
+ *   - v1.10 larger maps + wider zoom: normalizeFloor accepts the LARGE max
+ *     (400x250) and clamps beyond it; the widened clampScale (0.04x-8x)
+ *     lets fitView FRAME the whole max floor (scale inside the clamp, not
+ *     floored) at any reference viewport; a large-floor cullToView still
+ *     keeps only the on-screen elements; and a set-max-floor-then-Fit
+ *     round-trip yields a view whose bounds cover the whole floor
  *
  * Usage:  node verify_view.js
  * ASCII-only output. Exit 0 = all checks pass.
@@ -47,7 +53,7 @@ console.log("");
 
 /* ---- 1. Zoom clamp ------------------------------------------------ */
 check("clampScale holds the zoom bounds and rejects garbage",
-  V.clampScale(0.05) === V.SCALE_MIN &&
+  V.clampScale(0.01) === V.SCALE_MIN &&
   V.clampScale(999) === V.SCALE_MAX &&
   V.clampScale(1) === 1 &&
   V.clampScale(0) === 1 &&
@@ -106,7 +112,7 @@ check("clampScale holds the zoom bounds and rejects garbage",
 
 /* ---- 6. Fit clamps a huge floor to SCALE_MIN; pad never enlarges  */
 (() => {
-  const tiny = V.fitView(20, 120, 80, 100, 100, 0); // would want < 0.2
+  const tiny = V.fitView(20, 400, 250, 100, 100, 0); // max floor in a tiny box -> wants < SCALE_MIN
   const padded = V.fitView(20, 40, 24, 800, 480, 0.1);
   const unpadded = V.fitView(20, 40, 24, 800, 480, 0);
   check("Fit clamps to SCALE_MIN and padding only shrinks the scale",
@@ -234,6 +240,111 @@ check("snap() floors a fractional world coord to its cell",
   check("transform is monotonic (corner ordering preserved)",
     tl.x < mid.x && mid.x < br.x && tl.y < mid.y && mid.y < br.y,
     "tl=(" + tl.x.toFixed(0) + "," + tl.y.toFixed(0) + ") br=(" + br.x.toFixed(0) + "," + br.y.toFixed(0) + ")");
+})();
+
+/* =====================================================================
+ * v1.10 - Larger maps + wider zoom range. The floor now scales up to a
+ * 400 x 250 m hall and the interactive zoom clamp widens to 0.04x-8x so
+ * that Fit can FRAME the whole largest floor (fitView is no longer floored
+ * by the clamp) while still allowing detailed zoom-in. These checks pin
+ * that the big max is accepted, the max floor is framable within the new
+ * clamp at any reference viewport, and large-floor culling + a set-then-
+ * Fit round-trip still behave.
+ * ===================================================================== */
+
+/* ---- 16. Large max floor is ACCEPTED exactly -------------------- */
+(() => {
+  const max = V.normalizeFloor(V.FLOOR_MAX_W, V.FLOOR_MAX_H);
+  check("v1.10 normalizeFloor accepts the LARGE max (400 x 250) exactly",
+    V.FLOOR_MAX_W === 400 && V.FLOOR_MAX_H === 250 &&
+    max.gridW === 400 && max.gridH === 250,
+    "FLOOR_MAX=" + V.FLOOR_MAX_W + "x" + V.FLOOR_MAX_H + " -> " + max.gridW + "x" + max.gridH);
+})();
+
+/* ---- 17. Beyond the new max clamps down to it; min unchanged ----- */
+(() => {
+  const beyond = V.normalizeFloor(600, 400);
+  const under = V.normalizeFloor(2, 3);
+  check("v1.10 normalizeFloor clamps BEYOND the large max down to it (min still 8)",
+    beyond.gridW === 400 && beyond.gridH === 250 &&
+    under.gridW === V.FLOOR_MIN && under.gridH === V.FLOOR_MIN,
+    "600x400 -> " + beyond.gridW + "x" + beyond.gridH + ", 2x3 -> " + under.gridW + "x" + under.gridH);
+})();
+
+/* ---- 18. Wider zoom clamp: low enough MIN, unchanged-or-higher MAX */
+(() => {
+  // MIN must be low enough to fit the max floor (needs ~0.092); MAX must
+  // not have regressed below the old 5x; a mid scale passes through un-floored.
+  check("v1.10 clampScale is wider: MIN <= 0.05 (was 0.2), MAX >= 5 (was 5), mid un-floored",
+    V.SCALE_MIN <= 0.05 && V.SCALE_MAX >= 5 &&
+    approx(V.clampScale(0.092), 0.092) && V.clampScale(0.092) > V.SCALE_MIN,
+    "min=" + V.SCALE_MIN + " max=" + V.SCALE_MAX);
+})();
+
+/* ---- 19. The MAX floor is FRAMABLE - Fit is not floored by clamp - */
+(() => {
+  // Reference viewport (800x480 at cellPx=20). fitView computes the scale
+  // that shows the whole 400x250 floor; it must be > 0 and STRICTLY inside
+  // the new clamp (i.e. > SCALE_MIN) so clampScale does not floor it. It is
+  // also below the OLD 0.2 floor - which is exactly why the clamp widened.
+  const f = V.fitView(20, V.FLOOR_MAX_W, V.FLOOR_MAX_H, 800, 480, 0.04);
+  check("v1.10 Fit frames the MAX floor: scale > 0, inside clamp (> MIN), below old 0.2 floor",
+    f.scale > 0 &&
+    f.scale >= V.SCALE_MIN && f.scale <= V.SCALE_MAX &&
+    f.scale > V.SCALE_MIN &&
+    f.scale < 0.2 &&
+    approx(f.scale, 0.09216, 1e-6),
+    "fitScale=" + f.scale.toFixed(5) + " clamp=[" + V.SCALE_MIN + "," + V.SCALE_MAX + "]");
+})();
+
+/* ---- 20. Framability is viewport-independent (wider canvas) ------ */
+(() => {
+  // The viewport keeps the reference aspect, so the Fit scale is the same
+  // at a wider reference canvas (1100x660 at cellPx=27.5) - still above the
+  // clamp floor, so the whole max floor frames at any canvas size.
+  const f = V.fitView(27.5, V.FLOOR_MAX_W, V.FLOOR_MAX_H, 1100, 660, 0.04);
+  check("v1.10 Fit scale for the MAX floor is viewport-independent and stays above the clamp MIN",
+    approx(f.scale, 0.09216, 1e-6) && f.scale > V.SCALE_MIN,
+    "fitScale@1100=" + f.scale.toFixed(5));
+})();
+
+/* ---- 21. Large-floor culling keeps only on-screen elements ------ */
+(() => {
+  // Elements spread across the full 400x250 floor. At 100% zoom the visible
+  // world window is only the top-left 40x24 (viewBounds), so cullToView must
+  // return ONLY the element in that corner - a big floor draws just what's on
+  // screen (the v1.6 perf path, unchanged).
+  const big = [
+    { id: "nw", x: 2, y: 2, w: 6, d: 4 },
+    { id: "ne", x: 390, y: 3, w: 6, d: 4 },
+    { id: "sw", x: 3, y: 244, w: 6, d: 4 },
+    { id: "se", x: 392, y: 244, w: 6, d: 4 },
+    { id: "mid", x: 200, y: 125, w: 6, d: 4 },
+  ];
+  const bigView = { cellPx: 20, scale: 1, panX: 0, panY: 0 };
+  const vb = V.viewBounds(bigView, 800, 480); // -> {0,0,40,24}
+  const kept = V.cullToView(big, vb, 0);
+  const keptIds = kept.map((e) => e.id).join(",");
+  check("v1.10 cullToView on a LARGE (400x250) floor keeps ONLY the on-screen elements",
+    keptIds === "nw" && kept.length < big.length,
+    "visible=[" + keptIds + "] of " + big.length + " total; window=" +
+    vb.minX + "," + vb.minY + "->" + vb.maxX + "," + vb.maxY);
+})();
+
+/* ---- 22. Round-trip: set the MAX floor, Fit, bounds cover it ----- */
+(() => {
+  // Set the max floor, compute Fit, build the resulting view, and confirm
+  // its visible world rectangle COVERS the entire floor [0,400]x[0,250] -
+  // i.e. the whole hall is on screen after Fit.
+  const GW = V.FLOOR_MAX_W, GH = V.FLOOR_MAX_H, cpx = 20, VW = 800, VH = 480;
+  const f = V.fitView(cpx, GW, GH, VW, VH, 0.04);
+  const fitted = { cellPx: cpx, scale: f.scale, panX: f.panX, panY: f.panY };
+  const vb = V.viewBounds(fitted, VW, VH);
+  const covers = vb.minX <= 0 && vb.minY <= 0 && vb.maxX >= GW && vb.maxY >= GH;
+  check("v1.10 round-trip: set the MAX floor then Fit -> view bounds COVER the whole floor",
+    covers && f.scale > V.SCALE_MIN,
+    "bounds " + vb.minX.toFixed(1) + "," + vb.minY.toFixed(1) + " -> " +
+    vb.maxX.toFixed(1) + "," + vb.maxY.toFixed(1) + " covers 0,0->" + GW + "," + GH + " = " + covers);
 })();
 
 console.log("");
