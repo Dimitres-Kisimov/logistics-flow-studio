@@ -6,6 +6,61 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [1.11.0] — 2026-08-04
+
+### Added
+- **Realistic high-detail object rendering (progressive LOD).** A **third**
+  level-of-detail tier on top of the existing **icon** (far) and **glyph** (mid)
+  tiers, so the plant reads like a real facility when you zoom in — while big,
+  zoomed-out layouts stay just as fast.
+  - **`WT.shapes.detailLevel(pxPerCell)` → `"icon" | "glyph" | "rich"`**, a pure
+    function of the **on-screen** pixels-per-cell (base `cellPx` × the view
+    zoom). Thresholds: below **10 px/cell** → icon, **10–40** → glyph (today's
+    default), **≥ 40** → the new **rich** tier. `draw2D` and `draw3D` pick their
+    fidelity from it. The rich tier only fires when an element is **large on
+    screen** (zoomed in) *and* clears the existing footprint-legibility guard —
+    so a big hall at normal zoom never pays for it.
+  - **What "rich" adds (2D top-down), layered on top of the base glyph so
+    animated parts keep moving:** racking / AS-RS / shuttle / drive-in /
+    push-back / flow gain **pallet load-units** sitting in a share of the bay
+    positions; **AS/RS** a structured deep rack each side of the crane aisle;
+    **docks** a panelled door with guide rails; **conveyor** a couple of belt
+    load-units (they scroll when the flow is playing, static otherwise);
+    **stations / returns** a tote on the bench; **mezzanine** an interior post
+    grid; **forklift / RGV / AGV** a load body; plus sorter trays, stretch-wrap
+    film bands, cantilever long-goods bars, a charging post and a gate
+    threshold. Type colour kept; theme-aware.
+  - **What "rich" adds (2.5D isometric):** the extruded forms gain **pallet
+    load-units on the shelf levels** for racking; **AS/RS** a tall multi-level
+    rack each side of the crane mast; **mezzanine** a decked platform on an
+    **interior post grid** with pallets on the deck; **conveyor** belt
+    load-units; **vehicles** a small 3D load body. Painter-order and the single
+    light direction are unchanged.
+  - **Deterministic, allocation-lean, LOD-gated.** The load-unit fill is a
+    **fixed rule seeded from the element** (its floor position) — **no `Date`,
+    no RNG** — so it is stable frame-to-frame, identical on re-render, and
+    testable; identical racks at different spots don't look cloned. The rich
+    overlays add **no per-frame allocation** in the hot path, and the existing
+    v1.6 **view-culling** still only paints on-screen footprints, so zooming in
+    on one corner of a large hall stays smooth. The `anim` phase still drives
+    every moving part at the rich tier.
+  - **Honest scope.** This is an **illustrative, higher-fidelity schematic of a
+    synthetic model** — still **not** CAD, BIM or a survey (the real geometry
+    path remains the IFC export), and the load-units shown are an **illustrative
+    fill pattern, not the actual computed inventory count**. No real brands.
+  - `shapes.js` gains `detailLevel` + the `RICH2D`/`RICH3D` overlays; `iso.js`
+    `drawScene` threads the on-screen px/cell into `draw3D`; `app.js` passes the
+    per-element fill seed (2D) and the on-screen px/cell (iso). **New
+    `verify_detail.js` harness (32nd):** `detailLevel` thresholds +
+    determinism, an **every-type** rich 2D+3D mock-context smoke (light + dark,
+    all-finite, no throw, no input mutation), rich **adds** detail and is
+    **LOD-gated** (icon < glyph < rich; below the threshold the output equals
+    the plain glyph), the fill is deterministic + seed-sensitive, the anim phase
+    still moves at the rich tier, and the illustrative / not-an-inventory-count /
+    not-CAD-BIM honesty labels are present. Rendering only — the simulation,
+    logic, compliance, IFC and isometric projection are untouched. Service
+    worker cache bumped `wt-v39` → `wt-v40`. Offline, no dependencies, no cost.
+
 ## [1.10.0] — 2026-08-04
 
 ### Changed

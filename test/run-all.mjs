@@ -315,6 +315,23 @@
  *      isoBtn advertising P, sw wt-v37, the self-test P check, the runner).
  *      The live pixels + the live keypress run in the browser (?selftest=1);
  *      every draw + wiring PATH is covered here.
+ *  32. verify_detail.js     - progressive-LOD "rich" high-detail tier
+ *      (v1.11): a THIRD level-of-detail tier on top of icon (far) + glyph
+ *      (mid) that renders only when an element reads large on screen
+ *      (zoomed in), layering pallet load-units in the bays, extra shelf
+ *      levels, crane carriages, decked platforms and vehicle loads onto the
+ *      base glyph/form. Asserts WT.shapes.detailLevel(px) returns the three
+ *      tiers at the right px/cell thresholds (deterministic + garbage-safe),
+ *      a mock-context smoke draws EVERY type at the rich tier in 2D + 3D
+ *      (light + dark) with no throw + all-finite coords + no input mutation,
+ *      the rich tier ADDS detail (racking rich draws more than the mid glyph
+ *      and the base form) and is LOD-GATED (icon < glyph < rich, and below
+ *      the px threshold the output equals the plain glyph), the load-unit
+ *      fill is DETERMINISTIC (same element+seed -> identical draw calls) and
+ *      seed-sensitive, the anim phase still moves the part at the rich tier,
+ *      and the load-units carry the ILLUSTRATIVE / NOT-an-inventory-count /
+ *      NOT-CAD-BIM honesty labels. The live pixels are verified in the
+ *      browser; every draw PATH is covered here.
  *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
@@ -352,6 +369,7 @@ const HARNESSES = [
   { name: "Scenario A/B compare (verify_compare.js)", args: ["verify_compare.js"] },
   { name: "Live order pool (verify_orderpool.js)", args: ["verify_orderpool.js"] },
   { name: "Per-type 2D+3D shape registry (verify_shapes.js)", args: ["verify_shapes.js"] },
+  { name: "Progressive-LOD rich high-detail tier (verify_detail.js)", args: ["verify_detail.js"] },
   { name: "Production hardening: error boundary + self-test + CSP (verify_hardening.js)", args: ["verify_hardening.js"] },
   { name: "Accessibility + large-layout performance (verify_a11y_perf.js)", args: ["verify_a11y_perf.js"] },
   { name: "Scenario deep-link parser (verify_deeplink.js)", args: ["verify_deeplink.js"] },

@@ -262,6 +262,10 @@
     const colors = o.colors || {};
     const defs = o.elementDefs || {};
     const animFor = typeof o.animFor === "function" ? o.animFor : null;
+    // ON-SCREEN px per cell (base cellPx * the view zoom), supplied by the
+    // caller so the per-type forms can pick their LOD detail tier (rich when
+    // zoomed in). Absent -> the forms render at their base fidelity.
+    const pxc = isFinite(o.pxPerCell) && o.pxPerCell > 0 ? o.pxPerCell : undefined;
 
     // World (cell/metre) -> canvas base-px, through the iso projection.
     const P = (cx, cy, cz) => {
@@ -319,6 +323,7 @@
           cx: e.x, cy: e.y, w: e.w, d: e.d, heightM: h, color: color, theme: theme,
           selected: e.id === o.selectedId, selColor: colors.sel,
           anim: animFor ? animFor(e) : undefined,
+          lod: pxc, // ON-SCREEN px/cell so the form can pick its rich LOD tier
         });
       } else {
         drawBox(ctx, P, e.x, e.y, e.w, e.d, h, color, {

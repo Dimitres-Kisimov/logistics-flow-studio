@@ -404,6 +404,9 @@
         WT.shapes.draw2D(ctx, e.type, {
           x: px, y: py, w: pw, d: ph,
           cellPx: cellPx, color: def.color, theme: themeName, lod: cellPx * view.scale,
+          // Deterministic per-element seed for the rich-tier load-unit fill
+          // (stable frame-to-frame; identical racks at different spots differ).
+          seed: elemAnimSeed(e),
           // Deterministic moving part while the flow plays (draw2D itself
           // skips it on the tiny LOD-icon path, so this stays legible + cheap).
           anim: (fa.on && ANIMATABLE_TYPES[e.type]) ? WT.shapes.equipmentPhase(fa.t, elemAnimSeed(e)) : undefined,
@@ -603,6 +606,9 @@
       selectedId: state.selectedId,
       shortLabel,
       animFor: animFor,
+      // ON-SCREEN px/cell so the iso forms pick their rich LOD tier when
+      // zoomed in (rich only above the px threshold - big maps stay fast).
+      pxPerCell: onScreenCell,
     });
     // Live material-flow overlay, projected into the iso scene. Drawn
     // AFTER the blocks so the animation stays visible (an honest,

@@ -1124,6 +1124,320 @@
   }
 
   /* ==================================================================
+   * RICH DETAIL TIER (v1.11 "realistic high-detail rendering"). A THIRD
+   * LOD tier drawn ONLY when an element reads large on screen (zoomed in):
+   * the base glyph / form still draws first (so animated parts keep
+   * moving), then these overlays add the fine, recognisable detail -
+   * pallet load-units in the bays, extra shelf levels, crane carriages,
+   * decked platforms, vehicle loads. Zoomed OUT the app never reaches this
+   * tier (icon / glyph exactly as before), so big layouts stay fast.
+   *
+   * HONESTY: the load-units are a DETERMINISTIC fill pattern (a fixed rule
+   * seeded from the element - NO Date, NO RNG) - a schematic "this bay holds
+   * pallets" read, ILLUSTRATIVE only: NOT the actual computed inventory
+   * count, and NOT CAD/BIM/survey geometry.
+   * ================================================================== */
+
+  // On-screen px-per-cell tier thresholds. Below GLYPH_MIN -> a single LOD
+  // icon; between the two -> the schematic glyph/form (today's default);
+  // at or above RICH_MIN -> the high-detail overlays kick in.
+  const DETAIL_GLYPH_MIN = 10; // px/cell: below this -> "icon"
+  const DETAIL_RICH_MIN = 40;  // px/cell: at/above this -> "rich"
+  // PURE: the detail tier for a given ON-SCREEN px-per-cell. Deterministic,
+  // garbage-safe (non-finite / non-positive -> the cheapest "icon" tier).
+  function detailLevel(pxPerCell) {
+    const p = Number(pxPerCell);
+    if (!isFinite(p) || p < DETAIL_GLYPH_MIN) return "icon";
+    if (p < DETAIL_RICH_MIN) return "glyph";
+    return "rich";
+  }
+
+  // Deterministic hash of two integers -> [0,1). Pure, allocation-free, no
+  // Date and no RNG (same shape as the app's per-element anim seed), so the
+  // load-unit fill is stable frame-to-frame and testable.
+  function hash01(a, b) {
+    let h = ((a | 0) * 73856093) ^ ((b | 0) * 19349663);
+    h = h & 0x7fffffff;
+    return (h % 100000) / 100000;
+  }
+  const RICH_FILL = 0.62; // illustrative share of positions shown loaded
+  // "Is slot i (of a rack seeded by `seed`) carrying a load-unit?"
+  function loaded(i, seed, frac) { return hash01(i + 1, (seed | 0) + 1) < (frac > 0 ? frac : RICH_FILL); }
+
+  /* ---- rich 2D primitives ------------------------------------------ */
+  // Small pallet load-units in a deterministic share of an inner bay grid.
+  function richPallets2D(ctx, x, y, w, d, cell, gc, color, theme, seed, opt) {
+    opt = opt || {};
+    const m = clampN(Math.min(w, d) * (opt.margin || 0.16), 2, 8);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    if (!(iw > 2 && ih > 2)) return;
+    const cols = clampN(Math.round(iw / cell), 2, 16);
+    const rows = clampN(opt.rows || Math.round(ih / (cell * 0.6)), 1, 6);
+    const cw = iw / cols, ch = ih / rows;
+    const pad = clampN(Math.min(cw, ch) * 0.22, 1, 4);
+    ctx.save();
+    ctx.fillStyle = rgba(theme === "dark" ? lighten(color, 0.2) : shade(color, 0.82), theme === "dark" ? 0.6 : 0.5);
+    ctx.strokeStyle = gc.stroke;
+    ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!loaded(r * cols + c, seed, opt.frac)) continue;
+        const bx = ix + c * cw + pad, by = iy + r * ch + pad;
+        const bw = cw - 2 * pad, bh = ch - 2 * pad;
+        if (bw <= 0 || bh <= 0) continue;
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.strokeRect(bx, by, bw, bh);
+        seg(ctx, bx + bw / 2, by, bx + bw / 2, by + bh); // unit-load centre seam
+      }
+    }
+    ctx.restore();
+  }
+  function r2Rack(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    richPallets2D(ctx, x, y, w, d, cell, gc, color, theme, seed, {});
+  }
+  function r2Asrs(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const m = clampN(Math.min(w, d) * 0.12, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const aisle = clampN(ih * 0.3, 4, 14);
+    const topH = (ih - aisle) / 2, botY = iy + topH + aisle;
+    richPallets2D(ctx, ix, iy, iw, topH, cell, gc, color, theme, seed, { margin: 0.06, rows: 1, frac: 0.75 });
+    richPallets2D(ctx, ix, botY, iw, topH, cell, gc, color, theme, seed + 7, { margin: 0.06, rows: 1, frac: 0.75 });
+  }
+  function r2Shuttle(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const m = clampN(Math.min(w, d) * 0.14, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const lift = clampN(cell * 0.4, 4, 10);
+    richPallets2D(ctx, ix + lift, iy, iw - lift, ih, cell, gc, color, theme, seed,
+      { rows: clampN(Math.round(ih / (cell * 0.5)), 2, 6), frac: 0.66 });
+  }
+  function r2Conveyor(ctx, x, y, w, d, cell, gc, color, theme, seed, anim) {
+    if (typeof anim === "number" && isFinite(anim)) return; // base already scrolls loads
+    const m = clampN(Math.min(w, d) * 0.18, 2, 5);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const horiz = w >= d;
+    const isz = clampN(Math.min(iw, ih) * 0.5, 3, 12);
+    ctx.save();
+    ctx.fillStyle = gc.fill; ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
+    for (let i = 0; i < 2; i++) {
+      const frac = 0.3 + 0.4 * i;
+      const bx = horiz ? ix + frac * (iw - isz) : ix + iw / 2 - isz / 2;
+      const by = horiz ? iy + ih / 2 - isz / 2 : iy + frac * (ih - isz);
+      ctx.fillRect(bx, by, isz, isz); ctx.strokeRect(bx, by, isz, isz);
+    }
+    ctx.restore();
+  }
+  function r2Bench(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const m = clampN(Math.min(w, d) * 0.2, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const s = clampN(Math.min(iw, ih) * 0.26, 4, 14);
+    const bx = ix + iw * 0.14, by = iy + ih / 2 - s / 2;
+    ctx.save();
+    ctx.fillStyle = gc.fill; ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
+    ctx.fillRect(bx, by, s, s); ctx.strokeRect(bx, by, s, s);
+    seg(ctx, bx, by + s * 0.4, bx + s, by + s * 0.4); // tote lip
+    ctx.restore();
+  }
+  function r2Dock(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const m = clampN(Math.min(w, d) * 0.16, 2, 5);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const dw = clampN(iw * 0.5, 6, 40), dx = ix + (iw - dw) / 2;
+    const dh = clampN(ih * 0.28, 3, 10);
+    ctx.save();
+    ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
+    for (let j = 1; j < 3; j++) seg(ctx, dx, iy + dh * j / 3, dx + dw, iy + dh * j / 3); // door panel slats
+    seg(ctx, dx, iy, dx, iy + dh); seg(ctx, dx + dw, iy, dx + dw, iy + dh);              // door guide rails
+    ctx.restore();
+  }
+  function r2Mezz(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const m = clampN(Math.min(w, d) * 0.16, 3, 8);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const cols = clampN(Math.round(iw / cell), 2, 6), rows = clampN(Math.round(ih / cell), 1, 4);
+    const pr = clampN(cell * 0.07, 1.2, 2.6);
+    ctx.save();
+    ctx.fillStyle = gc.stroke;
+    for (let r = 1; r < rows; r++) for (let c = 1; c < cols; c++) disc(ctx, ix + iw * c / cols, iy + ih * r / rows, pr);
+    ctx.restore();
+  }
+  function r2Forklift(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const m = clampN(Math.min(w, d) * 0.16, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const s = clampN(Math.min(iw, ih) * 0.3, 3, 12);
+    const bx = ix + iw - s, by = iy + ih / 2 - s / 2;
+    ctx.save();
+    ctx.fillStyle = gc.fill; ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
+    ctx.fillRect(bx, by, s, s); ctx.strokeRect(bx, by, s, s); // pallet on the forks
+    ctx.restore();
+  }
+  function r2CartLoad(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const cx = x + w / 2, cy = y + d / 2;
+    const s = clampN(Math.min(w, d) * 0.24, 3, 12);
+    ctx.save();
+    ctx.fillStyle = gc.fill; ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
+    ctx.fillRect(cx - s / 2, cy - s / 2, s, s); ctx.strokeRect(cx - s / 2, cy - s / 2, s, s); // load on the vehicle
+    ctx.restore();
+  }
+  function r2Staging(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    richPallets2D(ctx, x, y, w, d, cell, gc, color, theme, seed, { frac: 0.5, rows: 2 });
+  }
+  function r2Sorter(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const m = clampN(Math.min(w, d) * 0.16, 3, 10);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const tk = clampN(Math.min(iw, ih) * 0.22, 4, 16);
+    const s = clampN(tk * 0.5, 2, 8);
+    ctx.save();
+    ctx.fillStyle = gc.fill; ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
+    const spots = [[0.3, 0], [0.7, 0], [0.5, 1]];
+    for (let i = 0; i < spots.length; i++) {
+      const px = ix + tk / 2 + spots[i][0] * (iw - tk) - s / 2;
+      const py = iy + (spots[i][1] > 0.5 ? ih - tk : 0) + tk / 2 - s / 2;
+      ctx.fillRect(px, py, s, s); ctx.strokeRect(px, py, s, s); // trays on the loop
+    }
+    ctx.restore();
+  }
+  function r2StretchWrap(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const cx = x + w / 2, cy = y + d / 2;
+    const R = clampN(Math.min(w, d) * 0.4, 6, 4000);
+    const s = clampN(R * 0.7, 4, 4000);
+    ctx.save();
+    ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.03, 0.7, 1.4);
+    for (let k = 1; k <= 3; k++) { const yy = cy - s / 2 + s * k / 4; seg(ctx, cx - s / 2, yy, cx + s / 2, yy); } // wrap-film bands
+    ctx.restore();
+  }
+  function r2Charging(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const m = clampN(Math.min(w, d) * 0.16, 2, 5);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const px = ix + iw * 0.72, tw = clampN(cell * 0.1, 2, 4);
+    ctx.save();
+    ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
+    for (let k = 1; k <= 3; k++) seg(ctx, px - tw, iy + ih * k / 4, px + tw, iy + ih * k / 4); // charge-level ticks
+    ctx.restore();
+  }
+  function r2Gate(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const m = clampN(Math.min(w, d) * 0.16, 2, 5);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const th = iy + ih, n = clampN(Math.round(iw / (cell * 0.5)), 3, 16);
+    ctx.save();
+    ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.05, 1, 2.2);
+    for (let i = 0; i < n; i++) seg(ctx, ix + iw * i / n, th, ix + iw * (i + 0.5) / n, th - clampN(cell * 0.15, 2, 5)); // threshold hazard
+    ctx.restore();
+  }
+  function r2Cantilever(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+    const m = clampN(Math.min(w, d) * 0.16, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const colX = ix + iw * 0.12, arms = clampN(Math.round(ih / (cell * 0.5)), 2, 4);
+    const bh = clampN(cell * 0.12, 2, 5);
+    ctx.save();
+    ctx.fillStyle = gc.fill; ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
+    for (let j = 0; j <= arms; j++) {
+      if (!loaded(j, seed, 0.6)) continue;
+      const gy = iy + (ih * j) / arms;
+      ctx.fillRect(colX + iw * 0.1, gy - bh / 2, iw * 0.7, bh); // long-goods load bar
+      ctx.strokeRect(colX + iw * 0.1, gy - bh / 2, iw * 0.7, bh);
+    }
+    ctx.restore();
+  }
+  const RICH2D = {
+    "selective-racking": r2Rack, "double-deep": r2Rack, "drive-in": r2Rack,
+    "push-back": r2Rack, "pallet-flow": r2Rack, "carton-flow": r2Rack,
+    "mobile-racking": r2Rack, "vna": r2Rack, "pick-to-light": r2Rack,
+    "cantilever": r2Cantilever, "asrs": r2Asrs, "shuttle": r2Shuttle,
+    "conveyor": r2Conveyor,
+    "push-station": r2Bench, "pull-station": r2Bench, "pack-station": r2Bench, "returns-station": r2Bench,
+    "dock-in": r2Dock, "dock-out": r2Dock, "mezzanine": r2Mezz,
+    "forklift": r2Forklift, "rgv": r2CartLoad, "agv": r2CartLoad,
+    "staging": r2Staging, "sorter": r2Sorter, "stretch-wrap": r2StretchWrap,
+    "charging-station": r2Charging, "gate": r2Gate,
+  };
+  function richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim) {
+    const fn = RICH2D[type];
+    if (fn) fn(ctx, x, y, w, d, cell, gc, color, theme, seed, anim);
+  }
+
+  /* ---- rich 3D primitives ------------------------------------------ */
+  // A solid extruded box occupying z0..z1 (a floating load-unit on a shelf).
+  // Same face order + light direction as box3d.
+  function box3dZ(ctx, P, x, y, w, d, z0, z1, color) {
+    const B = P(x + w, y, z0), C = P(x + w, y + d, z0), Dp = P(x, y + d, z0);
+    const At = P(x, y, z1), Bt = P(x + w, y, z1), Ct = P(x + w, y + d, z1), Dt = P(x, y + d, z1);
+    ctx.lineJoin = "round";
+    quad(ctx, Dp, C, Ct, Dt, shade(color, FACE.left), shade(color, FACE.left * 0.7));
+    quad(ctx, B, C, Ct, Bt, shade(color, FACE.right), shade(color, FACE.right * 0.7));
+    quad(ctx, At, Bt, Ct, Dt, shade(color, FACE.top), shade(color, 0.85));
+  }
+  // Pallet load-units on a deterministic share of (bay, level) shelf slots.
+  function richRack3D(ctx, P, x, y, w, d, h, color, theme, seed, opt) {
+    opt = opt || {};
+    const levels = clampN(opt.levels || 3, 1, 8);
+    const bays = clampN(opt.bays || Math.round(w / 1.5), 1, 10);
+    const frac = opt.frac || RICH_FILL;
+    const litc = lighten(color, theme === "dark" ? 0.22 : 0.14);
+    const bw = (w / bays) * 0.62;
+    const pd = d * 0.6, py = y + (d - pd) / 2;
+    const ph = clampN((h / levels) * 0.5, 0.2, h);
+    for (let lvl = 0; lvl < levels; lvl++) {
+      const z0 = (h * lvl) / levels + (h / levels) * 0.08;
+      for (let b = 0; b < bays; b++) {
+        if (!loaded(lvl * bays + b, seed, frac)) continue;
+        const bx = x + (w * b) / bays + ((w / bays) - bw) / 2;
+        box3dZ(ctx, P, bx, py, bw, pd, z0, z0 + ph, litc);
+      }
+    }
+  }
+  function f3Rack(levels) {
+    return function (ctx, P, x, y, w, d, h, color, theme, seed) {
+      richRack3D(ctx, P, x, y, w, d, h, color, theme, seed, { levels: levels, bays: Math.max(1, Math.round(w / 1.5)), frac: RICH_FILL });
+    };
+  }
+  function f3Asrs(ctx, P, x, y, w, d, h, color, theme, seed) {
+    const side = w * 0.4, aisle = w - 2 * side;
+    richRack3D(ctx, P, x, y, side, d, h, color, theme, seed, { levels: 6, bays: Math.max(2, Math.round(side / 1.2)), frac: 0.7 });
+    richRack3D(ctx, P, x + side + aisle, y, side, d, h, color, theme, seed + 11, { levels: 6, bays: Math.max(2, Math.round(side / 1.2)), frac: 0.7 });
+  }
+  function f3Shuttle(ctx, P, x, y, w, d, h, color, theme, seed) {
+    const lw = clampN(w * 0.14, 0.4, 1.2);
+    richRack3D(ctx, P, x + lw, y, w - lw, d, h, color, theme, seed, { levels: 6, bays: Math.max(1, Math.round((w - lw) / 1.4)), frac: 0.6 });
+  }
+  function f3Mezz(ctx, P, x, y, w, d, h, color, theme, seed) {
+    const deckZ = h * 0.5, deckT = clampN(h * 0.06, 0.15, 0.4);
+    const t = clampN(Math.min(w, d) * 0.06, 0.08, 0.2);
+    const cols = clampN(Math.round(w / 2.5), 2, 5), rows = clampN(Math.round(d / 2.5), 1, 4);
+    for (let r = 1; r < rows; r++) for (let c = 1; c < cols; c++) colBox(ctx, P, x + w * c / cols, y + d * r / rows, t, deckZ, shade(color, 0.85)); // interior support posts
+    const top = deckZ + deckT;
+    const pw = clampN(w * 0.16, 0.4, 1.4), pd = clampN(d * 0.3, 0.4, 2), ph = clampN(h * 0.18, 0.3, 1.2);
+    for (let i = 0; i < 3; i++) {
+      if (!loaded(i, seed, 0.7)) continue;
+      box3dZ(ctx, P, x + w * (0.2 + 0.3 * i), y + d * 0.35, pw, pd, top, top + ph, lighten(color, 0.14)); // pallets on the deck
+    }
+  }
+  function f3Conveyor(ctx, P, x, y, w, d, h, color, theme, seed, anim) {
+    if (typeof anim === "number" && isFinite(anim)) return; // base already scrolls loads
+    const horiz = w >= d;
+    const rw = horiz ? clampN(w * 0.16, 0.3, 1.4) : clampN(w * 0.5, 0.3, 2);
+    const rd = horiz ? clampN(d * 0.5, 0.3, 2) : clampN(d * 0.16, 0.3, 1.4);
+    const top = h + clampN(h * 0.9, 0.4, 1.3), litc = lighten(color, 0.2);
+    for (let i = 0; i < 2; i++) runner3D(ctx, P, x, y, w, d, 0.3 + 0.4 * i, horiz, rw, rd, top, litc);
+  }
+  function f3Forklift(ctx, P, x, y, w, d, h, color, theme, seed) {
+    const s = clampN(Math.min(w, d) * 0.34, 0.3, 1.6);
+    box3dZ(ctx, P, x + w * 0.62, y + (d - s) / 2, s, s, 0.05, 0.05 + clampN(h * 0.5, 0.3, 1.4), lighten(color, 0.16)); // pallet on the forks
+  }
+  function f3Vehicle(ctx, P, x, y, w, d, h, color, theme, seed) {
+    const cw = clampN(Math.min(w, d) * 0.4, 0.4, 2);
+    box3dZ(ctx, P, x + (w - cw) / 2, y + (d - cw) / 2, cw, cw, h, h + clampN(h * 0.5, 0.3, 1.2), lighten(color, 0.16)); // load on the body
+  }
+  const RICH3D = {
+    "selective-racking": f3Rack(3), "double-deep": f3Rack(3), "drive-in": f3Rack(3),
+    "push-back": f3Rack(3), "pallet-flow": f3Rack(3), "carton-flow": f3Rack(4),
+    "mobile-racking": f3Rack(4), "vna": f3Rack(5), "pick-to-light": f3Rack(4),
+    "asrs": f3Asrs, "shuttle": f3Shuttle, "mezzanine": f3Mezz,
+    "conveyor": f3Conveyor, "forklift": f3Forklift, "rgv": f3Vehicle, "agv": f3Vehicle,
+  };
+  function richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim) {
+    const fn = RICH3D[type];
+    if (fn) fn(ctx, P, x, y, w, d, h, color, theme, seed, anim);
+  }
+
+  /* ==================================================================
    * THE REGISTRY. Exactly the domain.ELEMENTS types (no orphans). Each
    * entry has a 2D glyph (d2), a 3D form (d3) and an LOD icon (icon).
    * ================================================================== */
@@ -1188,13 +1502,18 @@
     const theme = g.theme === "dark" ? "dark" : "light";
     const eff = isFinite(g.lod) && g.lod > 0 ? g.lod : cell;
     const scale = eff / cell;
+    const level = detailLevel(eff);            // px/cell tier: icon | glyph | rich
+    const seed = isFinite(g.seed) ? (g.seed | 0) : 0; // deterministic load-unit fill seed
     const gc = glyphColors(color, theme);
     ctx.save();
     ctx.lineJoin = "round";
     ctx.strokeStyle = gc.stroke;
     ctx.fillStyle = gc.fill;
     ctx.lineWidth = clampN(cell * 0.05, 1, 2.2);
-    if (w * scale < LOD_MIN_W || d * scale < LOD_MIN_H) {
+    // A too-small on-screen FOOTPRINT also collapses to the icon (even if the
+    // px/cell tier would allow a glyph) - the existing legibility guard.
+    const tinyFootprint = (w * scale < LOD_MIN_W || d * scale < LOD_MIN_H);
+    if (level === "icon" || tinyFootprint) {
       // LOD path: a single tiny centred icon (the tinted footprint is
       // already drawn by the caller), so it stays cheap + legible. The
       // animation is intentionally SKIPPED here (too small to read) - LOD-safe.
@@ -1205,6 +1524,9 @@
       // their moving part, all others ignore the extra argument.
       const anim = (isFinite(g.anim) && g.anim >= 0) ? g.anim : undefined;
       r.d2(ctx, x, y, w, d, cell, gc, color, theme, anim);
+      // Rich (zoomed-in) tier: layer the high-detail overlay ON TOP of the
+      // base glyph so animated parts keep moving and the fill is additive.
+      if (level === "rich") richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim);
     }
     ctx.restore();
     return true;
@@ -1226,6 +1548,16 @@
     ctx.lineJoin = "round";
     ctx.lineWidth = 1;
     r.d3(ctx, P, x, y, w, d, h, color, theme, anim);
+    // Rich (zoomed-in) tier: layer pallets / decked posts / vehicle loads on
+    // top of the base extruded form. Gated on the caller supplying an
+    // ON-SCREEN px/cell (o.lod) that reaches the rich tier; when absent (the
+    // headless height/anim harnesses pass none) the base form draws alone, so
+    // those forms stay byte-identical to before. Deterministic seed from the
+    // element (o.seed, else its world corner) - stable, testable, no random.
+    if (isFinite(o.lod) && detailLevel(o.lod) === "rich") {
+      const seed = isFinite(o.seed) ? (o.seed | 0) : (((x | 0) * 73856093) ^ ((y | 0) * 19349663));
+      richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim);
+    }
     if (o.selected) selOutline(ctx, P, x, y, w, d, h, o.selColor || "#38bdf8");
     ctx.restore();
     return true;
@@ -1253,6 +1585,12 @@
     // source of truth for the moving-equipment timing.
     equipmentPhase,
     ANIM_PERIOD,
+    // Progressive LOD detail tier (v1.11): the PURE on-screen-px/cell -> tier
+    // map both renderers pick their fidelity from. "rich" is the zoomed-in,
+    // high-detail overlay tier; "glyph"/"icon" are the existing tiers.
+    detailLevel,
+    DETAIL_GLYPH_MIN,
+    DETAIL_RICH_MIN,
     // Exposed for reuse/tests; illustrative schematic drawing only.
     colors: { rgba, shade, lighten },
   };
