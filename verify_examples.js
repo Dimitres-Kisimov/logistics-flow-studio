@@ -147,10 +147,17 @@ check("ITEM_COVERAGE only lists real palette element types",
   COV.every((t) => !!D.ELEMENTS[t]));
 
 /* ---- 7. exportData is a valid wt-1 layout ----------------------- */
+// The 22 studio-floor scenarios export on the app's 40 x 24 m floor; the one
+// large-scale showcase (config.mega) carries its OWN larger floor, still
+// within the app's supported 8..400 x 8..250 m range.
 let dataOK = true, dataTypeOK = true;
 for (const ex of LIB) {
   const dat = E.exportData(ex.id);
-  if (!dat || dat.version !== "wt-1" || dat.gridW !== 40 || dat.gridH !== 24 || !Array.isArray(dat.elements) || !dat.config) dataOK = false;
+  const isMega = !!(ex.config && ex.config.mega);
+  const gridOK = isMega
+    ? (dat.gridW > 40 && dat.gridW <= 400 && dat.gridH > 24 && dat.gridH <= 250)
+    : (dat.gridW === 40 && dat.gridH === 24);
+  if (!dat || dat.version !== "wt-1" || !gridOK || !Array.isArray(dat.elements) || !dat.config) dataOK = false;
   for (const e of dat.elements) {
     if (!e || !D.ELEMENTS[e.type] || typeof e.x !== "number" || typeof e.y !== "number" || typeof e.w !== "number" || typeof e.d !== "number") dataTypeOK = false;
   }
@@ -207,6 +214,51 @@ check("no example name/industry/description carries a real company brand", brand
 let threw = false;
 try { E.build("no-such-example-xyz"); } catch (_) { threw = true; }
 check("build() throws on an unknown example id (never guesses)", threw);
+
+/* ---- 10b. SIGNATURE SHOWCASE (mega) - the large-scale scenario ---
+ * A single deliberately huge synthetic plant that exercises the whole
+ * palette at distribution scale. Asserts it exists, is a first-class
+ * library member, builds to 800+ elements on its own large floor, uses
+ * EVERY one of the 29 palette types, is overlap-free, keeps every facing
+ * storage-row gap out of the (0, MIN_AISLE) fail band, and passes/warns
+ * (never fails) compliance - the "wow depth" scenario, validated. */
+const MEGA_ID = "mega-automated-fulfilment-plant";
+const megaEx = LIB.find((e) => e.id === MEGA_ID);
+check("signature showcase scenario is present in the library", !!megaEx, MEGA_ID);
+check("showcase is flagged config.mega (its own dedicated builder)", !!(megaEx && megaEx.config && megaEx.config.mega));
+if (megaEx) {
+  const mb = E.build(MEGA_ID);
+  const mels = mb.elements;
+  check("showcase builds 800+ elements (a dense large-scale plant)",
+    mels.length >= 800, mels.length + " elements");
+  check("showcase carries its own large floor within the supported range",
+    mb.gridW > 40 && mb.gridW <= 400 && mb.gridH > 24 && mb.gridH <= 250,
+    mb.gridW + " x " + mb.gridH + " m");
+  const megaTypes = {}; for (const e of mels) megaTypes[e.type] = true;
+  const missingPalette = D.paletteOrder.filter((t) => !megaTypes[t]);
+  check("showcase exercises the FULL 29-type equipment palette",
+    missingPalette.length === 0,
+    missingPalette.length ? "missing: " + missingPalette.join(", ") : Object.keys(megaTypes).length + "/" + D.paletteOrder.length + " types");
+  check("showcase is overlap-free at 800+ elements", overlapFree(mels));
+  // Every facing storage-row gap is 0 (back-to-back) or >= MIN_AISLE; NONE
+  // lands in the (0, MIN_AISLE) band, so aisle-width can warn but never fail.
+  const minAisle = mb.config.minAisleMetres;
+  const gaps = D.facingAislePairs(mels);
+  const inFailBand = gaps.filter((p) => p.gapM > 1e-6 && p.gapM < minAisle - 1e-6);
+  let minPos = Infinity; for (const p of gaps) if (p.gapM > 1e-6 && p.gapM < minPos) minPos = p.gapM;
+  check("showcase has NO facing-aisle gap in the (0, min-aisle) fail band",
+    inFailBand.length === 0, "min positive gap " + (isFinite(minPos) ? minPos : "n/a") + " m vs min-aisle " + minAisle + " m; " + gaps.length + " pairs");
+  const megaRep = complianceOf(mb);
+  check("showcase passes/warns compliance (never fails) on its own floor",
+    megaRep.summary.worst !== "fail",
+    "worst " + megaRep.summary.worst + " (pass " + megaRep.summary.pass + " / warn " + megaRep.summary.warn + " / fail " + megaRep.summary.fail + ")");
+  check("showcase elements are all in-bounds on its floor",
+    mels.every((e) => e.x >= 0 && e.y >= 0 && e.x + e.w <= mb.gridW && e.y + e.d <= mb.gridH));
+  check("determinism: the showcase rebuilds byte-identically",
+    JSON.stringify(E.build(MEGA_ID)) === JSON.stringify(E.build(MEGA_ID)));
+  console.log("  showcase: " + mels.length + " elements on " + mb.gridW + "x" + mb.gridH +
+    " m, " + Object.keys(megaTypes).length + " types, " + mb.meta.positions + " positions, compliance " + megaRep.summary.worst);
+}
 
 /* ---- 11. Top quick-pick dropdown (exampleQuickPick) wiring ------ *
  * The header dropdown must exist, ship ONLY a placeholder option (the 22

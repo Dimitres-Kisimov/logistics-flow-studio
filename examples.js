@@ -271,6 +271,22 @@
       config: { profile: "automotive-supply", seed: 454, minAisle: 2.9, racking: ["push-back", "drive-in", "selective-racking"], transport: "rgv", adds: [{ type: "pull-station", zone: "picking", count: 1 }] },
       dataProfile: { skuCount: 7400, dailyOrderLines: 9600, throughputPerHour: 1050, storagePositions: 14800, dockCount: 8, automation: "RGV to dispatch; push-back dense LIFO + drive-in bulk", staffingFte: 49, peakFactor: 2.9 },
     },
+    {
+      // SIGNATURE SHOWCASE (v1.14): a single, deliberately huge synthetic plant
+      // that exercises the WHOLE equipment palette at real distribution scale.
+      // Unlike the 22 above (built on the 40 x 24 studio floor by reusing the
+      // generator), this one has its OWN large floor and a DEDICATED
+      // deterministic tiling builder (buildMega / generateMegaLayout below).
+      // 800+ elements, every one of the 29 element types, overlap-free and
+      // compliance-safe (pass/warn, never fail) BY CONSTRUCTION.
+      id: "mega-automated-fulfilment-plant",
+      name: "Mega automated fulfilment plant (signature showcase)",
+      industry: "Large-scale fulfilment / distribution",
+      description:
+        "A deliberately large, dense automated fulfilment-and-distribution plant that shows the whole toolkit at once: AS/RS crane aisles, VNA narrow-aisle and shuttle high-bay, deep-lane drive-in / push-back / pallet-flow reserve, mobile and cantilever racking, mezzanine and pick-to-light / carton-flow pick faces, block-stack bulk, a central conveyor-and-sorter spine with RGV and AGV lanes, an inbound dock wall with staging and charging, and an outbound pack / returns / stretch-wrap line to a shipping dock wall. It is a SYNTHETIC, illustrative teaching layout - no real company or site - laid out deterministically (fixed seed, no random numbers) so it rebuilds byte-for-byte, and every working aisle and escape route is checked against the SAME standards guidance as every other scenario. Use it to stress the 2D / 2.5D rendering, the material-flow animation and Story Mode at 800+ elements.",
+      config: { mega: true, seed: 20260805 },
+      dataProfile: { skuCount: 240000, dailyOrderLines: 96000, throughputPerHour: 5200, storagePositions: 86000, dockCount: 26, automation: "AS/RS + shuttle + VNA high-bay, conveyor sortation loop, RGV/AGV transport, goods-to-person pick walls", staffingFte: 320, peakFactor: 2.6 },
+    },
   ];
 
   const BY_ID = {};
@@ -350,6 +366,253 @@
     return lay;
   }
 
+  /* ==================================================================
+   * SIGNATURE SHOWCASE GENERATOR (v1.14).
+   * generateMegaLayout() -> { elements, gridW, gridH, minAisleMetres }
+   *
+   * A dedicated, DETERMINISTIC tiling builder for the one large-scale
+   * showcase scenario. It does NOT reuse generate.js (that targets the
+   * small studio floor + the 4 pinned profiles); instead it lays a big
+   * plant on its OWN floor as a clean grid of rack BLOCKS separated by
+   * empty "streets", so three properties hold BY CONSTRUCTION and are
+   * asserted in verify_examples.js:
+   *
+   *   1. OVERLAP-FREE  - every element sits on disjoint integer cells;
+   *      the street grid is always empty.
+   *   2. AISLE-SAFE    - the only facing storage-row gaps are 0 (racks
+   *      back-to-back, not an aisle) or >= MIN_AISLE (a working aisle or
+   *      a street). No gap ever lands in (0, MIN_AISLE), so the DIN 15185
+   *      aisle-width check can WARN (tight) but NEVER FAIL.
+   *   3. ESCAPE-SAFE   - every storage row has an empty working aisle on
+   *      a side that opens onto the always-empty street grid, which runs
+   *      to the dock walls; so no rack is boxed in (ASR A2.3 reachability
+   *      never fails; long internal travel on a big plant honestly warns).
+   *
+   * NO Date, NO RNG. Deterministic column-index cycling (ci % pool.length)
+   * drives the (purely cosmetic) type variation, so build()/exportData() are
+   * byte-identical on every run. Every one of the 29 palette types appears.
+   * ================================================================== */
+  function generateMegaLayout() {
+    // 1 cell = 1 m. Floor stays within the app's 400 x 250 m maximum.
+    const W = 372, H = 248;
+    const MIN_AISLE = 3;   // truck-class working aisle (m) for this plant
+    const AISLE = 3;       // working aisle between facing rack pairs (cells)
+    const STREET = 4;      // main street width (empty, >= MIN_AISLE)
+    const PERIM = 4;       // empty perimeter margin
+
+    const els = [];
+    let idc = 0;
+    function add(type, x, y, w, d, zone) {
+      els.push({ id: "mega-" + (++idc), type: type, x: x, y: y, w: w, d: d, zone: zone });
+    }
+
+    // Vertical block columns (x-ranges), separated by STREET-wide empty streets.
+    const cols = [];
+    {
+      const BW = 24;
+      let x = PERIM;
+      while (x + 20 <= W - PERIM) {
+        const bw = Math.min(BW, (W - PERIM) - x);
+        if (bw < 20) break;
+        cols.push([x, x + bw]);
+        x += bw + STREET;
+      }
+    }
+
+    // Top / bottom dock walls sit on the very edges; the horizontal street
+    // just inside each is the clear dock apron (keeps the traffic route open).
+    const topDockY = 0;
+    const regTop = 1 + STREET;              // first band starts below the apron
+    const botDockY = H - 1;
+    const regBot = botDockY - STREET;       // last band ends above the apron
+
+    // Band plan (top -> bottom). "store" bands tile rack pairs; "flow" is the
+    // conveyor / sorter / transport spine; "pack" is the outbound process line.
+    const bandPlan = [
+      { kind: "store", h: 40, theme: "auto" },
+      { kind: "store", h: 38, theme: "reserve" },
+      { kind: "flow",  h: 16 },
+      { kind: "store", h: 40, theme: "dense" },
+      { kind: "store", h: 34, theme: "pick" },
+      { kind: "store", h: 28, theme: "reserve2" },
+      { kind: "pack",  h: 14 },
+    ];
+    // Pools are CYCLED by column index (ci % len) so - with >= len columns -
+    // every listed storage type is guaranteed to appear; the union of the
+    // pools deliberately covers ALL 14 storage element types.
+    const THEMES = {
+      auto:     ["asrs", "vna", "shuttle", "mobile-racking", "selective-racking"],
+      reserve:  ["double-deep", "drive-in", "cantilever", "pallet-flow"],
+      dense:    ["push-back", "block-stack", "drive-in"],
+      pick:     ["pick-to-light", "carton-flow", "mezzanine"],
+      reserve2: ["selective-racking", "double-deep", "vna"],
+    };
+
+    let by = regTop;
+    const bands = [];
+    for (const bp of bandPlan) {
+      if (by + bp.h > regBot) break;
+      bands.push({ kind: bp.kind, theme: bp.theme, y0: by, y1: by + bp.h });
+      by += bp.h + STREET;
+    }
+
+    // Tile one storage BLOCK: back-to-back pairs (gap 0) separated by an
+    // AISLE-wide working aisle; every row spans the full block width, so the
+    // only vertical gaps are 0 or AISLE and the only horizontal gaps are the
+    // STREET between blocks - never in (0, MIN_AISLE).
+    function tileStorageBlock(bx0, bx1, y0, y1, type) {
+      const def = D.ELEMENTS[type] || {};
+      const d = Math.max(1, Math.min(2, def.d || 1)); // clamp depth for tiling
+      const bw = bx1 - bx0;
+      const unit = 2 * d + AISLE;
+      const P = Math.floor((y1 - y0 + AISLE) / unit);
+      for (let p = 0; p < P; p++) {
+        const ry = y0 + p * unit;
+        add(type, bx0, ry, bw, d, "storage");        // front row
+        add(type, bx0, ry + d, bw, d, "storage");    // back-to-back row
+      }
+    }
+
+    for (let bi = 0; bi < bands.length; bi++) {
+      const band = bands[bi];
+      if (band.kind !== "store") continue;
+      const pool = THEMES[band.theme] || THEMES.reserve;
+      for (let ci = 0; ci < cols.length; ci++) {
+        tileStorageBlock(cols[ci][0], cols[ci][1], band.y0, band.y1, pool[ci % pool.length]);
+      }
+    }
+
+    // Inbound dock wall: one dock-in per block column, on the top edge.
+    for (let ci = 0; ci < cols.length; ci++) {
+      const c = cols[ci];
+      add("dock-in", c[0] + Math.floor((c[1] - c[0]) / 2) - 1, topDockY, 2, 1, "receiving");
+    }
+
+    // Central flow spine: a conveyor line, a sorter loop / RGV / AGV / stations
+    // / handling equipment CYCLED per column (guaranteed coverage), and a
+    // conveyor return line. Sub-elements TOUCH so no 1-wide escape pinch forms.
+    const flow = bands.find(function (b) { return b.kind === "flow"; });
+    if (flow) {
+      const midY = flow.y0 + Math.floor((flow.y1 - flow.y0) / 2);
+      for (let ci = 0; ci < cols.length; ci++) {
+        const c = cols[ci], ax0 = c[0], bw = c[1] - c[0];
+        add("conveyor", ax0, flow.y0 + 1, bw, 1, "picking");
+        const kind = ci % 5;
+        if (kind === 0) add("sorter", ax0, flow.y0 + 4, Math.min(6, bw), 4, "picking");
+        else if (kind === 1) add("rgv", ax0, midY, bw, 1, "storage");
+        else if (kind === 2) add("agv", ax0, midY, bw, 1, "storage");
+        else if (kind === 3) {
+          add("push-station", ax0, flow.y0 + 4, 2, 2, "picking");
+          add("pull-station", ax0 + 2, flow.y0 + 4, 2, 2, "picking");
+        } else {
+          add("forklift", ax0, flow.y0 + 4, 2, 2, "receiving");
+          add("charging-station", ax0 + 2, flow.y0 + 4, 2, 1, "receiving");
+        }
+        add("conveyor", ax0, flow.y1 - 2, bw, 1, "picking");
+      }
+    }
+
+    // Outbound process line: pack / returns / stretch-wrap / gate TOUCH in a
+    // row (no 1-wide pinch), with a staging buffer below.
+    const pack = bands.find(function (b) { return b.kind === "pack"; });
+    if (pack) {
+      for (let ci = 0; ci < cols.length; ci++) {
+        const c = cols[ci], ax0 = c[0], bw = c[1] - c[0];
+        add("pack-station", ax0, pack.y0 + 1, 3, 2, "packing");
+        add("returns-station", ax0 + 3, pack.y0 + 1, 3, 2, "packing");
+        add("stretch-wrap", ax0 + 6, pack.y0 + 1, 2, 2, "packing");
+        add("staging", ax0, pack.y0 + 5, Math.min(6, bw), 2, "packing");
+        if (ci % 3 === 0) add("gate", ax0 + 8, pack.y0 + 1, 2, 1, "shipping");
+      }
+    }
+
+    // Outbound dock wall: one dock-out per block column, on the bottom edge.
+    for (let ci = 0; ci < cols.length; ci++) {
+      const c = cols[ci];
+      add("dock-out", c[0] + Math.floor((c[1] - c[0]) / 2) - 1, botDockY, 2, 1, "shipping");
+    }
+
+    return { elements: els, gridW: W, gridH: H, minAisleMetres: MIN_AISLE };
+  }
+
+  /* ------------------------------------------------------------------
+   * buildMega(ex) -> the SAME { elements, config, meta, gridW, gridH }
+   * shape as build(), but from generateMegaLayout() on its own large
+   * floor. Mirrors build()'s derived-KPI / meta so the app, exportData,
+   * exportCsv and the report all treat it like any other example.
+   * ------------------------------------------------------------------ */
+  function buildMega(ex) {
+    const cfg = ex.config;
+    const gen = generateMegaLayout();
+    const W = gen.gridW, H = gen.gridH, minAisle = gen.minAisleMetres;
+    const els = gen.elements;
+
+    const positions = els.reduce((s, e) => s + D.elementCapacity(e), 0);
+    const floorArea = els.reduce((s, e) => s + e.w * e.d, 0);
+    const floorUsePct = Math.round((floorArea / (W * H)) * 1000) / 10;
+    const dockIn = els.filter((e) => e.type === "dock-in").length;
+    const dockOut = els.filter((e) => e.type === "dock-out").length;
+    const rackingUsed = [];
+    for (const e of els) if (isStorage(e.type) && rackingUsed.indexOf(e.type) === -1) rackingUsed.push(e.type);
+
+    const report = C.check(
+      { version: SERIALIZE_VERSION, gridW: W, gridH: H, cell: CELL_M, elements: els },
+      { minAisleMetres: minAisle }
+    );
+    const aisleFinding = report.findings.find((f) => f.ruleId === "aisle-width");
+
+    // orders / skuCount here are the pick-travel SIM's sample-size knobs
+    // (kept modest so the live WMS/flow stays responsive at 800+ elements -
+    // WT.sim.run is O(orders x skuCount)); the plant's HEADLINE figures live
+    // in the synthetic, clearly-labelled dataProfile, not here.
+    const config = {
+      seed: cfg.seed >>> 0,
+      strategy: "abc",
+      orders: 200,
+      skuCount: 2000,
+      minAisleMetres: minAisle,
+      flowMode: "pull",
+      demandSkew: 1.0,
+      profileKey: "mega-showcase",
+      profileLabel: ex.name,
+      automation: ex.dataProfile.automation,
+    };
+
+    const meta = {
+      version: SERIALIZE_VERSION,
+      exampleId: ex.id,
+      name: ex.name,
+      industry: ex.industry,
+      description: ex.description,
+      dataProfile: Object.assign({}, ex.dataProfile),
+      profileKey: "mega-showcase",
+      seed: cfg.seed >>> 0,
+      gridW: W,
+      gridH: H,
+      minAisleMetres: minAisle,
+      rackingUsed: rackingUsed,
+      transport: "rgv+agv",
+      zones: G.buildZones(els, W, H, []),
+      reserved: [],
+      counts: G.countByZone(els),
+      positions: positions,
+      floorUsePct: floorUsePct,
+      dockIn: dockIn,
+      dockOut: dockOut,
+      compliance: {
+        worst: report.summary.worst,
+        pass: report.summary.pass,
+        warn: report.summary.warn,
+        fail: report.summary.fail,
+        aisle: aisleFinding ? aisleFinding.status : "n/a",
+      },
+      syntheticLabel: SYNTHETIC_LABEL,
+      complianceLabel: COMPLIANCE_LABEL,
+    };
+
+    return { elements: els, config: config, meta: meta, gridW: W, gridH: H };
+  }
+
   /* ------------------------------------------------------------------
    * build(id) -> { elements, config, meta, gridW, gridH }
    * DETERMINISTIC. Overlap-free and compliance pass/warn by construction
@@ -361,6 +624,9 @@
     const ex = BY_ID[id];
     if (!ex) throw new Error("Unknown example: " + id);
     const cfg = ex.config;
+
+    // Signature showcase: its own large floor + dedicated deterministic tiler.
+    if (cfg && cfg.mega) return buildMega(ex);
 
     // 1. Proven skeleton from the generator (overlap-free, never-failing).
     let layout = G.generateLayout(cfg.profile, {

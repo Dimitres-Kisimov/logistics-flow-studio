@@ -194,6 +194,31 @@
       return { ok: true, detail: "render() returned" };
     });
 
+    // ---- v1.14 SIGNATURE SHOWCASE: the 800+ element mega plant loads, frames
+    // and RENDERS in the LIVE app (the perf-critical path - build + adopt +
+    // Fit + cull + render at scale) and stays compliance-safe (never a FAIL).
+    // Afterwards the first example is reloaded so later checks are unaffected.
+    check("mega-showcase-loads-renders-800-plus", function () {
+      if (!haveApi) return { ok: false, detail: "no test API" };
+      var lib = (WT.examples && WT.examples.library) || [];
+      var mega = lib.filter(function (e) { return e.config && e.config.mega; })[0];
+      if (!mega) return { ok: false, detail: "no config.mega scenario in library" };
+      API.loadExample(mega.id);           // build + adopt + Fit the big floor
+      var n = API.state.elements.length;
+      API.render();                        // same render() the app draws through
+      var worst = "n/a";
+      try {
+        var lay = API.currentLayout();
+        var rep = WT.compliance.check(lay, { minAisleMetres: lay.config && lay.config.minAisleMetres });
+        worst = rep.summary.worst;
+      } catch (e) { worst = "threw:" + (e && e.message); }
+      var restored = lib[0] ? (API.loadExample(lib[0].id), API.state.elements.length > 0) : true;
+      return {
+        ok: n >= 800 && worst !== "fail" && worst.indexOf("threw") !== 0 && restored,
+        detail: mega.id + ": " + n + " elements, compliance " + worst + ", restored=" + restored,
+      };
+    });
+
     // ---- WMS ops populates its panel -----------------------------------
     check("wms-ops-populates-panel", function () {
       if (!haveApi) return { ok: false, detail: "no test API" };
