@@ -356,10 +356,10 @@ console.log("");
 /* ---- 14. shipped wiring: button hint, sw bump, selftest, runner --- */
 (() => {
   const btnHint = /id="isoBtn"[^>]*aria-label="[^"]*\bP\b[^"]*"/.test(INDEX_SRC) && /Press P to switch/.test(INDEX_SRC);
-  const swBump = /CACHE_VERSION\s*=\s*"wt-v44"/.test(SW_SRC);
+  const swBump = /CACHE_VERSION\s*=\s*"wt-v45"/.test(SW_SRC);
   const selftestP = /key-p-toggles-view-mode/.test(SELFTEST_SRC) && /dispatchEvent/.test(SELFTEST_SRC) && /KeyboardEvent/.test(SELFTEST_SRC);
   const inRunner = /verify_animation\.js/.test(RUNALL_SRC);
-  check("shipped wiring: isoBtn advertises P, sw.js is wt-v44, selftest has the P-toggle check, run-all lists verify_animation",
+  check("shipped wiring: isoBtn advertises P, sw.js is wt-v45, selftest has the P-toggle check, run-all lists verify_animation",
     btnHint && swBump && selftestP && inRunner,
     "btnHint=" + btnHint + " sw=" + swBump + " selftest=" + selftestP + " runner=" + inRunner);
 })();
