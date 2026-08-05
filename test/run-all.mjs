@@ -395,6 +395,7 @@ const HARNESSES = [
   { name: "Accessibility + large-layout performance (verify_a11y_perf.js)", args: ["verify_a11y_perf.js"] },
   { name: "Scenario deep-link parser (verify_deeplink.js)", args: ["verify_deeplink.js"] },
   { name: "Living-plant animation: P toggle + flow-in-3D + animated equipment (verify_animation.js)", args: ["verify_animation.js"] },
+  { name: "Story Mode: cinematic guided tour plan + camera math (verify_story.js)", args: ["verify_story.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

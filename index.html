@@ -62,6 +62,12 @@
       </select>
     </div>
     <div class="topbar-actions">
+      <!-- Story Mode: the CINEMATIC guided tour (story.js). One click moves
+           the camera to frame each zone in flow order (receiving → storage →
+           picking → packing → shipping) with a plain-language caption, then
+           starts the live material flow. Pause/Skip on the HUD; Esc exits.
+           Interruptible + keyboard-accessible; see app.js storyMode. -->
+      <button id="storyBtn" class="btn primary" type="button" aria-label="Play Story Mode cinematic tour" aria-pressed="false" title="Play a cinematic, auto-narrated tour: the camera walks each warehouse zone in flow order, then the live material flow runs (Pause/Skip on the HUD, Esc exits). Synthetic scenario.">▶ Story</button>
       <!-- P8: one-click guided demo — runs the whole stack end-to-end by
            calling the SAME functions the manual controls call (load a
            synthetic scenario → run WMS ops → play the flow → surface the
@@ -735,6 +741,24 @@
     <button id="demoStopBtn" class="btn ghost demo-hud-stop" type="button" title="Stop the guided demo and return to normal editing">Stop</button>
   </div>
 
+  <!-- Story Mode: the cinematic tour's caption / callout HUD (story.js). Its
+       text is set from the WT.story plan per step; Pause/Resume freezes the
+       tour, Skip jumps to the next zone, Exit (or Esc) ends it and hands
+       control straight back to normal editing. Larger + centred so it reads
+       as a narrated callout rather than a status chip. -->
+  <div id="storyHud" class="story-hud" role="status" aria-live="polite" hidden>
+    <span id="storyHudStep" class="story-hud-step">1/7</span>
+    <div class="story-hud-text">
+      <strong id="storyHudTitle">Story Mode</strong>
+      <span id="storyHudBlurb"></span>
+    </div>
+    <div class="story-hud-controls">
+      <button id="storyPauseBtn" class="btn ghost" type="button" aria-pressed="false" title="Pause or resume the tour">Pause</button>
+      <button id="storySkipBtn" class="btn ghost" type="button" title="Skip to the next zone">Skip ▸</button>
+      <button id="storyStopBtn" class="btn ghost" type="button" title="Exit Story Mode and return to normal editing (or press Esc)">Exit</button>
+    </div>
+  </div>
+
   <!-- P8: About / why this — concise, honest positioning. Body is rendered
        from WT.demo.ABOUT (single source of truth) at boot. -->
   <div id="about" class="overlay" hidden>
@@ -802,6 +826,7 @@
   <script src="storage.js"></script>
   <script src="report.js"></script>
   <script src="demo.js"></script>
+  <script src="story.js"></script>
   <script src="cards.js"></script>
   <script src="scenarios.js"></script>
   <script src="compare.js"></script>

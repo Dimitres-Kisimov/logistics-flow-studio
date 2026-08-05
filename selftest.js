@@ -108,6 +108,7 @@
       ["shapes", function (m) { return m && typeof m.has === "function" && typeof m.draw2D === "function" && typeof m.draw3D === "function"; }],
       ["cards", function (m) { return m && typeof m.create === "function" && typeof m.slug === "function"; }],
       ["demo", function (m) { return m && typeof m.run === "function" && Array.isArray(m.ACTIONS) && m.ABOUT; }],
+      ["story", function (m) { return m && Array.isArray(m.STEPS) && m.STEPS.length > 0 && typeof m.run === "function" && typeof m.frameZone === "function" && typeof m.lerpCamera === "function"; }],
       ["tiers", function (m) { return m && typeof m.caps === "function" && typeof m.current === "function"; }],
     ];
     MODULES.forEach(function (pair) {
@@ -169,7 +170,7 @@
       var ids = ["genBtn", "exampleLoadBtn", "wmsBtn", "flowPlayBtn", "flowPauseBtn",
         "flowResetBtn", "flowStepBtn", "reportOpenBtn", "reportJsonBtn", "compareRunBtn",
         "scenarioSaveBtn", "storageAssignBtn", "autoBtn", "complBtn", "kbAddRuleBtn",
-        "guidedDemoBtn", "aboutBtn", "isoBtn", "zoomInBtn", "zoomOutBtn", "zoomFitBtn"];
+        "guidedDemoBtn", "storyBtn", "aboutBtn", "isoBtn", "zoomInBtn", "zoomOutBtn", "zoomFitBtn"];
       var missing = ids.filter(function (id) { return !$(id); });
       return { ok: missing.length === 0, detail: missing.length ? "missing: " + missing.join(",") : ids.length + " ok" };
     });
@@ -375,9 +376,66 @@
       return { ok: ok, detail: "kept=" + kept.length + " determ=" + determ + " noMutate=" + !mutated };
     });
 
+    // ---- v1.13 STORY MODE: the cinematic guided tour -------------------
+    // The "Story" control frames each zone with a moving WT.view camera and
+    // a caption, then plays the live flow. Assert the control has a name, the
+    // plan is well-formed, framing a zone MOVES the camera (the SAME
+    // storyTargetFor math the live tour tweens to), and Esc exits the tour.
+    check("story-control-has-accessible-name", function () {
+      var b = $("storyBtn");
+      var name = b ? (b.getAttribute("aria-label") || b.textContent || b.getAttribute("title") || "").trim() : "";
+      return { ok: !!b && name.length > 0, detail: b ? 'name="' + name + '"' : "no #storyBtn" };
+    });
+
+    check("story-plan-well-formed", function () {
+      var st = WT.story;
+      if (!st || typeof st.script !== "function") return { ok: false, detail: "WT.story MISSING" };
+      var plan = st.script();
+      var known = {};
+      (st.ACTIONS || []).forEach(function (a) { known[a] = true; });
+      var stageOk = {}; (st.STAGES || []).concat(["all"]).forEach(function (s) { stageOk[s] = true; });
+      var ok = Array.isArray(plan) && plan.length > 0 && plan.every(function (s) {
+        return s.id && s.title && s.caption && known[s.action] && stageOk[s.stage];
+      });
+      return { ok: ok, detail: plan.length + " steps: " + plan.map(function (s) { return s.stage; }).join(">") };
+    });
+
+    check("story-frame-zone-moves-camera", function () {
+      if (!haveApi || !API.story || typeof API.story.frame !== "function") return { ok: false, detail: "no story frame API" };
+      API.fitToFloor();
+      var fit = { s: API.view.scale, x: API.view.panX, y: API.view.panY };
+      var recv = API.story.frame("receiving");
+      var ship = API.story.frame("shipping");
+      var movedFromFit = recv.scale !== fit.s || recv.panX !== fit.x || recv.panY !== fit.y;
+      var zonesDiffer = recv.panX !== ship.panX || recv.panY !== ship.panY;
+      var finite = isFinite(recv.scale) && isFinite(recv.panX) && isFinite(recv.panY);
+      return {
+        ok: movedFromFit && zonesDiffer && finite,
+        detail: "movedFromFit=" + movedFromFit + " zonesDiffer=" + zonesDiffer + " scale=" + recv.scale.toFixed(2),
+      };
+    });
+
+    check("story-start-then-esc-exits", function () {
+      if (!haveApi || !API.story || typeof API.story.start !== "function") return { ok: false, detail: "no story start API" };
+      API.story.start();
+      var running = API.story.isRunning();
+      // Dispatch a REAL Escape keydown so the live window handler runs.
+      var ev;
+      try { ev = new KeyboardEvent("keydown", { key: "Escape", bubbles: true }); }
+      catch (e) {
+        ev = document.createEvent("Event"); ev.initEvent("keydown", true, true);
+        try { ev.key = "Escape"; } catch (_) { /* read-only in some engines */ }
+      }
+      window.dispatchEvent(ev);
+      var exited = API.story.isRunning() === false;
+      if (API.story.isRunning()) { try { API.story.stop(); } catch (_) { /* ensure clean */ } }
+      return { ok: running && exited, detail: "running=" + running + " exitedOnEsc=" + exited };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {
+        API.story.stop(); // ensure no lingering tour timers/rAF
         API.flowPause();
         API.setViewMode("top");
         API.fitToFloor();

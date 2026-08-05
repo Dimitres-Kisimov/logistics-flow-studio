@@ -1151,6 +1151,53 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 .demo-hud-stop { flex: 0 0 auto; }
 
+/* Story Mode caption HUD: the cinematic tour's narrated callout. Pinned
+   bottom-centre like the demo HUD but wider + a touch bolder so it reads as
+   a caption over the moving camera, with its own Pause/Skip/Exit controls. */
+.story-hud {
+  position: fixed;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 69;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  max-width: min(680px, calc(100vw - 28px));
+  padding: 12px 15px;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--primary) 50%, var(--border));
+  border-radius: 13px;
+  box-shadow: 0 14px 36px rgba(2, 6, 23, 0.44);
+}
+.story-hud-step {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--primary-ink, #ffffff);
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border-radius: 999px;
+  padding: 4px 10px;
+  letter-spacing: 0.02em;
+}
+.story-hud-text { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.story-hud-text strong { font-size: 0.9rem; }
+.story-hud-text span {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.story-hud-controls { flex: 0 0 auto; display: flex; gap: 6px; }
+.story-hud-controls .btn { padding: 5px 9px; font-size: 0.76rem; }
+@media (max-width: 560px) {
+  .story-hud { flex-wrap: wrap; gap: 9px; }
+  .story-hud-text { flex-basis: 100%; order: 3; }
+}
+
 /* The offered WMS Report control gently pulses at the end of the tour. */
 .demo-pulse {
   animation: demoPulse 1.25s ease-in-out infinite;

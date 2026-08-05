@@ -2372,6 +2372,9 @@
 
   window.addEventListener("keydown", (e) => {
     if (e.target && /input|select|textarea/i.test(e.target.tagName)) return;
+    // Story Mode owns Esc while it runs: one press exits the cinematic tour
+    // and hands control straight back to normal editing (keyboard-accessible).
+    if (e.key === "Escape" && storyRunning) { e.preventDefault(); stopStory(); return; }
     // Space = temporary hand/pan mode (release to resume editing). Leave
     // Space alone when a button/link is focused so it can still activate.
     if (e.key === " " || e.code === "Space") {
@@ -4961,6 +4964,217 @@
     if (demoResolvePause) { const r = demoResolvePause; demoResolvePause = null; r(); }
   }
 
+  // ================================================================
+  // STORY MODE: the cinematic guided tour (story.js)
+  // ----------------------------------------------------------------
+  // The richer, CINEMATIC cousin of the Guided demo. It moves the WT.view
+  // camera to FRAME each zone in flow order (receiving -> storage -> pick ->
+  // pack -> ship) with a plain-language caption, then starts the live
+  // material-flow animation so the viewer sees boxes moving. It reuses the
+  // SAME machinery - loadExample, the view transform (frameZone math from
+  // WT.story), flowPlay - it only SEQUENCES them (WT.story.run). Play/Pause,
+  // Skip and Exit (button + Esc) control it; it is fully interruptible and
+  // leaves the app in normal use afterwards.
+  //
+  // DETERMINISM: the camera tween is FRAME-COUNTED on the requestAnimation-
+  // Frame animation clock (WT.story.flySteps frames), NOT the wall clock -
+  // NO Date, NO RNG. Under prefers-reduced-motion the camera JUMP-CUTS (no
+  // motion) and each caption still dwells so it stays readable.
+  // ================================================================
+  let storyRunning = false;
+  let storyDone = false;
+  let storyStopFlag = false;
+  let storyPaused = false;
+  let storyTimer = null;
+  let storyPendingResolve = null;
+  let storyPendingMs = 0;
+  let storyFlyRaf = null;
+
+  // Compute the target { scale, panX, panY } for a story step's stage.
+  //   "all"  -> frame the WHOLE floor (the shared Fit transform)
+  //   a zone -> centre that zone's flow-sim centroid via WT.story.frameZone
+  // Reuses WT.flowsim.buildWaypoints for the SAME zone centroids the flow
+  // animation runs across, so the camera frames exactly where the boxes go.
+  function storyTargetFor(stage) {
+    if (stage === "all" || !stage) {
+      return V.fitView(cellPx, GRID_W, GRID_H, viewCssW, viewCssH,
+        (WT.story && WT.story.PARAMS ? WT.story.PARAMS.fitPad : 0.06));
+    }
+    let cx = GRID_W / 2, cy = GRID_H / 2;
+    try {
+      const wps = WT.flowsim ? WT.flowsim.buildWaypoints(currentLayout()) : null;
+      if (wps && wps.length) {
+        const w = wps.find((p) => p.stage === stage);
+        if (w && isFinite(w.x) && isFinite(w.y)) { cx = w.x; cy = w.y; }
+      }
+    } catch (_) { /* defensive: fall back to the floor centre */ }
+    return WT.story.frameZone({
+      cx: cx, cy: cy, cellPx: cellPx, vw: viewCssW, vh: viewCssH,
+    });
+  }
+
+  // Snap the camera to a target transform (used for jump-cuts + the tween
+  // frames). Routes through clampView() so a zone framed near an edge still
+  // keeps the floor covering the viewport, exactly like manual zoom/pan.
+  function storyApplyCamera(target) {
+    view.scale = target.scale;
+    view.panX = target.panX;
+    view.panY = target.panY;
+    clampView();
+    render();
+    updateZoomBadge();
+  }
+
+  function storyCancelFly() {
+    if (storyFlyRaf) { cancelAnimationFrame(storyFlyRaf); storyFlyRaf = null; }
+  }
+
+  // Fly the camera from its current framing to `target`. Under reduced motion
+  // (or a degenerate viewport) it JUMP-CUTS. Otherwise it tweens over
+  // WT.story.PARAMS.flySteps rAF frames using WT.story.lerpCamera - the
+  // animation clock, NO Date/RNG. A new fly cancels any in-flight one.
+  function storyFlyTo(target) {
+    storyCancelFly();
+    if (prefersReducedMotion()) { storyApplyCamera(target); return; }
+    const from = { scale: view.scale, panX: view.panX, panY: view.panY };
+    const total = Math.max(1, (WT.story && WT.story.PARAMS ? WT.story.PARAMS.flySteps : 42) | 0);
+    let i = 0;
+    const tick = () => {
+      storyFlyRaf = null;
+      if (storyStopFlag || storyPaused) return; // frozen while paused / on exit
+      i++;
+      const t = i / total;
+      const cam = WT.story.lerpCamera(from, target, t);
+      view.scale = cam.scale;
+      view.panX = cam.panX;
+      view.panY = cam.panY;
+      clampView();
+      render();
+      updateZoomBadge();
+      if (i < total) storyFlyRaf = requestAnimationFrame(tick);
+    };
+    storyFlyRaf = requestAnimationFrame(tick);
+  }
+
+  // The action map: each name in WT.story.ACTIONS -> the real app capability
+  // (the exact function the manual controls already call). No feature logic
+  // is duplicated here.
+  function storyActions() {
+    return {
+      // loadExample already frames the whole floor (fitToFloor), so the
+      // intro caption opens on the whole plant - no extra camera move.
+      loadScenario: (step) => { loadExample(step.exampleId); },
+      frameZone: (step) => { storyFlyTo(storyTargetFor(step.stage)); },
+      playFlow: () => { demoFocus("flowCard"); storyFlyTo(storyTargetFor("all")); flowPlay(); },
+    };
+  }
+
+  // An INTERRUPTIBLE, PAUSEABLE dwell. Exit resolves it immediately; Skip
+  // resolves it immediately; Pause clears the timer and holds until Resume
+  // re-arms it. Uses setTimeout (a UI timer), never Date - the story LOGIC
+  // (WT.story) carries no clock.
+  function storyArmTimer() {
+    if (storyTimer) { clearTimeout(storyTimer); storyTimer = null; }
+    storyTimer = setTimeout(() => {
+      storyTimer = null;
+      const r = storyPendingResolve; storyPendingResolve = null;
+      if (r) r();
+    }, Math.max(0, storyPendingMs | 0));
+  }
+  function storyPause(ms) {
+    return new Promise((resolve) => {
+      if (storyStopFlag) { resolve(); return; }
+      storyPendingResolve = resolve;
+      storyPendingMs = Math.max(0, ms | 0);
+      if (!storyPaused) storyArmTimer();
+    });
+  }
+  // Skip: end the current dwell now so the tour advances to the next step.
+  function storySkip() {
+    if (!storyRunning) return;
+    if (storyTimer) { clearTimeout(storyTimer); storyTimer = null; }
+    if (storyPendingResolve) { const r = storyPendingResolve; storyPendingResolve = null; r(); }
+  }
+  // Pause / Resume: freeze (or restart) the dwell + the camera tween.
+  function storyTogglePause() {
+    if (!storyRunning) return;
+    storyPaused = !storyPaused;
+    if (storyPaused) {
+      if (storyTimer) { clearTimeout(storyTimer); storyTimer = null; }
+      storyCancelFly();
+    } else if (storyPendingResolve) {
+      storyArmTimer();
+    }
+    updateStoryHud(null, null, null);
+    status(storyPaused ? "Story paused. Resume, Skip to the next step, or Esc to exit."
+      : "Story resumed.");
+  }
+
+  function showStoryHud(on) { const hud = $("storyHud"); if (hud) hud.hidden = !on; }
+
+  function updateStoryHud(step, i, total) {
+    if (step) {
+      const s = $("storyHudStep"), t = $("storyHudTitle"), b = $("storyHudBlurb");
+      if (s) s.textContent = (i + 1) + "/" + total;
+      if (t) t.textContent = step.title;
+      if (b) b.textContent = step.caption;
+      status("Story " + (i + 1) + "/" + total + ": " + step.title + " - " + step.caption);
+    }
+    const pb = $("storyPauseBtn");
+    if (pb) { pb.textContent = storyPaused ? "Resume" : "Pause"; pb.setAttribute("aria-pressed", String(storyPaused)); }
+  }
+
+  // Cleanly finish the tour (idempotent - Exit, Esc AND the natural onDone
+  // all route through here). Leaves the live flow running after a full run.
+  function finishStory(wasStopped) {
+    if (storyDone) return;
+    storyDone = true;
+    storyRunning = false;
+    storyStopFlag = true; // make the async run loop's next stopped() true
+    storyPaused = false;
+    storyCancelFly();
+    if (storyTimer) { clearTimeout(storyTimer); storyTimer = null; }
+    if (storyPendingResolve) { const r = storyPendingResolve; storyPendingResolve = null; r(); }
+    showStoryHud(false);
+    const sb = $("storyBtn"); if (sb) { sb.classList.remove("active"); sb.setAttribute("aria-pressed", "false"); }
+    status(wasStopped
+      ? "Story exited - back to normal editing. Everything shown is a SYNTHETIC scenario (no real company)."
+      : "Story complete - the live material flow is running. Everything shown is SYNTHETIC (no real company).");
+    toast(wasStopped
+      ? "Story exited. Normal editing resumed."
+      : "Story complete. The live flow is running on a SYNTHETIC example scenario - explore it, or build the WMS Report.");
+  }
+
+  function startStory() {
+    if (!WT.story || !WT.flowsim) { toast("Story Mode needs story.js + flowsim.js.", "warn"); return; }
+    if (storyRunning) return;
+    // Clear any open overlay so the tour is visible.
+    if ($("onboard")) $("onboard").hidden = true;
+    if ($("about")) $("about").hidden = true;
+    storyRunning = true;
+    storyDone = false;
+    storyStopFlag = false;
+    storyPaused = false;
+    const sb = $("storyBtn"); if (sb) { sb.classList.add("active"); sb.setAttribute("aria-pressed", "true"); }
+    showStoryHud(true);
+    updateStoryHud(null, null, null); // set the Pause label
+    status("Story starting - a cinematic tour of a SYNTHETIC example scenario, zone by zone.");
+    WT.story.run({
+      actions: storyActions(),
+      pause: storyPause,
+      stopped: () => storyStopFlag,
+      onStep: updateStoryHud,
+      onDone: () => finishStory(false),
+      onStop: () => finishStory(true),
+    });
+  }
+
+  function stopStory() { finishStory(true); }
+
+  // A one-button toggle (the top-bar "Story" control): start when idle,
+  // exit when running.
+  function toggleStory() { if (storyRunning) stopStory(); else startStory(); }
+
   // Render the About / why-this panel from WT.demo.ABOUT (single source of
   // truth - the honesty copy is asserted headlessly in verify_demo.js).
   function buildAbout() {
@@ -5908,6 +6122,12 @@
     if ($("aboutBtn")) $("aboutBtn").addEventListener("click", openAbout);
     if ($("aboutClose")) $("aboutClose").addEventListener("click", closeAbout);
     if ($("aboutRunDemo")) $("aboutRunDemo").addEventListener("click", () => { closeAbout(); startGuidedDemo(); });
+    // Story Mode: the cinematic guided tour (story.js). The top-bar button
+    // toggles it; the HUD carries Pause/Resume, Skip and Exit; Esc exits.
+    if ($("storyBtn")) $("storyBtn").addEventListener("click", toggleStory);
+    if ($("storyPauseBtn")) $("storyPauseBtn").addEventListener("click", storyTogglePause);
+    if ($("storySkipBtn")) $("storySkipBtn").addEventListener("click", storySkip);
+    if ($("storyStopBtn")) $("storyStopBtn").addEventListener("click", stopStory);
     wireViewControls();
   }
 
@@ -6010,6 +6230,19 @@
       prefersReducedMotion: prefersReducedMotion,
       cullToView: (els, bounds, pad) => V.cullToView(els, bounds, pad),
       viewBounds: () => V.viewBounds(view, viewCssW, viewCssH),
+      // Story Mode (cinematic guided tour) hooks for the self-test. `frame`
+      // applies a zone's framing INSTANTLY (the SAME storyTargetFor math the
+      // live tour tweens to) and returns the resulting transform, so the
+      // suite can assert that framing a zone actually moves the camera.
+      story: {
+        start: startStory,
+        stop: stopStory,
+        isRunning: () => storyRunning,
+        frame: (stage) => {
+          storyApplyCamera(storyTargetFor(stage));
+          return { scale: view.scale, panX: view.panX, panY: view.panY };
+        },
+      },
     };
   }
 
