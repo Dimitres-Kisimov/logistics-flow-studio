@@ -147,14 +147,34 @@
     const def = (D && D.ELEMENTS[e.type]) || {};
     return !!def.pickFace || !!def.goodsToPerson || e.type === "pallet-flow";
   }
+  // The BASE behaviour class of a user-defined type (library.js). Built-ins
+  // carry NO `base`, so every base-aware branch below is a strict NO-OP for a
+  // built-in-only layout - the flow sim stays byte-identical. Defensive: any
+  // missing domain / def yields null.
+  function baseOf(e) {
+    const els = WT.domain && WT.domain.ELEMENTS;
+    const def = els && e && els[e.type];
+    return def && def.custom && typeof def.base === "string" ? def.base : null;
+  }
+  // A user-defined DOCK's flow direction ("receiving" | "shipping" | null).
+  function dockDir(e) {
+    return baseOf(e) === "dock" ? (WT.domain.ELEMENTS[e.type].io === "receiving" ? "receiving" : "shipping") : null;
+  }
+
   function isTransport(e) {
-    return e.type === "conveyor" || e.type === "rgv" || e.type === "agv" || e.type === "track";
+    if (e.type === "conveyor" || e.type === "rgv" || e.type === "agv" || e.type === "track") return true;
+    const b = baseOf(e); // custom conveying / transporter objects CARRY loads
+    return b === "conveyor" || b === "transporter";
   }
 
   // Cell types that form a conveyor-following PATH (a box can ride ALONG
   // these). Same movement family as isTransport; documented as synthetic.
   const CONVEYOR_CELL_TYPES = { conveyor: 1, track: 1, rgv: 1, agv: 1 };
-  function isConveyorCellEl(e) { return !!CONVEYOR_CELL_TYPES[e.type]; }
+  function isConveyorCellEl(e) {
+    if (CONVEYOR_CELL_TYPES[e.type]) return true;
+    const b = baseOf(e);
+    return b === "conveyor" || b === "transporter";
+  }
 
   // Zone-rect centre from layout.meta.zones (generator/examples metadata),
   // used only as a secondary fallback when a stage has no elements.
@@ -288,7 +308,7 @@
     const gridH = Math.max(1, (layout && layout.gridH) || 24);
 
     const receiving =
-      centroidOf(els, (e) => e.type === "dock-in") ||
+      centroidOf(els, (e) => e.type === "dock-in" || dockDir(e) === "receiving") ||
       zoneCentre(layout, "receiving") ||
       { x: gridW / 2, y: 1 };
     let storage =
@@ -314,13 +334,13 @@
       } catch (_) { /* defensive: keep the plain centroid */ }
     }
     const packing =
-      centroidOf(els, (e) => e.type === "pack-station") ||
+      centroidOf(els, (e) => e.type === "pack-station" || baseOf(e) === "station") ||
       zoneCentre(layout, "packing") ||
       { x: gridW / 2, y: gridH - 4 };
     const shipping =
-      centroidOf(els, (e) => e.type === "dock-out") ||
+      centroidOf(els, (e) => e.type === "dock-out" || dockDir(e) === "shipping") ||
       zoneCentre(layout, "shipping") ||
-      centroidOf(els, (e) => e.type === "dock-in") ||
+      centroidOf(els, (e) => e.type === "dock-in" || dockDir(e) === "receiving") ||
       { x: gridW / 2, y: gridH - 1 };
     // Picking: pick faces if any, else the picking zone, else the mid
     // point between storage and packing (keeps the flow monotonic-ish).
@@ -437,7 +457,9 @@
 
     const putEls = els.filter((e) => e.type === "staging");
     const pickEls = els.filter(isPickFace);
-    const packEls = els.filter((e) => e.type === "pack-station");
+    // Custom STATION objects act as FIFO servers too - grouped with the pack
+    // stage (the generic processing stage). No-op for built-in-only layouts.
+    const packEls = els.filter((e) => e.type === "pack-station" || baseOf(e) === "station");
 
     const specs = [];
     Array.prototype.push.apply(specs, stationKind("put", "storage", putWp, putEls, cap["put-away"] || 0, gridW, gridH));

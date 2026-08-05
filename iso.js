@@ -318,9 +318,11 @@
       // using the SAME per-type height (domain heightM via elementHeight).
       // Fall back to the plain extruded box if the type has no custom form
       // or the module is absent - the extrusion still works, nothing breaks.
-      if (WT.shapes && WT.shapes.has(e.type)) {
+      if (WT.shapes && (WT.shapes.has(e.type) || def.custom)) {
         WT.shapes.draw3D(ctx, e.type, P, {
           cx: e.x, cy: e.y, w: e.w, d: e.d, heightM: h, color: color, theme: theme,
+          // User-defined types route through the generic 3D form via base/glyph.
+          base: def.base, glyph: def.glyph,
           selected: e.id === o.selectedId, selColor: colors.sel,
           anim: animFor ? animFor(e) : undefined,
           lod: pxc, // ON-SCREEN px/cell so the form can pick its rich LOD tier

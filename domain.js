@@ -474,6 +474,18 @@
     return PALLETS.find((p) => p.id === id) || PALLETS[0];
   }
 
+  // The BASE behaviour class of a type - ONLY user-defined (library.js)
+  // types carry a `base`; every built-in returns null, so every base-aware
+  // branch below is a strict no-op for a built-in-only layout (behaviour
+  // stays byte-identical). One of: storage|conveyor|station|transporter|
+  // dock|zone. Custom storage types use category "storage" (so capacity /
+  // aisles / slotting already treat them), so `base` here only routes the
+  // FLOW-side helpers (connectors + dock endpoints).
+  function elementBase(type) {
+    const def = ELEMENTS[type];
+    return def && def.custom && typeof def.base === "string" ? def.base : null;
+  }
+
   /* ------------------------------------------------------------------
    * Aisle-width guard (informed by DIN 15185). Shared by the canvas
    * editor (app.js), the advisor and the optimizer so there is ONE
@@ -536,7 +548,14 @@
    * ------------------------------------------------------------------ */
   const CONNECTOR_TYPES = { conveyor: 1, staging: 1, "push-station": 1, "pull-station": 1, "pack-station": 1 };
 
-  function isConnector(el) { return !!CONNECTOR_TYPES[el.type]; }
+  function isConnector(el) {
+    if (CONNECTOR_TYPES[el.type]) return true;
+    // Custom conveying / station objects pass material THROUGH the chain
+    // (same as the built-in conveyor + stations). Custom transporter / dock /
+    // zone are endpoints or markings, not connectors. No-op for built-ins.
+    const b = elementBase(el.type);
+    return b === "conveyor" || b === "station";
+  }
 
   function touching(a, b) {
     return a.x <= b.x + b.w && b.x <= a.x + a.w && a.y <= b.y + b.d && b.y <= a.y + a.d;
@@ -547,7 +566,7 @@
     const byId = {};
     els.forEach((e) => (byId[e.id] = e));
     const isStorageEl = (e) => (ELEMENTS[e.type] || {}).category === "storage";
-    const isDock = (e) => e.type === "dock-in" || e.type === "dock-out";
+    const isDock = (e) => e.type === "dock-in" || e.type === "dock-out" || elementBase(e.type) === "dock";
 
     // Chain edges: touching pairs where at least one side is a connector,
     // plus direct dock<->storage contact (a rack right at the door).
@@ -587,8 +606,12 @@
       return dist;
     }
 
-    const distToShip = bfs(els.filter((e) => e.type === "dock-out"));
-    const distFromReceive = bfs(els.filter((e) => e.type === "dock-in"));
+    // Outbound / inbound BFS seeds. A user-defined DOCK (base "dock") seeds
+    // the same endpoint BFS per its io direction, so custom docks are real
+    // flow source/sinks. No-op for built-ins (elementBase returns null).
+    const dockDir = (e) => (elementBase(e.type) === "dock" ? (ELEMENTS[e.type].io === "receiving" ? "receiving" : "shipping") : null);
+    const distToShip = bfs(els.filter((e) => e.type === "dock-out" || dockDir(e) === "shipping"));
+    const distFromReceive = bfs(els.filter((e) => e.type === "dock-in" || dockDir(e) === "receiving"));
 
     const outboundCovered = new Set();
     const inboundCovered = new Set();
@@ -720,6 +743,7 @@
     COMPLIANCE,
     PRESETS,
     elementCapacity,
+    elementBase,
     palletById,
     cartonsPerPallet,
     aisleViolations,

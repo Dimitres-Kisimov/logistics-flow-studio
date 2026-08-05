@@ -163,7 +163,16 @@
       <section class="card">
         <h2 class="card-title">Palette</h2>
         <p class="hint">Click an item, then click the floor to place it. Drag to move. Select to edit — arrow keys nudge 1 m, Ctrl+D (or the Duplicate button) copies.</p>
-        <div id="palette" class="palette"><!-- filled by app.js --></div>
+        <div class="pal-actions">
+          <button id="defineObjectBtn" class="btn wide primary" type="button" title="Define your OWN object type (like Siemens Plant Simulation UserObjects) — derived from a base MaterialFlow behaviour class, organised into the categorised tree. The built-ins are editable seeds.">＋ Define Object</button>
+          <div class="btn-grid" style="margin-top:6px">
+            <button id="libExportBtn" class="btn" type="button" title="Download your user-defined objects as JSON (offline, nothing uploaded)">Export objects</button>
+            <button id="libImportBtn" class="btn" type="button" title="Load user-defined objects from a JSON file you exported earlier">Import objects</button>
+          </div>
+          <input id="libImportInput" type="file" accept="application/json,.json" hidden />
+        </div>
+        <p class="hint">The palette is a categorised, collapsible tree. Built-ins live under their group; your own objects appear under <strong>My Objects</strong> (or the category you give them). Use <strong>✎</strong> to edit a custom object or <strong>⧉</strong> to clone a built-in into an editable custom.</p>
+        <div id="palette" class="palette"><!-- filled by app.js buildPalette() as a categorised tree --></div>
       </section>
 
       <section class="card">
@@ -711,6 +720,44 @@
     </aside>
   </main>
 
+  <!-- ============ DEFINE-OBJECT EDITOR (user-definable object library) ============
+       Create your own object TYPES (like Siemens Plant Simulation UserObjects),
+       derived from a base MaterialFlow behaviour class, and drop them into the
+       categorised palette tree. Labelled + keyboard-usable dialog. -->
+  <div id="defineModal" class="overlay" hidden>
+    <div class="overlay-card overlay-card--wide" role="dialog" aria-modal="true" aria-labelledby="doTitle">
+      <h2 id="doTitle">Define your own object</h2>
+      <p class="ob-sub">Derive a new object from a base behaviour class — the same idea as Siemens Plant Simulation <em>UserObjects</em>. It registers into the palette under its category and behaves in the sim per its base. Illustrative teaching element, not a vendor spec.</p>
+      <div class="do-form">
+        <div class="do-field"><label for="doName">Name</label><input id="doName" type="text" maxlength="48" placeholder="e.g. PartA, MyFrame, LKBox" /></div>
+        <div class="do-field"><label for="doCategory">Category</label><input id="doCategory" type="text" maxlength="40" list="doCatList" placeholder="My Objects" /><datalist id="doCatList"></datalist></div>
+        <div class="do-field"><label for="doBase">Base behaviour</label><select id="doBase"></select></div>
+        <div class="do-field"><label for="doGlyph">2D glyph</label><select id="doGlyph"></select></div>
+        <div class="do-field"><label for="doWidth">Width (m)</label><input id="doWidth" type="number" min="1" max="200" step="1" value="4" /></div>
+        <div class="do-field"><label for="doDepth">Depth (m)</label><input id="doDepth" type="number" min="1" max="200" step="1" value="2" /></div>
+        <div class="do-field"><label for="doHeight">Height (m)</label><input id="doHeight" type="number" min="0.1" max="60" step="0.1" value="3" /></div>
+        <div class="do-field"><label for="doColor">Colour</label><input id="doColor" type="color" value="#0ea5e9" /></div>
+        <!-- Base-specific behaviour params (only the matching rows show) -->
+        <div class="do-field do-param" data-base="storage"><label for="doDensity">Positions / m²</label><input id="doDensity" type="number" min="0.1" max="12" step="0.1" value="2" /></div>
+        <div class="do-field do-param" data-base="storage"><label for="doLevels">Levels</label><input id="doLevels" type="number" min="1" max="20" step="1" value="3" /></div>
+        <div class="do-field do-param" data-base="storage"><label for="doSelectivity">Selectivity (%)</label><input id="doSelectivity" type="number" min="5" max="100" step="1" value="100" /></div>
+        <div class="do-field do-param" data-base="station"><label for="doCycle">Cycle time (s)</label><input id="doCycle" type="number" min="0.5" max="3600" step="0.5" value="30" /></div>
+        <div class="do-field do-param" data-base="conveyor"><label for="doUnits">Throughput (units/hr)</label><input id="doUnits" type="number" min="1" max="100000" step="1" value="180" /></div>
+        <div class="do-field do-param" data-base="transporter"><label for="doSpeed">Speed (m/s)</label><input id="doSpeed" type="number" min="0.1" max="10" step="0.1" value="1.2" /></div>
+        <div class="do-field do-param" data-base="transporter"><label for="doMoves">Moves / hr</label><input id="doMoves" type="number" min="1" max="100000" step="1" value="30" /></div>
+        <div class="do-field do-param" data-base="transporter"><label for="doAisle">Aisle width (m)</label><input id="doAisle" type="number" min="0.5" max="8" step="0.1" value="1.6" /></div>
+        <div class="do-field do-param" data-base="dock"><label for="doIo">Direction</label><select id="doIo"><option value="shipping">Shipping (sink)</option><option value="receiving">Receiving (source)</option></select></div>
+      </div>
+      <div class="ob-actions do-actions">
+        <button id="doDeleteBtn" class="btn danger" type="button" title="Delete this custom object" hidden>Delete</button>
+        <button id="doDuplicateBtn" class="btn" type="button" title="Save a copy as a new object" hidden>Duplicate</button>
+        <button id="doCancelBtn" class="btn" type="button">Cancel</button>
+        <button id="doSaveBtn" class="btn primary" type="button">Save object</button>
+      </div>
+      <p class="std-disclaimer">Custom objects are <strong>illustrative schematic teaching elements</strong> — not CAD, BIM or a vendor spec. The base maps the object onto an existing simulation behaviour; sizes are the model's own metre grid.</p>
+    </div>
+  </div>
+
   <!-- ================= ONBOARDING OVERLAY ================= -->
   <div id="onboard" class="overlay" hidden>
     <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="obTitle">
@@ -804,6 +851,7 @@
   <script src="floor.js"></script>
   <script src="domain.js"></script>
   <script src="knowledge.js"></script>
+  <script src="library.js"></script>
   <script src="tiers.js"></script>
   <script src="simulation.js"></script>
   <script src="optimizer.js"></script>

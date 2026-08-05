@@ -110,6 +110,7 @@
       ["demo", function (m) { return m && typeof m.run === "function" && Array.isArray(m.ACTIONS) && m.ABOUT; }],
       ["story", function (m) { return m && Array.isArray(m.STEPS) && m.STEPS.length > 0 && typeof m.run === "function" && typeof m.frameZone === "function" && typeof m.lerpCamera === "function"; }],
       ["tiers", function (m) { return m && typeof m.caps === "function" && typeof m.current === "function"; }],
+      ["library", function (m) { return m && typeof m.define === "function" && typeof m.paletteTree === "function" && typeof m.embedInto === "function" && Array.isArray(m.BASES); }],
     ];
     MODULES.forEach(function (pair) {
       var name = pair[0];
@@ -455,6 +456,45 @@
       var exited = API.story.isRunning() === false;
       if (API.story.isRunning()) { try { API.story.stop(); } catch (_) { /* ensure clean */ } }
       return { ok: running && exited, detail: "running=" + running + " exitedOnEsc=" + exited };
+    });
+
+    // ---- v1.15 USER-DEFINABLE OBJECT LIBRARY --------------------------
+    // The "Define Object" control exists, the palette is a categorised tree
+    // (groups + My Objects), and a defined object registers, appears in the
+    // palette and can be PLACED on the floor. Cleans up after itself.
+    check("define-object-control-present", function () {
+      var btn = document.getElementById("defineObjectBtn");
+      var heads = document.querySelectorAll("#palette .pal-group-head");
+      return { ok: !!btn && heads.length >= 3, detail: btn ? ("groups=" + heads.length) : "no defineObjectBtn" };
+    });
+    check("palette-shows-categories-and-my-objects", function () {
+      var labels = [];
+      document.querySelectorAll("#palette .pal-group-label").forEach(function (el) { labels.push(el.textContent); });
+      return { ok: labels.indexOf("My Objects") !== -1 && labels.indexOf("Storage & Racking") !== -1, detail: labels.join(" | ") };
+    });
+    check("defined-object-registers-places-renders", function () {
+      if (!WT.library || !haveApi || !API.library) return { ok: false, detail: "no library api" };
+      var def = WT.library.define({ name: "Selftest Widget", base: "station", w: 2, d: 2, height: 1.5, glyph: "box", color: "#123456", params: { cycleSec: 12 } });
+      if (!def) return { ok: false, detail: "define failed" };
+      API.library.buildPalette();
+      var inPalette = false;
+      document.querySelectorAll("#palette .pal-item").forEach(function (b) { if (b.dataset.type === def.id) inPalette = true; });
+      var before = API.state.elements.length;
+      var lay = API.currentLayout();
+      var placed = false;
+      var spots = [[0, 0], [1, 1], [0, (lay.gridH || 10) - 1], [(lay.gridW || 10) - 2, 0]];
+      for (var i = 0; i < spots.length && !placed; i++) {
+        API.library.placeAt(def.id, spots[i][0], spots[i][1]);
+        if (API.state.elements.length > before) placed = true;
+      }
+      var el = placed ? API.state.elements[API.state.elements.length - 1] : null;
+      var typeOk = !!(el && el.type === def.id && WT.domain.ELEMENTS[def.id]);
+      // cleanup: drop the placed instance + the custom type, restore the palette.
+      if (el) API.state.elements = API.state.elements.filter(function (e) { return e.id !== el.id; });
+      WT.library.remove(def.id);
+      API.library.buildPalette();
+      API.render();
+      return { ok: inPalette && placed && typeOk, detail: "inPalette=" + inPalette + " placed=" + placed + " typeOk=" + typeOk };
     });
 
     // ---- Restore the app to a normal, usable state ---------------------

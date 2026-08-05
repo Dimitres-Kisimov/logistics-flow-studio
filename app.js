@@ -433,16 +433,21 @@
       // Distinct top-down glyph from the single shape registry (WT.shapes);
       // fall back to the built-in drawGlyph if the type has no custom shape
       // or the module is absent (nothing breaks). `lod` = on-screen px/cell.
-      if (WT.shapes && WT.shapes.has(e.type)) {
+      if (WT.shapes && (WT.shapes.has(e.type) || def.custom)) {
         WT.shapes.draw2D(ctx, e.type, {
           x: px, y: py, w: pw, d: ph,
           cellPx: cellPx, color: def.color, theme: themeName, lod: cellPx * view.scale,
+          // User-defined types route through the generic renderer via glyph/base.
+          glyph: def.glyph, base: def.base,
           // Deterministic per-element seed for the rich-tier load-unit fill
           // (stable frame-to-frame; identical racks at different spots differ).
           seed: elemAnimSeed(e),
           // Deterministic moving part while the flow plays (draw2D itself
           // skips it on the tiny LOD-icon path, so this stays legible + cheap).
-          anim: (fa.on && ANIMATABLE_TYPES[e.type]) ? WT.shapes.equipmentPhase(fa.t, elemAnimSeed(e)) : undefined,
+          // Built-in animatable types + custom conveying/transporter objects move.
+          anim: (fa.on && ANIMATABLE_TYPES[e.type]) ? WT.shapes.equipmentPhase(fa.t, elemAnimSeed(e))
+            : (fa.on && (def.base === "conveyor" || def.base === "transporter")) ? WT.shapes.equipmentPhase(fa.t, elemAnimSeed(e))
+            : undefined,
         });
       } else {
         drawGlyph(e, def, px, py, pw, ph);
@@ -1907,7 +1912,7 @@
       "pack-station": "Pack",
       "rgv": "RGV lane",
       "agv": "AGV route",
-    })[type] || type;
+    })[type] || (ELEMENTS[type] && ELEMENTS[type].label) || type;
   }
 
   function updateBadges(viol, chains) {
@@ -2431,39 +2436,306 @@
   // PALETTE (tier-aware: locked items stay visible with a padlock —
   // capability flags come from tiers.js, the one gate module)
   // ================================================================
+  // Collapse state per palette group (kept across re-renders so toggling a
+  // group open/closed survives a rebuild). Default: all expanded.
+  const palCollapsed = {};
+
+  // The palette is a CATEGORISED, COLLAPSIBLE TREE (like the Siemens class
+  // tree): the seven canonical groups + any custom category, built-ins under
+  // their group and user-defined types under "My Objects" (or their chosen
+  // category). Built-ins are editable SEEDS - clone one into a custom - not a
+  // hardcoded menu. WT.library.paletteTree() is the single source of the
+  // grouping; a fallback flat tree keeps the app usable if the module is absent.
+  function paletteTreeModel() {
+    if (WT.library && typeof WT.library.paletteTree === "function") return WT.library.paletteTree();
+    return [{ key: "All", label: "All objects", types: (D.paletteOrder || []).slice() }];
+  }
+
   function buildPalette() {
     const caps = WT.tiers.caps();
     const wrap = $("palette");
     wrap.innerHTML = "";
-    let lastCat = null;
-    for (const type of D.paletteOrder) {
-      const def = ELEMENTS[type];
-      if (def.category !== lastCat) {
-        lastCat = def.category;
-        const head = document.createElement("div");
-        head.className = "pal-head";
-        head.textContent = def.category === "storage" ? "Storage systems" : "Flow elements";
-        wrap.appendChild(head);
+    for (const group of paletteTreeModel()) {
+      const collapsed = !!palCollapsed[group.label];
+      const g = document.createElement("div");
+      g.className = "pal-group";
+      const head = document.createElement("button");
+      head.type = "button";
+      head.className = "pal-group-head";
+      head.setAttribute("aria-expanded", String(!collapsed));
+      head.innerHTML =
+        `<span class="pal-caret" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>` +
+        `<span class="pal-group-label">${esc(group.label)}</span>` +
+        `<span class="pal-count">${group.types.length}</span>`;
+      head.addEventListener("click", () => { palCollapsed[group.label] = !collapsed; buildPalette(); });
+      g.appendChild(head);
+      const body = document.createElement("div");
+      body.className = "pal-group-body";
+      body.hidden = collapsed;
+      if (group.types.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "pal-empty";
+        empty.textContent = "No objects yet — use “＋ Define Object” to add your own.";
+        body.appendChild(empty);
       }
-      const btn = document.createElement("button");
-      btn.className = "pal-item";
-      btn.type = "button";
-      btn.dataset.type = type;
-      const locked = !caps.paletteAllowed(type);
-      btn.innerHTML =
-        `<span class="pal-swatch" style="background:${def.color}"></span>` +
-        `<span>${def.label}</span>` +
-        (locked ? WT.tiers.padlockSVG() : `<span class="pal-cat">${def.category}</span>`);
-      if (locked) {
-        btn.classList.add("locked");
-        btn.setAttribute("aria-disabled", "true");
-        btn.addEventListener("click", () => toast(caps.lockHint(def.label), "warn"));
-        attachTooltip(btn, "Full version: " + def.desc);
-      } else {
-        btn.addEventListener("click", () => setTool(state.activeTool === type ? null : type));
-        attachTooltip(btn, def.desc);
-      }
-      wrap.appendChild(btn);
+      for (const type of group.types) renderPaletteItem(body, type, caps);
+      g.appendChild(body);
+      wrap.appendChild(g);
+    }
+  }
+
+  function renderPaletteItem(body, type, caps) {
+    const def = ELEMENTS[type];
+    if (!def) return;
+    const isCustom = !!def.custom;
+    const row = document.createElement("div");
+    row.className = "pal-row";
+    const btn = document.createElement("button");
+    btn.className = "pal-item";
+    btn.type = "button";
+    btn.dataset.type = type;
+    // A user-defined object is the user's own, so it is never tier-locked;
+    // built-ins still respect the tier gate.
+    const locked = !isCustom && !caps.paletteAllowed(type);
+    const catLabel = isCustom ? def.base : def.category;
+    btn.innerHTML =
+      `<span class="pal-swatch" style="background:${esc(def.color)}"></span>` +
+      `<span class="pal-name">${esc(def.label)}</span>` +
+      (locked ? WT.tiers.padlockSVG() : `<span class="pal-cat">${esc(catLabel)}</span>`);
+    if (locked) {
+      btn.classList.add("locked");
+      btn.setAttribute("aria-disabled", "true");
+      btn.addEventListener("click", () => toast(caps.lockHint(def.label), "warn"));
+      attachTooltip(btn, "Full version: " + def.desc);
+    } else {
+      if (state.activeTool === type) btn.classList.add("active");
+      btn.addEventListener("click", () => setTool(state.activeTool === type ? null : type));
+      attachTooltip(btn, def.desc);
+    }
+    row.appendChild(btn);
+    // Mini action: EDIT (custom) or CLONE-to-custom (built-in seed).
+    const mini = document.createElement("button");
+    mini.type = "button";
+    mini.className = "pal-mini";
+    if (isCustom) {
+      mini.textContent = "✎"; // pencil
+      mini.title = "Edit / clone / delete this object";
+      mini.setAttribute("aria-label", "Edit object " + def.label);
+      mini.addEventListener("click", () => openDefineDialog(type));
+    } else {
+      mini.textContent = "⧉"; // two squares (clone)
+      mini.title = "Clone into an editable custom object";
+      mini.setAttribute("aria-label", "Clone " + def.label + " into a custom object");
+      mini.addEventListener("click", () => cloneBuiltinToCustom(type));
+    }
+    row.appendChild(mini);
+    body.appendChild(row);
+  }
+
+  // Clone a built-in SEED into a new editable custom object (the built-in is
+  // never removed). Opens the editor pre-filled so the user can tweak + save.
+  function cloneBuiltinToCustom(type) {
+    if (!WT.library) return;
+    openDefineDialog(null, type);
+  }
+
+  // ================================================================
+  // DEFINE-OBJECT EDITOR — the user-definable object library (WT.library).
+  // Create your own object TYPES (like Siemens Plant Simulation UserObjects),
+  // derived from a base MaterialFlow behaviour class, and organise them into
+  // the categorised palette tree. Built-ins are editable SEEDS (Clone).
+  // ================================================================
+  let defineEditId = null; // id being edited, or null when creating
+
+  const BASE_HINT = {
+    storage: "Storage (holds load units + positions)",
+    conveyor: "Conveyor (carries loads along the flow)",
+    station: "Station (a server with a cycle time)",
+    transporter: "Transporter (mobile — carries between zones)",
+    dock: "Dock / endpoint (flow source or sink)",
+    zone: "Zone (a floor marking / boundary)",
+  };
+  const BASE_DEFAULT_GLYPH = { storage: "rack", conveyor: "arrow", station: "box", transporter: "vehicle", dock: "box", zone: "zone" };
+
+  function buildDefineDialog() {
+    const baseSel = $("doBase");
+    if (baseSel && WT.library && !baseSel.dataset.built) {
+      baseSel.dataset.built = "1";
+      baseSel.innerHTML = WT.library.BASES.map((b) => `<option value="${b}">${esc(BASE_HINT[b] || b)}</option>`).join("");
+      baseSel.addEventListener("change", syncDefineBase);
+    }
+    const glyphSel = $("doGlyph");
+    if (glyphSel && WT.library && !glyphSel.dataset.built) {
+      glyphSel.dataset.built = "1";
+      glyphSel.innerHTML = WT.library.GLYPHS.map((g) => `<option value="${g}">${esc(g)}</option>`).join("");
+      glyphSel.addEventListener("change", () => { glyphSel.dataset.touched = "1"; });
+    }
+  }
+
+  function fillDefineCategories() {
+    const dl = $("doCatList");
+    if (!dl || !WT.library) return;
+    const cats = WT.library.GROUP_ORDER.slice();
+    for (const d of WT.library.list()) if (cats.indexOf(d.paletteCategory) === -1) cats.push(d.paletteCategory);
+    dl.innerHTML = cats.map((c) => `<option value="${esc(c)}"></option>`).join("");
+  }
+
+  // Show only the behaviour-param rows matching the selected base.
+  function syncDefineBase() {
+    const base = ($("doBase") && $("doBase").value) || "storage";
+    document.querySelectorAll("#defineModal .do-param").forEach((row) => {
+      row.hidden = row.dataset.base !== base;
+    });
+    const glyphSel = $("doGlyph");
+    if (glyphSel && glyphSel.dataset.touched !== "1") glyphSel.value = BASE_DEFAULT_GLYPH[base] || "box";
+  }
+
+  function doSetVal(id, v) { const el = $(id); if (el) el.value = v; }
+  function doGetVal(id) { const el = $(id); return el ? el.value : ""; }
+
+  function openDefineDialog(editId, cloneFromType) {
+    if (!WT.library) { toast("Object library unavailable.", "warn"); return; }
+    buildDefineDialog();
+    fillDefineCategories();
+    defineEditId = editId || null;
+    let src = null, titleText = "Define your own object";
+    if (editId && ELEMENTS[editId]) { src = ELEMENTS[editId]; titleText = "Edit object — " + src.label; }
+    else if (cloneFromType && ELEMENTS[cloneFromType]) {
+      const s = ELEMENTS[cloneFromType];
+      const base = s.custom ? s.base : (WT.library.BUILTIN_BASE[cloneFromType] || (s.category === "storage" ? "storage" : "station"));
+      src = Object.assign({}, s, { label: s.label + " (custom)", base: base, paletteCategory: WT.library.MY_OBJECTS });
+      titleText = "Define object — cloned from " + s.label;
+    }
+    const d = src || { label: "", paletteCategory: WT.library.MY_OBJECTS, base: "storage", w: 4, d: 2, heightM: 3, color: "#0ea5e9", glyph: "rack" };
+    if ($("doTitle")) $("doTitle").textContent = titleText;
+    doSetVal("doName", d.label || "");
+    doSetVal("doCategory", d.paletteCategory || WT.library.MY_OBJECTS);
+    doSetVal("doBase", d.base || "storage");
+    doSetVal("doWidth", d.w || 4);
+    doSetVal("doDepth", d.d || 2);
+    doSetVal("doHeight", d.heightM || 3);
+    doSetVal("doColor", /^#([0-9a-f]{6})$/i.test(d.color || "") ? d.color : "#0ea5e9");
+    const glyphSel = $("doGlyph");
+    if (glyphSel) { glyphSel.dataset.touched = d.glyph ? "1" : ""; doSetVal("doGlyph", d.glyph || "rack"); }
+    doSetVal("doDensity", d.density != null ? d.density : 2);
+    doSetVal("doLevels", d.levels != null ? d.levels : 3);
+    doSetVal("doSelectivity", d.selectivity != null ? Math.round(d.selectivity * 100) : 100);
+    doSetVal("doCycle", d.cycleSec != null ? d.cycleSec : 30);
+    doSetVal("doUnits", d.unitsPerHr != null ? d.unitsPerHr : 180);
+    doSetVal("doSpeed", d.speedMps != null ? d.speedMps : 1.2);
+    doSetVal("doMoves", d.movesPerHr != null ? d.movesPerHr : 30);
+    doSetVal("doAisle", d.aisleWidthM != null ? d.aisleWidthM : 1.6);
+    doSetVal("doIo", d.io === "receiving" ? "receiving" : "shipping");
+    syncDefineBase();
+    if ($("doDeleteBtn")) $("doDeleteBtn").hidden = !defineEditId;
+    if ($("doDuplicateBtn")) $("doDuplicateBtn").hidden = !defineEditId;
+    $("defineModal").hidden = false;
+    const nameEl = $("doName");
+    if (nameEl) nameEl.focus();
+  }
+
+  function closeDefineDialog() { if ($("defineModal")) $("defineModal").hidden = true; defineEditId = null; }
+
+  function gatherDefineInput() {
+    return {
+      name: doGetVal("doName").trim(),
+      category: doGetVal("doCategory").trim(),
+      base: doGetVal("doBase"),
+      w: doGetVal("doWidth"), d: doGetVal("doDepth"), height: doGetVal("doHeight"),
+      color: doGetVal("doColor"), glyph: doGetVal("doGlyph"),
+      params: {
+        density: doGetVal("doDensity"), levels: doGetVal("doLevels"),
+        selectivity: Number(doGetVal("doSelectivity")) / 100,
+        cycleSec: doGetVal("doCycle"), unitsPerHr: doGetVal("doUnits"),
+        speedMps: doGetVal("doSpeed"), movesPerHr: doGetVal("doMoves"),
+        aisleWidthM: doGetVal("doAisle"), io: doGetVal("doIo"),
+      },
+    };
+  }
+
+  function saveDefine() {
+    const input = gatherDefineInput();
+    if (!input.name) { toast("Give the object a name.", "warn"); const n = $("doName"); if (n) n.focus(); return; }
+    const def = defineEditId ? WT.library.update(defineEditId, input) : WT.library.define(input);
+    if (!def) { toast("Could not save that object.", "warn"); return; }
+    buildPalette();
+    closeDefineDialog();
+    setTool(def.id);
+    render();
+    toast("Saved “" + def.label + "” → " + def.paletteCategory + " (base: " + def.base + ").");
+  }
+
+  function duplicateDefine() {
+    const input = gatherDefineInput();
+    input.name = (input.name || "Object") + " copy";
+    delete input.id;
+    const def = WT.library.define(input);
+    if (!def) { toast("Could not duplicate.", "warn"); return; }
+    buildPalette();
+    openDefineDialog(def.id);
+    toast("Duplicated as “" + def.label + "”.");
+  }
+
+  function deleteDefine() {
+    if (!defineEditId) return;
+    const def = ELEMENTS[defineEditId];
+    if (!window.confirm("Delete the custom object “" + (def ? def.label : defineEditId) + "”? Placed instances of it will be removed too.")) return;
+    const id = defineEditId;
+    const removed = state.elements.filter((e) => e.type === id).length;
+    state.elements = state.elements.filter((e) => e.type !== id);
+    if (state.activeTool === id) setTool(null);
+    WT.library.remove(id);
+    buildPalette();
+    closeDefineDialog();
+    scheduleSave();
+    render();
+    toast("Deleted the object" + (removed ? " and " + removed + " placed instance(s)." : "."));
+  }
+
+  function wireDefineObject() {
+    const openBtn = $("defineObjectBtn");
+    if (openBtn && !openBtn.dataset.wired) { openBtn.dataset.wired = "1"; openBtn.addEventListener("click", () => openDefineDialog(null)); }
+    const saveBtn = $("doSaveBtn");
+    if (saveBtn && !saveBtn.dataset.wired) { saveBtn.dataset.wired = "1"; saveBtn.addEventListener("click", saveDefine); }
+    const cancelBtn = $("doCancelBtn");
+    if (cancelBtn && !cancelBtn.dataset.wired) { cancelBtn.dataset.wired = "1"; cancelBtn.addEventListener("click", closeDefineDialog); }
+    const delBtn = $("doDeleteBtn");
+    if (delBtn && !delBtn.dataset.wired) { delBtn.dataset.wired = "1"; delBtn.addEventListener("click", deleteDefine); }
+    const dupBtn = $("doDuplicateBtn");
+    if (dupBtn && !dupBtn.dataset.wired) { dupBtn.dataset.wired = "1"; dupBtn.addEventListener("click", duplicateDefine); }
+    const modal = $("defineModal");
+    if (modal && !modal.dataset.wired) {
+      modal.dataset.wired = "1";
+      // Esc closes even with a field focused (the global keydown ignores inputs).
+      modal.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); closeDefineDialog(); } });
+      modal.addEventListener("click", (e) => { if (e.target === modal) closeDefineDialog(); });
+    }
+    // Library import / export (mirrors the KB editor's pattern).
+    const exp = $("libExportBtn");
+    if (exp && !exp.dataset.wired) {
+      exp.dataset.wired = "1";
+      exp.addEventListener("click", () => {
+        downloadFile("warehousetwin-object-library.json", WT.library.exportJson(), "application/json");
+        status("Exported your object library as JSON (offline — nothing uploaded).");
+      });
+    }
+    const imp = $("libImportBtn");
+    const impInput = $("libImportInput");
+    if (imp && !imp.dataset.wired) { imp.dataset.wired = "1"; imp.addEventListener("click", () => impInput && impInput.click()); }
+    if (impInput && !impInput.dataset.wired) {
+      impInput.dataset.wired = "1";
+      impInput.addEventListener("change", async () => {
+        const file = impInput.files && impInput.files[0];
+        impInput.value = "";
+        if (!file) return;
+        try {
+          const text = await readFileText(file);
+          const res = WT.library.importJson(text);
+          if (!res.ok && !res.added) { toast("Import failed: " + (res.error || "unrecognised file") + ".", "warn"); return; }
+          buildPalette();
+          toast("Imported " + res.added + " object(s)" + (res.errors && res.errors.length ? ", " + res.errors.length + " skipped." : "."));
+        } catch (err) { toast("Could not read that file: " + err.message, "warn"); }
+      });
     }
   }
 
@@ -3675,7 +3947,7 @@
   let saveTimer = null;
 
   function serialize() {
-    return {
+    const obj = {
       version: "wt-1",
       gridW: GRID_W,
       gridH: GRID_H,
@@ -3684,10 +3956,22 @@
       config: Object.assign({}, state.config),
       savedAt: new Date().toISOString(),
     };
+    // Embed the definitions of any USER-DEFINED (library.js) types the layout
+    // uses, so a saved / shared layout renders + simulates its custom objects
+    // anywhere. embedInto() adds obj.library ONLY when custom types are
+    // present, so a default (no-custom) layout stays byte-identical to before.
+    if (WT.library && typeof WT.library.embedInto === "function") WT.library.embedInto(obj, state.elements);
+    return obj;
   }
 
   function deserialize(obj, source) {
     if (!obj || !Array.isArray(obj.elements)) throw new Error("Invalid layout data");
+    // Rebuild any embedded USER-DEFINED type definitions FIRST, so the
+    // element loop below (which drops types absent from ELEMENTS) resolves
+    // the layout's custom objects. No-op for layouts with no `library` field.
+    if (WT.library && typeof WT.library.rebuildFrom === "function") {
+      try { WT.library.rebuildFrom(obj); } catch (_) { /* keep loading the built-ins */ }
+    }
     // Respect the layout's own warehouse size (may differ from 40 x 24);
     // clamp it into the supported range. Elements are then kept in-bounds
     // against THIS floor below.
@@ -6243,6 +6527,14 @@
           return { scale: view.scale, panX: view.panX, panY: view.panY };
         },
       },
+      // v1.15 user-definable object library hooks for the self-test:
+      library: {
+        open: openDefineDialog,
+        close: closeDefineDialog,
+        buildPalette: buildPalette,
+        placeAt: (type, cx, cy) => placeAt(type, cx, cy),
+        paletteTree: paletteTreeModel,
+      },
     };
   }
 
@@ -6259,6 +6551,7 @@
     buildAbout(); // P8: render the About / why-this copy from WT.demo.ABOUT
     initCollapsibleCards(); // v1.0: make the side-panel cards collapsible (default expanded)
     wireButtons();
+    wireDefineObject(); // user-definable object library (Define Object + import/export)
     wireDataPanel();
     wireWmsDataPanel();
     wireStoragePanel();

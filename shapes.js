@@ -1438,6 +1438,78 @@
   }
 
   /* ==================================================================
+   * GENERIC RENDERER for USER-DEFINED (library.js) types. A custom type
+   * has NO REG entry; draw2D/draw3D fall back here, parameterised by the
+   * type's `glyph` (2D) and `base` (3D form) which the caller passes on the
+   * g / o object. This is how a DEFINED object draws recognisably at every
+   * LOD tier without a bespoke per-type function. It reuses the same
+   * primitives + several built-in drawers so a custom object looks at home
+   * next to the built-ins. Illustrative schematic only, no external asset.
+   * ================================================================== */
+  function genericGlyph2D(ctx, glyph, x, y, w, d, cell, gc, color, theme, anim) {
+    switch (glyph) {
+      case "rack": return d2Selective(ctx, x, y, w, d, cell, gc);
+      case "zone": return d2Staging(ctx, x, y, w, d, cell, gc);
+      case "arrow": {
+        pen(ctx, gc, cell);
+        const cy = y + d / 2, m = clampN(Math.min(w, d) * 0.18, 2, 6);
+        arr(ctx, x + m, cy, x + w - m, cy, clampN(Math.min(w, d) * 0.28, 4, 10));
+        return;
+      }
+      case "circle": {
+        pen(ctx, gc, cell);
+        const r = clampN(Math.min(w, d) * 0.34, 3, Math.min(w, d) * 0.46);
+        disc(ctx, x + w / 2, y + d / 2, r * 0.62);
+        ring(ctx, x + w / 2, y + d / 2, r);
+        return;
+      }
+      case "vehicle": {
+        pen(ctx, gc, cell);
+        const m = clampN(Math.min(w, d) * 0.2, 2, 6);
+        ctx.fillRect(x + m, y + m, Math.max(1, w - 2 * m), Math.max(1, d - 2 * m)); // body
+        seg(ctx, x + m, y + d - m * 0.6, x + w - m, y + d - m * 0.6);               // wheels
+        seg(ctx, x + m, y + m * 0.6, x + w - m, y + m * 0.6);
+        return;
+      }
+      case "box":
+      default: {
+        pen(ctx, gc, cell);
+        const m = clampN(Math.min(w, d) * 0.2, 2, 7);
+        ctx.strokeRect(x + m, y + m, Math.max(1, w - 2 * m), Math.max(1, d - 2 * m));
+        seg(ctx, x + m, y + m, x + w - m, y + d - m);          // corner-to-corner (a taped box)
+        ctx.strokeRect(x + w * 0.4, y + d * 0.4, w * 0.2, d * 0.2); // inner label square
+        return;
+      }
+    }
+  }
+  function genericIcon(ctx, glyph, cx, cy, r) {
+    switch (glyph) {
+      case "rack": return icGrid(ctx, cx, cy, r);
+      case "circle": return icRobot(ctx, cx, cy, r);
+      case "vehicle": return icCart(ctx, cx, cy, r);
+      case "arrow": return icBelt(ctx, cx, cy, r);
+      case "zone": return icDash(ctx, cx, cy, r);
+      case "box":
+      default: return icStack(ctx, cx, cy, r);
+    }
+  }
+  // Generic 3D form keyed on the type's BASE behaviour class - reuses the
+  // built-in form that best represents that class (storage -> open frame,
+  // conveyor -> belt bed, station -> bench, transporter -> guided vehicle,
+  // dock -> door wall, zone -> low outlined pad).
+  function genericForm3D(ctx, P, base, x, y, w, d, h, color, theme, anim) {
+    switch (base) {
+      case "conveyor": return d3Conveyor(ctx, P, x, y, w, d, h, color, theme, anim);
+      case "station": return d3Pack(ctx, P, x, y, w, d, h, color, theme);
+      case "transporter": return d3Agv(ctx, P, x, y, w, d, h, color, theme, anim);
+      case "dock": return d3Dock(ctx, P, x, y, w, d, h, color, theme);
+      case "zone": return d3Staging(ctx, P, x, y, w, d, h, color, theme);
+      case "storage":
+      default: return d3Selective(ctx, P, x, y, w, d, h, color, theme);
+    }
+  }
+
+  /* ==================================================================
    * THE REGISTRY. Exactly the domain.ELEMENTS types (no orphans). Each
    * entry has a 2D glyph (d2), a 3D form (d3) and an LOD icon (icon).
    * ================================================================== */
@@ -1494,7 +1566,11 @@
   //             used to pick the detail tier (full glyph vs LOD icon)
   function draw2D(ctx, type, g) {
     const r = REG[type];
-    if (!r || typeof r.d2 !== "function" || !g) return false;
+    if (!g) return false;
+    // Custom (user-defined) types have no REG entry; they carry a `glyph`
+    // on g and route through the generic renderer instead.
+    const isCustom = (!r || typeof r.d2 !== "function") && typeof g.glyph === "string";
+    if ((!r || typeof r.d2 !== "function") && !isCustom) return false;
     const x = g.x, y = g.y, w = g.w, d = g.d;
     if (!(isFinite(x) && isFinite(y) && w > 0 && d > 0)) return false;
     const cell = g.cellPx > 0 ? g.cellPx : 20;
@@ -1518,15 +1594,21 @@
       // already drawn by the caller), so it stays cheap + legible. The
       // animation is intentionally SKIPPED here (too small to read) - LOD-safe.
       const rr = clampN(Math.min(w, d) * 0.3, 3, Math.min(w, d) * 0.5);
-      r.icon(ctx, x + w / 2, y + d / 2, rr);
+      if (r) r.icon(ctx, x + w / 2, y + d / 2, rr);
+      else genericIcon(ctx, g.glyph, x + w / 2, y + d / 2, rr);
     } else {
       // Optional animation phase (a number in [0,1)); animatable types draw
       // their moving part, all others ignore the extra argument.
       const anim = (isFinite(g.anim) && g.anim >= 0) ? g.anim : undefined;
-      r.d2(ctx, x, y, w, d, cell, gc, color, theme, anim);
-      // Rich (zoomed-in) tier: layer the high-detail overlay ON TOP of the
-      // base glyph so animated parts keep moving and the fill is additive.
-      if (level === "rich") richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim);
+      if (r) {
+        r.d2(ctx, x, y, w, d, cell, gc, color, theme, anim);
+        // Rich (zoomed-in) tier: layer the high-detail overlay ON TOP of the
+        // base glyph so animated parts keep moving and the fill is additive.
+        if (level === "rich") richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim);
+      } else {
+        // Custom type: generic glyph parameterised by g.glyph.
+        genericGlyph2D(ctx, g.glyph, x, y, w, d, cell, gc, color, theme, anim);
+      }
     }
     ctx.restore();
     return true;
@@ -1537,7 +1619,11 @@
   // (back) corner in world cells; heightM = domain.heightM (metres).
   function draw3D(ctx, type, P, o) {
     const r = REG[type];
-    if (!r || typeof r.d3 !== "function" || typeof P !== "function" || !o) return false;
+    if (typeof P !== "function" || !o) return false;
+    // Custom (user-defined) types have no REG entry; they carry a `base` on
+    // o and route through the generic 3D form.
+    const isCustom = (!r || typeof r.d3 !== "function") && typeof o.base === "string";
+    if ((!r || typeof r.d3 !== "function") && !isCustom) return false;
     const x = o.cx, y = o.cy, w = o.w, d = o.d;
     if (!(isFinite(x) && isFinite(y) && w > 0 && d > 0)) return false;
     const h = isFinite(o.heightM) && o.heightM > 0 ? o.heightM : 1;
@@ -1547,16 +1633,21 @@
     ctx.save();
     ctx.lineJoin = "round";
     ctx.lineWidth = 1;
-    r.d3(ctx, P, x, y, w, d, h, color, theme, anim);
-    // Rich (zoomed-in) tier: layer pallets / decked posts / vehicle loads on
-    // top of the base extruded form. Gated on the caller supplying an
-    // ON-SCREEN px/cell (o.lod) that reaches the rich tier; when absent (the
-    // headless height/anim harnesses pass none) the base form draws alone, so
-    // those forms stay byte-identical to before. Deterministic seed from the
-    // element (o.seed, else its world corner) - stable, testable, no random.
-    if (isFinite(o.lod) && detailLevel(o.lod) === "rich") {
-      const seed = isFinite(o.seed) ? (o.seed | 0) : (((x | 0) * 73856093) ^ ((y | 0) * 19349663));
-      richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim);
+    if (r) {
+      r.d3(ctx, P, x, y, w, d, h, color, theme, anim);
+      // Rich (zoomed-in) tier: layer pallets / decked posts / vehicle loads on
+      // top of the base extruded form. Gated on the caller supplying an
+      // ON-SCREEN px/cell (o.lod) that reaches the rich tier; when absent (the
+      // headless height/anim harnesses pass none) the base form draws alone, so
+      // those forms stay byte-identical to before. Deterministic seed from the
+      // element (o.seed, else its world corner) - stable, testable, no random.
+      if (isFinite(o.lod) && detailLevel(o.lod) === "rich") {
+        const seed = isFinite(o.seed) ? (o.seed | 0) : (((x | 0) * 73856093) ^ ((y | 0) * 19349663));
+        richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim);
+      }
+    } else {
+      // Custom type: generic extruded form parameterised by o.base.
+      genericForm3D(ctx, P, o.base, x, y, w, d, h, color, theme, anim);
     }
     if (o.selected) selOutline(ctx, P, x, y, w, d, h, o.selColor || "#38bdf8");
     ctx.restore();

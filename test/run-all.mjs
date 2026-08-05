@@ -396,6 +396,7 @@ const HARNESSES = [
   { name: "Scenario deep-link parser (verify_deeplink.js)", args: ["verify_deeplink.js"] },
   { name: "Living-plant animation: P toggle + flow-in-3D + animated equipment (verify_animation.js)", args: ["verify_animation.js"] },
   { name: "Story Mode: cinematic guided tour plan + camera math (verify_story.js)", args: ["verify_story.js"] },
+  { name: "User-definable object library (verify_library.js)", args: ["verify_library.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 
