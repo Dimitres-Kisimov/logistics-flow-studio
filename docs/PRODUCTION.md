@@ -36,13 +36,13 @@ python -m http.server 8971 --bind 127.0.0.1
 
 ### Read the result
 
-After the app boots, the suite runs ~45 checks against the live app and writes a
+After the app boots, the suite runs ~57 checks against the live app and writes a
 single **machine-readable** line into the `#wt-selftest` element (and
 `console.log`s it, with per-check detail). Two exact formats:
 
 ```
-WT-SELFTEST: PASS 45/45
-WT-SELFTEST: FAIL 43/45 :: iso-toggle-layout-unchanged, report-build-sections
+WT-SELFTEST: PASS 57/57
+WT-SELFTEST: FAIL 43/57 :: iso-toggle-layout-unchanged, report-build-sections
 ```
 
 The `#wt-selftest` element also carries `data-pass`, `data-total` and
@@ -58,7 +58,7 @@ msedge --headless=new --disable-gpu --virtual-time-budget=12000 --dump-dom \
 ```
 
 (`chrome` works identically — same engine.) Exit criterion: the scraped line is
-`WT-SELFTEST: PASS 45/45`.
+`WT-SELFTEST: PASS 57/57`.
 
 ### What it checks
 

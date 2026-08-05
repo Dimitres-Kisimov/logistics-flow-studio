@@ -58,7 +58,8 @@
     "Informed by ASR A1.8 / ASR A2.3 / DIN 15185 - a design aid, NOT a certification.";
 
   /* ------------------------------------------------------------------
-   * THE LIBRARY. 22 named, distinct, realistic industry scenarios.
+   * THE LIBRARY. 23 named, distinct, realistic industry scenarios
+   * (22 studio-floor recipes below + the large-scale mega showcase).
    * `config` carries the deterministic build recipe:
    *   profile        one of generate.js's 4 pinned plant profiles (the
    *                  proven skeleton: docks/staging/rows/spine/pack)

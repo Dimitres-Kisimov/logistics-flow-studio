@@ -162,7 +162,7 @@
       "An offline, browser-based warehouse / WMS digital twin and plant-flow simulator - " +
       "it runs on a laptop, with no install and no account.",
     what: [
-      "Generate a whole warehouse layout from a plant profile, or start from one of the 22 synthetic industry example scenarios.",
+      "Generate a whole warehouse layout from a plant profile, or start from one of the 23 synthetic industry example scenarios.",
       "Simulate the material flow and the 7-stage WMS operation to see throughput, per-stage load and where the bottleneck is.",
       "Read the live KPI cockpit, check the layout against public safety/design guidance, and roll every layer up into one consolidated report.",
     ],

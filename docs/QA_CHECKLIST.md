@@ -33,7 +33,7 @@ Convention below: `[ ]` to tick, **command** lines are copy-pasteable.
       **`python -m http.server 8971 --bind 127.0.0.1`**
 - [ ] **Self-test passes** — open `http://127.0.0.1:8971/index.html?selftest=1`
       and read the `#wt-selftest` line / console: expect **`WT-SELFTEST: PASS n/n`**
-      (currently `45/45`).
+      (currently `57/57`).
 - [ ] **Headless one-liner** (exit criterion = the scraped PASS line):
       ```
       msedge --headless=new --disable-gpu --virtual-time-budget=12000 --dump-dom \
@@ -84,7 +84,8 @@ Convention below: `[ ]` to tick, **command** lines are copy-pasteable.
 
 ## 6. Performance (bounded effort, **not** a guarantee for arbitrary size)
 
-- [ ] **Large-layout sanity** — build a large floor (e.g. 120×80) with many
+- [ ] **Large-layout sanity** — build a large floor (e.g. 120×80, up to the
+      current 400×250 m max) with many
       elements, play the flow, and confirm it stays responsive: the render
       culls off-screen elements (`WT.view.cullToView`) and the shapes LOD icon
       kicks in when zoomed out. No per-frame allocation growth / leak over a

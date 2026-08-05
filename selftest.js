@@ -12,8 +12,8 @@
  * boot. It writes a MACHINE-READABLE result into a #wt-selftest element
  * (created here) and console.log()s it, in one of two exact formats:
  *
- *     WT-SELFTEST: PASS 47/47
- *     WT-SELFTEST: FAIL 45/47 :: <comma-separated failed check names>
+ *     WT-SELFTEST: PASS 57/57
+ *     WT-SELFTEST: FAIL 45/57 :: <comma-separated failed check names>
  *
  * A maintainer runs it headlessly (e.g. headless Edge) and reads the
  * #wt-selftest text / the console line.

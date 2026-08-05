@@ -6,6 +6,83 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [2.0.0] — 2026-08-05
+
+### Added
+- **Consolidated showpiece release.** Brings Story Mode, the 894-element
+  signature plant, the user-definable object library and the 2.5D isometric
+  view together as the flagship build, with a new README hero and captured
+  in-app screenshots.
+- No behavioural or determinism change versus 1.15.0 — this is the
+  presentation/consolidation release; the version metadata is reconciled to
+  **v2.0.0** across the docs.
+- Verification is fully green and unchanged in substance: **35 headless logic
+  harnesses** (`node test/run-all.mjs`) plus the in-browser end-to-end
+  self-test at **PASS 57/57**. Proprietary, offline-only, strict-CSP intact.
+
+## [1.15.0] — 2026-08-05
+
+### Added
+- **User-definable object library (`library.js`, `WT.library`).** The palette
+  is no longer a fixed preset list — define your own object *types* from a base
+  material-flow behaviour class (storage / conveyor / station / transporter /
+  dock / zone), organised into a categorised, collapsible palette tree; the
+  built-in equipment types become editable *seeds* (clone a built-in into a
+  custom).
+- A **"Define Object" dialog** (name, category, base, integer-metre footprint,
+  height, a 2D glyph + colour, and base-specific behaviour params) with Edit /
+  Clone / Delete. A saved def injects straight into `WT.domain.ELEMENTS` so
+  every existing consumer (capacity, aisle/overlap, compliance, the WMS/flow
+  sim, the IFC export, the 2D + 2.5D renderers, serialize) resolves it with
+  **no special-casing** and a built-in-only layout stays byte-identical.
+- Persists to localStorage, import/exports as JSON, and **embeds** any custom
+  types a layout uses into the `wt-1` serialize output (a default no-custom
+  layout serializes byte-identically to before). Deterministic: no `Date`, no
+  RNG.
+- New **`verify_library.js` harness (35th)** plus Define-Object /
+  categorised-palette in-browser self-test checks.
+
+## [1.14.0] — 2026-08-05
+
+### Added
+- **894-element signature mega-plant.** A single, deliberately huge *synthetic*
+  automated fulfilment/distribution plant added to the Example Scenarios
+  library (`examples.js`, `mega-automated-fulfilment-plant`), bringing the
+  library to **23 scenarios**.
+- Its **own large floor (372 × 248 m**, within the app's **400 × 250 m** max)
+  and a dedicated deterministic tiling builder that lays **894 elements**
+  exercising the whole equipment palette at once (AS/RS aisles, VNA, shuttle
+  high-bay, deep-lane reserve, mezzanine pick faces, a conveyor-and-sorter
+  spine with RGV/AGV lanes, inbound/outbound dock walls). Clean rack blocks
+  separated by empty streets, so it is **overlap-free** and never *fails*
+  aisle/escape compliance by construction.
+- Loads as a first-class dropdown/side-panel example, renders in 2D + 2.5D,
+  animates the material flow and works under Story Mode; the v1.6 view-culling
+  + shapes LOD keep 800+ elements smooth. Deterministic (no `Date`, no RNG);
+  the 22 existing scenarios stay byte-identical.
+- `verify_examples.js` gains 10 showcase checks; the self-test gains a live
+  "mega loads + renders + compliance-safe at 800+ elements" check.
+
+## [1.13.0] — 2026-08-05
+
+### Added
+- **Story Mode — a cinematic one-click guided tour.** A new pure, DOM-free
+  `WT.story` module (`story.js`): an ordered **7-step** plan (load a synthetic
+  e-commerce FC scenario → frame the whole plant → walk the five functional
+  zones in flow order with plain-language captions → start the live material
+  flow) plus the camera math behind the moving shot (`ease`, `frameZone`,
+  `lerpCamera`).
+- A top-bar **"Story"** control starts/exits it; a caption HUD carries
+  Pause/Resume + Skip + Exit; Esc exits; it is fully keyboard-accessible.
+  Deterministic (a frame-counted tween, no `Date`/RNG); under
+  `prefers-reduced-motion` the camera **jump-cuts** and each caption still
+  dwells.
+- Plays over the **same synthetic, illustrative** example scenario — a
+  transparent teaching animation, **not** a real DES engine, **not** a
+  measurement and **not** a certification.
+- New **`verify_story.js` harness (34th)** plus Story in-browser self-test
+  checks.
+
 ## [1.12.0] — 2026-08-04
 
 ### Added
