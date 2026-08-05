@@ -1,5 +1,33 @@
 # WarehouseTwin — Logistics Flow Studio
 
+> **An interactive, fully-offline warehouse & plant-flow simulator you operate right in your browser** — no install, no account, no server, no network calls.
+
+[![The 894-element signature "mega automated fulfilment plant" on the canvas floor plan — dense racking across the full hall in the top-down editable view, with the AI generator, properties and simulation panels](docs/img/hero-plant-2d.png)](https://dimitres-kisimov.github.io/logistics-flow-studio/)
+
+- **What** — draw *or* generate a whole warehouse floor (racks, docks, staging, conveyor, automation), then run the material flow and the standard WMS operation as a living, animated plant-sim.
+- **Why** — clarity over enterprise complexity: a transparent, game-like teaching twin that is standards-*informed* rather than a black-box tool.
+- **Proof** — an **894-element signature plant**, a browser self-test **57/57**, **35 headless logic harnesses** all green, and a **100%-offline** installable PWA.
+
+### ▶ Live app — <https://dimitres-kisimov.github.io/logistics-flow-studio/>
+
+**Marquee capabilities**
+
+- **▶ Story Mode** — a one-click **cinematic guided tour** that flies the camera zone-by-zone through the plant.
+- **894-element signature plant** — a dense, fully-automated fulfilment plant (open it directly with `?scenario=mega-automated-fulfilment-plant`) carrying every one of the 29 object types, overlap-free and compliance-safe **by construction**.
+- **User-definable object library** — define your **own** object types, *Siemens Plant Simulation UserObjects*–style: derive from a base behaviour class, give it a glyph, size and colour, and it joins the categorised palette **and** the simulation.
+- **2D ⇄ 3D** — **press `P`** (or the "2.5D view" button) to flip the whole floor between the editable top-down plan and a 2.5D isometric presentation.
+- **Animated material flow** — handling units, conveyors, RGV/AGV and AS/RS cranes move in **both** views, while a live KPI cockpit and a bounded order pool update from the same render loop.
+- **ISO/DIN-informed compliance** — a deterministic pass/warn/fail design aid (working aisles, main traffic routes, escape routes) informed by ISO 22400 / DIN 15185 / ASR — *informed by, not a certification*.
+- **Offline install** — a Progressive Web App that installs to the desktop and runs with **zero network calls**.
+
+| 2.5D isometric presentation (press `P`) | Define your own object (UserObjects-style) |
+| :--: | :--: |
+| [![The signature plant rendered as a 2.5D isometric, extruded, depth-sorted scene](docs/img/hero-plant-iso.png)](docs/img/hero-plant-iso.png) | [![The Define-Object dialog: derive a custom object type from a base behaviour class, with an honest not-a-vendor-spec note](docs/img/define-object.png)](docs/img/define-object.png) |
+
+<sub><strong>Honest by design:</strong> the signature plant is built by a <strong>deterministic procedural generator</strong> (a seeded rule/heuristic engine), <em>not</em> a trained model; every figure is <strong>synthetic and illustrative</strong> unless you import your own data; the standards work is <strong>informed by public standards, not a certification</strong>; and there is <strong>no real company, brand or site</strong>.</sub>
+
+---
+
 WarehouseTwin is an **offline, browser-based warehouse / WMS digital twin and plant-flow simulator** that runs on a laptop with no install, no account and no server. Draw a warehouse floor plan — racks, dock doors, staging, conveyor, automation — or generate a whole layout from a plant profile, then simulate the material flow and the standard warehouse operation to see throughput, per-stage load, storage occupancy and where the bottleneck is. It is deliberately game-like and honest: every figure is **synthetic and seeded** (reproducible, same seed → same result) unless you import your own data, it is **informed by public standards** (ISO 22400, DIN 15185, ASR, EN, VDI) rather than being a certification, and it makes **zero network calls** — nothing is uploaded, and it installs as a Progressive Web App that works fully offline.
 
 ![WarehouseTwin — the starter demo layout on the canvas floor plan, with the palette, properties panel and simulation controls](docs/img/warehousetwin.png)
