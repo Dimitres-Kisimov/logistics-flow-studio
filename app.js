@@ -2475,8 +2475,11 @@
   // WT.library.paletteTree() is the single source of the grouping; a fallback
   // flat tree keeps the app usable if the module is absent.
   function paletteTreeModel() {
-    if (WT.library && typeof WT.library.paletteTree === "function") return WT.library.paletteTree();
-    return [{ key: "All", label: "All objects", types: (D.paletteOrder || []).slice() }];
+    const mode = currentPlantMode(); // v2.5: Warehouse hides Production/Assembly, Factory shows it
+    if (WT.library && typeof WT.library.paletteTree === "function") return WT.library.paletteTree({ mode: mode });
+    let types = (D.paletteOrder || []).slice();
+    if (mode === "warehouse") types = types.filter((t) => !/^mfg-/.test(t)); // degraded fallback still honours mode
+    return [{ key: "All", label: "All objects", types: types }];
   }
 
   // Does a type match the live search (by its visible label, case-insensitive)?
@@ -6735,6 +6738,57 @@
     if (btn) btn.addEventListener("click", toggleDensity);
   }
 
+  // ---- v2.5 FACTORY-A: Warehouse / Factory MODE toggle --------------
+  // The spec's mode-switch declutter lever, now meaningful. A labelled,
+  // aria-pressed, keyboard-usable toolbar toggle that FILTERS the Class
+  // Library: Warehouse (the default on a FRESH profile) HIDES the new
+  // "Production / Assembly" manufacturing group so a warehouse layout stays
+  // uncluttered; Factory SHOWS it (parts Source/Drain/Station/... appear).
+  // Nothing is ever deleted - both modes are one click apart and every type
+  // stays in the domain. The root <html data-mode> state + the button
+  // chrome are SEEDED AT RUNTIME (never hardcoded in static HTML, mirroring
+  // the density lever, so verify_ui's no-baked-in-state guarantee holds) and
+  // persisted to localStorage. The filter itself lives in WT.library.
+  // paletteTree({ mode }); this only flips the root state + rebuilds palette.
+  const MODE_KEY = "wt.ui.mode.v1";
+  function readPlantMode() {
+    try { return localStorage.getItem(MODE_KEY) === "factory" ? "factory" : "warehouse"; }
+    catch (_) { return "warehouse"; }
+  }
+  function currentPlantMode() {
+    return document.documentElement.getAttribute("data-mode") === "factory" ? "factory" : "warehouse";
+  }
+  function applyPlantMode(mode) {
+    const factory = mode === "factory";
+    document.documentElement.setAttribute("data-mode", factory ? "factory" : "warehouse");
+    const btn = $("modeBtn");
+    if (btn) {
+      btn.setAttribute("aria-pressed", factory ? "true" : "false");
+      btn.setAttribute(
+        "aria-label",
+        factory
+          ? "Layout mode: Factory. Activate to switch to Warehouse and hide the Production / Assembly components."
+          : "Layout mode: Warehouse. Activate to switch to Factory and show the Production / Assembly manufacturing components."
+      );
+      const lbl = $("modeLabel");
+      if (lbl) lbl.textContent = factory ? "Factory" : "Warehouse";
+    }
+    if (typeof buildPalette === "function") buildPalette(); // re-filter the Class Library for the new mode
+  }
+  function setPlantMode(mode) {
+    const m = mode === "factory" ? "factory" : "warehouse";
+    try { localStorage.setItem(MODE_KEY, m); } catch (_) { /* storage may be unavailable */ }
+    applyPlantMode(m);
+  }
+  function togglePlantMode() {
+    setPlantMode(currentPlantMode() === "factory" ? "warehouse" : "factory");
+  }
+  function initPlantMode() {
+    applyPlantMode(readPlantMode()); // default = Warehouse on a fresh profile
+    const btn = $("modeBtn");
+    if (btn) btn.addEventListener("click", togglePlantMode);
+  }
+
   // In-browser self-test hook. ATTACHED ONLY under ?selftest=1 - a normal
   // load never exposes these internals. selftest.js drives the LIVE app
   // through the SAME functions the UI uses (no re-implementation), so the
@@ -6757,6 +6811,13 @@
         mode: () => document.documentElement.getAttribute("data-density"),
         set: (m) => setDensity(m),
         toggle: () => toggleDensity(),
+      },
+      // v2.5 FACTORY-A: drive the Warehouse/Factory mode through the SAME
+      // path the toolbar toggle uses (seeds root data-mode + re-filters palette).
+      plantMode: {
+        mode: () => currentPlantMode(),
+        set: (m) => setPlantMode(m),
+        toggle: () => togglePlantMode(),
       },
       flowPlay: flowPlay,
       flowPause: flowPause,
@@ -6805,6 +6866,7 @@
 
   function boot() {
     initDensity(); // v2.4 UI-2: seed the Simple/Expert density state first (runtime-seeded, default Simple)
+    initPlantMode(); // v2.5 FACTORY-A: seed the Warehouse/Factory mode (runtime-seeded, default Warehouse) before the palette
     buildPalette();
     wirePaletteControls(); // v2.3 UI-1: Class Library search + arrow-key nav
     buildConfigControls();

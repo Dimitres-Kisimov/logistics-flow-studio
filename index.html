@@ -77,6 +77,21 @@
         <span class="density-cap" aria-hidden="true">Density</span>
         <span id="densityLabel" class="density-mode">Simple</span>
       </button>
+      <!-- v2.5 FACTORY-A: Warehouse / Factory MODE toggle. Filters the Class
+           Library - Warehouse (the default on a fresh profile) hides the new
+           "Production / Assembly" manufacturing components (Source, Drain,
+           Station, Parallel/Assembly/Dismantle) for a calm warehouse view;
+           Factory shows them so the app models production lines, not just
+           warehouses. Nothing is removed - both modes are one click apart.
+           The root <html data-mode> state + this button's label/aria-pressed
+           are SEEDED AT RUNTIME by app.js (never hardcoded here) and persisted
+           to localStorage. Labelled, aria-pressed, keyboard-usable. -->
+      <button id="modeBtn" class="btn ghost density-toggle" type="button" aria-pressed="false"
+              aria-label="Layout mode: Warehouse. Activate to switch to Factory and show the Production / Assembly manufacturing components."
+              title="Mode — Warehouse (default) shows the warehouse palette; Factory adds the Production / Assembly manufacturing components (Source, Drain, Station, Parallel, Assembly, Dismantle) so you can build production lines. Nothing is removed; your choice is remembered on this device.">
+        <span class="density-cap" aria-hidden="true">Mode</span>
+        <span id="modeLabel" class="density-mode">Warehouse</span>
+      </button>
       <!-- Story Mode: the CINEMATIC guided tour (story.js). One click moves
            the camera to frame each zone in flow order (receiving → storage →
            picking → packing → shipping) with a plain-language caption, then

@@ -775,6 +775,119 @@
   }
 
   /* ==================================================================
+   * PRODUCTION / ASSEMBLY 2D GLYPHS (v2.5 FACTORY-A). Distinct schematic
+   * top-down glyphs for the manufacturing MaterialFlow components: a
+   * SOURCE emits parts, a DRAIN swallows them, and the STATION family
+   * carries a cog motif (machine process) with a through / merge / split
+   * flow. Illustrative synthetic schematics - NOT CAD, NOT BIM, no brand.
+   * ================================================================== */
+  // A small cog / gear (a machine motif): a hub ring + short radial teeth.
+  function cog(ctx, cx, cy, r) {
+    ring(ctx, cx, cy, r * 0.62);
+    disc(ctx, cx, cy, clampN(r * 0.18, 1, r * 0.3));
+    const teeth = 8;
+    for (let i = 0; i < teeth; i++) {
+      const a = (i / teeth) * TAU;
+      seg(ctx, cx + Math.cos(a) * r * 0.62, cy + Math.sin(a) * r * 0.62, cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    }
+  }
+
+  // Source: an emitter node radiating parts outward (little squares leaving
+  // along a big output arrow). When `anim` is a phase, the parts advance.
+  function d2Source(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const cx = x + w / 2, cy = y + d / 2;
+    const r = clampN(Math.min(w, d) * 0.22, 3, Math.min(w, d) * 0.34);
+    disc(ctx, x + w * 0.28, cy, r * 0.7);              // the emitter core
+    ring(ctx, x + w * 0.28, cy, r);
+    arr(ctx, x + w * 0.28 + r, cy, x + w - clampN(w * 0.1, 2, 8), cy, clampN(cell * 0.3, 3, 8)); // output arrow
+    const isz = clampN(Math.min(w, d) * 0.16, 2.5, 7); // emitted parts riding the arrow
+    ctx.fillStyle = gc.stroke;
+    const base = x + w * 0.28 + r + isz, span = Math.max(1, (x + w - clampN(w * 0.1, 2, 8)) - base);
+    for (let i = 0; i < 3; i++) {
+      const ph = (typeof anim === "number" && isFinite(anim)) ? anim : 0;
+      const frac = ((i / 3) + ph) % 1;
+      ctx.fillRect(base + frac * span - isz / 2, cy - isz / 2, isz, isz);
+    }
+  }
+
+  // Drain / Sink: converging chevrons swallowed into a central hole (a sink).
+  function d2Drain(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const cx = x + w / 2, cy = y + d / 2;
+    const r = clampN(Math.min(w, d) * 0.2, 3, Math.min(w, d) * 0.3);
+    // funnel walls converging to the hole
+    const m = clampN(Math.min(w, d) * 0.2, 2, 7);
+    seg(ctx, x + m, y + m, cx - r * 0.7, cy - r * 0.7);
+    seg(ctx, x + w - m, y + m, cx + r * 0.7, cy - r * 0.7);
+    seg(ctx, x + m, y + d - m, cx - r * 0.7, cy + r * 0.7);
+    seg(ctx, x + w - m, y + d - m, cx + r * 0.7, cy + r * 0.7);
+    ring(ctx, cx, cy, r);
+    disc(ctx, cx, cy, r * 0.4);                        // the sink hole
+    arr(ctx, x + m, cy, cx - r, cy, clampN(cell * 0.26, 3, 7)); // intake arrow
+  }
+
+  // Station (single process): a machine housing with a cog + a through arrow
+  // (part enters left, exits right). `anim` advances the through part.
+  function d2Station2(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    ctx.strokeRect(ix, iy, iw, ih);                    // the machine housing
+    const cy = iy + ih / 2;
+    cog(ctx, ix + iw * 0.5, cy, clampN(Math.min(iw, ih) * 0.3, 4, 14));
+    arr(ctx, ix, cy, ix + iw * 0.24, cy, clampN(cell * 0.24, 3, 7));            // in port
+    arr(ctx, ix + iw * 0.76, cy, ix + iw, cy, clampN(cell * 0.24, 3, 7));       // out port
+    if (typeof anim === "number" && isFinite(anim)) {
+      const isz = clampN(Math.min(iw, ih) * 0.18, 2.5, 8);
+      ctx.fillStyle = gc.stroke;
+      const frac = anim % 1;
+      ctx.fillRect(ix + frac * (iw - isz), cy - isz / 2, isz, isz);
+    }
+  }
+
+  // Parallel station (N machines): a row of machine housings, each cogged,
+  // with a shared through arrow underneath (throughput scales with count).
+  function d2ParallelStation(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.14, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const n = clampN(Math.round(iw / cell), 2, 5);
+    const gap = clampN(iw * 0.04, 1, 4);
+    const bw = (iw - gap * (n - 1)) / n, bh = ih * 0.66;
+    for (let i = 0; i < n; i++) {
+      const bx = ix + i * (bw + gap);
+      ctx.strokeRect(bx, iy, bw, bh);
+      cog(ctx, bx + bw / 2, iy + bh / 2, clampN(Math.min(bw, bh) * 0.32, 3, 10));
+    }
+    arr(ctx, ix, iy + ih * 0.86, ix + iw, iy + ih * 0.86, clampN(cell * 0.24, 3, 7)); // shared flow line
+  }
+
+  // Assembly (join): two input arrows MERGE into one output + a cog at the join.
+  function d2Assembly(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const jx = ix + iw * 0.58, cyc = iy + ih / 2;      // the join point
+    arr(ctx, ix, iy + ih * 0.22, jx, cyc, clampN(cell * 0.22, 3, 6)); // input A (top)
+    arr(ctx, ix, iy + ih * 0.78, jx, cyc, clampN(cell * 0.22, 3, 6)); // input B (bottom)
+    cog(ctx, jx, cyc, clampN(Math.min(iw, ih) * 0.24, 3, 11));
+    arr(ctx, jx, cyc, ix + iw, cyc, clampN(cell * 0.26, 3, 8));       // single output
+  }
+
+  // Dismantle (split): one input arrow SPLITS into two outputs + a cog.
+  function d2Dismantle(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const jx = ix + iw * 0.42, cyc = iy + ih / 2;      // the split point
+    arr(ctx, ix, cyc, jx, cyc, clampN(cell * 0.26, 3, 8));           // single input
+    cog(ctx, jx, cyc, clampN(Math.min(iw, ih) * 0.24, 3, 11));
+    arr(ctx, jx, cyc, ix + iw, iy + ih * 0.22, clampN(cell * 0.22, 3, 6)); // output A (top)
+    arr(ctx, jx, cyc, ix + iw, iy + ih * 0.78, clampN(cell * 0.22, 3, 6)); // output B (bottom)
+  }
+
+  /* ==================================================================
    * TINY LOD ICONS. Drawn centred at (cx,cy) with radius r when a
    * footprint is too small on-screen for the full glyph. Cheap (a few
    * strokes) and legible at any zoom.
@@ -813,6 +926,13 @@
   function icReturn(ctx, cx, cy, r) { arr(ctx, cx + r, cy, cx - r, cy, r * 0.6); }
   function icGate(ctx, cx, cy, r) { ctx.strokeRect(cx - r * 0.8, cy - r, r * 1.6, r * 2); seg(ctx, cx - r * 0.8, cy - r * 0.4, cx + r * 0.8, cy - r * 0.4); seg(ctx, cx - r * 0.8, cy + r * 0.3, cx + r * 0.8, cy + r * 0.3); }
   function icLight(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r, r * 2, r * 2); disc(ctx, cx, cy, r * 0.35); }
+  // v2.5 FACTORY-A production icons.
+  function icSource(ctx, cx, cy, r) { ring(ctx, cx - r * 0.4, cy, r * 0.5); arr(ctx, cx - r * 0.4, cy, cx + r, cy, r * 0.5); }
+  function icDrain(ctx, cx, cy, r) { arr(ctx, cx - r, cy, cx + r * 0.3, cy, r * 0.5); disc(ctx, cx + r * 0.55, cy, r * 0.4); }
+  function icGear(ctx, cx, cy, r) { ring(ctx, cx, cy, r * 0.55); for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; seg(ctx, cx + Math.cos(a) * r * 0.55, cy + Math.sin(a) * r * 0.55, cx + Math.cos(a) * r, cy + Math.sin(a) * r); } }
+  function icGears(ctx, cx, cy, r) { icGear(ctx, cx - r * 0.45, cy, r * 0.6); icGear(ctx, cx + r * 0.5, cy, r * 0.55); }
+  function icMerge(ctx, cx, cy, r) { arr(ctx, cx - r, cy - r * 0.7, cx, cy, r * 0.4); arr(ctx, cx - r, cy + r * 0.7, cx, cy, r * 0.4); arr(ctx, cx, cy, cx + r, cy, r * 0.4); }
+  function icSplit(ctx, cx, cy, r) { arr(ctx, cx - r, cy, cx, cy, r * 0.4); arr(ctx, cx, cy, cx + r, cy - r * 0.7, r * 0.4); arr(ctx, cx, cy, cx + r, cy + r * 0.7, r * 0.4); }
 
   /* ==================================================================
    * 3D PRIMITIVES (world cells -> px via the caller-supplied P). All
@@ -1280,6 +1400,74 @@
     }
   }
 
+  /* ------------------------------------------------------------------
+   * PRODUCTION / ASSEMBLY 3D FORMS (v2.5 FACTORY-A). Distinct extruded
+   * forms for the manufacturing components, reusing the same primitives
+   * (box3d/colBox/edge/quad); extruded by the domain heightM so a taller
+   * element rises on screen. Illustrative, NOT CAD/BIM, no brand.
+   * ------------------------------------------------------------------ */
+  // Source: a squat emitter block with a raised spout and a part cube leaving.
+  function d3Source(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w * 0.6, d, h, color);                    // the emitter body
+    const bm = beamColor(color, theme);
+    edge(ctx, P, x + w * 0.6, y + d / 2, h * 0.5, x + w, y + d / 2, h * 0.5, bm, 2); // the output spout
+    const t = clampN(Math.min(w, d) * 0.22, 0.2, 0.8);
+    const ph = (typeof anim === "number" && isFinite(anim)) ? anim % 1 : 0.5;
+    const bx = x + w * 0.6 + ph * (w * 0.4 - t);
+    box3d(ctx, P, bx, y + (d - t) / 2, t, t, h * 0.5 + t, lighten(color, 0.2)); // an emitted part
+  }
+
+  // Drain / Sink: a hopper - a full-height rim narrowing to a low inner well.
+  function d3Drain(ctx, P, x, y, w, d, h, color, theme) {
+    box3d(ctx, P, x, y, w, d, h * 0.28, color);                   // the low outer pad
+    const bm = beamColor(color, theme);
+    // rim posts + converging edges into a central well (the sink)
+    const inx = clampN(Math.min(w, d) * 0.3, 0.3, 2);
+    colBox(ctx, P, x + inx, y + inx, inx * 0.5, h, shade(color, 0.8));
+    colBox(ctx, P, x + w - inx, y + inx, inx * 0.5, h, shade(color, 0.8));
+    colBox(ctx, P, x + inx, y + d - inx, inx * 0.5, h, shade(color, 0.8));
+    colBox(ctx, P, x + w - inx, y + d - inx, inx * 0.5, h, shade(color, 0.8));
+    edge(ctx, P, x + inx, y + inx, h, x + w / 2, y + d / 2, h * 0.28, bm, 1.4);
+    edge(ctx, P, x + w - inx, y + inx, h, x + w / 2, y + d / 2, h * 0.28, bm, 1.4);
+    edge(ctx, P, x + inx, y + d - inx, h, x + w / 2, y + d / 2, h * 0.28, bm, 1.4);
+    edge(ctx, P, x + w - inx, y + d - inx, h, x + w / 2, y + d / 2, h * 0.28, bm, 1.4);
+  }
+
+  // A machine housing: a solid box + a cog disc etched on the front face and a
+  // shared helper for the station family. `ports` = "through" | "merge" | "split".
+  function d3Machine(ctx, P, x, y, w, d, h, color, theme, ports, anim) {
+    box3d(ctx, P, x, y, w, d, h, color);                          // the housing
+    const bm = beamColor(color, theme);
+    // a cog ring on the top face
+    const cxw = x + w / 2, cyw = y + d / 2, R = Math.min(w, d) * 0.3;
+    let prev = null;
+    for (let i = 0; i <= 10; i++) {
+      const a = i / 10 * TAU, p = P(cxw + Math.cos(a) * R, cyw + Math.sin(a) * R, h);
+      if (prev) { ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(p.x, p.y); ctx.strokeStyle = bm; ctx.lineWidth = 1.2; ctx.stroke(); }
+      prev = p;
+    }
+    const z = h * 0.5;
+    if (ports === "merge") {
+      edge(ctx, P, x, y + d * 0.25, z, x, y + d * 0.75, z, bm, 1.6); // two inputs (left face)
+      edge(ctx, P, x + w, y + d / 2, z, x + w, y + d / 2, z, bm, 1.6); // one output (right)
+    } else if (ports === "split") {
+      edge(ctx, P, x, y + d / 2, z, x, y + d / 2, z, bm, 1.6);       // one input
+      edge(ctx, P, x + w, y + d * 0.25, z, x + w, y + d * 0.75, z, bm, 1.6); // two outputs
+    } else {
+      edge(ctx, P, x, y + d / 2, z, x + w, y + d / 2, z, bm, 1.6);   // through
+    }
+  }
+  function d3Station2(ctx, P, x, y, w, d, h, color, theme, anim) { d3Machine(ctx, P, x, y, w, d, h, color, theme, "through", anim); }
+
+  // Parallel station: a row of N machine housings side by side.
+  function d3ParallelStation(ctx, P, x, y, w, d, h, color, theme, anim) {
+    const n = clampN(Math.round(w / 1.3), 2, 4);
+    const gap = w * 0.06, bw = (w - gap * (n - 1)) / n;
+    for (let i = 0; i < n; i++) d3Machine(ctx, P, x + i * (bw + gap), y, bw, d, h, i % 2 ? lighten(color, 0.08) : color, theme, "through", anim);
+  }
+  function d3Assembly(ctx, P, x, y, w, d, h, color, theme, anim) { d3Machine(ctx, P, x, y, w, d, h, color, theme, "merge", anim); }
+  function d3Dismantle(ctx, P, x, y, w, d, h, color, theme, anim) { d3Machine(ctx, P, x, y, w, d, h, color, theme, "split", anim); }
+
   /* ==================================================================
    * RICH DETAIL TIER (v1.11 "realistic high-detail rendering"). A THIRD
    * LOD tier drawn ONLY when an element reads large on screen (zoomed in):
@@ -1738,6 +1926,13 @@
     "stretch-wrap": { d2: d2StretchWrap, d3: d3StretchWrap, icon: icWrap, g2: "turntable ring + pallet + rotating wrap arm", f3: "turntable base + pallet + orbiting wrap mast" },
     "returns-station": { d2: d2Returns, d3: d3Returns, icon: icReturn, g2: "bench + return arrow + QA lens", f3: "bench on legs + inspection screen" },
     "gate": { d2: d2Gate, d3: d3Gate, icon: icGate, g2: "side posts + horizontal door slats + latch", f3: "wall / door frame + roller-door slats" },
+    // v2.5 FACTORY-A: Production / Assembly manufacturing components.
+    "mfg-source": { d2: d2Source, d3: d3Source, icon: icSource, g2: "emitter node radiating parts along an output arrow", f3: "emitter block + output spout + a part leaving" },
+    "mfg-drain": { d2: d2Drain, d3: d3Drain, icon: icDrain, g2: "converging funnel walls into a central sink hole", f3: "hopper rim converging to a low inner well" },
+    "mfg-station": { d2: d2Station2, d3: d3Station2, icon: icGear, g2: "machine housing + cog + in/out through arrows", f3: "machine housing + cog ring + through ports" },
+    "mfg-parallel-station": { d2: d2ParallelStation, d3: d3ParallelStation, icon: icGears, g2: "a row of cogged machine boxes + shared flow line", f3: "a row of N machine housings side by side" },
+    "mfg-assembly": { d2: d2Assembly, d3: d3Assembly, icon: icMerge, g2: "two input arrows merging into one + cog at the join", f3: "machine housing + two inputs merging to one output" },
+    "mfg-dismantle": { d2: d2Dismantle, d3: d3Dismantle, icon: icSplit, g2: "one input arrow splitting into two outputs + cog", f3: "machine housing + one input splitting to two outputs" },
   };
 
   /* ==================================================================

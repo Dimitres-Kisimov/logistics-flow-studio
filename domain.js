@@ -361,6 +361,75 @@
       w: 2, d: 1, color: "#78716c", resizable: false, heightM: 4.0,
       desc: "An internal sectional door / barrier that segregates zones (fire, security or temperature separation) - distinct from a loading dock door (no vehicle bay, no inbound/outbound flow direction). Boundary element: 0 storage capacity. Synthetic teaching element.",
     },
+
+    // ==================================================================
+    // PRODUCTION / ASSEMBLY (v2.5 FACTORY-A "manufacturing components").
+    // Siemens-Plant-Simulation-style MaterialFlow parts so the app models
+    // FACTORIES, not just warehouses: a Source emits parts, a Drain
+    // consumes them, and a family of Stations processes them. These are
+    // the FIRST built-in types to DECLARE a `base` behaviour class - the
+    // SAME mechanism library.js custom objects use (storage|conveyor|
+    // station|transporter|dock|zone) - so they RIDE the existing flow
+    // machinery with NO re-invented sim: Source/Drain map onto the dock
+    // ENDPOINT path (a flow source / sink, via elementBase -> "dock" + io)
+    // and the Station family onto the station-SERVER path (via elementBase
+    // -> "station", the same class the custom-object station uses and the
+    // flow sim already treats as a FIFO server). elementBase()/flowsim's
+    // baseOf() honour a DECLARED base on a built-in; the ~30 warehouse
+    // built-ins declare none, so every base-aware branch stays a strict
+    // NO-OP for a warehouse-only layout (behaviour BYTE-IDENTICAL).
+    //
+    // Category "flow" -> 0 storage positions (like docks / stations /
+    // conveyors: elementCapacity() returns 0). Assembly / Dismantle carry
+    // an inputs / outputs COUNT now (represented STRUCTURALLY - a station
+    // with a BOM count); the deep combine / split flow logic is DEFERRED
+    // to the line-simulation build (honest). Honest, synthetic teaching
+    // elements - no vendor spec, no real brand or model.
+    // ==================================================================
+    "mfg-source": {
+      id: "mfg-source", label: "Source (parts)", category: "flow",
+      base: "dock", io: "receiving", w: 2, d: 2, color: "#16a34a", resizable: false, heightM: 1.6,
+      // emitRatePerHr: work-piece parts EMITTED per hour (inter-arrival =
+      // 3600 / rate seconds). Synthetic order-of-magnitude teaching value;
+      // the live part-flow reuses the WMS/flow line rate (no separate clock).
+      emitRatePerHr: 120,
+      desc: "Production SOURCE: emits work-piece PARTS into the line at a set inter-arrival rate (~120 parts/hr here => ~30 s apart). A flow ENTRY endpoint (maps onto the receiving-dock path) - parts spawn here and travel Source -> Station -> ... -> Drain along the connected conveyors, reusing the existing material-flow animation. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "mfg-drain": {
+      id: "mfg-drain", label: "Drain / Sink (parts)", category: "flow",
+      base: "dock", io: "shipping", w: 2, d: 2, color: "#b91c1c", resizable: false, heightM: 1.6,
+      sink: true,
+      desc: "Production DRAIN / SINK: consumes FINISHED parts and counts throughput - the end of a production line. A flow EXIT endpoint (maps onto the shipping-dock path). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "mfg-station": {
+      id: "mfg-station", label: "Station (process)", category: "flow",
+      base: "station", w: 3, d: 2, color: "#2563eb", resizable: true, heightM: 2.2,
+      // cycleSec: single-machine process time per part; servers: 1 machine.
+      cycleSec: 30, servers: 1,
+      desc: "Single-machine process STATION: one server with a cycle time (~30 s/part). Maps onto the station-SERVER flow path (parts pass THROUGH it, like a pack station). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "mfg-parallel-station": {
+      id: "mfg-parallel-station", label: "Parallel station (N machines)", category: "flow",
+      base: "station", w: 4, d: 3, color: "#4f46e5", resizable: true, heightM: 2.2,
+      // servers: N identical machines in parallel; stage throughput scales
+      // with the machine count (deep per-server queueing deferred to line-sim).
+      cycleSec: 30, servers: 3,
+      desc: "Parallel STATION: N identical machines working in PARALLEL (servers = 3 here), so the stage throughput scales with the machine count. Maps onto the station-server path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "mfg-assembly": {
+      id: "mfg-assembly", label: "Assembly station (join)", category: "flow",
+      base: "station", w: 4, d: 3, color: "#7c3aed", resizable: true, heightM: 2.4,
+      // inputs: how many input parts combine into one (a simple BOM count).
+      cycleSec: 40, servers: 1, inputs: 2,
+      desc: "Assembly STATION: combines SEVERAL input parts into ONE (a simple BOM - inputs = 2 here) before releasing it downstream. Represented STRUCTURALLY now (a station carrying an inputs count); the deep combine / BOM flow logic is DEFERRED to the line-simulation build. Maps onto the station-server path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "mfg-dismantle": {
+      id: "mfg-dismantle", label: "Dismantle station (split)", category: "flow",
+      base: "station", w: 4, d: 3, color: "#db2777", resizable: true, heightM: 2.4,
+      // outputs: how many parts one input splits into.
+      cycleSec: 40, servers: 1, outputs: 2,
+      desc: "Dismantle STATION: SPLITS one part into SEVERAL (outputs = 2 here). Represented STRUCTURALLY now (a station carrying an outputs count); the deep split flow logic is DEFERRED to the line-simulation build. Maps onto the station-server path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
   };
 
   /* ------------------------------------------------------------------
@@ -487,16 +556,19 @@
     return PALLETS.find((p) => p.id === id) || PALLETS[0];
   }
 
-  // The BASE behaviour class of a type - ONLY user-defined (library.js)
-  // types carry a `base`; every built-in returns null, so every base-aware
-  // branch below is a strict no-op for a built-in-only layout (behaviour
-  // stays byte-identical). One of: storage|conveyor|station|transporter|
-  // dock|zone. Custom storage types use category "storage" (so capacity /
+  // The BASE behaviour class of a type - a def DECLARES it via `base`. Two
+  // kinds of def declare one: user-defined (library.js) custom objects, and
+  // the v2.5 FACTORY-A manufacturing built-ins (Source/Drain -> "dock",
+  // the Station family -> "station"). Every WAREHOUSE built-in declares
+  // NONE and returns null, so every base-aware branch below is a strict
+  // no-op for a warehouse-only layout (behaviour stays BYTE-IDENTICAL - the
+  // new types are additive). One of: storage|conveyor|station|transporter|
+  // dock|zone. Storage-base types use category "storage" (so capacity /
   // aisles / slotting already treat them), so `base` here only routes the
   // FLOW-side helpers (connectors + dock endpoints).
   function elementBase(type) {
     const def = ELEMENTS[type];
-    return def && def.custom && typeof def.base === "string" ? def.base : null;
+    return def && typeof def.base === "string" ? def.base : null;
   }
 
   /* ------------------------------------------------------------------
@@ -774,6 +846,9 @@
       "rgv", "agv",
       "forklift", "charging-station", "sorter", "stretch-wrap",
       "returns-station", "gate",
+      // v2.5 FACTORY-A: Production / Assembly manufacturing components.
+      "mfg-source", "mfg-drain", "mfg-station", "mfg-parallel-station",
+      "mfg-assembly", "mfg-dismantle",
     ],
   };
 })();

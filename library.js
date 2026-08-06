@@ -63,6 +63,10 @@
    * given). GROUP_ORDER fixes the display order.
    * ------------------------------------------------------------------ */
   const MY_OBJECTS = "My Objects";
+  // v2.5 FACTORY-A: the manufacturing group. It is filtered by the Warehouse
+  // / Factory MODE switch (paletteTree({ mode })): hidden in Warehouse mode,
+  // shown in Factory mode. Nothing is ever deleted - both modes are reachable.
+  const PRODUCTION = "Production / Assembly";
   const GROUP_ORDER = [
     "Storage & Racking",
     "Conveying & Sortation",
@@ -70,6 +74,7 @@
     "Transport",
     "Docks & Endpoints",
     "Zones",
+    PRODUCTION,
     MY_OBJECTS,
   ];
   // Which built-in type sits in which group (display only; the built-ins are
@@ -92,6 +97,9 @@
     "dock-in": "Docks & Endpoints", "dock-out": "Docks & Endpoints",
     "staging": "Docks & Endpoints",
     "gate": "Zones",
+    // v2.5 FACTORY-A manufacturing components (Production / Assembly group).
+    "mfg-source": PRODUCTION, "mfg-drain": PRODUCTION, "mfg-station": PRODUCTION,
+    "mfg-parallel-station": PRODUCTION, "mfg-assembly": PRODUCTION, "mfg-dismantle": PRODUCTION,
   };
   // The base each built-in maps onto (so a CLONE of a built-in gets a sane
   // base). Used only when cloning; the built-in itself is never modified.
@@ -108,6 +116,10 @@
     "rgv": "transporter", "agv": "transporter",
     "dock-in": "dock", "dock-out": "dock", "staging": "dock",
     "gate": "zone",
+    // v2.5 FACTORY-A: cloning a manufacturing built-in seeds the right base
+    // (Source/Drain -> dock endpoint, the Station family -> station server).
+    "mfg-source": "dock", "mfg-drain": "dock", "mfg-station": "station",
+    "mfg-parallel-station": "station", "mfg-assembly": "station", "mfg-dismantle": "station",
   };
 
   // The live store of user-defined types, keyed by id (insertion order kept
@@ -312,8 +324,20 @@
    * dropped EXCEPT "My Objects" (always shown so the user sees where their
    * definitions land). Custom categories outside the canonical set get
    * their own group appended in first-seen order.
+   *
+   * v2.5 FACTORY-A: the Warehouse / Factory MODE switch. `opts.mode` is
+   * "warehouse" | "factory":
+   *   - "warehouse" HIDES the "Production / Assembly" manufacturing group
+   *     (a warehouse layout does not need the factory parts) - the spec's
+   *     declutter lever;
+   *   - "factory" (or ANY other value, incl. none) SHOWS every group.
+   * Nothing is ever deleted - a hidden group's types stay in the domain and
+   * are reachable by switching mode. A pure function of (mode, registry);
+   * no DOM, no localStorage (the caller owns persistence). NO Date, NO RNG.
    * ------------------------------------------------------------------ */
-  function paletteTree() {
+  function paletteTree(opts) {
+    const mode = opts && typeof opts.mode === "string" ? opts.mode : null;
+    const hideProduction = mode === "warehouse"; // Factory (and default) shows it
     const els = ELEMENTS();
     const order = (D().paletteOrder || []).slice();
     const groups = {};
@@ -337,7 +361,8 @@
     }
     return groupList
       .map((label) => groups[label])
-      .filter((g) => g.types.length > 0 || g.label === MY_OBJECTS);
+      .filter((g) => g.types.length > 0 || g.label === MY_OBJECTS)
+      .filter((g) => !(hideProduction && g.label === PRODUCTION));
   }
 
   /* ------------------------------------------------------------------
@@ -464,6 +489,7 @@
     GLYPHS: GLYPHS,
     GROUP_ORDER: GROUP_ORDER,
     MY_OBJECTS: MY_OBJECTS,
+    PRODUCTION: PRODUCTION,
     BUILTIN_BASE: BUILTIN_BASE,
     buildDef: buildDef,
     define: define,

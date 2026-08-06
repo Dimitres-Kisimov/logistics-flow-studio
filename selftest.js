@@ -653,6 +653,75 @@
       };
     });
 
+    // ---- v2.5 FACTORY-A: Warehouse / Factory MODE + manufacturing parts -
+    // The mode toggle exists, is labelled + aria-pressed, seeds a root
+    // data-mode state; switching to Factory REVEALS the Production / Assembly
+    // group in the Class Library and lets a manufacturing component be placed;
+    // Warehouse HIDES that group again. Every state is restored afterwards.
+    check("factory-mode-toggle-present-and-labelled", function () {
+      var btn = $("modeBtn");
+      if (!btn) return { ok: false, detail: "no #modeBtn" };
+      var pressed = btn.getAttribute("aria-pressed");
+      var name = (btn.getAttribute("aria-label") || btn.textContent || btn.getAttribute("title") || "").trim();
+      var rootState = document.documentElement.getAttribute("data-mode");
+      var ok = (pressed === "true" || pressed === "false") && name.length > 0 &&
+        (rootState === "warehouse" || rootState === "factory");
+      return { ok: ok, detail: "aria-pressed=" + pressed + " root=" + rootState + " named=" + (name.length > 0) };
+    });
+    check("factory-mode-shows-production-group-and-places-a-component", function () {
+      if (!haveApi || !API.plantMode || !API.library) return { ok: false, detail: "no plantMode/library API" };
+      var PROD = (WT.library && WT.library.PRODUCTION) || "Production / Assembly";
+      function hasGroup(label) {
+        var found = false;
+        document.querySelectorAll("#palette .pal-group-head").forEach(function (h) { if (h.dataset.group === label) found = true; });
+        return found;
+      }
+      var original = API.plantMode.mode();
+      // Warehouse HIDES the group.
+      API.plantMode.set("warehouse");
+      var hiddenInWarehouse = !hasGroup(PROD);
+      var whRoot = document.documentElement.getAttribute("data-mode");
+      // Factory SHOWS it + a manufacturing component is placeable.
+      API.plantMode.set("factory");
+      var shownInFactory = hasGroup(PROD);
+      var facRoot = document.documentElement.getAttribute("data-mode");
+      var before = API.state.elements.length;
+      var lay = API.currentLayout();
+      var placed = false;
+      var spots = [[0, 0], [1, 1], [0, (lay.gridH || 10) - 1], [(lay.gridW || 10) - 2, 0]];
+      for (var i = 0; i < spots.length && !placed; i++) {
+        API.library.placeAt("mfg-source", spots[i][0], spots[i][1]);
+        if (API.state.elements.length > before) placed = true;
+      }
+      var el = placed ? API.state.elements[API.state.elements.length - 1] : null;
+      var typeOk = !!(el && el.type === "mfg-source");
+      // cleanup: drop the placed instance + restore the profile's mode.
+      if (el) API.state.elements = API.state.elements.filter(function (e) { return e.id !== el.id; });
+      API.plantMode.set(original);
+      API.library.buildPalette();
+      API.render();
+      var ok = hiddenInWarehouse && shownInFactory && placed && typeOk && whRoot === "warehouse" && facRoot === "factory";
+      return { ok: ok, detail: "whHidden=" + hiddenInWarehouse + " facShown=" + shownInFactory + " placed=" + placed + " typeOk=" + typeOk };
+    });
+    check("factory-mode-part-flows-source-to-drain", function () {
+      if (!WT.flowsim || typeof WT.flowsim.buildWaypoints !== "function") return { ok: false, detail: "no flowsim" };
+      // A minimal production line: Source -> conveyor -> Station -> Drain. The
+      // Part MU rides the EXISTING flow animation: the spine anchors receiving
+      // at the Source and shipping at the Drain (deep line-sim deferred).
+      var lay = { gridW: 22, gridH: 12, elements: [
+        { id: "s1", type: "mfg-source", x: 1, y: 5, w: 2, d: 2 },
+        { id: "c1", type: "conveyor", x: 3, y: 5, w: 9, d: 1 },
+        { id: "m1", type: "mfg-station", x: 12, y: 4, w: 3, d: 2 },
+        { id: "d1", type: "mfg-drain", x: 19, y: 5, w: 2, d: 2 },
+      ] };
+      var wp = WT.flowsim.buildWaypoints(lay);
+      var recv = null, ship = null;
+      for (var i = 0; i < wp.length; i++) { if (wp[i].stage === "receiving") recv = wp[i]; if (wp[i].stage === "shipping") ship = wp[i]; }
+      var srcOk = !!recv && recv.x < 7;   // receiving anchored at the Source (left)
+      var drnOk = !!ship && ship.x > 15;  // shipping anchored at the Drain (right)
+      return { ok: srcOk && drnOk && wp.length >= 5, detail: "recv.x=" + (recv && recv.x) + " ship.x=" + (ship && ship.x) + " wps=" + wp.length };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

@@ -111,6 +111,13 @@
     "stretch-wrap": 2.6,
     "returns-station": 1.1,
     "gate": 4.0,
+    // v2.5 FACTORY-A "manufacturing components" (mirror domain heightM).
+    "mfg-source": 1.6,
+    "mfg-drain": 1.6,
+    "mfg-station": 2.2,
+    "mfg-parallel-station": 2.2,
+    "mfg-assembly": 2.4,
+    "mfg-dismantle": 2.4,
   };
 
   // Fallback used when a type is unknown to BOTH the domain model and the

@@ -147,14 +147,17 @@
     const def = (D && D.ELEMENTS[e.type]) || {};
     return !!def.pickFace || !!def.goodsToPerson || e.type === "pallet-flow";
   }
-  // The BASE behaviour class of a user-defined type (library.js). Built-ins
-  // carry NO `base`, so every base-aware branch below is a strict NO-OP for a
-  // built-in-only layout - the flow sim stays byte-identical. Defensive: any
-  // missing domain / def yields null.
+  // The BASE behaviour class DECLARED by a type's def - user-defined
+  // (library.js) custom objects AND the v2.5 FACTORY-A manufacturing
+  // built-ins (Source/Drain -> "dock", the Station family -> "station").
+  // Warehouse built-ins declare NO `base`, so every base-aware branch below
+  // is a strict NO-OP for a warehouse-only layout - the flow sim stays
+  // byte-identical (the new types are additive). Defensive: any missing
+  // domain / def yields null.
   function baseOf(e) {
     const els = WT.domain && WT.domain.ELEMENTS;
     const def = els && e && els[e.type];
-    return def && def.custom && typeof def.base === "string" ? def.base : null;
+    return def && typeof def.base === "string" ? def.base : null;
   }
   // A user-defined DOCK's flow direction ("receiving" | "shipping" | null).
   function dockDir(e) {

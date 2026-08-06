@@ -238,7 +238,15 @@ if (megaEx) {
   // conveyor-curve (v2.1) is an ADDITIVE palette type placed from the palette /
   // by rotating a corner; it is NOT retro-fitted into the byte-identical mega
   // builder, so it is exempt from the showcase's "covers the palette" property.
-  const MEGA_EXEMPT = { "conveyor-curve": 1 };
+  // The v2.5 FACTORY-A manufacturing components (mfg-*) are the Factory mode's
+  // Production / Assembly group; the mega showcase is a synthetic WAREHOUSE
+  // distribution plant (Warehouse mode), so it legitimately omits them and
+  // stays byte-identical - they are exempt from the warehouse-palette property.
+  const MEGA_EXEMPT = {
+    "conveyor-curve": 1,
+    "mfg-source": 1, "mfg-drain": 1, "mfg-station": 1,
+    "mfg-parallel-station": 1, "mfg-assembly": 1, "mfg-dismantle": 1,
+  };
   const megaRequired = D.paletteOrder.filter((t) => !MEGA_EXEMPT[t]);
   const missingPalette = megaRequired.filter((t) => !megaTypes[t]);
   check("showcase exercises the full core equipment palette (additive v2.1 curved conveyor exempt)",

@@ -341,6 +341,40 @@ check("honesty labels present (illustrative / NOT a vendor spec)",
   /[Ii]llustrative/.test(LIB_SRC) && /NOT a vendor spec/.test(LIB_SRC));
 
 /* ---------------------------------------------------------------------
+ * 12. v2.5 FACTORY-A: Warehouse / Factory MODE switch filters the palette.
+ * The six manufacturing built-ins land in the "Production / Assembly"
+ * group; Warehouse mode HIDES that group; Factory (and the default) SHOWS
+ * it; nothing else changes and nothing is deleted (both modes reachable).
+ * ------------------------------------------------------------------- */
+const MFG = ["mfg-source", "mfg-drain", "mfg-station", "mfg-parallel-station", "mfg-assembly", "mfg-dismantle"];
+const PROD = L.PRODUCTION || "Production / Assembly";
+const groupOf = (treeArr, label) => treeArr.find((g) => g.label === label) || null;
+
+const facTree = L.paletteTree({ mode: "factory" });
+const whTree = L.paletteTree({ mode: "warehouse" });
+const defTree = L.paletteTree(); // no mode = show everything (byte-compatible default)
+
+const prodFactory = groupOf(facTree, PROD);
+check("FACTORY-A: the six manufacturing components land in the Production / Assembly group (Factory mode)",
+  !!prodFactory && MFG.every((t) => prodFactory.types.indexOf(t) !== -1),
+  prodFactory ? prodFactory.types.join(",") : "no Production group");
+
+check("FACTORY-A: Warehouse mode HIDES the Production / Assembly group; Factory + default SHOW it",
+  groupOf(whTree, PROD) === null && !!groupOf(facTree, PROD) && !!groupOf(defTree, PROD),
+  "warehouse=" + (groupOf(whTree, PROD) ? "present" : "hidden") +
+  " factory=" + (groupOf(facTree, PROD) ? "shown" : "MISSING") +
+  " default=" + (groupOf(defTree, PROD) ? "shown" : "MISSING"));
+
+check("FACTORY-A: the mode switch removes NOTHING else - the warehouse groups are identical across modes",
+  ["Storage & Racking", "Conveying & Sortation", "Stations", "Transport", "Docks & Endpoints", "Zones"].every((lbl) => {
+    const a = groupOf(whTree, lbl), b = groupOf(facTree, lbl);
+    return a && b && a.types.join(",") === b.types.join(",");
+  }), "warehouse groups unchanged between modes");
+
+check("FACTORY-A: cloning a manufacturing built-in SEED keeps its base (mfg-station -> station) and leaves the built-in intact",
+  (() => { const c = L.clone("mfg-station", "My machine"); return c && c.custom === true && c.base === "station" && D.ELEMENTS["mfg-station"] && !D.ELEMENTS["mfg-station"].custom; })());
+
+/* ---------------------------------------------------------------------
  * Summary.
  * ------------------------------------------------------------------- */
 console.log("");

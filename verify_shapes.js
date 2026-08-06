@@ -479,8 +479,81 @@ function recCtx() {
     !addFail && !moveFail && !gateFail, addFail || moveFail || gateFail || MANNED.length + " manned stations OK");
 })();
 
+/* =====================================================================
+ * v2.5 FACTORY-A "manufacturing components" - focused checks for the six
+ * NEW Production / Assembly types. The all-types smoke above already
+ * exercises them; these assert the NEW set specifically: registered +
+ * palette-listed + a DECLARED base behaviour (dock/station) so they ride
+ * the flow machinery, 0 capacity (all flow), a focused non-mutating 2D+3D
+ * draw smoke, that the six glyphs are all DISTINCT, and that the process
+ * station animates its through-part.
+ * ===================================================================== */
+const MFG_TYPES = ["mfg-source", "mfg-drain", "mfg-station", "mfg-parallel-station", "mfg-assembly", "mfg-dismantle"];
+const MFG_BASE = { "mfg-source": "dock", "mfg-drain": "dock", "mfg-station": "station", "mfg-parallel-station": "station", "mfg-assembly": "station", "mfg-dismantle": "station" };
+
+/* ---- 23. mfg types: domain + registry + palette + base + 0 capacity - */
+(() => {
+  const inDomain = MFG_TYPES.filter((t) => !D.ELEMENTS[t]);
+  const noShape = MFG_TYPES.filter((t) => S.has(t) !== true);
+  const notInPalette = MFG_TYPES.filter((t) => (D.paletteOrder || []).indexOf(t) < 0);
+  const badBase = MFG_TYPES.filter((t) => D.elementBase(t) !== MFG_BASE[t]);
+  const badCap = MFG_TYPES.filter((t) => { const def = D.ELEMENTS[t] || {}; return D.elementCapacity({ type: t, w: def.w, d: def.d }) !== 0; });
+  check("v2.5 FACTORY-A components are in the domain, the shape registry (2D+3D), the palette, declare a base (dock/station) and are 0-capacity (flow)",
+    inDomain.length === 0 && noShape.length === 0 && notInPalette.length === 0 && badBase.length === 0 && badCap.length === 0,
+    (inDomain.length ? "not in domain: " + inDomain.join(",") : "") +
+    (noShape.length ? " no shape: " + noShape.join(",") : "") +
+    (notInPalette.length ? " not in palette: " + notInPalette.join(",") : "") +
+    (badBase.length ? " wrong base: " + badBase.join(",") : "") +
+    (badCap.length ? " nonzero capacity: " + badCap.join(",") : "") ||
+    MFG_TYPES.length + " manufacturing components covered");
+})();
+
+/* ---- 24. focused mfg draw smoke (2D+3D x themes x scales), no mutation */
+(() => {
+  const P = makeP();
+  const cell = 20;
+  let bad = null, notFinite = null, mutated = null;
+  for (const t of MFG_TYPES) {
+    const def = D.ELEMENTS[t];
+    for (const theme of THEMES) {
+      for (const lod of [3, 44]) {
+        const g = { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme, lod, anim: 0.3 };
+        const before = JSON.stringify(g);
+        const c = makeCtx();
+        try { if (S.draw2D(c, t, g) !== true) bad = bad || t + " draw2D returned non-true"; }
+        catch (e) { bad = bad || t + " 2D/" + theme + "/" + lod + ": " + e.message; }
+        if (c._bad.length) notFinite = notFinite || t + " 2D " + c._bad[0];
+        if (JSON.stringify(g) !== before) mutated = mutated || t + " (2D)";
+      }
+      const o = { cx: 4, cy: 3, w: def.w, d: def.d, heightM: def.heightM, color: def.color, theme, anim: 0.3, selected: true, selColor: "#38bdf8" };
+      const beforeO = JSON.stringify(o);
+      const c3 = makeCtx();
+      try { if (S.draw3D(c3, t, P, o) !== true) bad = bad || t + " draw3D returned non-true"; }
+      catch (e) { bad = bad || t + " 3D/" + theme + ": " + e.message; }
+      if (c3._bad.length) notFinite = notFinite || t + " 3D " + c3._bad[0];
+      if (JSON.stringify(o) !== beforeO) mutated = mutated || t + " (3D)";
+    }
+  }
+  check("v2.5 FACTORY-A: every manufacturing component draws 2D+3D x light/dark x small/large - no throw, all finite, no mutation",
+    bad === null && notFinite === null && mutated === null,
+    bad || notFinite || (mutated ? "mutated " + mutated : MFG_TYPES.length + " components x themes x scales clean"));
+})();
+
+/* ---- 25. the six glyphs are DISTINCT + the process station animates --- */
+(() => {
+  const cell = 20;
+  const glyphOf = (t) => { const def = D.ELEMENTS[t]; const c = recCtx(); S.draw2D(c, t, { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod: 44 }); return c._pts.join("|"); };
+  const uniq = new Set(MFG_TYPES.map(glyphOf));
+  const distinct = uniq.size === MFG_TYPES.length;
+  const def = D.ELEMENTS["mfg-station"];
+  const anim = (a) => { const c = recCtx(); S.draw2D(c, "mfg-station", { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod: 44, anim: a }); return c._pts.join("|"); };
+  const moves = anim(0.05) !== anim(0.55);
+  check("v2.5 FACTORY-A: the six components render DISTINCT glyphs and the process station animates its through-part",
+    distinct && moves, "distinct=" + uniq.size + "/" + MFG_TYPES.length + " stationMoves=" + moves);
+})();
+
 console.log("");
 console.log(failures === 0
-  ? "ALL SHAPES CHECKS PASSED (22 checks)"
+  ? "ALL SHAPES CHECKS PASSED (25 checks)"
   : failures + " SHAPES CHECK(S) FAILED");
 process.exit(failures === 0 ? 0 : 1);
