@@ -5373,6 +5373,147 @@
     if (o) o.innerHTML = '<p class="empty">Cancelled — layout unchanged.</p>';
   }
 
+  // ================================================================
+  // v3.1 ANALYTICS A1: the ANALYZE panel (WT.analytics) — the Analysis home.
+  // Two READ-ONLY analysis views over the app's EXISTING sim state (it does
+  // NOT re-run/re-invent any sim): the Bottleneck Analyzer (ranked table +
+  // proportional SVG bar chart, the #1 constraint flagged with a plain-
+  // language "why") and a hand-drawn SVG Sankey of material-flow volumes.
+  // FACTORY mode reads WT.process.metrics(state.process); WAREHOUSE mode
+  // reads WT.wms.runOperations(currentLayout()) — the SAME modules the app
+  // already runs, so the analysis can never diverge from the app. Pure +
+  // deterministic renderers in analytics.js; verify_analytics.js covers them.
+  // ================================================================
+
+  // Reuse the WMS flow sim with the SAME parameters the WMS Operations panel
+  // uses (orders/hours/seed + the imported order pool when present) so the
+  // Analyze warehouse read-out matches the WMS card. Returns null if WT.wms
+  // is absent or the layout has no storage for the picking stage to run.
+  function analyzeWmsResult() {
+    if (!WT.wms || typeof WT.wms.runOperations !== "function") return null;
+    const hoursInp = $("wmsHoursInput");
+    const ordersInp = $("wmsOrdersInput");
+    const hours = Math.max(1, Math.round(Number(hoursInp && hoursInp.value) || 8));
+    let orders = Math.max(1, Math.round(Number(ordersInp && ordersInp.value) || 300));
+    const seed = Math.max(0, Math.round(Number(state.config.seed) || 0));
+    const cfg = Object.assign({}, state.config);
+    const shape = activeOrderShape();
+    if (shape) { orders = shape.orders; cfg.linesPerOrderMax = shape.linesPerOrderMax; }
+    const layout = Object.assign(currentLayout(), { config: cfg });
+    let result = null;
+    try { result = WT.wms.runOperations(layout, { orders: orders, hours: hours, seed: seed }); } catch (_) { result = null; }
+    return (result && result.ok) ? result : null;
+  }
+
+  // Build the analysis model for the CURRENT model. Factory when a `process`
+  // block is present (and yields a bottleneck); otherwise the warehouse flow.
+  function analyzeModel() {
+    if (!WT.analytics) return null;
+    if (state.process && WT.process && typeof WT.process.metrics === "function") {
+      let m = null;
+      try { m = WT.process.metrics(state.process); } catch (_) { m = null; }
+      if (m && m.bottleneck) {
+        return {
+          mode: "factory",
+          bottleneck: WT.analytics.bottleneckFromProcess(m),
+          sankey: WT.analytics.sankeyFromProcess(state.process),
+        };
+      }
+    }
+    const wms = analyzeWmsResult();
+    if (wms) {
+      return {
+        mode: "warehouse",
+        bottleneck: WT.analytics.bottleneckFromWarehouse(wms),
+        sankey: WT.analytics.sankeyFromWarehouse(wms),
+      };
+    }
+    return null;
+  }
+
+  // The accessible ranked TABLE (rank / resource / proportional bar / value)
+  // that carries the same data as the SVG bar chart for screen readers. The
+  // #1 row is the constraint (flagged). Bars are 0-based (width % of value).
+  function analyzeBottleneckTableHtml(b) {
+    let maxV = 0;
+    for (const r of b.resources) maxV = Math.max(maxV, r.value || 0);
+    if (maxV <= 0) maxV = 1;
+    let rows = "";
+    for (const r of b.resources) {
+      const w = Math.max(0, Math.min(100, Math.round((r.value / maxV) * 100)));
+      rows +=
+        '<tr class="an-row' + (r.isConstraint ? " is-constraint" : "") + '">' +
+          '<td class="an-rank">' + r.rank + "</td>" +
+          '<td class="an-name">' + esc(r.name) + (r.isConstraint ? ' <span class="an-tag">constraint</span>' : "") +
+            '<span class="an-detail">' + esc(r.detail || "") + "</span></td>" +
+          '<td class="an-bar-cell"><span class="an-bar-track"><span class="an-bar-fill' + (r.isConstraint ? " is-constraint" : "") +
+            '" style="width:' + w + '%"></span></span></td>' +
+          '<td class="an-val">' + r.pct + "%</td>" +
+        "</tr>";
+    }
+    return (
+      '<table class="an-table">' +
+        '<caption class="sr-only">Resources ranked by ' + esc(b.metricLabel) + '. The number-one row is the constraint.</caption>' +
+        "<thead><tr><th>#</th><th>Resource</th><th>" + esc(b.metricLabel) + "</th><th>Value</th></tr></thead>" +
+        "<tbody>" + rows + "</tbody>" +
+      "</table>"
+    );
+  }
+
+  function renderAnalyzePanel() {
+    const head = $("analyzeHeadline");
+    if (!head) return;
+    const bottleneckHost = $("analyzeBottleneck");
+    const sankeyHost = $("analyzeSankey");
+    const model = analyzeModel();
+    if (!model || !model.bottleneck) {
+      head.innerHTML = '<p class="empty">Nothing to analyze yet — switch to <strong>Factory</strong> mode and Generate a line, or place racking / load a warehouse example, then press <strong>Analyze</strong>.</p>';
+      if (bottleneckHost) bottleneckHost.innerHTML = "";
+      if (sankeyHost) sankeyHost.innerHTML = "";
+      return;
+    }
+    const theme = kpiTheme();
+    const b = model.bottleneck;
+    const s = model.sankey;
+    const modeLabel = model.mode === "factory" ? "Factory line (Theory of Constraints)" : "Warehouse flow (per-stage load vs capacity)";
+
+    head.innerHTML =
+      '<div class="analyze-mode-pill">' + esc(modeLabel) + "</div>" +
+      '<h3 class="analyze-lede">' + esc(b.headline) + "</h3>" +
+      '<p class="analyze-throughput">Line throughput ≈ ' + procFmt(b.throughput) + " " + esc(b.throughputUnit) + ".</p>" +
+      '<p class="analyze-why">' + esc(b.why) + "</p>" +
+      '<p class="proc-basis">' + esc(b.honesty) + "</p>";
+
+    if (bottleneckHost) {
+      let html = '<p class="analyze-metric-note">Ranked by <strong>' + esc(b.metricLabel) + "</strong>. The #1 resource is the constraint the sim reports — this ranking reads it from the sim, so it can't diverge.</p>";
+      // The accessible ranked table (data) + the SVG bar chart (visual).
+      html += analyzeBottleneckTableHtml(b);
+      html += '<div class="an-bar-chart" aria-hidden="true">' + WT.analytics.bottleneckSvg(b, theme) + "</div>";
+      bottleneckHost.innerHTML = html;
+    }
+
+    if (sankeyHost) {
+      const dominant = (s && Array.isArray(s.links) && s.links.length)
+        ? s.links.reduce((a, l) => (l.value > a.value ? l : a), s.links[0]) : null;
+      const nodeName = (id) => { const n = s.nodes.find((x) => x.id === id); return n ? n.name : id; };
+      let html = "";
+      if (dominant && dominant.value > 0) {
+        html += '<p class="analyze-metric-note">Dominant flow: <strong>' + esc(nodeName(dominant.from)) + " → " + esc(nodeName(dominant.to)) +
+          "</strong> at " + procFmt(dominant.value) + " " + esc(s.unit) + '. Link widths are proportional to the flow volume.</p>';
+      }
+      html += '<div class="an-sankey">' + WT.analytics.sankeySvg(s, theme) + "</div>";
+      html += '<p class="proc-basis">Material-flow Sankey — deterministic, hand-drawn SVG (no plotting library). ' + esc(s.honesty) + "</p>";
+      sankeyHost.innerHTML = html;
+    }
+
+    // Open the drill-ins so the ranking + Sankey are visible after Analyze.
+    const d1 = $("analyzeDetails"), d2 = $("analyzeSankeyDetails");
+    if (d1) d1.open = true;
+    if (d2) d2.open = true;
+    status("Analyze — " + (model.mode === "factory" ? "factory line" : "warehouse flow") +
+      ": constraint = " + b.constraint.name + ". Ranking + Sankey read straight from the sim (can't diverge); modelled, deterministic, teaching-scale.");
+  }
+
   // ---- Optimise report HTML (headline + preview actions + groups) --------
   function renderOptimiseReport(opt) {
     const p = opt.placement, b = opt.balance, toc = opt.toc;
@@ -6950,6 +7091,7 @@
     wireFlowControls();
     $("optimizeBtn").addEventListener("click", runOptimize);
     if ($("procOptBtn")) $("procOptBtn").addEventListener("click", runFactoryOptimise);
+    if ($("analyzeBtn")) $("analyzeBtn").addEventListener("click", renderAnalyzePanel); // v3.1 ANALYTICS A1
     $("compareBtn").addEventListener("click", runCompare);
     $("helpBtn").addEventListener("click", () => { $("onboard").hidden = false; });
     $("onboardClose").addEventListener("click", closeOnboard);
@@ -7187,6 +7329,10 @@
       // v2.7 FACTORY-C: the factory line read-out (process model + line sim)
       renderProcessPanel: renderProcessPanel,
       processMetrics: () => (state.process && WT.process ? WT.process.metrics(state.process) : null),
+      // v3.1 ANALYTICS A1: drive the Analyze panel (Bottleneck + Sankey)
+      // through the SAME handler the button uses, for the live self-test.
+      renderAnalyzePanel: renderAnalyzePanel,
+      analyzeModel: analyzeModel,
       // v2.8 FACTORY-D: drive the factory efficiency optimiser (preview/accept)
       // through the SAME handlers the button uses, for the live self-test.
       runFactoryOptimise: runFactoryOptimise,

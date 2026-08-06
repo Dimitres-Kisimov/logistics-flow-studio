@@ -399,6 +399,27 @@
  *      deterministic / local-optimum / NOT-optimal / NOT-a-DES / NOT-CAD-BIM
  *      / NOT-a-certification / does-not-beat-the-suites honesty is restated.
  *
+ *  36. verify_analytics.js - ANALYTICS suite A1 (v3.1): the Bottleneck
+ *      Analyzer + the Sankey material-flow diagram (WT.analytics), READ-ONLY
+ *      analysis over the app's EXISTING sim state (it re-runs + re-invents
+ *      NOTHING). The Bottleneck Analyzer RANKS resources/stations and names
+ *      the SAME constraint the sim/process reports so it CANNOT diverge:
+ *      factory ranks by station utilisation (rank #1 === metrics.bottleneck,
+ *      util = 1 there) and warehouse by load-vs-capacity (rank #1 === the wms
+ *      flow sim's lowest-capacity bottleneckIndex stage, identical tiebreak),
+ *      resources sorted desc with a plain-language "why" (+servers/-cycle or
+ *      +capacity). The Sankey's link band thickness is PROPORTIONAL to the
+ *      flow volume (widest link flagged), its SVG is BYTE-IDENTICAL across
+ *      runs, well-formed (balanced tags, no NaN/undefined) and theme-aware;
+ *      the 0-based bar-chart SVG draws a track + value bar per resource. It
+ *      proves the analysis is READ-ONLY (the process block, metrics, layout
+ *      and wms result are byte-identical before/after every call -> a
+ *      warehouse layout's serialize is unchanged, no data-model surface) and
+ *      restates the modelled / deterministic / teaching-scale / can't-diverge
+ *      / NOT-a-DES / NOT-CAD-BIM / NOT-a-certification honesty. The live
+ *      "open Analyze -> bottleneck + sankey render" path runs in the browser
+ *      self-test; every model + SVG PATH is covered here.
+ *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
  * ===================================================================== */
@@ -446,6 +467,7 @@ const HARNESSES = [
   { name: "User-definable object library (verify_library.js)", args: ["verify_library.js"] },
   { name: "Factory process model + deterministic line sim (verify_process.js)", args: ["verify_process.js"] },
   { name: "Factory efficiency optimizer: CRAFT placement + RPW balance + TOC (verify_optimize.js)", args: ["verify_optimize.js"] },
+  { name: "Analytics: Bottleneck Analyzer + Sankey material-flow (verify_analytics.js)", args: ["verify_analytics.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

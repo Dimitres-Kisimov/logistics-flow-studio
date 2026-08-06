@@ -678,6 +678,36 @@
         </div>
       </section>
 
+      <!-- v3.1 ANALYTICS A1: the ANALYZE card — the Analysis home (Siemens
+           Plant Simulation "Tools" parity: BottleneckAnalyzer + SankeyDiagram,
+           free/offline/honest). Two READ-ONLY analysis views over the app's
+           EXISTING sim state (it does NOT re-run/re-invent any sim): the
+           Bottleneck Analyzer (ranked table + bar chart, the #1 constraint
+           flagged with a plain-language "why") and a hand-drawn SVG Sankey of
+           material-flow volumes. Works in BOTH modes — FACTORY reads
+           WT.process.metrics (station utilisation / TOC bottleneck), WAREHOUSE
+           reads WT.wms.runOperations (per-stage load vs capacity). Pure,
+           deterministic, theme-aware renderers live in analytics.js
+           (WT.analytics); verify_analytics.js covers them headlessly. -->
+      <section class="card" id="analyzeCard" data-default-collapsed>
+        <h2 class="card-title">Analyze — bottleneck &amp; material flow</h2>
+        <div class="wms-disclaimer">
+          <strong>MODELLED, not measured; DETERMINISTIC; TEACHING-SCALE.</strong>
+          The named bottleneck and the flow volumes come <strong>straight from the same simulation the app runs</strong> — Theory of Constraints for the production line, per-stage load vs capacity for the warehouse — so the analysis <strong>can't diverge</strong> from it. <strong>NOT</strong> a validated discrete-event simulation, <strong>NOT</strong> CAD/BIM and <strong>NOT</strong> a certification.
+        </div>
+        <p class="hint">One calm home for the two analysis tools the pro suites charge for. <strong>Bottleneck Analyzer</strong> — resources/stations ranked by utilisation (factory) or load vs capacity (warehouse), the #1 constraint flagged with a plain-language why. <strong>Sankey</strong> — a hand-drawn material-flow diagram whose link widths are proportional to the volume moved between stages. Reads the current floor; nothing is uploaded.</p>
+        <button id="analyzeBtn" class="btn primary wide" type="button" title="Analyze the current model: rank the constraint and draw the material-flow Sankey. Works for a factory line (Theory of Constraints) or a warehouse (per-stage load vs capacity). Offline, read-only, deterministic.">Analyze</button>
+        <div id="analyzeHeadline" class="analyze-headline"><p class="empty">Press <strong>Analyze</strong> to rank the constraint and draw the material-flow Sankey for the current model — a factory line (switch to <strong>Factory</strong> mode, then Generate) or a warehouse (place racking / load an example).</p></div>
+        <details id="analyzeDetails" class="analyze-details">
+          <summary class="std-summary">Bottleneck ranking — resources by utilisation / load, the #1 constraint flagged</summary>
+          <div id="analyzeBottleneck" class="analyze-bottleneck"><!-- filled by app.js renderAnalyzePanel() --></div>
+        </details>
+        <details id="analyzeSankeyDetails" class="analyze-details">
+          <summary class="std-summary">Material-flow Sankey — link widths ∝ flow volume between stages</summary>
+          <div id="analyzeSankey" class="analyze-sankey"><!-- filled by app.js renderAnalyzePanel() --></div>
+        </details>
+      </section>
+
       <!-- P3: unit-load catalog (pallets, cartons, totes) -->
       <section class="card">
         <details id="catalogDetails">
@@ -960,6 +990,7 @@
   <script src="orderpool.js"></script>
   <script src="process.js"></script>
   <script src="optimize_factory.js"></script>
+  <script src="analytics.js"></script>
   <script src="app.js"></script>
   <!-- In-browser E2E self-test. INERT unless the URL carries ?selftest=1;
        a normal load never runs it. Loaded LAST so the app has booted. -->

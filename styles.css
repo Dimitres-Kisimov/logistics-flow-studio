@@ -1403,3 +1403,51 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .opt-matrix abbr { text-decoration: none; cursor: help; border-bottom: 1px dotted var(--text-dim); }
 .opt-legend { font-size: 0.66rem; color: var(--text-dim); line-height: 1.5; margin: 2px 0 4px; }
 .opt-legend span { display: inline-block; margin-right: 4px; }
+
+/* ================================================================
+ * v3.1 ANALYTICS A1: the Analyze card — Bottleneck Analyzer (ranked
+ * table + proportional SVG bar chart) + the material-flow Sankey.
+ * Calm, colourblind-safe, theme-aware, static (reduced-motion safe).
+ * ================================================================ */
+.analyze-headline .empty { color: var(--text-dim); font-size: 0.8rem; line-height: 1.5; }
+.analyze-mode-pill {
+  display: inline-block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; margin: 4px 0 6px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.analyze-lede { font-size: 0.92rem; font-weight: 700; color: var(--text); line-height: 1.4; margin: 2px 0 4px; }
+.analyze-throughput { font-size: 0.78rem; color: var(--text); margin: 0 0 4px; font-variant-numeric: tabular-nums; }
+.analyze-why { font-size: 0.8rem; color: var(--text); line-height: 1.5; margin: 4px 0 6px; }
+.analyze-metric-note { font-size: 0.72rem; color: var(--text-dim); line-height: 1.5; margin: 6px 0; }
+.analyze-details { margin-top: 8px; }
+
+.an-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; margin: 6px 0; }
+.an-table caption { text-align: left; }
+.an-table thead th {
+  font-size: 0.64rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--text-dim); text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--border);
+}
+.an-table thead th:last-child, .an-table td.an-val { text-align: right; }
+.an-row td { padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.an-rank { width: 1.6em; color: var(--text-dim); font-variant-numeric: tabular-nums; font-weight: 700; }
+.an-name { color: var(--text); min-width: 0; }
+.an-detail { display: block; font-size: 0.66rem; color: var(--text-dim); line-height: 1.4; }
+.an-tag {
+  display: inline-block; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: 999px; padding: 0 6px; margin-left: 4px; vertical-align: middle;
+}
+.an-bar-cell { width: 38%; }
+.an-bar-track {
+  display: block; height: 9px; border-radius: 5px; overflow: hidden;
+  background: color-mix(in srgb, var(--text-dim) 22%, transparent);
+}
+.an-bar-fill { display: block; height: 100%; border-radius: 5px; background: var(--accent-2); }
+.an-bar-fill.is-constraint { background: var(--danger); }
+.an-val { color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.an-row.is-constraint .an-name { color: var(--danger); font-weight: 700; }
+
+.an-bar-chart, .an-sankey { margin: 8px 0 4px; overflow-x: auto; }
+.an-bar-svg, .an-sankey-svg { display: block; width: 100%; height: auto; }
+.an-sankey { border: 1px solid var(--border); border-radius: 8px; padding: 4px 6px; background: var(--surface-2); }

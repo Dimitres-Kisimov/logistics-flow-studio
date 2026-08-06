@@ -893,6 +893,83 @@
       return { ok: okAll, detail: detail };
     });
 
+    // ---- v3.1 ANALYTICS A1: the Analyze panel (Bottleneck + Sankey) -----
+    // Drive the REAL Analyze handler (the SAME one the button fires) in BOTH
+    // modes and assert it renders: the headline names the constraint, the
+    // bottleneck ranking flags it, the Sankey draws an <svg> - and the named
+    // constraint matches the sim/process the app already runs (can't diverge).
+    check("analyze-panel-factory-bottleneck-and-sankey-render-and-match-sim", function () {
+      if (!haveApi || !API.plantMode || typeof API.runGenerate !== "function" ||
+        typeof API.renderAnalyzePanel !== "function") {
+        return { ok: false, detail: "no analyze API" };
+      }
+      if (!WT.analytics || !WT.process) return { ok: false, detail: "no WT.analytics/process" };
+      var original = API.plantMode.mode();
+      var okAll = false, detail = "";
+      try {
+        API.plantMode.set("factory");
+        API.runGenerate("assembly-line"); // the REAL Generate handler
+        var m = WT.process.metrics(API.state.process);
+        API.renderAnalyzePanel(); // the REAL Analyze handler
+        var head = document.getElementById("analyzeHeadline");
+        var bott = document.getElementById("analyzeBottleneck");
+        var sank = document.getElementById("analyzeSankey");
+        var headTxt = head ? (head.textContent || "") : "";
+        var bottTxt = bott ? (bott.textContent || "") : "";
+        var bottHtml = bott ? (bott.innerHTML || "") : "";
+        var sankHtml = sank ? (sank.innerHTML || "") : "";
+        var headOk = headTxt.indexOf("throughput") !== -1 && headTxt.indexOf(m.bottleneck.name) !== -1 &&
+          headTxt.indexOf("Press") === -1;
+        var bottOk = bottTxt.indexOf("constraint") !== -1 && bottTxt.indexOf(m.bottleneck.name) !== -1 &&
+          /<svg/.test(bottHtml) && /class="an-table"/.test(bottHtml);
+        var sankOk = /<svg/.test(sankHtml) && /<path/.test(sankHtml);
+        var mdl = API.analyzeModel();
+        var matchOk = !!mdl && mdl.mode === "factory" && mdl.bottleneck.constraint.id === m.bottleneck.opId &&
+          mdl.bottleneck.resources[0].id === m.bottleneck.opId;
+        okAll = headOk && bottOk && sankOk && matchOk;
+        detail = "head=" + headOk + " bottleneck=" + bottOk + " sankey=" + sankOk + " matchesSim=" + matchOk +
+          " (constraint=" + (mdl && mdl.bottleneck.constraint.name) + ")";
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      } finally {
+        try { API.plantMode.set(original); } catch (_) { /* best-effort */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
+    check("analyze-panel-warehouse-bottleneck-and-sankey-render-and-match-sim", function () {
+      if (!haveApi || typeof API.renderAnalyzePanel !== "function" || typeof API.analyzeModel !== "function") {
+        return { ok: false, detail: "no analyze API" };
+      }
+      if (!WT.analytics || !WT.wms) return { ok: false, detail: "no WT.analytics/wms" };
+      var okAll = false, detail = "";
+      try {
+        // A warehouse example (no process block) -> the warehouse flow path.
+        var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+        if (ex && typeof API.loadExample === "function") API.loadExample(ex.id);
+        var mdl = API.analyzeModel();
+        API.renderAnalyzePanel();
+        var head = document.getElementById("analyzeHeadline");
+        var sank = document.getElementById("analyzeSankey");
+        var headTxt = head ? (head.textContent || "") : "";
+        var sankHtml = sank ? (sank.innerHTML || "") : "";
+        var renderedOk = mdl && mdl.mode === "warehouse" &&
+          headTxt.indexOf(mdl.bottleneck.constraint.name) !== -1 && /<svg/.test(sankHtml);
+        // The named constraint === the WMS flow sim's bottleneck stage (can't diverge).
+        var matchOk = false;
+        if (mdl) {
+          var r0 = mdl.bottleneck.resources[0];
+          matchOk = r0.isConstraint && r0.id === mdl.bottleneck.constraint.id;
+        }
+        okAll = !!renderedOk && matchOk;
+        detail = "mode=" + (mdl && mdl.mode) + " rendered=" + !!renderedOk + " matchesSim=" + matchOk +
+          " (constraint=" + (mdl && mdl.bottleneck.constraint.name) + ")";
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      }
+      return { ok: okAll, detail: detail };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {
