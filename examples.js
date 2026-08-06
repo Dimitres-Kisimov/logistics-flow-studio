@@ -394,7 +394,7 @@
    * byte-identical on every run. Every one of the 29 palette types appears.
    * ================================================================== */
   function generateMegaLayout() {
-    // 1 cell = 1 m. Floor stays within the app's 400 x 250 m maximum.
+    // 1 cell = 1 m. Floor stays within the app's 1200 x 800 m maximum.
     const W = 372, H = 248;
     const MIN_AISLE = 3;   // truck-class working aisle (m) for this plant
     const AISLE = 3;       // working aisle between facing rack pairs (cells)

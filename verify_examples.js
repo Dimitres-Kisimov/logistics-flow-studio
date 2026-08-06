@@ -149,13 +149,13 @@ check("ITEM_COVERAGE only lists real palette element types",
 /* ---- 7. exportData is a valid wt-1 layout ----------------------- */
 // The 22 studio-floor scenarios export on the app's 40 x 24 m floor; the one
 // large-scale showcase (config.mega) carries its OWN larger floor, still
-// within the app's supported 8..400 x 8..250 m range.
+// within the app's supported 8..1200 x 8..800 m range.
 let dataOK = true, dataTypeOK = true;
 for (const ex of LIB) {
   const dat = E.exportData(ex.id);
   const isMega = !!(ex.config && ex.config.mega);
   const gridOK = isMega
-    ? (dat.gridW > 40 && dat.gridW <= 400 && dat.gridH > 24 && dat.gridH <= 250)
+    ? (dat.gridW > 40 && dat.gridW <= 1200 && dat.gridH > 24 && dat.gridH <= 800)
     : (dat.gridW === 40 && dat.gridH === 24);
   if (!dat || dat.version !== "wt-1" || !gridOK || !Array.isArray(dat.elements) || !dat.config) dataOK = false;
   for (const e of dat.elements) {
@@ -232,7 +232,7 @@ if (megaEx) {
   check("showcase builds 800+ elements (a dense large-scale plant)",
     mels.length >= 800, mels.length + " elements");
   check("showcase carries its own large floor within the supported range",
-    mb.gridW > 40 && mb.gridW <= 400 && mb.gridH > 24 && mb.gridH <= 250,
+    mb.gridW > 40 && mb.gridW <= 1200 && mb.gridH > 24 && mb.gridH <= 800,
     mb.gridW + " x " + mb.gridH + " m");
   const megaTypes = {}; for (const e of mels) megaTypes[e.type] = true;
   // conveyor-curve (v2.1) is an ADDITIVE palette type placed from the palette /

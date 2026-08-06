@@ -35,25 +35,27 @@
    * floor spans it at scale 1), so the Fit scale for a gridW-wide floor is
    * purely width-/height-bound and independent of the pixel size:
    *   fitScale = min( REF_W*(1-pad)/gridW , REF_H*(1-pad)/gridH ).
-   * For the LARGEST floor (400 x 250) with the usual 4% pad that is
-   *   min( 40*0.96/400 , 24*0.96/250 ) = min(0.096, 0.0922) ~= 0.092.
-   * SCALE_MIN sits comfortably BELOW that, so fitView is never floored by
-   * the clamp: the entire max floor is always framable. Zooming further
-   * out than Fit is still allowed for extra breathing room.
+   * For the LARGEST floor (1200 x 800) with the usual 4% pad that is
+   *   min( 40*0.96/1200 , 24*0.96/800 ) = min(0.032, 0.0288) ~= 0.0288.
+   * SCALE_MIN sits comfortably BELOW that (~2.4x margin), so fitView is
+   * never floored by the clamp: the entire max floor is always framable.
+   * Zooming further out than Fit is still allowed for extra breathing room.
    * ------------------------------------------------------------------ */
-  const SCALE_MIN = 0.04; // 4% - low enough to frame the largest floor (~0.092 to fit)
+  const SCALE_MIN = 0.012; // 1.2% - low enough to frame the largest floor (~0.0288 to fit)
   const SCALE_MAX = 8.0; // 800% - detail zoom-in
 
   /* ------------------------------------------------------------------
    * Configurable floor size, in metres (= cells). The classic floor is
    * 40 x 24 m; the editor now accepts anything from FLOOR_MIN up to a
-   * large hall (400 x 250 m) so complex layouts have room. Bigger-than-
-   * viewport floors are navigated with zoom + pan and framed with Fit.
+   * large campus (1200 x 800 m) so factory / DC-campus layouts have room.
+   * Bigger-than-viewport floors are navigated with zoom + pan and framed
+   * with Fit. The metre grid is unchanged (1 cell = 1 m), so a bigger
+   * floor is literally more real metres - distances stay metre-accurate.
    * A very large but sparse floor is simply extra empty space - honest.
    * ------------------------------------------------------------------ */
   const FLOOR_MIN = 8; // fits the widest single element (AS/RS is 8 m)
-  const FLOOR_MAX_W = 400;
-  const FLOOR_MAX_H = 250;
+  const FLOOR_MAX_W = 1200;
+  const FLOOR_MAX_H = 800;
   const FLOOR_DEFAULT_W = 40;
   const FLOOR_DEFAULT_H = 24;
 
