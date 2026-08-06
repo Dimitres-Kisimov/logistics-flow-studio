@@ -1534,6 +1534,66 @@
       };
     });
 
+    // ---- v3.11: EMPTY-HALL GUARD on Run + flow Play + RUN discoverability ----
+    // The reported failure: pressing Run on an EMPTY floor silently did nothing
+    // (there is nothing to simulate). Now Run AND flow Play give a friendly,
+    // ANNOUNCED hint on an empty floor, while a POPULATED floor runs 100% as
+    // before; and the Simulate rail tool lights a calm "ready to run" dot the
+    // moment the floor has content. Drives the SAME handlers the UI uses.
+    (function () {
+      if (!haveApi) {
+        results.push({ name: "sim-empty-run-guides-not-silent", ok: false, detail: "no test API" });
+        results.push({ name: "sim-empty-flow-play-guides", ok: false, detail: "no test API" });
+        results.push({ name: "sim-populated-run-unchanged-plus-nudge", ok: false, detail: "no test API" });
+        return;
+      }
+      var simBtn = document.querySelector('#wtRail [data-drawer="simulate"]');
+
+      // (1) EMPTY floor: Run must GUIDE, not silently no-op. Clear to an empty
+      // hall (a valid preset size), then drive the SAME Run handler #runBtn uses.
+      var P = API.emptyState.presets.medium;
+      API.emptyState.startHall(P.w, P.h);
+      var emptyNow = API.state.elements.length === 0 && API.hasSimulatableLayout() === false;
+      API.runSim("run");
+      var toastEl = $("toast");
+      var headText = ($("simHeadline").textContent || "");
+      var toastText = toastEl ? (toastEl.textContent || "") : "";
+      var runGuides = /nothing to simulate/i.test(headText) &&
+        /nothing to simulate/i.test(toastText) && !!toastEl && toastEl.hidden === false;
+      var nudgeOffEmpty = !!simBtn && simBtn.classList.contains("is-ready") === false;
+      check("sim-empty-run-guides-not-silent", function () {
+        return { ok: emptyNow && runGuides && nudgeOffEmpty,
+          detail: "empty=" + emptyNow + " guides=" + runGuides + " nudgeOff=" + nudgeOffEmpty };
+      });
+
+      // (2) EMPTY floor: flow Play must GUIDE too - and NOT start the animation.
+      API.flowPlay();
+      var playBlocked = API.state.flow.playing === false;
+      var playGuides = /nothing to simulate/i.test(($("simHeadline").textContent || ""));
+      check("sim-empty-flow-play-guides", function () {
+        return { ok: playBlocked && playGuides,
+          detail: "notPlaying=" + playBlocked + " guides=" + playGuides };
+      });
+
+      // (3) POPULATED floor: Run is UNCHANGED - a REAL result lands in the
+      // headline (res.ok, "Ran N orders", no guard text) - and the Simulate rail
+      // dot lights up (Run is now discoverable from the rail).
+      var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+      if (ex) API.loadExample(ex.id);
+      API.render();
+      var populated = API.state.elements.length > 0 && API.hasSimulatableLayout() === true;
+      API.runSim("run");
+      var res = API.state.lastResult;
+      var head2 = ($("simHeadline").textContent || "");
+      var ranResult = !!(res && res.ok) && /Ran\s+\d+\s+orders/i.test(head2) &&
+        !/nothing to simulate/i.test(head2);
+      var nudgeOnPopulated = !!simBtn && simBtn.classList.contains("is-ready") === true;
+      check("sim-populated-run-unchanged-plus-nudge", function () {
+        return { ok: populated && ranResult && nudgeOnPopulated,
+          detail: "populated=" + populated + " ran=" + ranResult + " nudgeOn=" + nudgeOnPopulated };
+      });
+    })();
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

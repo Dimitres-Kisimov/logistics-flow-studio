@@ -1566,6 +1566,9 @@
 
   function flowPlay() {
     if (!WT.flowsim) { toast("Live material flow needs flowsim.js.", "warn"); return; }
+    // v3.11: same empty-hall guard as Run - an empty floor has nothing to
+    // animate, so guide the user rather than silently playing an empty stage.
+    if (!hasSimulatableLayout()) { announceNothingToSimulate(); return; }
     if (!flowEnsureFresh()) return;
     state.flow.on = true;
     // v1.6 a11y: honour "reduce motion". Rather than auto-run the continuous
@@ -3169,7 +3172,40 @@
   // ================================================================
   // SIMULATION
   // ================================================================
+
+  // v3.11: a layout is SIMULATABLE only when the floor actually has elements.
+  // A brand-new / cleared hall has nothing to run, so Run (and flow Play) must
+  // SAY so - a friendly, announced hint - rather than silently rendering a wall
+  // of zeros or animating an empty floor. This is a pre-flight check only: a
+  // POPULATED layout falls straight through to the unchanged run path, so the
+  // normal Run behaves 100% identically to before.
+  function hasSimulatableLayout() {
+    return Array.isArray(state.elements) && state.elements.length > 0;
+  }
+
+  // The shared "nothing to simulate yet" guidance for an empty floor: an
+  // announced toast (the #toast region is role=status / aria-live=polite), the
+  // status line, and an honest one-line hint in the Simulate drawer headline.
+  // Purely chrome - it touches no data, so serialize() is unaffected.
+  var NOTHING_TO_SIM_MSG =
+    "Nothing to simulate yet - this layout is empty. Load an example, generate a plant, " +
+    "or drag components onto the floor, then press ▶ Run.";
+  function announceNothingToSimulate() {
+    toast(NOTHING_TO_SIM_MSG, "warn");
+    status(NOTHING_TO_SIM_MSG);
+    const el = $("simHeadline");
+    if (el) {
+      el.innerHTML =
+        "<strong>Nothing to simulate yet</strong> - this layout is empty. Load an example, " +
+        "generate a plant, or drag components onto the floor, then press <strong>▶ Run</strong>.";
+    }
+  }
+
   function runSimulation(source) {
+    // v3.11: empty-hall guard. An empty floor has nothing to simulate, so guide
+    // the user instead of a silent no-op / a wall of zeros. Populated layouts
+    // are untouched by this - they fall through to the unchanged run below.
+    if (!hasSimulatableLayout()) { announceNothingToSimulate(); return; }
     readConfigFromUI();
     const layout = { elements: state.elements, gridW: GRID_W, gridH: GRID_H, cell: CELL_M };
     const res = WT.sim.run(layout, simConfig());
@@ -5096,6 +5132,26 @@
     _emptyStateShown = show;
     overlay.hidden = !show;
     overlay.setAttribute("aria-hidden", show ? "false" : "true");
+    // v3.11: mirror the empty <-> populated flip onto the Simulate rail tool so
+    // a first-timer sees where ▶ Run lives once the floor has content. Runs on
+    // the SAME (cheap, edge-triggered) flip the empty-state already tracks.
+    updateSimRailNudge(!show);
+  }
+
+  // v3.11: RUN DISCOVERABILITY. After the rail/drawer redesign, Run lives one
+  // click away in the Simulate drawer - obvious once found, easy to miss first
+  // time. This adds a calm "ready to run" affordance (a small accent dot, CSS)
+  // to the Simulate rail icon the moment the floor has simulatable content, and
+  // removes it when the floor is cleared. Purely a class/attribute hook - no
+  // header/canvas clutter, no data touched. Keyboard/focus behaviour unchanged.
+  function updateSimRailNudge(hasElements) {
+    const rail = $("wtRail");
+    if (!rail) return;
+    const btn = rail.querySelector('.wt-rail-btn[data-drawer="simulate"]');
+    if (!btn) return;
+    btn.classList.toggle("is-ready", !!hasElements);
+    if (hasElements) btn.setAttribute("data-ready", "1");
+    else btn.removeAttribute("data-ready");
   }
 
   // Start (or reset to) a LARGE blank building-shell hall at a chosen size:
@@ -7955,6 +8011,11 @@
       flowStep: flowStep,
       flowReset: flowReset,
       drawFlowKpis: drawFlowKpis,
+      // v3.11: drive Run through the SAME handler the ▶ Run button uses, and
+      // read the empty/insufficient pre-flight the guard checks, for the live
+      // self-test (empty floor -> guidance; populated floor -> unchanged run).
+      runSim: runSimulation,
+      hasSimulatableLayout: hasSimulatableLayout,
       // v2.7 FACTORY-C: the factory line read-out (process model + line sim)
       renderProcessPanel: renderProcessPanel,
       processMetrics: () => (state.process && WT.process ? WT.process.metrics(state.process) : null),

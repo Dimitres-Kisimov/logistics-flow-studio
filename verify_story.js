@@ -42,7 +42,7 @@
  *  13.  Determinism guard (source scan): story.js references NO Date and NO
  *       Math.random and carries the "NO Date, NO RNG" note.
  *  14.  Shipped-source wiring: index.html loads story.js before app.js, sw.js
- *       precaches ./story.js at the bumped wt-v63 cache (previously wt-v62), and app.js wires the
+ *       precaches ./story.js at the bumped wt-v64 cache (previously wt-v63), and app.js wires the
  *       storyBtn control + exposes the Story self-test hook.
  *
  * Everything is deterministic (no wall-clock, no Math.random). Usage:
@@ -288,7 +288,7 @@ check(
   const storyBeforeApp = html.indexOf('src="story.js"') !== -1 &&
     html.indexOf('src="story.js"') < html.indexOf('src="app.js"');
   const btnPresent = /id="storyBtn"/.test(html);
-  const swCaches = /["']\.\/story\.js["']/.test(sw) && /wt-v63/.test(sw);
+  const swCaches = /["']\.\/story\.js["']/.test(sw) && /wt-v64/.test(sw);
   const appWires = /storyBtn/.test(appSrc) && /WT\.story\.run\(/.test(appSrc) &&
     /startStory/.test(appSrc) && /finishStory/.test(appSrc);
   check(
@@ -296,7 +296,7 @@ check(
     storyBeforeApp && btnPresent, "beforeApp=" + storyBeforeApp + " btn=" + btnPresent
   );
   check(
-    "sw.js precaches ./story.js at the bumped wt-v63 cache; app.js wires + sequences it",
+    "sw.js precaches ./story.js at the bumped wt-v64 cache; app.js wires + sequences it",
     swCaches && appWires, "sw=" + swCaches + " app=" + appWires
   );
 

@@ -281,6 +281,30 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   outline: 2px solid var(--accent, #2563eb);
   outline-offset: 2px;
 }
+/* v3.11 RUN DISCOVERABILITY: a calm "ready to run" affordance on the Simulate
+   rail tool once the floor has simulatable content - a small accent dot that
+   points a first-timer at where ▶ Run lives, without cluttering the header or
+   canvas. Static by default; the gentle pulse is dropped under reduced motion. */
+.wt-rail-btn.is-ready { position: relative; }
+.wt-rail-btn.is-ready::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent, #2563eb);
+  box-shadow: 0 0 0 2px var(--bg, #fff);
+  animation: wt-rail-ready 2.6s ease-in-out infinite;
+}
+@keyframes wt-rail-ready {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.25); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wt-rail-btn.is-ready::after { animation: none; opacity: 0.9; }
+}
 
 /* ---------------- v3.9 flyout drawer (one open at a time) ---------------- */
 .wt-drawer-host {
