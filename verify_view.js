@@ -23,7 +23,7 @@
  *     topmost on overlap, and null on empty floor
  *   - clampPan keeps the content in view; centerPan centres it
  *   - v2.2 larger maps + wider zoom: normalizeFloor accepts the LARGE max
- *     (1200x800) and clamps beyond it; the widened clampScale (0.012x-8x)
+ *     (1200x800) and clamps beyond it; the widened clampScale (0.012x-24x)
  *     lets fitView FRAME the whole max floor (scale inside the clamp, not
  *     floored) at any reference viewport; a large-floor cullToView still
  *     keeps only the on-screen elements; and a set-max-floor-then-Fit
@@ -244,7 +244,7 @@ check("snap() floors a fractional world coord to its cell",
 
 /* =====================================================================
  * v2.2 - Larger maps + wider zoom range. The floor now scales up to a
- * 1200 x 800 m campus and the interactive zoom clamp widens to 0.012x-8x
+ * 1200 x 800 m campus and the interactive zoom clamp widens to 0.012x-24x
  * so that Fit can FRAME the whole largest floor (fitView is no longer
  * floored by the clamp) while still allowing detailed zoom-in. These
  * checks pin that the big max is accepted, the max floor is framable
@@ -346,6 +346,45 @@ check("snap() floors a fractional world coord to its cell",
     covers && f.scale > V.SCALE_MIN,
     "bounds " + vb.minX.toFixed(1) + "," + vb.minY.toFixed(1) + " -> " +
     vb.maxX.toFixed(1) + "," + vb.maxY.toFixed(1) + " covers 0,0->" + GW + "," + GH + " = " + covers);
+})();
+
+/* =====================================================================
+ * v3.8 REDESIGN-1 - Deeper detail zoom. The interactive zoom clamp MAX
+ * rises to 24x (was 8x) so a single component reads large on screen in a
+ * big empty hall, while Fit still frames the whole largest floor (the MIN
+ * side is unchanged, so the max-floor Fit is still un-floored). 1 cell =
+ * 1 m throughout; the transform math is otherwise untouched.
+ * ===================================================================== */
+
+/* ---- 23. Deeper detail zoom: MAX is 24x, still clamps, Fit unaffected  */
+(() => {
+  // The deep-zoom MAX must be exactly 24 (the new detail ceiling) and the
+  // clamp must still saturate there; a mid value passes through; the MIN is
+  // unchanged so Fit still frames the max floor un-floored (regression).
+  const f = V.fitView(20, V.FLOOR_MAX_W, V.FLOOR_MAX_H, 800, 480, 0.04);
+  check("v3.8 deeper zoom: SCALE_MAX === 24, clamp saturates, Fit still frames the MAX floor",
+    V.SCALE_MAX === 24 &&
+    V.clampScale(1000) === 24 &&
+    V.clampScale(24) === 24 &&
+    approx(V.clampScale(12), 12) &&
+    V.clampScale(30) === V.SCALE_MAX &&
+    f.scale > V.SCALE_MIN && f.scale < 0.04 && approx(f.scale, 0.0288, 1e-6),
+    "max=" + V.SCALE_MAX + " fitMaxFloor=" + f.scale.toFixed(5));
+})();
+
+/* ---- 24. A single component fills a large fraction of the viewport at MAX  */
+(() => {
+  // At the deep-zoom MAX, one metre of world reads as cellPx*SCALE_MAX px on
+  // screen (20 * 24 = 480). A single 2 x 2 m component therefore spans ~960 px
+  // - i.e. it fills a normal viewport, which is the whole point of the deeper
+  // ceiling: you can study one component in a big hall.
+  const view = { cellPx: 20, scale: V.SCALE_MAX, panX: 0, panY: 0 };
+  const a = V.worldToScreen(view, 10, 10);
+  const b = V.worldToScreen(view, 12, 12); // a 2 x 2 m footprint
+  const spanPx = b.x - a.x;
+  check("v3.8 deeper zoom: a 2x2 m component spans a large pixel footprint at MAX zoom",
+    approx(spanPx, 2 * 20 * V.SCALE_MAX) && spanPx >= 900,
+    "2m spans " + spanPx.toFixed(0) + "px at " + V.SCALE_MAX + "x");
 })();
 
 console.log("");

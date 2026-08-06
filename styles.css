@@ -380,6 +380,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   color: var(--text);
 }
 .canvas-wrap {
+  position: relative; /* v3.8: positioning context for the empty-state overlay */
   background: var(--canvas-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -390,6 +391,65 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
 #floor { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
 .status-line { font-size: 0.78rem; color: var(--text-dim); margin: 8px 2px 0; min-height: 1.2em; }
 .status-line.warn { color: var(--warn); }
+
+/* ---------------- v3.8 REDESIGN-1: canvas-hero empty-state -------------
+   Shown by app.js ONLY when the floor has no elements, hidden the moment it
+   has content. The overlay container is pointer-events:none so clicks/drags on
+   the empty canvas pass THROUGH to the floor (placing the first item is never
+   blocked); only the card re-enables pointer events. Fully theme-aware; no
+   motion (reduced-motion-safe by construction). */
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--canvas-bg) 34%, transparent);
+  z-index: 5;
+}
+.empty-state[hidden] { display: none; }
+.empty-card {
+  pointer-events: auto; /* only the card is interactive */
+  width: min(100%, 560px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 22px 18px;
+  text-align: center;
+}
+.empty-title { margin: 0 0 4px; font-size: 1.15rem; }
+.empty-sub { margin: 0 0 16px; font-size: 0.85rem; color: var(--text-dim); }
+.empty-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 560px) { .empty-actions { grid-template-columns: 1fr; } }
+.empty-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: auto;
+  padding: 14px 10px;
+  text-align: center;
+  white-space: normal;
+}
+.empty-ico { font-size: 1.5rem; line-height: 1; }
+.empty-btn-label { font-weight: 700; font-size: 0.9rem; }
+.empty-btn-note { font-size: 0.7rem; color: var(--text-dim); font-weight: 400; line-height: 1.25; }
+.empty-btn.primary .empty-btn-note { color: inherit; opacity: 0.85; }
+.empty-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.empty-sizes-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); }
+.empty-size { display: inline-flex; gap: 6px; align-items: baseline; }
+.empty-size small { color: var(--text-dim); font-size: 0.68rem; }
+.empty-foot { margin: 14px 0 0; font-size: 0.74rem; color: var(--text-dim); }
 
 /* ---------------- Properties ---------------- */
 .prop-panel .empty { color: var(--text-dim); font-size: 0.82rem; }

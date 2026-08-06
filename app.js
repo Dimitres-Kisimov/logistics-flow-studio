@@ -331,6 +331,10 @@
   }
 
   function render() {
+    // v3.8 REDESIGN-1: keep the canvas-hero empty-state in sync with the layout
+    // (shown only when there are no elements). Cheap - only touches the DOM when
+    // the empty/non-empty state flips - so calling it every frame is fine.
+    updateEmptyState();
     const cssW = GRID_W * cellPx; // floor extent in base (scale-1) px
     const cssH = GRID_H * cellPx;
 
@@ -402,6 +406,13 @@
       ctx.lineTo(cssW, Math.round(y * cellPx) + 0.5);
       ctx.stroke();
     }
+
+    // v3.8 REDESIGN-1: building-shell perimeter WALL band. Drawn over the grid
+    // but UNDER the elements (never obscures content), in the world transform,
+    // on EVERY floor so the scene reads as an enclosed place - most of all the
+    // big empty hall you start from. Render-only: derived from the floor size,
+    // never stored as an element, so serialize() stays byte-identical.
+    drawPerimeterWalls();
 
     // v1.12: faint floor markings - facility perimeter outline, aisle centre
     // guides between facing rack rows, and dock-approach hatching in front of
@@ -691,6 +702,37 @@
   // pair model the compliance aisle check uses, so they can never disagree)
   // and dock-approach hatching in front of dock doors. `onCell` = on-screen
   // px per 1 m cell. Drawn over the grid, under the elements.
+  /* ------------------------------------------------------------------
+   * v3.8 REDESIGN-1: paint the building-shell perimeter WALL band (a
+   * readable band, not a hairline), so the floor reads as "an entire
+   * place". Pure geometry from WT.floor.wallBand (render-only, never an
+   * element). The band is filled with the even-odd rule (outer rect minus
+   * the clear interior) so only the wall ring is painted, then its inner +
+   * outer edges are stroked crisply. Theme-aware via COLORS.gridStrong.
+   * ------------------------------------------------------------------ */
+  function drawPerimeterWalls() {
+    if (!F || typeof F.wallBand !== "function") return;
+    const band = F.wallBand(GRID_W, GRID_H);
+    if (!band || !(band.inner.w > 0) || !(band.inner.h > 0)) return;
+    ctx.save();
+    // Fill just the ring: outer rect + inner rect, even-odd cuts the middle.
+    ctx.beginPath();
+    ctx.rect(band.outer.x * cellPx, band.outer.y * cellPx, band.outer.w * cellPx, band.outer.h * cellPx);
+    ctx.rect(band.inner.x * cellPx, band.inner.y * cellPx, band.inner.w * cellPx, band.inner.h * cellPx);
+    ctx.fillStyle = COLORS.gridStrong;
+    ctx.globalAlpha = 0.45;
+    ctx.fill("evenodd");
+    ctx.globalAlpha = 1;
+    // Crisp inner edge so the interior boundary reads at a glance.
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = COLORS.gridStrong;
+    ctx.strokeRect(
+      band.inner.x * cellPx + 0.5, band.inner.y * cellPx + 0.5,
+      band.inner.w * cellPx - 1, band.inner.h * cellPx - 1
+    );
+    ctx.restore();
+  }
+
   function drawFloorMarkings(onCell) {
     if (!F) return;
     ctx.save();
@@ -861,6 +903,12 @@
       // ON-SCREEN px/cell so the iso forms pick their rich LOD tier when
       // zoomed in (rich only above the px threshold - big maps stay fast).
       pxPerCell: onScreenCell,
+      // v3.8 REDESIGN-1: building-shell perimeter walls (the two BACK edges,
+      // so interior content is never occluded). Render-only - derived from the
+      // floor size, never serialized. Absent WT.floor -> no walls, nothing breaks.
+      walls: (F && typeof F.wallBand === "function") ? F.wallBand(GRID_W, GRID_H) : null,
+      wallHeightM: 3,
+      wallColor: COLORS.gridStrong,
     });
     // Live material-flow overlay, projected into the iso scene. Drawn
     // AFTER the blocks so the animation stays visible (an honest,
@@ -4955,6 +5003,125 @@
   }
 
   // ================================================================
+  // v3.8 REDESIGN-1: canvas-hero EMPTY-STATE + big empty walled hall
+  // ----------------------------------------------------------------
+  // The empty-state overlay (#emptyState in index.html) is shown ONLY when the
+  // floor has no elements and hidden the moment it has content. It offers the
+  // three starting actions wired to the EXISTING handlers (empty hall = a
+  // cleared, resized floor; Generate = runGenerate; Example = the scenario
+  // loader UI). Nothing here touches the DATA model, so serialize() is
+  // byte-identical - it is purely a DOM overlay + a floor-size + clear.
+  // ================================================================
+
+  // Quick empty-hall sizes (metres). All <= the 1200 x 800 max; no typing.
+  const EMPTY_HALL_PRESETS = {
+    medium: { w: 120, h: 80 },
+    large: { w: 250, h: 160 },
+    huge: { w: 500, h: 300 },
+  };
+
+  // Cached last-shown state so render() can call updateEmptyState() every frame
+  // cheaply (it only touches the DOM when the empty/non-empty state actually
+  // flips). Keyboard-accessible: the overlay's buttons are in normal tab order.
+  let _emptyStateShown = null;
+  function updateEmptyState() {
+    const overlay = $("emptyState");
+    if (!overlay) return;
+    const show = state.elements.length === 0;
+    if (show === _emptyStateShown) return;
+    _emptyStateShown = show;
+    overlay.hidden = !show;
+    overlay.setAttribute("aria-hidden", show ? "false" : "true");
+  }
+
+  // Start (or reset to) a LARGE blank building-shell hall at a chosen size:
+  // clear every element, resize the floor, keep it empty and framed, ready to
+  // fill by hand. setFloorSize() normalises + clamps, keeps in-bounds (there is
+  // nothing to keep), re-fits, syncs the floor inputs and saves.
+  function startEmptyHall(w, h) {
+    state.idCounter = 0;
+    state.elements = [];
+    state.selectedId = null;
+    state.preview = null;
+    state.complianceHighlight = null;
+    state.process = null; // drop any factory process block so it reads empty
+    if (state.flow && state.flow.on) flowPause(); // cleanly stop any running flow anim (cancels its rAF)
+    setFloorSize(w, h); // normalises, re-fits, syncs inputs, saves, renders
+    renderProps();
+    updateEmptyState();
+    render();
+    status(
+      "Empty hall ready at " + GRID_W + " × " + GRID_H + " m — a blank walled building. " +
+      "Drag components from the Class Library onto the floor to build it by hand. " +
+      "Zoom in for detail; Fit frames the whole hall."
+    );
+    toast("Empty hall: " + GRID_W + " × " + GRID_H + " m. Drag from the Class Library to place items by hand.");
+  }
+
+  // v3.8 REDESIGN-1: the CALM fresh-profile start. Instead of dumping the busy
+  // 11-element demo starter, a brand-new profile opens on an EMPTY default floor
+  // so the canvas-hero empty-state is the first thing seen (the fix for
+  // "overstuffed"). The demo starter is NOT removed - it stays one click away on
+  // the Layout card's "Demo" button and via Ctrl-K. Returning users still get
+  // their saved layout (loadSaved runs before this fallback).
+  function emptyStart() {
+    state.idCounter = 0;
+    GRID_W = V.FLOOR_DEFAULT_W;
+    GRID_H = V.FLOOR_DEFAULT_H;
+    state.elements = [];
+    state.selectedId = null;
+    state.preview = null;
+    state.complianceHighlight = null;
+    state.process = null;
+    syncFloorInputs();
+    renderProps();
+    fitToFloor();
+    updateEmptyState();
+    scheduleSave();
+    status(
+      "Empty floor. Choose a starting point on the canvas — Start empty hall, Generate a plant, " +
+      "or Open an example — or drag a component from the Class Library onto the floor."
+    );
+  }
+
+  // Expand a (possibly collapsed) side-panel card by id and scroll it into
+  // view, reusing the SAME header-toggle path so the persisted collapse store
+  // stays correct. Returns the card element (or null).
+  function revealCard(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return null;
+    const title = card.querySelector(":scope > .card-title");
+    if (title && card.classList.contains("card--collapsed")) title.click();
+    try { card.scrollIntoView({ block: "nearest" }); } catch (_) { /* best-effort */ }
+    return card;
+  }
+
+  // "Open an example" from the empty-state: reveal the Example scenarios list
+  // (the real scenario loader UI) so the user picks one. Falls back to loading
+  // the first library example directly if that card is unavailable.
+  function openExamplePicker() {
+    const card = revealCard("examplesCard");
+    const search = $("exampleSearch");
+    if (search) { try { search.focus(); } catch (_) { /* best-effort */ } }
+    if (!card && WT.examples && WT.examples.library && WT.examples.library[0]) {
+      loadExample(WT.examples.library[0].id);
+    }
+    return card;
+  }
+
+  function wireEmptyState() {
+    const on = (id, fn) => { const el = $(id); if (el) el.addEventListener("click", fn); };
+    // The primary "Start empty hall" defaults to the Large hall.
+    on("emptyHallBtn", () => startEmptyHall(EMPTY_HALL_PRESETS.large.w, EMPTY_HALL_PRESETS.large.h));
+    on("emptyHallMediumBtn", () => startEmptyHall(EMPTY_HALL_PRESETS.medium.w, EMPTY_HALL_PRESETS.medium.h));
+    on("emptyHallLargeBtn", () => startEmptyHall(EMPTY_HALL_PRESETS.large.w, EMPTY_HALL_PRESETS.large.h));
+    on("emptyHallHugeBtn", () => startEmptyHall(EMPTY_HALL_PRESETS.huge.w, EMPTY_HALL_PRESETS.huge.h));
+    on("emptyGenerateBtn", () => runGenerate());
+    on("emptyExampleBtn", () => openExamplePicker());
+    updateEmptyState();
+  }
+
+  // ================================================================
   // P3: ONE-CLICK PRESETS (domain.js PRESETS)
   // ================================================================
   function loadPreset(presetId) {
@@ -7343,6 +7510,7 @@
     if ($("storySkipBtn")) $("storySkipBtn").addEventListener("click", storySkip);
     if ($("storyStopBtn")) $("storyStopBtn").addEventListener("click", stopStory);
     wireViewControls();
+    wireEmptyState(); // v3.8 REDESIGN-1: canvas-hero empty-state (3 starting actions + hall-size presets)
   }
 
   // Zoom / pan / floor-size controls in the canvas toolbar.
@@ -7669,6 +7837,16 @@
       render: render,
       setViewMode: setViewMode,
       toggleViewMode: toggleViewMode,
+      // v3.8 REDESIGN-1: canvas-hero empty-state + big empty walled hall hooks
+      // for the live self-test (drive the SAME functions the overlay buttons use).
+      emptyState: {
+        shown: () => { const o = $("emptyState"); return !!o && o.hidden === false; },
+        update: updateEmptyState,
+        startHall: (w, h) => startEmptyHall(w, h),
+        presets: EMPTY_HALL_PRESETS,
+        wallBand: () => (F && typeof F.wallBand === "function" ? F.wallBand(GRID_W, GRID_H) : null),
+        floor: () => ({ gridW: GRID_W, gridH: GRID_H }),
+      },
       buildCurrentReport: buildCurrentReport,
       openAbout: openAbout,
       closeAbout: closeAbout,
@@ -7754,7 +7932,10 @@
     // Boot precedence: an explicit #layout= share-hash wins, else a
     // ?scenario= deep-link, else the saved layout, else the demo starter.
     if (!loadFromShareHash() && !loadScenarioDeepLink(deeplink.scenario) && !loadSaved(true)) {
-      demoLayout();
+      // v3.8 REDESIGN-1: a fresh profile opens CALM + EMPTY (the canvas-hero
+      // empty-state is the first screen). The demo starter stays reachable via
+      // the Layout "Demo" button + Ctrl-K, so nothing is removed.
+      emptyStart();
     }
     // P4: apply the tier gate to every gated control (palette, strategy
     // selects, preset button, tier badge). Default tier is "demo".

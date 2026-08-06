@@ -42,7 +42,7 @@
    * Zooming further out than Fit is still allowed for extra breathing room.
    * ------------------------------------------------------------------ */
   const SCALE_MIN = 0.012; // 1.2% - low enough to frame the largest floor (~0.0288 to fit)
-  const SCALE_MAX = 8.0; // 800% - detail zoom-in
+  const SCALE_MAX = 24.0; // 2400% - deep detail zoom-in (v3.8: study a single component in a big empty hall)
 
   /* ------------------------------------------------------------------
    * Configurable floor size, in metres (= cells). The classic floor is

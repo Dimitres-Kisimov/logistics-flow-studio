@@ -20,6 +20,9 @@
  *   - dimensionLabel returns the correct "w x d m" text (metre grid), whole
  *     values un-decimalled, garbage -> ""
  *   - perimeter is the origin-anchored floor rect with in-bounds corners
+ *   - v3.8 wallThickness is ~2% of the short side clamped [0.6,4] m (garbage
+ *     -> 0), and wallBand's 4 disjoint segments TILE the perimeter ring
+ *     exactly (inner = the inset floor, all in bounds, garbage -> null)
  *   - dockApproach returns an in-bounds apron + hatch lines fully inside it
  *     for a dock on every edge, and does NOT mutate the element
  *   - aisleGuides returns a centre line between a facing pair, in bounds,
@@ -149,6 +152,44 @@ console.log("");
     p.points.length === 4 && cornersIn &&
     F.perimeter(0, 24) === null && F.perimeter(40, -1) === null,
     "rect=" + [p.x, p.y, p.w, p.h].join(","));
+})();
+
+/* ---- 7b. v3.8 building-shell WALL band ---------------------------- */
+(() => {
+  // wallThickness: proportional to the short side, clamped [0.6, 4] m, garbage -> 0.
+  const tSmall = F.wallThickness(40, 24);   // 24*0.02 = 0.48 -> clamped up to 0.6
+  const tBig = F.wallThickness(500, 300);   // 300*0.02 = 6   -> clamped down to 4
+  const tMid = F.wallThickness(250, 160);   // 160*0.02 = 3.2 -> in range
+  const thicknessOk =
+    Math.abs(tSmall - 0.6) < 1e-9 &&
+    Math.abs(tBig - 4) < 1e-9 &&
+    Math.abs(tMid - 3.2) < 1e-9 &&
+    F.wallThickness(0, 10) === 0 && F.wallThickness("x", 10) === 0;
+  check("v3.8 wallThickness: ~2% of the short side, clamped [0.6, 4] m, garbage -> 0",
+    thicknessOk, "40x24=" + tSmall + " 250x160=" + tMid + " 500x300=" + tBig);
+
+  // wallBand: the 4 disjoint segments TILE the band exactly (areas sum to the
+  // outer-minus-inner ring area, no overlap, no gap), the inner clear rect is
+  // the floor inset by the thickness on all sides, and every segment is inside
+  // the floor. Garbage -> null; the band never crosses itself on a tiny floor.
+  const W = 250, H = 160;
+  const band = F.wallBand(W, H);
+  const t = band.thickness;
+  const ringArea = W * H - (W - 2 * t) * (H - 2 * t);
+  const segArea = band.segments.reduce((s, r) => s + r.w * r.h, 0);
+  const innerOk = band.inner.x === t && band.inner.y === t &&
+    Math.abs(band.inner.w - (W - 2 * t)) < 1e-9 && Math.abs(band.inner.h - (H - 2 * t)) < 1e-9;
+  const segsInside = band.segments.every((r) =>
+    r.x >= 0 && r.y >= 0 && r.x + r.w <= W + 1e-9 && r.y + r.h <= H + 1e-9 && r.w >= 0 && r.h >= 0);
+  const fourSides = band.segments.length === 4 &&
+    ["top", "bottom", "left", "right"].every((s) => band.segments.some((r) => r.side === s));
+  // Tiny floor: thickness is capped at half the short side so inner can't invert.
+  const tiny = F.wallBand(8, 8);
+  const tinyOk = tiny && tiny.thickness <= 4 && tiny.inner.w >= 0 && tiny.inner.h >= 0;
+  check("v3.8 wallBand: 4 disjoint segments tile the ring exactly, inner is the inset floor, in-bounds; garbage -> null",
+    Math.abs(segArea - ringArea) < 1e-6 && innerOk && segsInside && fourSides &&
+    F.wallBand(0, 10) === null && tinyOk,
+    "ringArea=" + ringArea.toFixed(1) + " segArea=" + segArea.toFixed(1) + " t=" + t);
 })();
 
 /* ---- 8. dockApproach on every edge: in-bounds + hatch inside + pure */

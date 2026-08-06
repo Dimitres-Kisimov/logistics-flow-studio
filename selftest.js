@@ -1320,6 +1320,57 @@
       return { ok: okAll, detail: detail };
     });
 
+    // ---- v3.8 REDESIGN-1: canvas-hero EMPTY-STATE + big empty walled hall.
+    // The overlay exposes the THREE starting actions (+ three hall-size presets),
+    // is shown ONLY when the floor is empty, "Start empty hall" gives a big empty
+    // WALLED room, and drag-placing an item populates the floor + hides the
+    // overlay. Restores to a normal example afterwards so later state is clean.
+    check("empty-state-3-actions-then-empty-hall-then-drag-place", function () {
+      if (!haveApi || !API.emptyState || !API.library) {
+        return { ok: false, detail: "no emptyState/library API" };
+      }
+      var ES = API.emptyState;
+      var overlay = $("emptyState");
+      if (!overlay) return { ok: false, detail: "no #emptyState overlay" };
+      // 1) the three primary actions + three hall-size presets exist + are labelled
+      var ids = ["emptyHallBtn", "emptyGenerateBtn", "emptyExampleBtn",
+                 "emptyHallMediumBtn", "emptyHallLargeBtn", "emptyHallHugeBtn"];
+      var allPresent = ids.every(function (id) {
+        var b = $(id);
+        return b && (b.textContent || b.getAttribute("aria-label") || b.title || "").trim().length > 0;
+      });
+      var libFirst = WT.examples && WT.examples.library && WT.examples.library[0];
+      // 2) "Start empty hall" (Medium preset) -> a big empty WALLED room, overlay shown
+      ES.startHall(ES.presets.medium.w, ES.presets.medium.h);
+      var floor = ES.floor();
+      var emptyNow = API.state.elements.length === 0;
+      var shownWhenEmpty = ES.shown() && overlay.hidden === false;
+      var band = ES.wallBand();
+      var walled = !!band && Array.isArray(band.segments) && band.segments.length === 4 && band.thickness > 0;
+      var bigHall = floor.gridW >= 100 && floor.gridH >= 60;
+      // 3) drag-place a component (the SAME placeAt a pointer drop uses) -> populated
+      var before = API.state.elements.length;
+      var placed = false;
+      var spots = [[2, 2], [1, 1], [0, 0]];
+      for (var i = 0; i < spots.length && !placed; i++) {
+        API.library.placeAt("selective-racking", spots[i][0], spots[i][1]);
+        if (API.state.elements.length > before) placed = true;
+      }
+      API.render();
+      var hiddenWhenPopulated = ES.shown() === false && overlay.hidden === true;
+      // restore: reload a real example so the app + later state are normal
+      if (libFirst) API.loadExample(libFirst.id);
+      API.fitToFloor();
+      API.render();
+      var ok = allPresent && emptyNow && shownWhenEmpty && walled && bigHall && placed && hiddenWhenPopulated;
+      return {
+        ok: ok,
+        detail: "actions=" + allPresent + " empty=" + emptyNow + " shownEmpty=" + shownWhenEmpty +
+          " walled=" + walled + " hall=" + floor.gridW + "x" + floor.gridH +
+          " placed=" + placed + " hiddenPop=" + hiddenWhenPopulated,
+      };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

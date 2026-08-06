@@ -328,6 +328,22 @@
     ctx.stroke();
     ctx.restore();
 
+    // ---- v3.8 REDESIGN-1: building-shell perimeter WALLS ---------------
+    // When the caller passes a wall band (WT.floor.wallBand geometry), draw
+    // the two BACK edges (north y=0 + west x=0) as low extruded wall boxes so
+    // the scene reads as an enclosed HALL. The two FRONT edges are omitted so
+    // interior content is never occluded (honest, illustrative shell). Drawn
+    // BEFORE the elements, so every placed item paints on top.
+    if (o.walls && Array.isArray(o.walls.segments)) {
+      const wallH = isFinite(o.wallHeightM) && o.wallHeightM > 0 ? o.wallHeightM : 3;
+      const wallColor = o.wallColor || colors.gridStrong || "#94a3b8";
+      for (const s of o.walls.segments) {
+        if (s.side !== "top" && s.side !== "left") continue; // back walls only
+        if (!(s.w > 0) || !(s.h > 0)) continue;
+        drawBox(ctx, P, s.x, s.y, s.w, s.h, wallH, wallColor, {});
+      }
+    }
+
     // ---- Elements: extruded blocks, back-to-front ---------------------
     const ordered = sortByDepth(o.elements || []);
     const labelFn = typeof o.shortLabel === "function" ? o.shortLabel : null;

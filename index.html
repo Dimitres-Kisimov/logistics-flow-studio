@@ -462,6 +462,43 @@
              floor size, view mode, sim status). -->
         <canvas id="floor" aria-label="Warehouse floor plan editor" aria-describedby="floorDesc"></canvas>
         <p id="floorDesc" class="sr-only">Warehouse floor plan. Loading…</p>
+        <!-- v3.8 REDESIGN-1: canvas-hero EMPTY-STATE. app.js shows this ONLY
+             when the floor has no elements (fresh load / after Clear) and hides
+             it the moment the layout has content. It teaches ONE decision so a
+             first-timer begins WITHOUT reading any side panel. The container is
+             pointer-events:none (CSS) so clicking/dragging on the empty canvas
+             passes straight through — only the card itself is interactive, so it
+             never blocks placing the first item. Labelled + keyboard-navigable. -->
+        <div id="emptyState" class="empty-state" role="region" aria-label="Get started — choose a starting point" hidden>
+          <div class="empty-card" role="group" aria-labelledby="emptyStateTitle">
+            <h2 id="emptyStateTitle" class="empty-title">Start building your plant</h2>
+            <p class="empty-sub">Pick a starting point. Everything else stays one click away in the side panels.</p>
+            <div class="empty-actions">
+              <button id="emptyHallBtn" class="btn primary empty-btn" type="button" title="Clear to a large empty walled hall you fill by hand (Large — about 250 × 160 m)">
+                <span class="empty-ico" aria-hidden="true">▢</span>
+                <span class="empty-btn-label">Start empty hall</span>
+                <span class="empty-btn-note">a blank walled building to arrange by hand</span>
+              </button>
+              <button id="emptyGenerateBtn" class="btn empty-btn" type="button" title="Generate a ready-made, compliance-safe plant you can then edit">
+                <span class="empty-ico" aria-hidden="true">✦</span>
+                <span class="empty-btn-label">Generate a plant</span>
+                <span class="empty-btn-note">an instant starting layout, then steer it</span>
+              </button>
+              <button id="emptyExampleBtn" class="btn empty-btn" type="button" title="Open the Example scenarios list and load a realistic worked scenario">
+                <span class="empty-ico" aria-hidden="true">▦</span>
+                <span class="empty-btn-label">Open an example</span>
+                <span class="empty-btn-note">a realistic worked scenario to explore</span>
+              </button>
+            </div>
+            <div class="empty-sizes" role="group" aria-label="Empty hall size — pick one, no typing">
+              <span class="empty-sizes-label">Empty hall size</span>
+              <button id="emptyHallMediumBtn" class="btn small empty-size" type="button" title="Medium empty hall, about 120 × 80 m">Medium <small>120 × 80 m</small></button>
+              <button id="emptyHallLargeBtn" class="btn small empty-size" type="button" title="Large empty hall, about 250 × 160 m">Large <small>250 × 160 m</small></button>
+              <button id="emptyHallHugeBtn" class="btn small empty-size" type="button" title="Huge empty hall, about 500 × 300 m">Huge <small>500 × 300 m</small></button>
+            </div>
+            <p class="empty-foot">or drag a component from the <strong>Class Library</strong> straight onto the floor.</p>
+          </div>
+        </div>
       </div>
       <p id="statusLine" class="status-line">Ready. Place racks &amp; docks, pick a strategy, then run the simulation.</p>
     </section>
@@ -475,7 +512,7 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card" id="simCard" data-default-collapsed>
         <h2 class="card-title">Simulation</h2>
         <div class="field">
           <label for="strategySelect">Slotting strategy</label>

@@ -139,6 +139,53 @@
   }
 
   /* ------------------------------------------------------------------
+   * v3.8 REDESIGN-1 - building-shell PERIMETER WALL. A readable wall BAND
+   * (not a hairline outline) hugging the inside of the floor edge, so the
+   * floor reads as "an entire place" - especially the big empty hall you
+   * start from. It is a RENDER-ONLY facility layer: derived purely from the
+   * floor size, never stored as an element, so serialize() is byte-identical.
+   *
+   * wallThickness(floorW, floorH) -> an illustrative, teaching-scale wall
+   * thickness in metres: ~2% of the SHORT side so it stays proportional as
+   * the hall grows, clamped [0.6, 4] m so it is visible on a small floor and
+   * never absurd on a huge one. Deterministic; garbage -> 0.
+   * ------------------------------------------------------------------ */
+  function wallThickness(floorW, floorH) {
+    const W = num(floorW), H = num(floorH);
+    if (!isFinite(W) || !isFinite(H) || W <= 0 || H <= 0) return 0;
+    const t = Math.min(W, H) * 0.02;
+    return Math.max(0.6, Math.min(4, t));
+  }
+
+  /* ------------------------------------------------------------------
+   * wallBand(floorW, floorH, thicknessM?) -> the perimeter wall geometry:
+   *   { thickness, outer:{x,y,w,h}, inner:{x,y,w,h}, segments:[4 rects] }
+   * The band is the region between the floor rect (`outer`) and the clear
+   * interior (`inner`), of `thickness` metres (defaulting to wallThickness).
+   * `segments` are the FOUR disjoint wall rectangles (top, bottom, left,
+   * right) that TILE the band exactly (no overlap, no gap) - so a renderer
+   * can fill/extrude each one, and a test can assert their areas sum to the
+   * band area. Thickness is capped at half the short side so the band can
+   * never cross itself on a tiny floor. Pure + deterministic; garbage -> null.
+   * ------------------------------------------------------------------ */
+  function wallBand(floorW, floorH, thicknessM) {
+    const W = num(floorW), H = num(floorH);
+    if (!isFinite(W) || !isFinite(H) || W <= 0 || H <= 0) return null;
+    let t = num(thicknessM);
+    if (!isFinite(t) || t <= 0) t = wallThickness(W, H);
+    t = Math.min(t, Math.min(W, H) / 2);
+    const midH = Math.max(0, H - 2 * t);
+    const inner = { x: t, y: t, w: Math.max(0, W - 2 * t), h: midH };
+    const segments = [
+      { x: 0, y: 0, w: W, h: t, side: "top" },        // north edge
+      { x: 0, y: H - t, w: W, h: t, side: "bottom" },  // south edge
+      { x: 0, y: t, w: t, h: midH, side: "left" },     // west edge
+      { x: W - t, y: t, w: t, h: midH, side: "right" }, // east edge
+    ];
+    return { thickness: t, outer: { x: 0, y: 0, w: W, h: H }, inner: inner, segments: segments };
+  }
+
+  /* ------------------------------------------------------------------
    * dockApproach(el, floorW, floorH, depthM) -> the apron in FRONT of a
    * dock/gate element: a rectangle extending depthM metres from the
    * element's interior-facing side (the side nearest the closest floor
@@ -285,6 +332,8 @@
     rulerLabelStepM,
     dimensionLabel,
     perimeter,
+    wallThickness,
+    wallBand,
     dockApproach,
     aisleGuides,
     stageOfType,
