@@ -52,6 +52,29 @@
     "drive-in": ["drive-in", "drive in"],
     "mobile-racking": ["mobile racking", "mobile racks", "mobile rack"],
     mezzanine: ["mezzanine"],
+    // v2.6 FACTORY-B: the FACTORY-A1 manufacturing components. Longest-match
+    // wins (matchFromTable), so "parallel machining station" beats "machining
+    // station" beats "station"; "pack station" (warehouse) still wins over a
+    // bare "station" too - so warehouse phrasings are unchanged.
+    "mfg-source": ["parts source", "part source", "material source", "source"],
+    "mfg-drain": ["parts drain", "part drain", "finished-goods drain", "drain", "sink"],
+    "mfg-parallel-station": ["parallel machining stations", "parallel machining station", "parallel stations", "parallel station", "parallel machines", "parallel machine"],
+    "mfg-station": ["machining stations", "machining station", "process stations", "process station", "inspection station", "qa station", "machine station", "stations", "station"],
+    "mfg-assembly": ["assembly stations", "assembly station", "assemblies", "assembly"],
+    "mfg-dismantle": ["dismantle stations", "dismantle station", "split stations", "split station", "dismantle"],
+  };
+
+  // v2.6 FACTORY-B: a DEFAULT line stage for each factory component, so
+  // "add 2 more assembly stations" (no explicit zone) lands on the assembly
+  // lane. Only the mfg-* types carry a default; every WAREHOUSE type has
+  // none, so "add 3 RGVs" with no zone still asks "which zone?" (unchanged).
+  const TYPE_DEFAULT_ZONE = {
+    "mfg-source": "receiving",
+    "mfg-drain": "shipping",
+    "mfg-station": "storage",
+    "mfg-parallel-station": "storage",
+    "mfg-assembly": "picking",
+    "mfg-dismantle": "picking",
   };
 
   // Number words -> integers.
@@ -61,17 +84,26 @@
   };
 
   function profileKeys() {
-    return (WT.generate && WT.generate.plantProfiles) ? Object.keys(WT.generate.plantProfiles) : [
+    const warehouse = (WT.generate && WT.generate.plantProfiles) ? Object.keys(WT.generate.plantProfiles) : [
       "ecommerce-fulfilment", "spare-parts-distribution", "automotive-supply", "cold-chain",
     ];
+    const factory = (WT.generate && WT.generate.factoryProfiles) ? Object.keys(WT.generate.factoryProfiles) : [
+      "assembly-line", "machining-shop", "general-factory",
+    ];
+    return warehouse.concat(factory);
   }
   // Profile synonyms (built from the known keys + hand-written aliases).
+  // Includes the v2.6 FACTORY-B factory baselines so "use the assembly-line
+  // baseline" regenerates a whole factory line (dispatched in generate.js).
   function profileSynonyms() {
     return {
       "ecommerce-fulfilment": ["ecommerce fulfilment", "ecommerce fulfillment", "e-commerce fulfilment", "e-commerce", "ecommerce", "fulfilment", "fulfillment", "online retail", "b2c", "parcel"],
       "spare-parts-distribution": ["spare-parts distribution", "spare parts distribution", "spare parts", "spare-parts", "spares", "aftermarket", "parts distribution", "mro"],
       "automotive-supply": ["automotive supply", "automotive", "car parts", "vehicle", "jit supply", "jis", "line-side", "tier 1", "oem supply"],
       "cold-chain": ["cold-chain", "cold chain", "temperature-controlled", "temperature controlled", "chilled", "frozen", "refrigerated", "freezer", "cold"],
+      "assembly-line": ["assembly-line factory", "assembly line factory", "assembly-line", "assembly line", "final assembly", "product build"],
+      "machining-shop": ["machining shop", "machining-shop", "machine shop", "cnc cell", "cnc shop", "job shop", "metal cutting"],
+      "general-factory": ["general factory", "general-factory", "manufacturing plant", "production line", "general production", "factory"],
     };
   }
 
@@ -184,7 +216,11 @@
     // ---- 4. REMOVE: "remove the <type> in <zone>" ------------------
     if (/\b(remove|delete|clear|take out|get rid of)\b/.test(t)) {
       const type = matchType(t);
-      const zone = matchZone(t);
+      let zone = matchZone(t);
+      // Factory component with no explicit zone -> its default line stage.
+      if (type && !zone && TYPE_DEFAULT_ZONE[type] && knownZones.indexOf(TYPE_DEFAULT_ZONE[type]) !== -1) {
+        zone = TYPE_DEFAULT_ZONE[type];
+      }
       if (type && zone && knownZones.indexOf(zone) !== -1) {
         return {
           ok: true,
@@ -201,13 +237,22 @@
     // ---- 5. ADD: "include/add N (more) <type> in the <zone>" -------
     if (/\b(include|add|place|put|insert|drop|introduce|more)\b/.test(t)) {
       const type = matchType(t);
-      const zone = matchZone(t);
+      let zone = matchZone(t);
       const count = parseCount(t);
+      // Factory component with no explicit zone -> its default line stage, so
+      // "add 2 more assembly stations" / "add a parallel machining station"
+      // work without naming a zone. Warehouse types have no default (below).
+      let defaulted = false;
+      if (type && !zone && TYPE_DEFAULT_ZONE[type] && knownZones.indexOf(TYPE_DEFAULT_ZONE[type]) !== -1) {
+        zone = TYPE_DEFAULT_ZONE[type];
+        defaulted = true;
+      }
       if (type && zone && knownZones.indexOf(zone) !== -1) {
         return {
           ok: true,
           op: { kind: "add", type: type, count: count, zone: zone },
-          echo: "Understood: add " + count + " " + labelOf(type) + (count === 1 ? "" : "s") + " to the " + zone + " zone.",
+          echo: "Understood: add " + count + " " + labelOf(type) + (count === 1 ? "" : "s") +
+            " to the " + zone + " zone" + (defaulted ? " (the line's default stage)" : "") + ".",
           message: "add " + count + " " + type + " -> " + zone,
           suggestions: [],
         };

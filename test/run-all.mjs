@@ -36,6 +36,18 @@
  *      the offline NL parser (the pinned "include 2 more RGVs in the
  *      picking sector" -> +2 rgv, reserve/regenerate/widen/remove, and
  *      an honest not-understood on unknown input).
+ *   8b. verify_factory.js    - Factory layout GENERATOR (v2.6 FACTORY-B): the
+ *      3 factory line profiles (assembly-line / machining-shop / general-
+ *      factory) as a SEPARATE path from the 4 warehouse profiles; each build
+ *      has a Source + Drain + >=1 Station + straight AND curved conveyors +
+ *      real dock doors, is overlap-free + in-bounds on its own floor, byte-
+ *      identical on re-run, passes/warns (never fails) compliance, and a Part
+ *      traverses the line Source -> ... -> Drain (a finite flow pool drains to
+ *      completion); plain-language edits cover the production components
+ *      ("add 2 more assembly stations" -> +2, a parallel/machining station,
+ *      reserve packing, "use the machining-shop baseline"), while a warehouse
+ *      type with no zone is still not guessed; and the ready-made assembly-
+ *      line-factory example builds/exports on its own factory floor.
  *   9. verify_examples.js    - Example Scenarios library + data export:
  *      >=20 distinct realistic scenarios, every example builds
  *      overlap-free and passes/warns (never fails) compliance, a
@@ -371,6 +383,7 @@ const HARNESSES = [
   { name: "IFC export bridge (verify_ifc.js)", args: ["verify_ifc.js"] },
   { name: "Compliance Check findings (verify_compliance.js)", args: ["verify_compliance.js"] },
   { name: "AI Environment Generator (verify_generate.js)", args: ["verify_generate.js"] },
+  { name: "Factory layout generator + factory scenario (verify_factory.js)", args: ["verify_factory.js"] },
   { name: "Example Scenarios + data export (verify_examples.js)", args: ["verify_examples.js"] },
   { name: "WMS Operations layer (verify_wms.js)", args: ["verify_wms.js"] },
   { name: "Live material-flow animation (verify_flowsim.js)", args: ["verify_flowsim.js"] },

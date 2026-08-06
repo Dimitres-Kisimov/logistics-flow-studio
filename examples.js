@@ -58,8 +58,9 @@
     "Informed by ASR A1.8 / ASR A2.3 / DIN 15185 - a design aid, NOT a certification.";
 
   /* ------------------------------------------------------------------
-   * THE LIBRARY. 23 named, distinct, realistic industry scenarios
-   * (22 studio-floor recipes below + the large-scale mega showcase).
+   * THE LIBRARY. 24 named, distinct, realistic industry scenarios
+   * (22 studio-floor warehouse recipes + the large-scale mega showcase +
+   * the v2.6 FACTORY-B assembly-line factory, built on its own floor).
    * `config` carries the deterministic build recipe:
    *   profile        one of generate.js's 4 pinned plant profiles (the
    *                  proven skeleton: docks/staging/rows/spine/pack)
@@ -287,6 +288,23 @@
         "A deliberately large, dense automated fulfilment-and-distribution plant that shows the whole toolkit at once: AS/RS crane aisles, VNA narrow-aisle and shuttle high-bay, deep-lane drive-in / push-back / pallet-flow reserve, mobile and cantilever racking, mezzanine and pick-to-light / carton-flow pick faces, block-stack bulk, a central conveyor-and-sorter spine with RGV and AGV lanes, an inbound dock wall with staging and charging, and an outbound pack / returns / stretch-wrap line to a shipping dock wall. It is a SYNTHETIC, illustrative teaching layout - no real company or site - laid out deterministically (fixed seed, no random numbers) so it rebuilds byte-for-byte, and every working aisle and escape route is checked against the SAME standards guidance as every other scenario. Use it to stress the 2D / 2.5D rendering, the material-flow animation and Story Mode at 800+ elements.",
       config: { mega: true, seed: 20260805 },
       dataProfile: { skuCount: 240000, dailyOrderLines: 96000, throughputPerHour: 5200, storagePositions: 86000, dockCount: 26, automation: "AS/RS + shuttle + VNA high-bay, conveyor sortation loop, RGV/AGV transport, goods-to-person pick walls", staffingFte: 320, peakFactor: 2.6 },
+    },
+    {
+      // v2.6 FACTORY-B: the ONE ready-made FACTORY scenario, so users see a
+      // whole production line immediately. Unlike the 22 warehouse recipes +
+      // the mega showcase, this one is FACTORY mode: it is built by the NEW
+      // factory generator (generateFactoryLayout / buildFactory below), NOT
+      // the warehouse skeleton path, so it carries its OWN floor and the
+      // FACTORY-A1 manufacturing components (Source -> machining -> assembly
+      // -> QA/inspection -> packing -> Drain, conveyor-linked with curved
+      // turns). Additive: the 23 warehouse scenarios stay byte-identical.
+      id: "assembly-line-factory",
+      name: "Assembly-line factory (production line)",
+      industry: "Discrete manufacturing / assembly",
+      description:
+        "A discrete-manufacturing assembly line, not a warehouse: raw parts enter at a goods-in dock and a parts Source, run a machining/process feed lane (with a parallel station duplicating the slow step), a join/assembly lane, then a QA/inspection and packing lane, and leave as finished goods at a Drain and a shipping dock. Straight conveyors carry the line along each lane with curved conveyors where it turns. It is an ILLUSTRATIVE synthetic production layout laid out deterministically (no random numbers) - a teaching schematic, NOT a validated process plan and NOT a CAD/BIM model; the material flow animates a Part end-to-end Source -> ... -> Drain.",
+      config: { factory: true, profile: "assembly-line", seed: 2606 },
+      dataProfile: { skuCount: 40, dailyOrderLines: 900, throughputPerHour: 120, storagePositions: 60, dockCount: 2, automation: "conveyor-linked assembly line: machining feed -> assembly join -> QA/inspection -> pack; ~60 line-side WIP buffer positions", staffingFte: 24, peakFactor: 1.5 },
     },
   ];
 
@@ -615,6 +633,76 @@
   }
 
   /* ------------------------------------------------------------------
+   * buildFactory(ex) -> the SAME { elements, config, meta, gridW, gridH }
+   * shape as build(), but from the v2.6 FACTORY-B factory generator
+   * (generateFactoryLayout) on its OWN floor with the FACTORY-A1
+   * manufacturing components. Mirrors build()'s derived-KPI / meta so the
+   * app, exportData, exportCsv and the report treat it like any other
+   * example. Deterministic + overlap-free + compliance pass/warn by
+   * construction (asserted in the factory generator + verify_factory.js).
+   * ------------------------------------------------------------------ */
+  function buildFactory(ex) {
+    const cfg = ex.config;
+    const gen = G.generateFactoryLayout(cfg.profile, { seed: cfg.seed >>> 0 });
+    const W = gen.gridW, H = gen.gridH, minAisle = gen.config.minAisleMetres;
+    const els = gen.elements;
+
+    const positions = els.reduce((s, e) => s + D.elementCapacity(e), 0);
+    const floorArea = els.reduce((s, e) => s + e.w * e.d, 0);
+    const floorUsePct = Math.round((floorArea / (W * H)) * 1000) / 10;
+    const dockIn = els.filter((e) => e.type === "dock-in").length;
+    const dockOut = els.filter((e) => e.type === "dock-out").length;
+
+    const report = C.check(
+      { version: SERIALIZE_VERSION, gridW: W, gridH: H, cell: CELL_M, elements: els },
+      { minAisleMetres: minAisle }
+    );
+    const aisleFinding = report.findings.find((f) => f.ruleId === "aisle-width");
+
+    const config = Object.assign({}, gen.config, {
+      profileKey: cfg.profile,
+      profileLabel: ex.name,
+      automation: ex.dataProfile.automation,
+    });
+
+    const meta = {
+      version: SERIALIZE_VERSION,
+      exampleId: ex.id,
+      name: ex.name,
+      industry: ex.industry,
+      description: ex.description,
+      dataProfile: Object.assign({}, ex.dataProfile),
+      profileKey: cfg.profile,
+      kind: "factory",
+      seed: cfg.seed >>> 0,
+      gridW: W,
+      gridH: H,
+      minAisleMetres: minAisle,
+      rackingUsed: [],
+      transport: "conveyor",
+      zones: gen.meta.zones,
+      reserved: [],
+      counts: G.countByZone(els),
+      stationCount: gen.meta.stationCount,
+      positions: positions,
+      floorUsePct: floorUsePct,
+      dockIn: dockIn,
+      dockOut: dockOut,
+      compliance: {
+        worst: report.summary.worst,
+        pass: report.summary.pass,
+        warn: report.summary.warn,
+        fail: report.summary.fail,
+        aisle: aisleFinding ? aisleFinding.status : "n/a",
+      },
+      syntheticLabel: SYNTHETIC_LABEL,
+      complianceLabel: COMPLIANCE_LABEL,
+    };
+
+    return { elements: els, config: config, meta: meta, gridW: W, gridH: H };
+  }
+
+  /* ------------------------------------------------------------------
    * build(id) -> { elements, config, meta, gridW, gridH }
    * DETERMINISTIC. Overlap-free and compliance pass/warn by construction
    * (generate.js base + geometry-preserving substitution + safe flow
@@ -628,6 +716,12 @@
 
     // Signature showcase: its own large floor + dedicated deterministic tiler.
     if (cfg && cfg.mega) return buildMega(ex);
+
+    // v2.6 FACTORY-B: the ready-made FACTORY scenario - built by the NEW
+    // factory generator (its own floor + the FACTORY-A1 components), NOT the
+    // warehouse skeleton path below. Additive; the warehouse scenarios are
+    // untouched (and stay byte-identical).
+    if (cfg && cfg.factory) return buildFactory(ex);
 
     // 1. Proven skeleton from the generator (overlap-free, never-failing).
     let layout = G.generateLayout(cfg.profile, {

@@ -154,7 +154,10 @@ let dataOK = true, dataTypeOK = true;
 for (const ex of LIB) {
   const dat = E.exportData(ex.id);
   const isMega = !!(ex.config && ex.config.mega);
-  const gridOK = isMega
+  // v2.6 FACTORY-B: the factory scenario carries its OWN floor (like the mega
+  // showcase), sized to fit the production line, within the supported range.
+  const isFactory = !!(ex.config && ex.config.factory);
+  const gridOK = (isMega || isFactory)
     ? (dat.gridW > 40 && dat.gridW <= 1200 && dat.gridH > 24 && dat.gridH <= 800)
     : (dat.gridW === 40 && dat.gridH === 24);
   if (!dat || dat.version !== "wt-1" || !gridOK || !Array.isArray(dat.elements) || !dat.config) dataOK = false;

@@ -4936,18 +4936,35 @@
   const GEN = WT.generate;
   const NL = WT.nl;
 
-  function buildGeneratePanel() {
+  // v2.6 FACTORY-B: the Generate panel is MODE-AWARE - Warehouse mode offers
+  // the 4 warehouse plant profiles; Factory mode offers the 3 factory line
+  // profiles (assembly-line / machining-shop / general-factory). The select
+  // is repopulated whenever the Warehouse/Factory toggle flips.
+  function genProfilesForMode() {
+    return (currentPlantMode() === "factory" && GEN && GEN.factoryProfiles)
+      ? GEN.factoryProfiles : (GEN ? GEN.plantProfiles : {});
+  }
+  function populateGenProfiles() {
     if (!GEN || !$("genProfileSelect")) return;
     const sel = $("genProfileSelect");
+    const prev = sel.value;
+    const profiles = genProfilesForMode();
     sel.innerHTML = "";
-    Object.keys(GEN.plantProfiles).forEach((key) => {
-      const p = GEN.plantProfiles[key];
+    Object.keys(profiles).forEach((key) => {
+      const p = profiles[key];
       const o = document.createElement("option");
       o.value = key;
       o.textContent = p.label;
       sel.appendChild(o);
     });
+    if (prev && profiles[prev]) sel.value = prev;
     updateGenProfileDesc();
+  }
+
+  function buildGeneratePanel() {
+    if (!GEN || !$("genProfileSelect")) return;
+    const sel = $("genProfileSelect");
+    populateGenProfiles();
     sel.addEventListener("change", updateGenProfileDesc);
     $("genKeywordInput").addEventListener("input", () => {
       const k = matchGenProfile($("genKeywordInput").value);
@@ -4956,7 +4973,7 @@
     [["genModeAuto", "auto"], ["genModeGuided", "guided"], ["genModeReserve", "reserve"]].forEach(([id, mode]) => {
       $(id).addEventListener("click", () => setGenMode(mode));
     });
-    $("genBtn").addEventListener("click", runGenerate);
+    $("genBtn").addEventListener("click", () => runGenerate());
     $("genCmdBtn").addEventListener("click", runGenCommand);
     $("genCmdInput").addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); runGenCommand(); }
@@ -4966,17 +4983,22 @@
 
   function updateGenProfileDesc() {
     const key = $("genProfileSelect").value;
-    const p = GEN.plantProfiles[key];
+    const p = genProfilesForMode()[key];
     $("genProfileDesc").textContent = p
       ? p.label + " — " + p.keywords.join(", ") + ". Automation: " + p.automation + "."
       : "";
   }
 
-  // Map a free-text keyword to one of the 4 profile keys (contains scan).
+  // Map a free-text keyword to a profile key (contains scan). Mode-aware: in
+  // Factory mode it matches the factory line profiles, else the warehouse ones.
   function matchGenProfile(text) {
     const t = String(text || "").toLowerCase();
     if (!t.trim()) return null;
-    const table = {
+    const table = currentPlantMode() === "factory" ? {
+      "assembly-line": ["assembly", "final assembly", "make-to-order", "build line"],
+      "machining-shop": ["machin", "cnc", "job shop", "cutting", "mill", "lathe"],
+      "general-factory": ["factory", "manufactur", "production", "plant", "general"],
+    } : {
       "ecommerce-fulfilment": ["ecommerce", "e-commerce", "fulfil", "online", "b2c", "parcel"],
       "spare-parts-distribution": ["spare", "aftermarket", "parts", "mro"],
       "automotive-supply": ["auto", "car", "vehicle", "jit", "jis", "oem", "tier"],
@@ -4999,33 +5021,44 @@
     });
   }
 
-  function runGenerate() {
+  function runGenerate(explicitKey) {
     if (!GEN) return;
-    const key = $("genProfileSelect").value;
-    const p = GEN.plantProfiles[key];
+    const key = explicitKey || $("genProfileSelect").value;
+    // v2.6 FACTORY-B: a factory profile builds a WHOLE factory line via the
+    // new factory code path; a warehouse profile builds as before (untouched).
+    const isFactory = !!(GEN.factoryProfiles && GEN.factoryProfiles[key]);
+    const p = isFactory ? GEN.factoryProfiles[key] : GEN.plantProfiles[key];
     if (!p) return;
     const mode = state.genMode;
     const reserve = mode === "reserve" ? ["picking"] : [];
     let gen;
     try {
-      gen = GEN.generateLayout(key, {
+      const genOpts = {
         gridW: GRID_W, gridH: GRID_H,
         seed: Number.isFinite(Number(state.config.seed)) ? Number(state.config.seed) : undefined,
         reserve: reserve,
-      });
+      };
+      gen = isFactory ? GEN.generateFactoryLayout(key, genOpts) : GEN.generateLayout(key, genOpts);
     } catch (err) {
       toast("Generate failed: " + err.message, "err");
       return;
     }
     applyGeneratedLayout(gen, "generate");
+    const reserveLabel = isFactory ? "Manual-reserve (assembly lane left empty)" : "Manual-reserve (picking left empty)";
     const modeLabel = mode === "auto"
       ? "Auto (AI builds all)"
-      : mode === "guided" ? "Guided (baseline + your edits)" : "Manual-reserve (picking left empty)";
-    logGen("ok", "Generated a " + p.label + " environment — " + modeLabel + ".", gen.meta.summary);
-    if (mode === "guided") logGen("info", "Guided mode: refine it with a plain-language command below.", "");
-    if (mode === "reserve") logGen("info", "The picking sector is reserved (empty, marked). Try: “include 2 more RGVs in the picking sector”.", "");
-    status("Generated a " + p.label + " layout (seed " + gen.meta.seed + "). AI-assisted starting point — checked against ASR/DIN guidance, not certified.");
-    toast("Environment generated. It's a best-practice-informed starting point, not a certified plan — steer it with a command or run the sim.");
+      : mode === "guided" ? "Guided (baseline + your edits)" : reserveLabel;
+    logGen("ok", "Generated a " + p.label + (isFactory ? " factory line" : " environment") + " — " + modeLabel + ".", gen.meta.summary);
+    if (mode === "guided") logGen("info", "Guided mode: refine it with a plain-language command below.",
+      isFactory ? "Try: “add 2 more assembly stations” or “add a parallel machining station”." : "");
+    if (mode === "reserve") logGen("info",
+      isFactory ? "The assembly lane is reserved (empty, marked). Try: “add 2 more assembly stations”."
+                : "The picking sector is reserved (empty, marked). Try: “include 2 more RGVs in the picking sector”.", "");
+    status("Generated a " + p.label + " layout (seed " + gen.meta.seed + "). " +
+      (isFactory ? "Illustrative synthetic production line — a deterministic build, not a validated process plan / not CAD-BIM."
+                 : "AI-assisted starting point — checked against ASR/DIN guidance, not certified."));
+    toast((isFactory ? "Factory line generated." : "Environment generated.") +
+      " It's a best-practice-informed starting point, not a certified plan — steer it with a command or run the sim.");
   }
 
   // Adopt a generated/steered layout into the live editor state, keeping
@@ -6774,6 +6807,7 @@
       if (lbl) lbl.textContent = factory ? "Factory" : "Warehouse";
     }
     if (typeof buildPalette === "function") buildPalette(); // re-filter the Class Library for the new mode
+    if (typeof populateGenProfiles === "function") populateGenProfiles(); // v2.6 FACTORY-B: mode-aware Generate profiles
   }
   function setPlantMode(mode) {
     const m = mode === "factory" ? "factory" : "warehouse";
@@ -6803,6 +6837,10 @@
       // the real UI handlers
       loadExample: loadExample,
       runWmsOps: runWmsOps,
+      // v2.6 FACTORY-B: drive the REAL Generate handler (optionally with an
+      // explicit profile key) so the self-test can build a factory line.
+      runGenerate: runGenerate,
+      currentGenLayout: currentGenLayout,
       // v2.4 UI-2 hooks: drive selection + the grouped Inspector, and the
       // Simple/Expert density lever, through the SAME functions the UI uses.
       selectElement: selectElement,

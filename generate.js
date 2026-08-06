@@ -167,6 +167,64 @@
   };
 
   /* ------------------------------------------------------------------
+   * FACTORY PLANT PROFILES (v2.6 FACTORY-B). A SEPARATE, ADDITIVE keyed
+   * vocabulary for FACTORY mode - it does NOT touch the 4 warehouse
+   * PROFILES above (verify_generate.js pins that plantProfiles has EXACTLY
+   * those 4 keys). Each factory profile declares a PRODUCTION LINE recipe:
+   * how many machining / process stations, parallel stations, assembly &
+   * dismantle stations, QA/inspection stations and pack stations make up
+   * the line, plus the real dock doors (raw-parts goods-in + finished-goods
+   * shipping) the line spans. The generator lays these out as a serpentine
+   * Source -> machining -> assembly -> QA/inspection -> packing -> Drain,
+   * connected by straight conveyors (per lane) with CURVED conveyors where
+   * the line turns. All synthetic, best-practice-informed teaching values;
+   * an ILLUSTRATIVE production layout, NOT a validated process plan / NOT
+   * CAD-BIM. The Station family rides the EXISTING flow machinery (Source ->
+   * receiving endpoint, Drain -> shipping endpoint, Stations -> FIFO servers)
+   * so a part flows Source -> ... -> Drain with no re-invented sim.
+   * ------------------------------------------------------------------ */
+  const FACTORY_PROFILES = {
+    "assembly-line": {
+      key: "assembly-line",
+      label: "Assembly-line factory",
+      keywords: ["assembly line", "final assembly", "product build", "make-to-order line"],
+      // Line composition (stations per lane). Lane 1 = machining/process,
+      // lane 2 = assembly/join, lane 3 = QA/inspection + packing.
+      machining: 2, parallel: 1, assembly: 2, dismantle: 0, qa: 1, packing: 1,
+      docksIn: 1, docksOut: 1,
+      gridW: 44, gridH: 26,
+      strategy: "wave", orders: 180, skuCount: 40, flowMode: "pull", demandSkew: 1.0,
+      automation: "conveyor-linked assembly line: machining feed -> assembly join -> QA -> pack",
+      summary:
+        "an assembly-line factory: parts enter at a Source, run a machining/process feed lane (with a parallel station for the slow step), a join/assembly lane, then a QA/inspection + packing lane to a Drain - straight conveyors along each lane and curved conveyors where the line turns",
+    },
+    "machining-shop": {
+      key: "machining-shop",
+      label: "Machining shop",
+      keywords: ["machining shop", "CNC cell", "metal cutting", "job shop", "parallel machines"],
+      machining: 3, parallel: 2, assembly: 1, dismantle: 1, qa: 1, packing: 1,
+      docksIn: 1, docksOut: 1,
+      gridW: 54, gridH: 26,
+      strategy: "batch", orders: 160, skuCount: 60, flowMode: "push", demandSkew: 1.1,
+      automation: "parallel machining cells + a dismantle/split step, feeding assembly, QA and pack",
+      summary:
+        "a machining shop: a wide bank of process stations and parallel machining cells (the slow steps duplicated) with a dismantle/split step, feeding a join/assembly stage then QA/inspection and packing - conveyor-linked with curved turns",
+    },
+    "general-factory": {
+      key: "general-factory",
+      label: "General factory",
+      keywords: ["factory", "manufacturing plant", "production line", "general production"],
+      machining: 2, parallel: 1, assembly: 1, dismantle: 0, qa: 1, packing: 2,
+      docksIn: 1, docksOut: 1,
+      gridW: 46, gridH: 26,
+      strategy: "wave", orders: 170, skuCount: 50, flowMode: "pull", demandSkew: 1.05,
+      automation: "balanced production line: process feed -> assembly -> QA -> a wider pack-out",
+      summary:
+        "a general factory: a balanced production line - a process/machining feed, an assembly join, then a QA/inspection step and a wider pack-out - from a parts Source to a finished-goods Drain, conveyor-linked with curved turns",
+    },
+  };
+
+  /* ------------------------------------------------------------------
    * Geometry helpers (grid cells). Overlap-free by construction; these
    * back the assertions in verify_generate.js and the applyCommand ops.
    * ------------------------------------------------------------------ */
@@ -441,6 +499,202 @@
   }
 
   /* ==================================================================
+   * generateFactoryLayout(profileKey, opts) -> { elements, config, meta,
+   * gridW, gridH }.  v2.6 FACTORY-B. A DETERMINISTIC procedural builder for
+   * a COMPLETE FACTORY layout using the FACTORY-A1 manufacturing components
+   * (mfg-source / mfg-station / mfg-parallel-station / mfg-assembly /
+   * mfg-dismantle / mfg-drain) + conveyors (straight + curved). It is a
+   * NEW code path - the warehouse generateLayout() above is UNTOUCHED.
+   *
+   * Layout: a horizontal SERPENTINE production line over 3 lanes -
+   *   receiving  : a goods-in Dock + a parts Source (top)
+   *   lane 1     : machining / process stations (+ parallel), zone "storage"
+   *   [right turn: curved conveyor]
+   *   lane 2     : assembly / dismantle stations, zone "picking"
+   *   [left turn: curved conveyor]
+   *   lane 3     : QA/inspection station + pack stations, zone "packing"
+   *   shipping   : a finished-goods Drain + a shipping Dock (bottom)
+   * connected by a straight conveyor spine per lane. Zones reuse the SAME 5
+   * keys the warehouse generator + the flow spine + the NL ops use, so a
+   * part flows Source(receiving) -> storage -> picking -> packing ->
+   * Drain(shipping) with NO re-invented sim, and "leave zone packing for
+   * manual expansion" / "add 2 more assembly stations" just work.
+   *
+   * Overlap-free + in-bounds by construction (asserted). NO Date, NO RNG in
+   * the placement (seeded stream created for parity only); byte-identical
+   * per profile. Illustrative synthetic layout, NOT a validated process
+   * plan and NOT CAD/BIM.
+   * ================================================================== */
+  function repeatTypes(type, n) {
+    const out = [];
+    for (let i = 0; i < Math.max(0, n | 0); i++) out.push(type);
+    return out;
+  }
+
+  function generateFactoryLayout(profileKey, opts) {
+    opts = opts || {};
+    const profile = FACTORY_PROFILES[profileKey];
+    if (!profile) throw new Error("Unknown factory plant profile: " + profileKey);
+
+    // The line sizes its OWN floor (>= the profile's preferred size, never
+    // smaller than the passed floor). applyGeneratedLayout adopts it.
+    const gridW = Math.max(profile.gridW, clampInt(opts.gridW, 24, 400, profile.gridW));
+    const gridH = Math.max(profile.gridH, clampInt(opts.gridH, 18, 400, profile.gridH));
+    const seed = Number.isFinite(opts.seed) ? opts.seed >>> 0 : (hashStr(profileKey) & 0xffff);
+    const reserve = normalizeZones(opts.reserve);
+    // The line composition + placement are a FIXED function of the profile
+    // (no RNG needed), so a factory build is deterministic + byte-identical;
+    // the seed is recorded in config/meta for parity with generateLayout.
+
+    const pad = 3;
+    const isReserved = (key) => reserve.indexOf(key) !== -1;
+    const els = [];
+    let idc = 0;
+    // Reserved zones stay EMPTY except real dock doors + the flow endpoints
+    // (Source/Drain are the line's fixed in/out points, like docks).
+    const add = (type, x, y, w, d, zone) => {
+      if (isReserved(zone) && type !== "dock-in" && type !== "dock-out" &&
+          type !== "mfg-source" && type !== "mfg-drain") return null;
+      const e = { id: "gen-" + ++idc, type: type, x: x, y: y, w: w, d: d, zone: zone };
+      els.push(e);
+      return e;
+    };
+
+    // ---- vertical band plan (rows); 3 clear rows between fixture bands ----
+    const dockInY = 0;                 // goods-in doors on the top edge
+    const sourceY = 2;                 // Source (d=2 -> rows 2,3); row 1 clear
+    const lane0Spine = 5;              // machining conveyor spine (d=1)
+    const lane0Band = 6;               // machining stations (d up to 3 -> 6,7,8)
+    const lane1Spine = 11;             // assembly conveyor spine
+    const lane1Band = 12;              // assembly stations (12,13,14)
+    const lane2Spine = 17;             // QA + packing conveyor spine
+    const lane2Band = 18;              // QA + pack stations (18,19,20)
+    const drainY = gridH - 4;          // Drain (d=2); row gridH-2 clear of docks
+    const dockOutY = gridH - 1;        // shipping doors on the bottom edge
+
+    // ---- RECEIVING: goods-in dock door(s) + the parts Source ----
+    for (const x of spread(profile.docksIn, 2, pad, gridW - pad)) {
+      add("dock-in", x, dockInY, 2, 1, "receiving");
+    }
+    add("mfg-source", pad, sourceY, 2, 2, "receiving");
+
+    // ---- helper: lay a lane of stations left->right, top-aligned at
+    // bandY, spread across [x0, x1), plus a straight conveyor spine on
+    // spineY spanning the lane. maxW slots keep mixed-width stations apart.
+    const layLane = (types, x0, x1, bandY, spineY, zone) => {
+      const n = types.length;
+      if (n > 0) {
+        const xs = spread(n, 4, x0, x1);
+        for (let i = 0; i < n; i++) {
+          const def = ELEMENTS[types[i]] || { w: 3, d: 2 };
+          add(types[i], xs[i], bandY, def.w, def.d, zone);
+        }
+      }
+      // Straight conveyor spine for the lane (a connector, never blocks an
+      // aisle). Full lane width so it reads as a continuous belt.
+      const sw = Math.max(2, (x1 - 1) - x0);
+      if (!isReserved(zone)) add("conveyor", x0, spineY, sw, 1, zone);
+    };
+
+    // Lane 1: machining / process feed (+ a parallel station for the slow
+    // step). Zone "storage" (early-line processing; the flow spine's storage
+    // waypoint). Leave the right 3 cols for the right turn.
+    const machiningTypes = repeatTypes("mfg-station", profile.machining)
+      .concat(repeatTypes("mfg-parallel-station", profile.parallel));
+    layLane(machiningTypes, pad, gridW - pad - 3, lane0Band, lane0Spine, "storage");
+    // Right turn: a curved conveyor (belt from the left turns down).
+    add("conveyor-curve", gridW - pad - 3, lane0Spine, 3, 3, "storage")
+      && (els[els.length - 1].arc = "bl");
+
+    // Lane 2: assembly / dismantle (join / split). Zone "picking" (mid-line;
+    // the flow spine's picking waypoint). Leave the left 3 cols for the turn.
+    const assemblyTypes = repeatTypes("mfg-assembly", profile.assembly)
+      .concat(repeatTypes("mfg-dismantle", profile.dismantle));
+    layLane(assemblyTypes, pad + 3, gridW - pad, lane1Band, lane1Spine, "picking");
+    // Left turn: a curved conveyor (belt from the right turns down).
+    add("conveyor-curve", pad, lane1Spine, 3, 3, "picking")
+      && (els[els.length - 1].arc = "br");
+
+    // Lane 3: QA/inspection (a process station) + pack stations. Zone
+    // "packing" (the flow spine's packing waypoint). Leave the right cols
+    // clear for the Drain + shipping dock.
+    const finishTypes = repeatTypes("mfg-station", profile.qa)
+      .concat(repeatTypes("pack-station", profile.packing));
+    layLane(finishTypes, pad, gridW - pad - 4, lane2Band, lane2Spine, "packing");
+
+    // ---- SHIPPING: the finished-goods Drain + shipping dock door(s) ----
+    add("mfg-drain", gridW - pad - 2, drainY, 2, 2, "shipping");
+    for (const x of spread(profile.docksOut, 2, pad, gridW - pad)) {
+      add("dock-out", x, dockOutY, 2, 1, "shipping");
+    }
+
+    // Zones (bounding boxes; reuse the shared builder) + safety asserts.
+    const zones = buildZones(els, gridW, gridH, reserve);
+    assertNoOverlap(els);
+    assertInBounds(els, gridW, gridH);
+
+    const config = {
+      seed: seed,
+      strategy: profile.strategy || "wave",
+      orders: profile.orders || 180,
+      skuCount: profile.skuCount || 50,
+      minAisleMetres: 3.0,
+      flowMode: profile.flowMode === "push" ? "push" : "pull",
+      demandSkew: profile.demandSkew || 1.0,
+      palletType: "EUR1",
+      boxType: "EURO-CASE",
+      wagePerHour: 22,
+      weeklyOrders: 1200,
+    };
+
+    const counts = countByZone(els);
+    const stations = els.filter((e) => (ELEMENTS[e.type] || {}).base === "station").length;
+    const meta = {
+      version: SERIALIZE_VERSION,
+      generator: GENERATOR_VERSION,
+      kind: "factory",
+      profileKey: profileKey,
+      profileLabel: profile.label,
+      seed: seed,
+      gridW: gridW,
+      gridH: gridH,
+      minAisleMetres: 3.0,
+      aisleCells: aisleCells(3.0),
+      automation: profile.automation,
+      zones: zones,
+      reserved: reserve.slice(),
+      counts: counts,
+      stationCount: stations,
+      summary: plainFactorySummary(profile, seed, gridW, gridH, reserve, counts, stations),
+    };
+
+    return { elements: els, config: config, meta: meta, gridW: gridW, gridH: gridH };
+  }
+
+  function assertInBounds(els, gridW, gridH) {
+    for (const e of els) {
+      if (e.x < 0 || e.y < 0 || e.x + e.w > gridW || e.y + e.d > gridH) {
+        throw new Error("generateFactoryLayout produced an out-of-bounds element: " + e.id);
+      }
+    }
+  }
+
+  function plainFactorySummary(profile, seed, gridW, gridH, reserve, counts, stations) {
+    let s =
+      "Generated " + profile.summary + " on a " + gridW + "x" + gridH + " m floor " +
+      "(seed " + seed + "). Automation: " + profile.automation + ". " +
+      "Elements: " + counts.total + " total, including " + stations + " process/assembly stations, " +
+      "a parts Source and a finished-goods Drain, conveyor-linked.";
+    if (reserve.length) {
+      s += " Reserved for manual expansion: " + reserve.join(", ") + " (left empty).";
+    }
+    s += " Illustrative synthetic production layout - a deterministic procedural build, " +
+      "NOT a validated process plan and NOT CAD/BIM. Checked against the same ASR/DIN " +
+      "guidance as the rest of the app (informed by, NOT certified).";
+    return s;
+  }
+
+  /* ==================================================================
    * applyCommand(layout, op) -> { ok, layout, echo, message, changed }
    * The structured-op executor. `layout` is { elements, config, meta,
    * gridW, gridH } (as returned by generateLayout, or a shallow shape
@@ -588,11 +842,20 @@
   }
 
   function opRegenerate(layout, op, grid) {
-    if (!PROFILES[op.profileKey]) return failOp("I don't have a \"" + op.profileKey + "\" baseline.", Object.keys(PROFILES));
+    const isFactory = !!FACTORY_PROFILES[op.profileKey];
+    if (!PROFILES[op.profileKey] && !isFactory) {
+      return failOp("I don't have a \"" + op.profileKey + "\" baseline.",
+        Object.keys(PROFILES).concat(Object.keys(FACTORY_PROFILES)));
+    }
     const seed = (layout.meta && Number.isFinite(layout.meta.seed)) ? layout.meta.seed : undefined;
     const reserve = (layout.meta && layout.meta.reserved) || [];
-    const gen = generateLayout(op.profileKey, { gridW: grid.w, gridH: grid.h, seed: seed, reserve: reserve });
-    const echo = "Rebuilt the environment from the " + PROFILES[op.profileKey].label + " baseline (seed " + gen.meta.seed + ").";
+    // Factory baselines size their own floor; warehouse baselines reuse the
+    // current floor. Either way applyGeneratedLayout adopts the result.
+    const gen = isFactory
+      ? generateFactoryLayout(op.profileKey, { gridW: grid.w, gridH: grid.h, seed: seed, reserve: reserve })
+      : generateLayout(op.profileKey, { gridW: grid.w, gridH: grid.h, seed: seed, reserve: reserve });
+    const label = isFactory ? FACTORY_PROFILES[op.profileKey].label : PROFILES[op.profileKey].label;
+    const echo = "Rebuilt the environment from the " + label + " baseline (seed " + gen.meta.seed + ").";
     return { ok: true, layout: gen, echo: echo, message: echo, changed: gen.elements.length, kind: "regenerate" };
   }
 
@@ -625,7 +888,9 @@
     SERIALIZE_VERSION: SERIALIZE_VERSION,
     ZONE_KEYS: ZONE_KEYS,
     plantProfiles: PROFILES,
+    factoryProfiles: FACTORY_PROFILES, // v2.6 FACTORY-B (separate from the 4 warehouse profiles)
     generateLayout: generateLayout,
+    generateFactoryLayout: generateFactoryLayout, // v2.6 FACTORY-B: build a whole factory line
     applyCommand: applyCommand,
     // helpers exposed for the UI + the NL layer (and tests)
     buildZones: buildZones,

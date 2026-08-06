@@ -722,6 +722,58 @@
       return { ok: srcOk && drnOk && wp.length >= 5, detail: "recv.x=" + (recv && recv.x) + " ship.x=" + (ship && ship.x) + " wps=" + wp.length };
     });
 
+    // ---- v2.6 FACTORY-B: GENERATE A WHOLE FACTORY (live) ---------------
+    // Drive the REAL Generate handler in Factory mode for a factory profile:
+    // it builds a complete production line (Source -> machining -> assembly
+    // -> QA/pack -> Drain, straight + curved conveyors), the app RENDERS it,
+    // and a finite flow pool DRAINS to completion (a Part travels the line
+    // Source -> ... -> Drain). Restores the app to a warehouse example after.
+    check("factory-generate-builds-line-renders-and-flows", function () {
+      if (!haveApi || !API.plantMode || typeof API.runGenerate !== "function") {
+        return { ok: false, detail: "no plantMode/runGenerate API" };
+      }
+      if (!WT.generate || !WT.generate.factoryProfiles || !WT.flowsim) {
+        return { ok: false, detail: "no factory generator / flowsim" };
+      }
+      var original = API.plantMode.mode();
+      var okAll = false, detail = "";
+      try {
+        API.plantMode.set("factory");
+        API.runGenerate("assembly-line"); // the REAL Generate handler
+        var els = API.state.elements || [];
+        function has(type) { return els.some(function (e) { return e.type === type; }); }
+        function stationCount() {
+          return els.filter(function (e) {
+            var d = WT.domain.ELEMENTS[e.type]; return d && d.base === "station";
+          }).length;
+        }
+        var builtLine = has("mfg-source") && has("mfg-drain") && stationCount() >= 1 &&
+          has("conveyor") && has("conveyor-curve");
+        API.render(); // renders without throwing (the error boundary would catch it)
+        var rendered = els.length > 0;
+        // A Part flows Source -> ... -> Drain: a finite pool drains to done.
+        var lay = API.currentLayout();
+        var units = 8;
+        var s = WT.flowsim.state(lay, { seed: 9, loop: false, units: units });
+        var guard = 0;
+        while (!(s.completed === units && s.inflight === 0) && guard < 900) { WT.flowsim.step(s, 1); guard++; }
+        var flowed = s.spawned === units && s.completed === units && s.inflight === 0;
+        okAll = builtLine && rendered && flowed;
+        detail = "line=" + builtLine + " rendered=" + rendered + " stations=" + stationCount() +
+          " els=" + els.length + " flow(spawned=" + s.spawned + " completed=" + s.completed + " inflight=" + s.inflight + ")";
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      } finally {
+        // Restore: warehouse mode + a warehouse example on the floor.
+        try {
+          API.plantMode.set(original);
+          var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+          if (ex) API.loadExample(ex.id);
+        } catch (_) { /* best-effort restore */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {
