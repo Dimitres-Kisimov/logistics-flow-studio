@@ -5385,6 +5385,34 @@
   // deterministic renderers in analytics.js; verify_analytics.js covers them.
   // ================================================================
 
+  // v3.2 COST + ENERGY: the app's OWN editable copy of the illustrative rates
+  // (€/kWh, €/labour-hour, per-equipment capex/amortisation, grid CO2 factor).
+  // Editing a rate changes the analysis VIEW only - never the layout/data
+  // model. Lazily seeded from the analytics defaults; Reset restores them.
+  let analyzeRates = null;
+  const CURRENCY = (WT.analytics && WT.analytics.CURRENCY) || "€";
+  function ensureRates() {
+    if (!analyzeRates && WT.analytics) analyzeRates = WT.analytics.defaultRates();
+    return analyzeRates;
+  }
+  // UI-only money formatter (thousands-separated, ≤2 dp under 100). Not tested
+  // for determinism - it never feeds the model, only the display.
+  function moneyFmt(v) {
+    v = Number(v); if (!Number.isFinite(v)) v = 0;
+    const neg = v < 0; const abs = Math.abs(v);
+    let str = abs >= 100 ? String(Math.round(abs)) : (Math.round(abs * 100) / 100).toFixed(2);
+    const parts = str.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return (neg ? "−" : "") + parts.join(".");
+  }
+  function kwhFmt(v) {
+    v = Number(v); if (!Number.isFinite(v)) v = 0;
+    let str = v >= 100 ? String(Math.round(v)) : (Math.round(v * 10) / 10).toFixed(1);
+    const parts = str.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  }
+
   // Reuse the WMS flow sim with the SAME parameters the WMS Operations panel
   // uses (orders/hours/seed + the imported order pool when present) so the
   // Analyze warehouse read-out matches the WMS card. Returns null if WT.wms
@@ -5470,6 +5498,8 @@
       head.innerHTML = '<p class="empty">Nothing to analyze yet — switch to <strong>Factory</strong> mode and Generate a line, or place racking / load a warehouse example, then press <strong>Analyze</strong>.</p>';
       if (bottleneckHost) bottleneckHost.innerHTML = "";
       if (sankeyHost) sankeyHost.innerHTML = "";
+      if ($("analyzeCost")) $("analyzeCost").innerHTML = "";
+      if ($("analyzeEnergy")) $("analyzeEnergy").innerHTML = "";
       return;
     }
     const theme = kpiTheme();
@@ -5506,12 +5536,193 @@
       sankeyHost.innerHTML = html;
     }
 
+    // v3.2: the Cost + Energy analyzers over the SAME sim state.
+    renderCostPanel();
+    renderEnergyPanel();
+
     // Open the drill-ins so the ranking + Sankey are visible after Analyze.
     const d1 = $("analyzeDetails"), d2 = $("analyzeSankeyDetails");
     if (d1) d1.open = true;
     if (d2) d2.open = true;
     status("Analyze — " + (model.mode === "factory" ? "factory line" : "warehouse flow") +
       ": constraint = " + b.constraint.name + ". Ranking + Sankey read straight from the sim (can't diverge); modelled, deterministic, teaching-scale.");
+  }
+
+  // ================================================================
+  // v3.2 COST + ENERGY ANALYZERS (WT.analytics.costModel / .energyModel).
+  // Two more READ-ONLY views over the SAME sim state the Bottleneck Analyzer
+  // reads (nothing is re-run): illustrative operating cost (equipment +
+  // labour + energy, and a cost-per-unit) and modelled energy (kWh + energy-
+  // per-unit + an optional CO2 line). Rates are EDITABLE illustrative
+  // constants; editing one re-renders the analysis view only. Honest: "not a
+  // quote / not metered; modelled, not measured."
+  // ================================================================
+
+  // The cost/energy input reuses the SAME sim the Bottleneck Analyzer uses:
+  // the factory line's process metrics, else the warehouse flow result. The
+  // placed elements feed the equipment breakdown (warehouse). Read-only.
+  function analyzeCostEnergyInput() {
+    if (!WT.analytics) return null;
+    if (state.process && WT.process && typeof WT.process.metrics === "function") {
+      let m = null;
+      try { m = WT.process.metrics(state.process); } catch (_) { m = null; }
+      if (m && m.bottleneck) return { mode: "factory", sim: m, elements: currentLayout().elements };
+    }
+    const wms = analyzeWmsResult();
+    if (wms) return { mode: "warehouse", sim: wms, elements: currentLayout().elements };
+    return null;
+  }
+
+  // A small labelled, EDITABLE rate table (KB-editor pattern). Global rates
+  // (kind "global") carry a data-rate key; per-equipment rates carry a
+  // data-equip + data-field. Editing fires the delegated `change` handler,
+  // which recomputes the analysis view only.
+  function rateInput(id, label, value, unit, attrs) {
+    return '<div class="an-rate"><label class="an-rate-lbl" for="' + id + '">' + esc(label) + "</label>" +
+      '<span class="an-rate-edit"><input class="an-rate-in" id="' + id + '" type="number" step="any" min="0" ' +
+      'value="' + esc(String(value)) + '" ' + attrs + ' aria-label="' + esc(label) + '" />' +
+      '<span class="an-rate-unit">' + esc(unit || "") + "</span></span></div>";
+  }
+
+  function costRateTableHtml(c) {
+    const r = ensureRates();
+    let g = '<div class="an-rate-grid">' +
+      rateInput("an-rate-kwh", "Energy price", r.energyPricePerKWh, CURRENCY + "/kWh", 'data-rate="energyPricePerKWh"') +
+      rateInput("an-rate-labour", "Labour rate", r.labourPerHour, CURRENCY + "/h", 'data-rate="labourPerHour"') +
+      rateInput("an-rate-hpy", "Amortisation basis", r.hoursPerYear, "h/yr", 'data-rate="hoursPerYear"') +
+      "</div>";
+    // Per-class capex + amortisation for the classes actually present.
+    let rows = "";
+    for (const grp of c.equipmentByClass) {
+      const er = r.equipment[grp.key] || {};
+      rows += '<tr><td class="an-name">' + esc(grp.label) + ' <span class="an-detail">× ' + grp.count + "</span></td>" +
+        '<td class="an-val"><input class="an-rate-in narrow" type="number" step="any" min="0" value="' + esc(String(er.capex)) +
+        '" data-equip="' + esc(grp.key) + '" data-field="capex" aria-label="' + esc(grp.label) + ' capex" /></td>' +
+        '<td class="an-val"><input class="an-rate-in narrow" type="number" step="any" min="0" value="' + esc(String(er.amortYears)) +
+        '" data-equip="' + esc(grp.key) + '" data-field="amortYears" aria-label="' + esc(grp.label) + ' amortisation years" /></td>' +
+        "</tr>";
+    }
+    const tbl = rows
+      ? '<table class="an-table an-rate-table"><thead><tr><th>Equipment</th><th>Capex ' + CURRENCY + "</th><th>Amort. yr</th></tr></thead><tbody>" + rows + "</tbody></table>"
+      : "";
+    return '<details class="analyze-rates"><summary class="std-summary">Editable illustrative rates — not a quote</summary>' +
+      '<p class="analyze-metric-note">Illustrative constants you can edit; the analysis recomputes live. They change the <strong>view only</strong>, never the layout.</p>' +
+      g + tbl +
+      '<div class="an-rate-actions"><button id="an-cost-reset" class="btn small ghost" type="button">Reset rates</button></div></details>';
+  }
+
+  function renderCostPanel() {
+    const host = $("analyzeCost");
+    if (!host || !WT.analytics) return;
+    const input = analyzeCostEnergyInput();
+    if (!input) { host.innerHTML = ""; return; }
+    const c = WT.analytics.costModel(input, ensureRates());
+    if (!c) { host.innerHTML = ""; return; }
+    const theme = kpiTheme();
+    const total = c.totalCost;
+    const catRows = c.categories.map((cat) => ({
+      label: cat.label, value: cat.amount, emphasis: false,
+      text: CURRENCY + moneyFmt(cat.amount) + (total > 0 ? " · " + Math.round((cat.amount / total) * 100) + "%" : ""),
+    }));
+    if (catRows.length) { let mx = 0, mi = 0; catRows.forEach((r, i) => { if (r.value > mx) { mx = r.value; mi = i; } }); catRows[mi].emphasis = true; }
+
+    let html =
+      '<div class="an-figure-row">' +
+        '<div class="an-figure"><span class="an-figure-val">' + CURRENCY + moneyFmt(total) + '</span>' +
+          '<span class="an-figure-lbl">total operating cost · ' + procFmt(c.operatingHours) + ' h window</span></div>' +
+        '<div class="an-figure"><span class="an-figure-val">' + CURRENCY + moneyFmt(c.perUnit) + '</span>' +
+          '<span class="an-figure-lbl">per ' + esc(c.throughputUnit) + ' · ' + procFmt(c.throughput) + ' ' + esc(c.throughputUnit) + 's</span></div>' +
+      "</div>";
+    // Category breakdown table (equipment / labour / energy).
+    let trs = "";
+    for (const cat of c.categories) {
+      const pct = total > 0 ? Math.round((cat.amount / total) * 100) : 0;
+      trs += '<tr class="an-row"><td class="an-name">' + esc(cat.label) + "</td>" +
+        '<td class="an-val">' + CURRENCY + moneyFmt(cat.amount) + "</td>" +
+        '<td class="an-val">' + pct + "%</td></tr>";
+    }
+    html += '<table class="an-table"><thead><tr><th>Category</th><th>Cost</th><th>Share</th></tr></thead><tbody>' + trs + "</tbody></table>";
+    html += '<div class="an-bar-chart" aria-hidden="true">' + WT.analytics.breakdownSvg(catRows, theme, { title: "Operating cost by category" }) + "</div>";
+    html += costRateTableHtml(c);
+    html += '<p class="proc-basis">' + esc(c.honesty) + "</p>";
+    host.innerHTML = html;
+    wireRateHost(host);
+  }
+
+  function renderEnergyPanel() {
+    const host = $("analyzeEnergy");
+    if (!host || !WT.analytics) return;
+    const input = analyzeCostEnergyInput();
+    if (!input) { host.innerHTML = ""; return; }
+    const e = WT.analytics.energyModel(input, ensureRates());
+    if (!e) { host.innerHTML = ""; return; }
+    const theme = kpiTheme();
+    const r = ensureRates();
+    const rows = e.byClass.map((g) => ({
+      label: g.label, value: g.energyKWh, emphasis: false,
+      text: kwhFmt(g.energyKWh) + " kWh",
+    }));
+    if (rows.length) { let mx = 0, mi = 0; rows.forEach((x, i) => { if (x.value > mx) { mx = x.value; mi = i; } }); rows[mi].emphasis = true; }
+
+    let html =
+      '<div class="an-figure-row">' +
+        '<div class="an-figure"><span class="an-figure-val">' + kwhFmt(e.totalKWh) + ' kWh</span>' +
+          '<span class="an-figure-lbl">total energy · ' + procFmt(e.operatingHours) + ' h window</span></div>' +
+        '<div class="an-figure"><span class="an-figure-val">' + (e.perUnit >= 1 ? kwhFmt(e.perUnit) : (Math.round(e.perUnit * 1000) / 1000)) + ' kWh</span>' +
+          '<span class="an-figure-lbl">per ' + esc(e.throughputUnit) + ' · ' + procFmt(e.throughput) + ' ' + esc(e.throughputUnit) + 's</span></div>' +
+        '<div class="an-figure"><span class="an-figure-val">' + kwhFmt(e.co2Kg) + ' kg</span>' +
+          '<span class="an-figure-lbl">CO₂e · ' + (Math.round(e.co2Factor * 1000) / 1000) + ' kg/kWh (illustrative)</span></div>' +
+      "</div>";
+    // Per-resource breakdown table (energy by equipment class / station kind).
+    let trs = "";
+    for (const g of e.byClass) {
+      const er = r.equipment[g.key] || {};
+      trs += '<tr class="an-row"><td class="an-name">' + esc(g.label) + ' <span class="an-detail">× ' + g.count + "</span></td>" +
+        '<td class="an-val"><input class="an-rate-in narrow" type="number" step="any" min="0" value="' + esc(String(er.powerKW)) +
+        '" data-equip="' + esc(g.key) + '" data-field="powerKW" aria-label="' + esc(g.label) + ' power kW" /></td>' +
+        '<td class="an-val">' + kwhFmt(g.energyKWh) + " kWh</td></tr>";
+    }
+    html += '<table class="an-table an-rate-table"><thead><tr><th>Resource</th><th>Power kW</th><th>Energy</th></tr></thead><tbody>' + trs + "</tbody></table>";
+    html += '<div class="an-bar-chart" aria-hidden="true">' + WT.analytics.breakdownSvg(rows, theme, { title: "Energy by resource" }) + "</div>";
+    // Editable grid CO2 factor.
+    html += '<div class="an-rate-grid">' +
+      rateInput("an-rate-co2", "Grid CO₂ factor", r.co2PerKWh, "kg/kWh", 'data-rate="co2PerKWh"') +
+      rateInput("an-rate-kwh2", "Energy price", r.energyPricePerKWh, CURRENCY + "/kWh", 'data-rate="energyPricePerKWh"') +
+      "</div>";
+    html += '<div class="an-rate-actions"><button id="an-energy-reset" class="btn small ghost" type="button">Reset rates</button></div>';
+    html += '<p class="proc-basis">' + esc(e.honesty) + "</p>";
+    host.innerHTML = html;
+    wireRateHost(host);
+  }
+
+  // Delegated rate-edit wiring: attached ONCE per host (survives innerHTML
+  // swaps). A `change` on any [data-rate] / [data-equip] input updates the
+  // app's rate copy and recomputes BOTH cost + energy views. Reset restores
+  // the analytics defaults. The layout/data model is never touched.
+  function wireRateHost(host) {
+    if (!host || host.dataset.rateWired === "1") return;
+    host.dataset.rateWired = "1";
+    host.addEventListener("change", (ev) => {
+      const t = ev.target;
+      if (!t || t.tagName !== "INPUT") return;
+      const val = Number(t.value);
+      if (!Number.isFinite(val) || val < 0) { renderCostPanel(); renderEnergyPanel(); return; }
+      const rates = ensureRates();
+      if (t.dataset.rate) { rates[t.dataset.rate] = val; }
+      else if (t.dataset.equip && t.dataset.field) {
+        rates.equipment[t.dataset.equip] = rates.equipment[t.dataset.equip] || {};
+        rates.equipment[t.dataset.equip][t.dataset.field] = val;
+      } else return;
+      renderCostPanel(); renderEnergyPanel();
+      status("Analyze — illustrative rate updated; recomputed the cost + energy view only (layout unchanged).");
+    });
+    host.addEventListener("click", (ev) => {
+      const t = ev.target;
+      if (!t || (t.id !== "an-cost-reset" && t.id !== "an-energy-reset")) return;
+      analyzeRates = WT.analytics.defaultRates();
+      renderCostPanel(); renderEnergyPanel();
+      status("Analyze — illustrative rates reset to the defaults.");
+    });
   }
 
   // ---- Optimise report HTML (headline + preview actions + groups) --------
@@ -7333,6 +7544,11 @@
       // through the SAME handler the button uses, for the live self-test.
       renderAnalyzePanel: renderAnalyzePanel,
       analyzeModel: analyzeModel,
+      // v3.2 COST + ENERGY: drive the two new analyzers + read their input
+      // (the SAME sim state) for the live self-test rate-edit check.
+      renderCostPanel: renderCostPanel,
+      renderEnergyPanel: renderEnergyPanel,
+      analyzeCostEnergyInput: analyzeCostEnergyInput,
       // v2.8 FACTORY-D: drive the factory efficiency optimiser (preview/accept)
       // through the SAME handlers the button uses, for the live self-test.
       runFactoryOptimise: runFactoryOptimise,

@@ -970,6 +970,53 @@
       return { ok: okAll, detail: detail };
     });
 
+    // ---- v3.2: the Cost + Energy analyzers render, and editing an
+    // illustrative rate updates the total (view-only, layout untouched). ----
+    check("analyze-cost-and-energy-render-and-rate-edit-updates-total", function () {
+      if (!haveApi || typeof API.renderCostPanel !== "function" ||
+        typeof API.renderEnergyPanel !== "function" || typeof API.renderAnalyzePanel !== "function") {
+        return { ok: false, detail: "no cost/energy API" };
+      }
+      if (!WT.analytics || typeof WT.analytics.costModel !== "function") return { ok: false, detail: "no WT.analytics cost API" };
+      var okAll = false, detail = "";
+      try {
+        // A warehouse example (no process block) -> the warehouse flow path.
+        var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+        if (ex && typeof API.loadExample === "function") API.loadExample(ex.id);
+        API.renderAnalyzePanel(); // renders the whole Analyze card incl. cost + energy
+        var cost = document.getElementById("analyzeCost");
+        var energy = document.getElementById("analyzeEnergy");
+        var costHtml = cost ? (cost.innerHTML || "") : "";
+        var energyHtml = energy ? (energy.innerHTML || "") : "";
+        // Both headline figures + an editable-rate input rendered.
+        var costOk = /an-figure-val/.test(costHtml) && /per\s/.test((cost && cost.textContent) || "") &&
+          /data-rate="energyPricePerKWh"/.test(costHtml);
+        var energyOk = /kWh/.test(energyHtml) && /data-equip=/.test(energyHtml) && /CO/.test((energy && energy.textContent) || "");
+        // Serialize BEFORE the edit -> proves the edit is view-only.
+        var serBefore = (typeof API.serialize === "function") ? API.serialize() :
+          JSON.stringify(API.currentLayout ? API.currentLayout() : null);
+        // Read the total, edit the €/kWh rate up, and confirm the total moves.
+        var kwhInput = cost.querySelector('input[data-rate="energyPricePerKWh"]');
+        var totalBefore = cost.querySelector(".an-figure-val");
+        var tb = totalBefore ? totalBefore.textContent : "";
+        var moved = false;
+        if (kwhInput) {
+          kwhInput.value = String((Number(kwhInput.value) || 0.3) * 5 + 1);
+          kwhInput.dispatchEvent(new Event("change", { bubbles: true }));
+          var ta = cost.querySelector(".an-figure-val");
+          moved = !!ta && ta.textContent !== tb;
+        }
+        var serAfter = (typeof API.serialize === "function") ? API.serialize() :
+          JSON.stringify(API.currentLayout ? API.currentLayout() : null);
+        var layoutSame = serBefore === serAfter;
+        okAll = costOk && energyOk && moved && layoutSame;
+        detail = "cost=" + costOk + " energy=" + energyOk + " totalMovedOnEdit=" + moved + " layoutUnchanged=" + layoutSame;
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      }
+      return { ok: okAll, detail: detail };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

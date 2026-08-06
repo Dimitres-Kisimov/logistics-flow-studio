@@ -695,7 +695,7 @@
           <strong>MODELLED, not measured; DETERMINISTIC; TEACHING-SCALE.</strong>
           The named bottleneck and the flow volumes come <strong>straight from the same simulation the app runs</strong> — Theory of Constraints for the production line, per-stage load vs capacity for the warehouse — so the analysis <strong>can't diverge</strong> from it. <strong>NOT</strong> a validated discrete-event simulation, <strong>NOT</strong> CAD/BIM and <strong>NOT</strong> a certification.
         </div>
-        <p class="hint">One calm home for the two analysis tools the pro suites charge for. <strong>Bottleneck Analyzer</strong> — resources/stations ranked by utilisation (factory) or load vs capacity (warehouse), the #1 constraint flagged with a plain-language why. <strong>Sankey</strong> — a hand-drawn material-flow diagram whose link widths are proportional to the volume moved between stages. Reads the current floor; nothing is uploaded.</p>
+        <p class="hint">One calm home for the analysis tools the pro suites charge for. <strong>Bottleneck Analyzer</strong> — resources/stations ranked by utilisation (factory) or load vs capacity (warehouse), the #1 constraint flagged with a plain-language why. <strong>Sankey</strong> — a hand-drawn material-flow diagram whose link widths are proportional to the volume moved between stages. <strong>Cost Analyzer</strong> — illustrative operating cost (equipment + labour + energy) and a cost per unit from editable rates. <strong>Energy Analyzer</strong> — modelled energy (kWh), energy per unit and an optional CO₂ line. Reads the current floor; nothing is uploaded.</p>
         <button id="analyzeBtn" class="btn primary wide" type="button" title="Analyze the current model: rank the constraint and draw the material-flow Sankey. Works for a factory line (Theory of Constraints) or a warehouse (per-stage load vs capacity). Offline, read-only, deterministic.">Analyze</button>
         <div id="analyzeHeadline" class="analyze-headline"><p class="empty">Press <strong>Analyze</strong> to rank the constraint and draw the material-flow Sankey for the current model — a factory line (switch to <strong>Factory</strong> mode, then Generate) or a warehouse (place racking / load an example).</p></div>
         <details id="analyzeDetails" class="analyze-details">
@@ -705,6 +705,18 @@
         <details id="analyzeSankeyDetails" class="analyze-details">
           <summary class="std-summary">Material-flow Sankey — link widths ∝ flow volume between stages</summary>
           <div id="analyzeSankey" class="analyze-sankey"><!-- filled by app.js renderAnalyzePanel() --></div>
+        </details>
+        <!-- v3.2: Cost Analyzer + Energy Analyzer (Siemens Plant Simulation
+             CostAnalyzer + EnergyAnalyzer parity) — READ-ONLY over the SAME sim
+             state, with small EDITABLE illustrative-rate tables. Honest:
+             modelled, not measured; not a quote; not metered. -->
+        <details id="analyzeCostDetails" class="analyze-details">
+          <summary class="std-summary">Cost Analyzer — illustrative operating cost &amp; cost per unit (not a quote)</summary>
+          <div id="analyzeCost" class="analyze-cost"><!-- filled by app.js renderCostPanel() --></div>
+        </details>
+        <details id="analyzeEnergyDetails" class="analyze-details">
+          <summary class="std-summary">Energy Analyzer — modelled energy (kWh), energy per unit &amp; CO₂ (not metered)</summary>
+          <div id="analyzeEnergy" class="analyze-energy"><!-- filled by app.js renderEnergyPanel() --></div>
         </details>
       </section>
 

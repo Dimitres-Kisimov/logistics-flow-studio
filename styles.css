@@ -1451,3 +1451,25 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .an-bar-chart, .an-sankey { margin: 8px 0 4px; overflow-x: auto; }
 .an-bar-svg, .an-sankey-svg { display: block; width: 100%; height: auto; }
 .an-sankey { border: 1px solid var(--border); border-radius: 8px; padding: 4px 6px; background: var(--surface-2); }
+
+/* v3.2: Cost Analyzer + Energy Analyzer — headline figures + editable rates. */
+.an-figure-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 8px; }
+.an-figure {
+  flex: 1 1 120px; min-width: 110px; border: 1px solid var(--border); border-radius: 9px;
+  padding: 8px 10px; background: var(--surface-2);
+}
+.an-figure-val { display: block; font-size: 1.02rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.an-figure-lbl { display: block; font-size: 0.66rem; color: var(--text-dim); line-height: 1.4; margin-top: 2px; }
+.analyze-rates { margin-top: 8px; }
+.an-rate-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.an-rate { flex: 1 1 130px; min-width: 120px; }
+.an-rate-lbl { display: block; font-size: 0.66rem; color: var(--text-dim); margin-bottom: 3px; }
+.an-rate-edit { display: flex; align-items: center; gap: 6px; }
+.an-rate-in {
+  flex: 1 1 60px; min-width: 48px; padding: 4px 8px; font-size: 0.8rem; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); font-variant-numeric: tabular-nums;
+}
+.an-rate-in.narrow { width: 5.5em; max-width: 6.5em; padding: 3px 6px; }
+.an-rate-unit { font-size: 0.68rem; color: var(--text-dim); white-space: nowrap; }
+.an-rate-table td.an-val { text-align: right; }
+.an-rate-actions { margin: 6px 0 2px; }

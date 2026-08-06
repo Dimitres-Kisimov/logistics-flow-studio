@@ -467,7 +467,7 @@ const HARNESSES = [
   { name: "User-definable object library (verify_library.js)", args: ["verify_library.js"] },
   { name: "Factory process model + deterministic line sim (verify_process.js)", args: ["verify_process.js"] },
   { name: "Factory efficiency optimizer: CRAFT placement + RPW balance + TOC (verify_optimize.js)", args: ["verify_optimize.js"] },
-  { name: "Analytics: Bottleneck Analyzer + Sankey material-flow (verify_analytics.js)", args: ["verify_analytics.js"] },
+  { name: "Analytics: Bottleneck + Sankey + Cost + Energy analyzers (verify_analytics.js)", args: ["verify_analytics.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

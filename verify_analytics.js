@@ -260,7 +260,141 @@ function sankeyChecks(tag, model, unit) {
     /SYNTHETIC/i.test(bW.honesty) && /NOT a certification/i.test(bW.honesty));
 }
 
-/* ---- 8. Shipped wiring (source guards) ---------------------------------- */
+/* ==================================================================
+ * v3.2 COST ANALYZER + ENERGY ANALYZER - two more READ-ONLY views over the
+ * SAME sim state. Proves the load-bearing identities:
+ *   cost   = SUM(equipment, labour, energy)   cost/unit = total / throughput
+ *   energy = SUM(power x active-time)          energy/unit = total / throughput
+ * plus predictable rate scaling, determinism, and read-only (byte-identical).
+ * ================================================================== */
+
+/* ---- 8. Module surface + fresh default rates ---------------------------- */
+check("WT.analytics exposes the cost + energy API (v3.2)",
+  ["defaultRates", "classifyEquipment", "energyModel", "costModel", "breakdownSvg"].every((k) => typeof A[k] === "function"));
+{
+  const r1 = A.defaultRates(), r2 = A.defaultRates();
+  r1.energyPricePerKWh = 999; r1.equipment.asrs.powerKW = 999;
+  check("defaultRates() returns a FRESH deep copy (editing one never touches another/the seed)",
+    r2.energyPricePerKWh === 0.30 && r2.equipment.asrs.powerKW === 15 &&
+    A.defaultRates().energyPricePerKWh === 0.30);
+  check("default illustrative rates are the documented constants (EUR/kWh, EUR/h, CO2, amort basis)",
+    r2.energyPricePerKWh === 0.30 && r2.co2PerKWh === 0.30 && r2.labourPerHour === 35 && r2.hoursPerYear === 4000);
+}
+
+// Shared cost+energy identity + scaling checks for one input (mode/sim/elements).
+function costEnergyChecks(tag, input) {
+  const rates = A.defaultRates();
+  const em = A.energyModel(input, rates);
+  const cm = A.costModel(input, rates);
+  check(tag + ": energy + cost models build with a positive throughput",
+    !!em && !!cm && em.throughput > 0 && cm.throughput > 0 && em.throughput === cm.throughput,
+    em ? "tp=" + em.throughput : "null");
+
+  // ENERGY = SUM(power x active-time): each row's kWh == power x count x activeHours,
+  // and the total is exactly their sum.
+  check(tag + ": every energy row = power x count x active-hours (SUM(power x time))",
+    em.resources.every((rr) => approx(rr.energyKWh, rr.powerKW * rr.count * rr.activeHours, 1e-9)));
+  let sumK = 0; for (const rr of em.resources) sumK += rr.energyKWh;
+  check(tag + ": total energy == SUM of the per-resource kWh", approx(em.totalKWh, sumK, 1e-9), "total=" + em.totalKWh);
+  check(tag + ": energy per unit == total / throughput (identity)",
+    approx(em.perUnit, em.totalKWh / em.throughput, 1e-9));
+  check(tag + ": CO2 == total energy x the editable grid factor", approx(em.co2Kg, em.totalKWh * em.co2Factor, 1e-9));
+  check(tag + ": byClass sums the resources (count + kWh conserved)", (() => {
+    let c = 0, k = 0; for (const g of em.byClass) { c += g.count; k += g.energyKWh; }
+    let rc = 0; for (const rr of em.resources) rc += rr.count;
+    return approx(k, em.totalKWh, 1e-9) && c === rc;
+  })());
+
+  // COST = SUM(categories); cost per unit == total / throughput.
+  let catSum = 0; for (const c of cm.categories) catSum += c.amount;
+  check(tag + ": total cost == SUM(equipment + labour + energy)", approx(cm.totalCost, catSum, 1e-9), "total=" + cm.totalCost);
+  check(tag + ": cost has exactly the three categories (equipment/labour/energy)",
+    cm.categories.map((c) => c.key).join(",") === "equipment,labour,energy");
+  check(tag + ": cost per unit == total / throughput (identity)",
+    approx(cm.perUnit, cm.totalCost / cm.throughput, 1e-9));
+  const enCat = cm.categories.find((c) => c.key === "energy").amount;
+  check(tag + ": cost's energy category == energy kWh x price (can't diverge from the Energy analyzer)",
+    approx(enCat, em.totalKWh * rates.energyPricePerKWh, 1e-9));
+
+  // PREDICTABLE RATE SCALING.
+  const rp = A.defaultRates(); rp.energyPricePerKWh *= 2;
+  check(tag + ": doubling EUR/kWh doubles the energy cost category (predictable)",
+    approx(A.costModel(input, rp).categories.find((c) => c.key === "energy").amount, 2 * enCat, 1e-6));
+  const rc = A.defaultRates(); rc.co2PerKWh *= 3;
+  check(tag + ": tripling the grid CO2 factor triples the CO2 line (predictable)",
+    approx(A.energyModel(input, rc).co2Kg, 3 * em.co2Kg, 1e-6));
+  // Double the power rating of the LARGEST-energy class -> that class doubles.
+  const big = em.byClass.slice().sort((a, b) => b.energyKWh - a.energyKWh)[0];
+  if (big && big.energyKWh > 0) {
+    const rpow = A.defaultRates(); rpow.equipment[big.key].powerKW *= 2;
+    const em2 = A.energyModel(input, rpow);
+    const big2 = em2.byClass.find((g) => g.key === big.key);
+    check(tag + ": doubling a class's power rating doubles that class's energy (predictable)",
+      approx(big2.energyKWh, 2 * big.energyKWh, 1e-6));
+  }
+  // Double the capex of a present class -> equipment cost rises by its share.
+  const eqCat = cm.categories.find((c) => c.key === "equipment").amount;
+  if (em.byClass.length) {
+    const k0 = em.byClass[0].key;
+    const rcap = A.defaultRates(); rcap.equipment[k0].capex *= 2;
+    check(tag + ": doubling a class capex raises the equipment cost (monotonic, predictable)",
+      A.costModel(input, rcap).categories.find((c) => c.key === "equipment").amount > eqCat - 1e-9);
+  }
+
+  // DETERMINISM (no Date/RNG): byte-identical models on re-run.
+  check(tag + ": cost + energy models are DETERMINISTIC (byte-identical JSON on re-run)",
+    JSON.stringify(A.costModel(input, A.defaultRates())) === JSON.stringify(cm) &&
+    JSON.stringify(A.energyModel(input, A.defaultRates())) === JSON.stringify(em));
+
+  // HONESTY labels.
+  check(tag + ": cost honesty says illustrative + not-a-quote; energy says modelled + not-metered",
+    /not a quote/i.test(cm.honesty) && /illustrative/i.test(cm.honesty) &&
+    /not metered/i.test(em.honesty) && /modelled/i.test(em.honesty));
+
+  // Deterministic, well-formed, theme-aware breakdown SVG for both.
+  const catRows = cm.categories.map((c) => ({ label: c.label, value: c.amount, text: String(c.amount) }));
+  const svg1 = A.breakdownSvg(catRows, "light");
+  check(tag + ": cost breakdown SVG deterministic + well-formed + theme-aware",
+    svg1 === A.breakdownSvg(catRows, "light") && wellFormed(svg1) && svg1 !== A.breakdownSvg(catRows, "dark"));
+}
+
+/* ---- 9. FACTORY cost + energy ------------------------------------------- */
+{
+  const fac = G.generateFactoryLayout("assembly-line", { seed: 7 });
+  const m = WT.process.metrics(WT.process.derive(fac));
+  costEnergyChecks("factory", { mode: "factory", sim: m, elements: fac.elements });
+  // factory per-unit is per PART; the operating window is the shift.
+  const em = A.energyModel({ mode: "factory", sim: m, elements: fac.elements }, A.defaultRates());
+  check("factory: energy/cost per-unit denominator is parts (throughput x shift hours)",
+    em.throughputUnit === "part" && approx(em.throughput, m.throughputPerHr * (m.shiftSec / 3600), 1e-9));
+}
+
+/* ---- 10. WAREHOUSE cost + energy + read-only (serialize byte-identical) -- */
+{
+  const wh = G.generateLayout("ecommerce-fulfilment", { seed: 5 });
+  const layout = { elements: wh.elements, gridW: wh.gridW, gridH: wh.gridH, config: wh.config || {} };
+  const wms = WT.wms.runOperations(layout, { orders: 300, hours: 8, seed: 0 });
+  const input = { mode: "warehouse", sim: wms, elements: layout.elements };
+  costEnergyChecks("warehouse", input);
+
+  // classifyEquipment counts match a hand count of the mapped element types.
+  const counts = A.classifyEquipment(layout.elements);
+  const dockCount = layout.elements.filter((e) => e.type === "dock-in" || e.type === "dock-out").length;
+  check("warehouse: classifyEquipment counts the dock class == hand count of dock-in/out elements",
+    (counts.dock || 0) === dockCount, "dock=" + (counts.dock || 0) + " hand=" + dockCount);
+  check("warehouse: per-unit denominator is shipped units (per pallet-equivalent unit)",
+    A.energyModel(input, A.defaultRates()).throughputUnit === "unit");
+
+  // READ-ONLY: analysing does NOT mutate the layout or the wms result -> a
+  // warehouse layout's serialize is byte-identical (no data-model change).
+  const layoutBefore = JSON.stringify(layout);
+  const wmsBefore = JSON.stringify(wms);
+  A.costModel(input, A.defaultRates()); A.energyModel(input, A.defaultRates()); A.classifyEquipment(layout.elements);
+  check("read-only: cost + energy analysis does NOT mutate the layout or wms (serialize byte-identical)",
+    JSON.stringify(layout) === layoutBefore && JSON.stringify(wms) === wmsBefore);
+}
+
+/* ---- 11. Shipped wiring (source guards) --------------------------------- */
 {
   const idx = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   const sw = fs.readFileSync(path.join(__dirname, "sw.js"), "utf8");
@@ -270,11 +404,15 @@ function sankeyChecks(tag, model, unit) {
     idx.indexOf('src="analytics.js"') < idx.indexOf('src="app.js"') &&
     /id="analyzeCard"/.test(idx) && /id="analyzeBtn"/.test(idx) &&
     /id="analyzeBottleneck"/.test(idx) && /id="analyzeSankey"/.test(idx));
-  check("sw.js precaches ./analytics.js at the bumped wt-v54 cache",
-    /["']\.\/analytics\.js["']/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v54"/.test(sw));
-  check("app.js wires the Analyze button + exposes the self-test hook",
+  check("index.html ships the Cost + Energy drill-ins in the Analyze card (v3.2)",
+    /id="analyzeCost"/.test(idx) && /id="analyzeEnergy"/.test(idx) &&
+    /id="analyzeCostDetails"/.test(idx) && /id="analyzeEnergyDetails"/.test(idx));
+  check("sw.js precaches ./analytics.js at the bumped wt-v55 cache",
+    /["']\.\/analytics\.js["']/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v55"/.test(sw));
+  check("app.js wires the Analyze button + exposes the self-test hooks (bottleneck + cost + energy)",
     /analyzeBtn"\)\.addEventListener\("click", renderAnalyzePanel\)/.test(app) &&
-    /renderAnalyzePanel:\s*renderAnalyzePanel/.test(app));
+    /renderAnalyzePanel:\s*renderAnalyzePanel/.test(app) &&
+    /renderCostPanel:\s*renderCostPanel/.test(app) && /renderEnergyPanel:\s*renderEnergyPanel/.test(app));
 }
 
 console.log("");
