@@ -245,10 +245,16 @@ if (megaEx) {
   // Production / Assembly group; the mega showcase is a synthetic WAREHOUSE
   // distribution plant (Warehouse mode), so it legitimately omits them and
   // stays byte-identical - they are exempt from the warehouse-palette property.
+  // The v3.4 FACTORY-A2 flow-geometry components (converter/angular-converter/
+  // turntable/turnplate/flow-control/cycle/track/two-lane-track) are likewise
+  // ADDITIVE palette types NOT retro-fitted into the byte-identical mega builder
+  // (the plant stays byte-identical), so they are exempt from this property too.
   const MEGA_EXEMPT = {
     "conveyor-curve": 1,
     "mfg-source": 1, "mfg-drain": 1, "mfg-station": 1,
     "mfg-parallel-station": 1, "mfg-assembly": 1, "mfg-dismantle": 1,
+    "converter": 1, "angular-converter": 1, "turntable": 1, "turnplate": 1,
+    "flow-control": 1, "cycle": 1, "track": 1, "two-lane-track": 1,
   };
   const megaRequired = D.paletteOrder.filter((t) => !MEGA_EXEMPT[t]);
   const missingPalette = megaRequired.filter((t) => !megaTypes[t]);

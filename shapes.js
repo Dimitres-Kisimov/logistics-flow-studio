@@ -888,6 +888,190 @@
   }
 
   /* ==================================================================
+   * FLOW-GEOMETRY 2D GLYPHS (v3.4 FACTORY-A2). Distinct schematic top-down
+   * glyphs for the Siemens-Plant-Simulation-style flow-geometry components:
+   * transfer / redirect nodes (Converter / AngularConverter), rotating
+   * carrier / track plates (Turntable / Turnplate - animated rotation), a
+   * routing-rule node (FlowControl), a closed carrier loop (Cycle -
+   * animated) and single / dual guided lanes (Track / TwoLaneTrack).
+   * Illustrative synthetic schematics - NOT CAD, NOT BIM, no brand.
+   * ================================================================== */
+  // Converter: a straight-through belt transfer + a LATERAL divert. A through
+  // flow arrow across the deck + a perpendicular divert arrow at the centre;
+  // when `anim` is a phase a part rides the belt through.
+  function d2Converter(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    ctx.strokeRect(ix, iy, iw, ih);                                     // the transfer deck
+    const cy = iy + ih / 2, cx = ix + iw / 2;
+    const n = clampN(Math.round(iw / (cell * 0.5)), 2, 16);
+    for (let i = 1; i < n; i++) { const gx = ix + iw * i / n; seg(ctx, gx, cy - ih * 0.2, gx, cy + ih * 0.2); } // belt rollers
+    arr(ctx, ix, cy, ix + iw, cy, clampN(cell * 0.26, 3, 7));           // straight-through flow
+    arr(ctx, cx, cy, cx, iy + ih, clampN(cell * 0.22, 3, 6));           // the lateral divert
+    if (typeof anim === "number" && isFinite(anim)) {
+      const isz = clampN(Math.min(iw, ih) * 0.16, 2.5, 8);
+      ctx.fillStyle = gc.stroke;
+      ctx.fillRect(ix + (anim % 1) * (iw - isz), cy - isz / 2, isz, isz); // a part riding through
+    }
+  }
+
+  // Angular converter: a 90-degree transfer between two PERPENDICULAR lines -
+  // an L of two belt legs meeting at the centre (a sharp corner, distinct from
+  // the swept curved belt). When `anim` is a phase a part travels in then turns.
+  function d2AngularConverter(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const cx = ix + iw / 2, cy = iy + ih / 2;
+    const bw = clampN(Math.min(iw, ih) * 0.34, 4, 22);
+    ctx.strokeRect(ix, cy - bw / 2, cx - ix + bw / 2, bw);              // horizontal in-leg
+    ctx.strokeRect(cx - bw / 2, cy - bw / 2, bw, iy + ih - (cy - bw / 2)); // vertical out-leg
+    arr(ctx, ix, cy, cx, cy, clampN(cell * 0.22, 3, 6));               // in (from left)
+    arr(ctx, cx, cy, cx, iy + ih, clampN(cell * 0.22, 3, 6));          // out (90 deg, downward)
+    if (typeof anim === "number" && isFinite(anim)) {
+      const isz = clampN(bw * 0.5, 2.5, 8), p = anim % 1;
+      let px, py;
+      if (p < 0.5) { px = ix + (p / 0.5) * (cx - ix); py = cy; }
+      else { px = cx; py = cy + ((p - 0.5) / 0.5) * (iy + ih - cy); }
+      ctx.fillStyle = gc.stroke;
+      ctx.fillRect(px - isz / 2, py - isz / 2, isz, isz);
+    }
+  }
+
+  // Turntable: a rotating disc with a diametric through-track bar. The bar's
+  // ANGLE is anim-driven (a subtle deterministic rotation; default horizontal).
+  function d2Turntable(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const cx = x + w / 2, cy = y + d / 2;
+    const R = clampN(Math.min(w, d) * 0.4, 6, 4000);
+    ring(ctx, cx, cy, R);                                               // the disc rim
+    ring(ctx, cx, cy, clampN(R * 0.16, 2, 4000));                       // the hub
+    const ang = (typeof anim === "number" && isFinite(anim)) ? anim * TAU : 0;
+    const bx = Math.cos(ang), by = Math.sin(ang);                       // the track direction
+    const nx = -by, ny = bx, off = clampN(R * 0.24, 2, 4000);           // its perpendicular
+    seg(ctx, cx - bx * R, cy - by * R, cx + bx * R, cy + by * R);       // the through-track centreline
+    seg(ctx, cx - bx * R * 0.9 + nx * off, cy - by * R * 0.9 + ny * off, cx + bx * R * 0.9 + nx * off, cy + by * R * 0.9 + ny * off); // rail edge
+    seg(ctx, cx - bx * R * 0.9 - nx * off, cy - by * R * 0.9 - ny * off, cx + bx * R * 0.9 - nx * off, cy + by * R * 0.9 - ny * off); // rail edge
+    arr(ctx, cx + R * 0.74, cy - R * 0.5, cx + R * 0.5, cy - R * 0.74, clampN(cell * 0.2, 3, 6)); // rotation hint
+  }
+
+  // Turnplate: a rotating SQUARE plate carrying a track segment. The whole
+  // plate + track ROTATE (anim-driven angle; default axis-aligned).
+  function d2Turnplate(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const cx = x + w / 2, cy = y + d / 2;
+    const R = clampN(Math.min(w, d) * 0.4, 6, 4000);
+    ring(ctx, cx, cy, R);                                               // the rotation bearing
+    const ang = (typeof anim === "number" && isFinite(anim)) ? anim * TAU : 0;
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const s = clampN(R * 0.66, 4, 4000);                                // the plate half-size
+    const cor = [[-s, -s], [s, -s], [s, s], [-s, s]].map((p) => ({ x: cx + p[0] * ca - p[1] * sa, y: cy + p[0] * sa + p[1] * ca }));
+    ctx.beginPath();
+    ctx.moveTo(cor[0].x, cor[0].y);
+    for (let i = 1; i < 4; i++) ctx.lineTo(cor[i].x, cor[i].y);
+    ctx.closePath(); ctx.stroke();                                      // the rotated square plate
+    const px = -sa, py = ca, half = s * 0.92;                           // the track along the plate
+    for (const o of [-s * 0.42, 0, s * 0.42]) {
+      seg(ctx, cx - ca * half + px * o, cy - sa * half + py * o, cx + ca * half + px * o, cy + sa * half + py * o);
+    }
+  }
+
+  // Flow control: a routing-rule node - a decision diamond with ONE input and
+  // TWO fanned outputs (the outputs count + rule are structural). Distinct from
+  // the dismantle machine (a cog box) - this is a bare routing decision node.
+  function d2FlowControl(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const cx = x + w / 2, cy = y + d / 2;
+    const r = clampN(Math.min(w, d) * 0.26, 3, Math.min(w, d) * 0.4);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r, cy);
+    ctx.closePath(); ctx.stroke();                                      // the decision diamond
+    disc(ctx, cx, cy, clampN(r * 0.22, 1.2, r * 0.5));                  // the rule hub
+    const m = clampN(Math.min(w, d) * 0.12, 2, 6);
+    arr(ctx, x + m, cy, cx - r, cy, clampN(cell * 0.2, 3, 6));          // single input
+    arr(ctx, cx + r * 0.7, cy, x + w - m, y + d * 0.24, clampN(cell * 0.18, 2.5, 5)); // output A
+    arr(ctx, cx + r * 0.7, cy, x + w - m, y + d * 0.76, clampN(cell * 0.18, 2.5, 5)); // output B
+  }
+
+  // Cycle: a closed carrier LOOP - a rounded loop track with clockwise
+  // direction arrows; a carrier circulates the loop when animating. Distinct
+  // from the sorter loop (no divert chutes / tray ticks - a plain carrier loop).
+  function d2Cycle(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 3, 10);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const tk = clampN(Math.min(iw, ih) * 0.2, 4, 16);
+    ctx.strokeRect(ix, iy, iw, ih);                                     // outer loop edge
+    ctx.strokeRect(ix + tk, iy + tk, Math.max(1, iw - 2 * tk), Math.max(1, ih - 2 * tk)); // inner edge
+    const hs = clampN(cell * 0.22, 3, 6);
+    arr(ctx, ix + iw * 0.32, iy + tk / 2, ix + iw * 0.68, iy + tk / 2, hs);                 // top ->
+    arr(ctx, ix + iw - tk / 2, iy + ih * 0.32, ix + iw - tk / 2, iy + ih * 0.68, hs);       // right v
+    arr(ctx, ix + iw * 0.68, iy + ih - tk / 2, ix + iw * 0.32, iy + ih - tk / 2, hs);       // bottom <-
+    arr(ctx, ix + tk / 2, iy + ih * 0.68, ix + tk / 2, iy + ih * 0.32, hs);                 // left ^
+    if (typeof anim === "number" && isFinite(anim)) {
+      const p = rectPerim(ix + tk / 2, iy + tk / 2, Math.max(1, iw - tk), Math.max(1, ih - tk), anim);
+      const ts = clampN(tk * 0.6, 2, 8);
+      ctx.fillStyle = gc.stroke;
+      ctx.fillRect(p.x - ts / 2, p.y - ts / 2, ts, ts);                // the circulating carrier
+    }
+  }
+
+  // Track: a single-lane AGV guide PATH - a centre guide line with heading
+  // chevrons; a carrier marker travels the lane when animating. Distinct from
+  // the RGV (twin rails + cart) and AGV (dashed path + robot) - a bare guide path.
+  function d2Track(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.2, 2, 5);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const horiz = w >= d;
+    if (horiz) {
+      seg(ctx, ix, iy + ih * 0.5, ix + iw, iy + ih * 0.5);             // the centre guide line
+      const n = clampN(Math.round(iw / cell), 2, 12);
+      for (let i = 0; i < n; i++) chev(ctx, ix + iw * (i + 0.5) / n, iy + ih * 0.5, clampN(ih * 0.22, 2, 8), "right"); // waypoint chevrons
+    } else {
+      seg(ctx, ix + iw * 0.5, iy, ix + iw * 0.5, iy + ih);
+      const n = clampN(Math.round(ih / cell), 2, 12);
+      for (let i = 0; i < n; i++) chev(ctx, ix + iw * 0.5, iy + ih * (i + 0.5) / n, clampN(iw * 0.22, 2, 8), "down");
+    }
+    if (typeof anim === "number" && isFinite(anim)) laneRunner2D(ctx, gc, ix, iy, iw, ih, horiz, ((anim % 1) + 1) % 1);
+  }
+
+  // Two-lane track: two parallel guide lanes running OPPOSITE directions
+  // (bidirectional) + a median; two markers travel opposite ways when animating.
+  function d2TwoLaneTrack(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.18, 2, 5);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const horiz = w >= d, hs = clampN(cell * 0.22, 3, 7);
+    if (horiz) {
+      const y1 = iy + ih * 0.32, y2 = iy + ih * 0.68;
+      seg(ctx, ix, y1, ix + iw, y1); seg(ctx, ix, y2, ix + iw, y2);    // two lanes
+      seg(ctx, ix, iy + ih * 0.5, ix + iw, iy + ih * 0.5);            // the median
+      arr(ctx, ix + iw * 0.25, y1, ix + iw * 0.75, y1, hs);           // lane 1 ->
+      arr(ctx, ix + iw * 0.75, y2, ix + iw * 0.25, y2, hs);           // lane 2 <-
+      if (typeof anim === "number" && isFinite(anim)) {
+        const p = ((anim % 1) + 1) % 1, ts = clampN(ih * 0.16, 2.5, 7);
+        ctx.fillStyle = gc.stroke;
+        ctx.fillRect(ix + p * (iw - ts), y1 - ts / 2, ts, ts);
+        ctx.fillRect(ix + (1 - p) * (iw - ts), y2 - ts / 2, ts, ts);
+      }
+    } else {
+      const x1 = ix + iw * 0.32, x2 = ix + iw * 0.68;
+      seg(ctx, x1, iy, x1, iy + ih); seg(ctx, x2, iy, x2, iy + ih);
+      seg(ctx, ix + iw * 0.5, iy, ix + iw * 0.5, iy + ih);
+      arr(ctx, x1, iy + ih * 0.25, x1, iy + ih * 0.75, hs);
+      arr(ctx, x2, iy + ih * 0.75, x2, iy + ih * 0.25, hs);
+      if (typeof anim === "number" && isFinite(anim)) {
+        const p = ((anim % 1) + 1) % 1, ts = clampN(iw * 0.16, 2.5, 7);
+        ctx.fillStyle = gc.stroke;
+        ctx.fillRect(x1 - ts / 2, iy + p * (ih - ts), ts, ts);
+        ctx.fillRect(x2 - ts / 2, iy + (1 - p) * (ih - ts), ts, ts);
+      }
+    }
+  }
+
+  /* ==================================================================
    * TINY LOD ICONS. Drawn centred at (cx,cy) with radius r when a
    * footprint is too small on-screen for the full glyph. Cheap (a few
    * strokes) and legible at any zoom.
@@ -933,6 +1117,15 @@
   function icGears(ctx, cx, cy, r) { icGear(ctx, cx - r * 0.45, cy, r * 0.6); icGear(ctx, cx + r * 0.5, cy, r * 0.55); }
   function icMerge(ctx, cx, cy, r) { arr(ctx, cx - r, cy - r * 0.7, cx, cy, r * 0.4); arr(ctx, cx - r, cy + r * 0.7, cx, cy, r * 0.4); arr(ctx, cx, cy, cx + r, cy, r * 0.4); }
   function icSplit(ctx, cx, cy, r) { arr(ctx, cx - r, cy, cx, cy, r * 0.4); arr(ctx, cx, cy, cx + r, cy - r * 0.7, r * 0.4); arr(ctx, cx, cy, cx + r, cy + r * 0.7, r * 0.4); }
+  // v3.4 FACTORY-A2 flow-geometry icons.
+  function icConverter(ctx, cx, cy, r) { arr(ctx, cx - r, cy, cx + r, cy, r * 0.4); arr(ctx, cx, cy, cx, cy + r, r * 0.4); }
+  function icAngle(ctx, cx, cy, r) { arr(ctx, cx - r, cy - r * 0.55, cx + r * 0.3, cy - r * 0.55, r * 0.35); arr(ctx, cx + r * 0.3, cy - r * 0.55, cx + r * 0.3, cy + r, r * 0.35); }
+  function icTurn(ctx, cx, cy, r) { ring(ctx, cx, cy, r * 0.85); seg(ctx, cx - r * 0.85, cy, cx + r * 0.85, cy); arr(ctx, cx + r * 0.6, cy - r * 0.55, cx + r * 0.85, cy - r * 0.18, r * 0.32); }
+  function icTurnplate(ctx, cx, cy, r) { ctx.strokeRect(cx - r * 0.7, cy - r * 0.7, r * 1.4, r * 1.4); seg(ctx, cx - r * 0.7, cy, cx + r * 0.7, cy); arr(ctx, cx + r * 0.5, cy - r * 0.95, cx + r * 0.95, cy - r * 0.5, r * 0.3); }
+  function icRoute(ctx, cx, cy, r) { ctx.beginPath(); ctx.moveTo(cx, cy - r * 0.7); ctx.lineTo(cx + r * 0.7, cy); ctx.lineTo(cx, cy + r * 0.7); ctx.lineTo(cx - r * 0.7, cy); ctx.closePath(); ctx.stroke(); seg(ctx, cx + r * 0.7, cy, cx + r, cy - r * 0.6); seg(ctx, cx + r * 0.7, cy, cx + r, cy + r * 0.6); }
+  function icCycle(ctx, cx, cy, r) { ring(ctx, cx, cy, r * 0.8); arr(ctx, cx + r * 0.8, cy - r * 0.15, cx + r * 0.5, cy - r * 0.62, r * 0.3); }
+  function icTrack(ctx, cx, cy, r) { seg(ctx, cx - r, cy, cx + r, cy); chev(ctx, cx - r * 0.3, cy, r * 0.4, "right"); chev(ctx, cx + r * 0.45, cy, r * 0.4, "right"); }
+  function icTwoLane(ctx, cx, cy, r) { arr(ctx, cx - r, cy - r * 0.5, cx + r, cy - r * 0.5, r * 0.35); arr(ctx, cx + r, cy + r * 0.5, cx - r, cy + r * 0.5, r * 0.35); }
 
   /* ==================================================================
    * 3D PRIMITIVES (world cells -> px via the caller-supplied P). All
@@ -1468,6 +1661,140 @@
   function d3Assembly(ctx, P, x, y, w, d, h, color, theme, anim) { d3Machine(ctx, P, x, y, w, d, h, color, theme, "merge", anim); }
   function d3Dismantle(ctx, P, x, y, w, d, h, color, theme, anim) { d3Machine(ctx, P, x, y, w, d, h, color, theme, "split", anim); }
 
+  /* ------------------------------------------------------------------
+   * FLOW-GEOMETRY 3D FORMS (v3.4 FACTORY-A2). Distinct extruded forms for
+   * the flow-geometry components, reusing the same primitives (box3d /
+   * box3dZ / colBox / edge / quad); extruded by the domain heightM so a
+   * taller element rises on screen. Turntable / Turnplate / Cycle / the
+   * guide-path carriers ANIMATE deterministically (seeded from
+   * equipmentPhase by the caller - NO Date / RNG). Illustrative, NOT
+   * CAD/BIM, no brand.
+   * ------------------------------------------------------------------ */
+  // Converter: a low transfer deck (belt rollers) + a lateral divert spur.
+  function d3Converter(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h, color);                              // the transfer deck
+    const bm = beamColor(color, theme);
+    const n = clampN(Math.round(w / 0.6), 2, 20);
+    for (let i = 1; i < n; i++) { const gx = x + w * i / n; edge(ctx, P, gx, y, h, gx, y + d, h, bm); } // rollers
+    edge(ctx, P, x + w / 2, y + d / 2, h, x + w / 2, y + d, h, bm, 1.8); // the lateral divert spur
+    if (typeof anim === "number" && isFinite(anim)) {
+      const rw = clampN(w * 0.16, 0.3, 1.4), rd = clampN(d * 0.5, 0.3, 2);
+      runner3D(ctx, P, x, y, w, d, anim % 1, true, rw, rd, h + clampN(h * 0.9, 0.4, 1.3), lighten(color, 0.24));
+    }
+  }
+
+  // Angular converter: a low deck + two perpendicular port markers (an L).
+  function d3AngularConverter(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h, color);
+    const bm = beamColor(color, theme);
+    const cx = x + w / 2, cy = y + d / 2;
+    edge(ctx, P, x, cy, h, cx, cy, h, bm, 1.8);                       // in-leg (from left)
+    edge(ctx, P, cx, cy, h, cx, y + d, h, bm, 1.8);                   // out-leg (90 deg, to front)
+    if (typeof anim === "number" && isFinite(anim)) {
+      const ls = clampN(Math.min(w, d) * 0.22, 0.25, 1), top = h + clampN(h * 0.8, 0.3, 1.2), p = anim % 1;
+      let px, py;
+      if (p < 0.5) { px = x + (p / 0.5) * (cx - x); py = cy; }
+      else { px = cx; py = cy + ((p - 0.5) / 0.5) * (y + d - cy); }
+      box3dZ(ctx, P, px - ls / 2, py - ls / 2, ls, ls, h, top, lighten(color, 0.24));
+    }
+  }
+
+  // Turntable: a low disc base + a rotating through-track bar on top.
+  function d3Turntable(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h * 0.42, shade(color, 0.78));          // the disc base
+    const cx = x + w / 2, cy = y + d / 2;
+    const ang = (typeof anim === "number" && isFinite(anim)) ? anim * TAU : 0;
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const R = Math.min(w, d) * 0.42, bw = clampN(Math.min(w, d) * 0.22, 0.2, 1.2), z1 = h * 0.62;
+    const ax0 = cx - ca * R, ay0 = cy - sa * R, ax1 = cx + ca * R, ay1 = cy + sa * R;
+    const px = -sa * bw / 2, py = ca * bw / 2;
+    quad(ctx, P(ax0 + px, ay0 + py, z1), P(ax1 + px, ay1 + py, z1), P(ax1 - px, ay1 - py, z1), P(ax0 - px, ay0 - py, z1), shade(color, FACE.top), shade(color, 0.85)); // the rotating bar top
+    edge(ctx, P, ax0, ay0, z1, ax1, ay1, z1, beamColor(color, theme), 1.6);
+  }
+
+  // Turnplate: a low bearing base + a rotating SQUARE plate with a track.
+  function d3Turnplate(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h * 0.34, shade(color, 0.78));          // the bearing base
+    const cx = x + w / 2, cy = y + d / 2;
+    const ang = (typeof anim === "number" && isFinite(anim)) ? anim * TAU : 0;
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const s = Math.min(w, d) * 0.36, z = h * 0.52;
+    const cor = [[-s, -s], [s, -s], [s, s], [-s, s]].map((p) => P(cx + p[0] * ca - p[1] * sa, cy + p[0] * sa + p[1] * ca, z));
+    quad(ctx, cor[0], cor[1], cor[2], cor[3], shade(color, FACE.top), shade(color, 0.85)); // the rotating plate top
+    const t0 = P(cx - ca * s, cy - sa * s, z), t1 = P(cx + ca * s, cy + sa * s, z);
+    ctx.beginPath(); ctx.moveTo(t0.x, t0.y); ctx.lineTo(t1.x, t1.y); ctx.strokeStyle = beamColor(color, theme); ctx.lineWidth = 1.6; ctx.stroke(); // the track across the plate
+  }
+
+  // Flow control: a small routing cabinet + branching output ports on top.
+  function d3FlowControl(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h, color);                             // the routing cabinet
+    const bm = beamColor(color, theme);
+    const cx = x + w / 2, cy = y + d / 2;
+    edge(ctx, P, x, cy, h, cx, cy, h, bm, 1.6);                      // input
+    edge(ctx, P, cx, cy, h, x + w, y + d * 0.25, h, bm, 1.4);        // output A
+    edge(ctx, P, cx, cy, h, x + w, y + d * 0.75, h, bm, 1.4);        // output B
+  }
+
+  // Cycle: a low closed-loop track deck + a carrier circulating the loop.
+  function d3Cycle(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h, color);                             // the loop deck
+    const bm = beamColor(color, theme);
+    const inx = clampN(Math.min(w, d) * 0.22, 0.3, 2);
+    edge(ctx, P, x + inx, y + inx, h, x + w - inx, y + inx, h, bm);
+    edge(ctx, P, x + w - inx, y + inx, h, x + w - inx, y + d - inx, h, bm);
+    edge(ctx, P, x + w - inx, y + d - inx, h, x + inx, y + d - inx, h, bm);
+    edge(ctx, P, x + inx, y + d - inx, h, x + inx, y + inx, h, bm);   // the closed loop channel
+    if (typeof anim === "number" && isFinite(anim)) {
+      const p = rectPerim(x + inx, y + inx, Math.max(0.2, w - 2 * inx), Math.max(0.2, d - 2 * inx), anim);
+      const ts = clampN(inx * 0.8, 0.2, 1.2);
+      box3d(ctx, P, p.x - ts / 2, p.y - ts / 2, ts, ts, h + clampN(h * 0.6, 0.3, 1), lighten(color, 0.26)); // the circulating carrier
+    }
+  }
+
+  // Track: a single low raised guide rail (extruded) + heading ticks + carrier.
+  function d3Track(ctx, P, x, y, w, d, h, color, theme, anim) {
+    const horiz = w >= d, bm = beamColor(color, theme);
+    const rt = clampN(Math.min(w, d) * 0.24, 0.1, 0.6);
+    if (horiz) box3d(ctx, P, x, y + (d - rt) / 2, w, rt, h, color);   // the raised guide rail
+    else box3d(ctx, P, x + (w - rt) / 2, y, rt, d, h, color);
+    const n = clampN(Math.round((horiz ? w : d) / 1.0), 2, 12);
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      if (horiz) edge(ctx, P, x + w * t, y + d * 0.38, h, x + w * t, y + d * 0.62, h, bm);
+      else edge(ctx, P, x + w * 0.38, y + d * t, h, x + w * 0.62, y + d * t, h, bm);
+    }
+    if (typeof anim === "number" && isFinite(anim)) {
+      const rw = horiz ? clampN(w * 0.14, 0.3, 1.2) : clampN(w * 0.5, 0.3, 2);
+      const rd = horiz ? clampN(d * 0.5, 0.3, 2) : clampN(d * 0.14, 0.3, 1.2);
+      runner3D(ctx, P, x, y, w, d, ((anim % 1) + 1) % 1, horiz, rw, rd, h + clampN(h, 0.2, 1), lighten(color, 0.26)); // the carrier
+    }
+  }
+
+  // Two-lane track: two low raised guide rails + two carriers travelling opposite.
+  function d3TwoLaneTrack(ctx, P, x, y, w, d, h, color, theme, anim) {
+    const horiz = w >= d;
+    const rt = clampN(Math.min(w, d) * 0.16, 0.08, 0.5);
+    if (horiz) {
+      box3d(ctx, P, x, y + d * 0.24 - rt / 2, w, rt, h, color);
+      box3d(ctx, P, x, y + d * 0.76 - rt / 2, w, rt, h, color);
+    } else {
+      box3d(ctx, P, x + w * 0.24 - rt / 2, y, rt, d, h, color);
+      box3d(ctx, P, x + w * 0.76 - rt / 2, y, rt, d, h, color);
+    }
+    if (typeof anim === "number" && isFinite(anim)) {
+      const p = ((anim % 1) + 1) % 1, top = h + clampN(h, 0.2, 1), litc = lighten(color, 0.26);
+      if (horiz) {
+        const cw = clampN(w * 0.14, 0.3, 1.2), cd = clampN(d * 0.18, 0.2, 1);
+        box3dZ(ctx, P, x + p * (w - cw), y + d * 0.24 - cd / 2, cw, cd, h, top, litc);
+        box3dZ(ctx, P, x + (1 - p) * (w - cw), y + d * 0.76 - cd / 2, cw, cd, h, top, litc);
+      } else {
+        const cw = clampN(w * 0.18, 0.2, 1), cd = clampN(d * 0.14, 0.3, 1.2);
+        box3dZ(ctx, P, x + w * 0.24 - cw / 2, y + p * (d - cd), cw, cd, h, top, litc);
+        box3dZ(ctx, P, x + w * 0.76 - cw / 2, y + (1 - p) * (d - cd), cw, cd, h, top, litc);
+      }
+    }
+  }
+
   /* ==================================================================
    * RICH DETAIL TIER (v1.11 "realistic high-detail rendering"). A THIRD
    * LOD tier drawn ONLY when an element reads large on screen (zoomed in):
@@ -1933,6 +2260,15 @@
     "mfg-parallel-station": { d2: d2ParallelStation, d3: d3ParallelStation, icon: icGears, g2: "a row of cogged machine boxes + shared flow line", f3: "a row of N machine housings side by side" },
     "mfg-assembly": { d2: d2Assembly, d3: d3Assembly, icon: icMerge, g2: "two input arrows merging into one + cog at the join", f3: "machine housing + two inputs merging to one output" },
     "mfg-dismantle": { d2: d2Dismantle, d3: d3Dismantle, icon: icSplit, g2: "one input arrow splitting into two outputs + cog", f3: "machine housing + one input splitting to two outputs" },
+    // v3.4 FACTORY-A2: flow-geometry components (Conveying & Sortation + Transport).
+    "converter": { d2: d2Converter, d3: d3Converter, icon: icConverter, g2: "belt deck + through arrow + a lateral divert arrow", f3: "low transfer belt deck + a lateral divert spur" },
+    "angular-converter": { d2: d2AngularConverter, d3: d3AngularConverter, icon: icAngle, g2: "two perpendicular belt legs meeting at a right angle (an L)", f3: "low transfer deck + two perpendicular ports (90 deg)" },
+    "turntable": { d2: d2Turntable, d3: d3Turntable, icon: icTurn, g2: "rotating disc + a diametric through-track bar (rotates)", f3: "low disc base + a rotating through-track bar" },
+    "turnplate": { d2: d2Turnplate, d3: d3Turnplate, icon: icTurnplate, g2: "rotating square plate carrying a track segment (rotates)", f3: "low bearing base + a rotating square plate + track" },
+    "flow-control": { d2: d2FlowControl, d3: d3FlowControl, icon: icRoute, g2: "routing decision diamond + one input + two fanned outputs", f3: "routing cabinet + branching output ports" },
+    "cycle": { d2: d2Cycle, d3: d3Cycle, icon: icCycle, g2: "closed loop track + clockwise arrows + a circulating carrier", f3: "low closed-loop track deck + a circulating carrier" },
+    "track": { d2: d2Track, d3: d3Track, icon: icTrack, g2: "single guide line + heading chevrons + a travelling carrier", f3: "single low raised guide rail + heading ticks + carrier" },
+    "two-lane-track": { d2: d2TwoLaneTrack, d3: d3TwoLaneTrack, icon: icTwoLane, g2: "two parallel lanes with opposing arrows + a median (bidirectional)", f3: "two low raised guide rails + two carriers travelling opposite" },
   };
 
   /* ==================================================================

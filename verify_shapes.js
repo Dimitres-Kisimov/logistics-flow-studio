@@ -552,8 +552,87 @@ const MFG_BASE = { "mfg-source": "dock", "mfg-drain": "dock", "mfg-station": "st
     distinct && moves, "distinct=" + uniq.size + "/" + MFG_TYPES.length + " stationMoves=" + moves);
 })();
 
+/* =====================================================================
+ * v3.4 FACTORY-A2 "flow-geometry components" - focused checks for the eight
+ * NEW Conveying & Sortation + Transport types. The all-types smoke above
+ * already exercises them; these assert the NEW set specifically: registered +
+ * palette-listed + a DECLARED base behaviour (conveyor/transporter) so they
+ * ride the flow machinery, 0 capacity (all flow), a focused non-mutating 2D+3D
+ * draw smoke, that the eight glyphs are all DISTINCT, and that the rotating /
+ * looping forms (turntable, turnplate, cycle) actually MOVE across anim phases.
+ * ===================================================================== */
+const A2_TYPES = ["converter", "angular-converter", "turntable", "turnplate", "flow-control", "cycle", "track", "two-lane-track"];
+const A2_BASE = {
+  "converter": "conveyor", "angular-converter": "conveyor", "turntable": "conveyor",
+  "turnplate": "conveyor", "flow-control": "conveyor", "cycle": "conveyor",
+  "track": "transporter", "two-lane-track": "transporter",
+};
+
+/* ---- 26. A2 types: domain + registry + palette + base + 0 capacity -- */
+(() => {
+  const inDomain = A2_TYPES.filter((t) => !D.ELEMENTS[t]);
+  const noShape = A2_TYPES.filter((t) => S.has(t) !== true);
+  const notInPalette = A2_TYPES.filter((t) => (D.paletteOrder || []).indexOf(t) < 0);
+  const badBase = A2_TYPES.filter((t) => D.elementBase(t) !== A2_BASE[t]);
+  const badCap = A2_TYPES.filter((t) => { const def = D.ELEMENTS[t] || {}; return D.elementCapacity({ type: t, w: def.w, d: def.d }) !== 0; });
+  check("v3.4 FACTORY-A2 components are in the domain, the shape registry (2D+3D), the palette, declare a base (conveyor/transporter) and are 0-capacity (flow)",
+    inDomain.length === 0 && noShape.length === 0 && notInPalette.length === 0 && badBase.length === 0 && badCap.length === 0,
+    (inDomain.length ? "not in domain: " + inDomain.join(",") : "") +
+    (noShape.length ? " no shape: " + noShape.join(",") : "") +
+    (notInPalette.length ? " not in palette: " + notInPalette.join(",") : "") +
+    (badBase.length ? " wrong base: " + badBase.join(",") : "") +
+    (badCap.length ? " nonzero capacity: " + badCap.join(",") : "") ||
+    A2_TYPES.length + " flow-geometry components covered");
+})();
+
+/* ---- 27. focused A2 draw smoke (2D+3D x themes x scales), no mutation */
+(() => {
+  const P = makeP();
+  const cell = 20;
+  let bad = null, notFinite = null, mutated = null;
+  for (const t of A2_TYPES) {
+    const def = D.ELEMENTS[t];
+    for (const theme of THEMES) {
+      for (const lod of [3, 44]) {
+        const g = { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme, lod, anim: 0.3 };
+        const before = JSON.stringify(g);
+        const c = makeCtx();
+        try { if (S.draw2D(c, t, g) !== true) bad = bad || t + " draw2D returned non-true"; }
+        catch (e) { bad = bad || t + " 2D/" + theme + "/" + lod + ": " + e.message; }
+        if (c._bad.length) notFinite = notFinite || t + " 2D " + c._bad[0];
+        if (JSON.stringify(g) !== before) mutated = mutated || t + " (2D)";
+      }
+      const o = { cx: 4, cy: 3, w: def.w, d: def.d, heightM: def.heightM, color: def.color, theme, anim: 0.3, selected: true, selColor: "#38bdf8" };
+      const beforeO = JSON.stringify(o);
+      const c3 = makeCtx();
+      try { if (S.draw3D(c3, t, P, o) !== true) bad = bad || t + " draw3D returned non-true"; }
+      catch (e) { bad = bad || t + " 3D/" + theme + ": " + e.message; }
+      if (c3._bad.length) notFinite = notFinite || t + " 3D " + c3._bad[0];
+      if (JSON.stringify(o) !== beforeO) mutated = mutated || t + " (3D)";
+    }
+  }
+  check("v3.4 FACTORY-A2: every flow-geometry component draws 2D+3D x light/dark x small/large - no throw, all finite, no mutation",
+    bad === null && notFinite === null && mutated === null,
+    bad || notFinite || (mutated ? "mutated " + mutated : A2_TYPES.length + " components x themes x scales clean"));
+})();
+
+/* ---- 28. the eight A2 glyphs are DISTINCT + rotating/looping forms move */
+(() => {
+  const cell = 20;
+  const glyphOf = (t) => { const def = D.ELEMENTS[t]; const c = recCtx(); S.draw2D(c, t, { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod: 44 }); return c._pts.join("|"); };
+  const uniq = new Set(A2_TYPES.map(glyphOf));
+  const distinct = uniq.size === A2_TYPES.length;
+  // turntable + turnplate ROTATE, cycle LOOPS - each must move its part across phases.
+  const movesOf = (t) => { const def = D.ELEMENTS[t]; const draw = (a) => { const c = recCtx(); S.draw2D(c, t, { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod: 44, anim: a }); return c._pts.join("|"); }; return draw(0.05) !== draw(0.55); };
+  const animated = ["turntable", "turnplate", "cycle"];
+  const stillStuck = animated.filter((t) => !movesOf(t));
+  check("v3.4 FACTORY-A2: the eight components render DISTINCT glyphs and the rotating/looping forms (turntable, turnplate, cycle) move across anim phases",
+    distinct && stillStuck.length === 0,
+    "distinct=" + uniq.size + "/" + A2_TYPES.length + (stillStuck.length ? " static: " + stillStuck.join(",") : " animate OK"));
+})();
+
 console.log("");
 console.log(failures === 0
-  ? "ALL SHAPES CHECKS PASSED (25 checks)"
+  ? "ALL SHAPES CHECKS PASSED (28 checks)"
   : failures + " SHAPES CHECK(S) FAILED");
 process.exit(failures === 0 ? 0 : 1);

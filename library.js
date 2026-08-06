@@ -100,6 +100,13 @@
     // v2.5 FACTORY-A manufacturing components (Production / Assembly group).
     "mfg-source": PRODUCTION, "mfg-drain": PRODUCTION, "mfg-station": PRODUCTION,
     "mfg-parallel-station": PRODUCTION, "mfg-assembly": PRODUCTION, "mfg-dismantle": PRODUCTION,
+    // v3.4 FACTORY-A2 flow-geometry components. The conveying / routing nodes
+    // group with Conveying & Sortation; the guide paths with Transport. Both
+    // groups are always shown (NOT mode-filtered) - generic material-flow geometry.
+    "converter": "Conveying & Sortation", "angular-converter": "Conveying & Sortation",
+    "turntable": "Conveying & Sortation", "turnplate": "Conveying & Sortation",
+    "flow-control": "Conveying & Sortation", "cycle": "Conveying & Sortation",
+    "track": "Transport", "two-lane-track": "Transport",
   };
   // The base each built-in maps onto (so a CLONE of a built-in gets a sane
   // base). Used only when cloning; the built-in itself is never modified.
@@ -120,6 +127,11 @@
     // (Source/Drain -> dock endpoint, the Station family -> station server).
     "mfg-source": "dock", "mfg-drain": "dock", "mfg-station": "station",
     "mfg-parallel-station": "station", "mfg-assembly": "station", "mfg-dismantle": "station",
+    // v3.4 FACTORY-A2: the conveying / routing nodes ride the conveyor
+    // connector path; the guide paths ride the transporter path.
+    "converter": "conveyor", "angular-converter": "conveyor", "turntable": "conveyor",
+    "turnplate": "conveyor", "flow-control": "conveyor", "cycle": "conveyor",
+    "track": "transporter", "two-lane-track": "transporter",
   };
 
   // The live store of user-defined types, keyed by id (insertion order kept

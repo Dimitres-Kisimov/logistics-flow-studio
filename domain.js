@@ -430,6 +430,106 @@
       cycleSec: 40, servers: 1, outputs: 2,
       desc: "Dismantle STATION: SPLITS one part into SEVERAL (outputs = 2 here). Represented STRUCTURALLY now (a station carrying an outputs count); the deep split flow logic is DEFERRED to the line-simulation build. Maps onto the station-server path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
     },
+
+    // ==================================================================
+    // FLOW-GEOMETRY COMPONENTS (v3.4 FACTORY-A2). The remaining Siemens-
+    // Plant-Simulation-style MaterialFlow FLOW-GEOMETRY objects, rounding
+    // out component parity: Converter / AngularConverter (transfer /
+    // redirect flow between conveyor lines), Turntable / Turnplate
+    // (rotating carrier / track plates), FlowControl (a routing-rule node),
+    // Cycle (a repeating closed carrier loop) and Track / TwoLaneTrack
+    // (AGV / vehicle guide paths, single + dual lane).
+    //
+    // Like the FACTORY-A manufacturing built-ins, each DECLARES a `base`
+    // behaviour class so it RIDES the existing flow machinery with NO
+    // re-invented sim: the conveying / routing nodes map onto the
+    // conveyor CONNECTOR path (base "conveyor" -> domain.isConnector +
+    // flowsim isTransport/conveyor-cell treat them like a belt segment)
+    // and the guide paths onto the transporter path (base "transporter",
+    // the SAME movement family as rgv / agv). Every WAREHOUSE built-in
+    // still declares no base, so every base-aware branch stays a strict
+    // NO-OP for a warehouse-only layout (behaviour BYTE-IDENTICAL; the
+    // new types are additive).
+    //
+    // Category "flow" -> 0 storage positions (elementCapacity() returns 0,
+    // like conveyors / docks / stations). FlowControl carries an `outputs`
+    // COUNT + a `rule` label and Converter / AngularConverter a `divert`
+    // direction - the routing rule is represented STRUCTURALLY now; the
+    // deep MULTI-WAY routing / divert-decision flow logic is DEFERRED to a
+    // later line-simulation build (honest). Turntable / Turnplate / Cycle
+    // ANIMATE deterministically (rotation / loop) seeded from
+    // equipmentPhase - NO Date, NO RNG; LOD-gated + reduced-motion-safe.
+    // Honest, synthetic teaching elements - no vendor spec, no real brand.
+    // ==================================================================
+    "converter": {
+      id: "converter", label: "Converter (transfer)", category: "flow",
+      base: "conveyor", w: 3, d: 3, color: "#06b6d4", resizable: true, heightM: 0.9,
+      // divert: the lateral direction material can be redirected to; the
+      // straight-through path continues in the belt-run direction. unitsPerHr
+      // mirrors the straight conveyor (a transfer, not a bottleneck).
+      divert: "lateral", unitsPerHr: 180,
+      desc: "Flow CONVERTER: transfers / redirects material between conveyor lines - a straight-through belt with a LATERAL divert (a part carries on, or is pushed sideways onto a crossing line). Maps onto the conveyor CONNECTOR path so it passes material THROUGH the chain. The straight-vs-divert routing DECISION is structural now (the deep multi-way divert logic is deferred). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "angular-converter": {
+      id: "angular-converter", label: "Angular converter (90 deg transfer)", category: "flow",
+      base: "conveyor", w: 3, d: 3, color: "#0e7490", resizable: true, heightM: 0.9,
+      // divert: a right-angle transfer between two PERPENDICULAR lines - a
+      // corner transfer, distinct from the curved belt (a sharp 90 deg hand-off,
+      // not a swept arc).
+      divert: "90deg", unitsPerHr: 180,
+      desc: "ANGULAR converter: a 90-degree transfer between two PERPENDICULAR conveyor lines - a part is handed off at a right angle (a corner transfer, distinct from the swept curved belt). Maps onto the conveyor CONNECTOR path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "turntable": {
+      id: "turntable", label: "Turntable (rotating disc)", category: "flow",
+      base: "conveyor", w: 3, d: 3, color: "#a855f7", resizable: true, heightM: 0.9,
+      // rotates: the disc turns a carrier / MU to a new heading. A subtle
+      // DETERMINISTIC rotation animates from equipmentPhase (NO Date/RNG).
+      rotates: true, unitsPerHr: 180,
+      desc: "TURNTABLE: a rotating disc that turns a carrier / load-unit to a new heading before it continues - the through-track ROTATES on the disc (animated deterministically from the sim clock, paused/reduced-motion safe). Maps onto the conveyor CONNECTOR path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "turnplate": {
+      id: "turnplate", label: "Turnplate (rotating track plate)", category: "flow",
+      base: "conveyor", w: 3, d: 3, color: "#7e22ce", resizable: true, heightM: 0.9,
+      // rotates: a rotating SQUARE plate carrying a track segment (rotates the
+      // whole track section, not just a disc). Animated deterministically.
+      rotates: true, unitsPerHr: 180,
+      desc: "TURNPLATE: a rotating square PLATE carrying a track / conveyor segment - it swings the whole track section round to align with a different line (animated deterministically; paused/reduced-motion safe). Distinct from the disc turntable (a square plate + track, not a bare disc). Maps onto the conveyor CONNECTOR path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "flow-control": {
+      id: "flow-control", label: "Flow control (routing rule)", category: "flow",
+      base: "conveyor", w: 2, d: 2, color: "#f97316", resizable: true, heightM: 1.0,
+      // outputs: how many downstream lines the node can route to; rule: the
+      // (illustrative) routing policy label. Represented STRUCTURALLY - the
+      // deep per-output routing DECISION logic is deferred to the line-sim.
+      outputs: 2, rule: "cyclic", unitsPerHr: 180,
+      desc: "FLOW CONTROL: a routing-rule node that directs a part to ONE of its outputs (outputs = 2, rule = cyclic here). The rule is represented STRUCTURALLY now (an outputs count + a rule label); the deep multi-way routing DECISION logic is DEFERRED to the line-simulation build. Maps onto the conveyor CONNECTOR path (material passes through). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "cycle": {
+      id: "cycle", label: "Cycle (carrier loop)", category: "flow",
+      base: "conveyor", w: 6, d: 4, color: "#ec4899", resizable: true, heightM: 1.0,
+      // loop: a closed carrier loop - a carrier circulates the track endlessly.
+      // A DETERMINISTIC carrier animates around the loop (NO Date/RNG).
+      loop: true, unitsPerHr: 180,
+      desc: "CYCLE: a repeating CLOSED carrier loop - a carrier circulates the track endlessly (animated deterministically around the loop; paused/reduced-motion safe). Distinct from the sorter loop (a plain circulating carrier, no divert chutes). Maps onto the conveyor CONNECTOR path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "track": {
+      id: "track", label: "Track (AGV guide path)", category: "flow",
+      base: "transporter", w: 4, d: 1, color: "#6366f1", resizable: true, transport: true, heightM: 0.4,
+      // lanes: a SINGLE guided lane (the passive guide PATH an AGV / vehicle
+      // rides). Same movement family as rgv / agv (base transporter). A carrier
+      // marker travels the lane when animating (deterministic, NO Date/RNG).
+      lanes: 1,
+      desc: "TRACK: a single-lane AGV / vehicle GUIDE PATH - the passive guided route a transporter rides between points (a carrier marker travels the lane when the flow runs). Transport ONLY: 0 storage positions; occupies floor like a reserved lane. Maps onto the transporter path (same family as rgv / agv). Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "two-lane-track": {
+      id: "two-lane-track", label: "Two-lane track (dual guide path)", category: "flow",
+      base: "transporter", w: 4, d: 2, color: "#3730a3", resizable: true, transport: true, heightM: 0.4,
+      // lanes: TWO parallel guided lanes running OPPOSITE directions (a
+      // bidirectional dual-lane guide path). Two markers travel opposite ways
+      // when animating (deterministic, NO Date/RNG).
+      lanes: 2,
+      desc: "TWO-LANE TRACK: a dual-lane AGV / vehicle guide path - two parallel guided lanes running OPPOSITE directions (bidirectional). Transport ONLY: 0 storage positions; occupies floor as a reserved twin lane. Maps onto the transporter path (same family as rgv / agv). Illustrative synthetic model, NOT a vendor spec.",
+    },
   };
 
   /* ------------------------------------------------------------------
@@ -849,6 +949,10 @@
       // v2.5 FACTORY-A: Production / Assembly manufacturing components.
       "mfg-source", "mfg-drain", "mfg-station", "mfg-parallel-station",
       "mfg-assembly", "mfg-dismantle",
+      // v3.4 FACTORY-A2: flow-geometry components (Conveying & Sortation +
+      // Transport). Additive; a warehouse-only layout never uses them.
+      "converter", "angular-converter", "turntable", "turnplate",
+      "flow-control", "cycle", "track", "two-lane-track",
     ],
   };
 })();

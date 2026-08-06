@@ -722,6 +722,60 @@
       return { ok: srcOk && drnOk && wp.length >= 5, detail: "recv.x=" + (recv && recv.x) + " ship.x=" + (ship && ship.x) + " wps=" + wp.length };
     });
 
+    // ---- v3.4 FACTORY-A2: flow-geometry components place + render + animate -
+    // The eight new Siemens-style flow-geometry types (Converter / Angular-
+    // Converter / Turntable / Turnplate / FlowControl / Cycle / Track /
+    // TwoLaneTrack) are registered with a declared base (conveyor/transporter)
+    // + 0 capacity, RENDER on a REAL canvas at the zoomed-in tier without
+    // throwing, the turntable's rotation MOVES across anim phases, and one
+    // places through the SAME library.placeAt path the palette uses.
+    check("flow-geometry-components-place-and-render", function () {
+      var S = WT.shapes, DM = WT.domain;
+      if (!S || !DM) return { ok: false, detail: "shapes/domain missing" };
+      var A2 = ["converter", "angular-converter", "turntable", "turnplate", "flow-control", "cycle", "track", "two-lane-track"];
+      var registered = A2.every(function (t) { return S.has(t) === true && !!DM.ELEMENTS[t]; });
+      var zeroCap = A2.every(function (t) { var def = DM.ELEMENTS[t] || {}; return DM.elementCapacity({ type: t, w: def.w, d: def.d }) === 0; });
+      var basedOk = DM.elementBase("turntable") === "conveyor" && DM.elementBase("track") === "transporter";
+      var drewOk = true;
+      try {
+        var cv = document.createElement("canvas"); cv.width = 240; cv.height = 240;
+        var g = cv.getContext("2d");
+        A2.forEach(function (t) {
+          var def = DM.ELEMENTS[t];
+          S.draw2D(g, t, { x: 10, y: 10, w: def.w * 30, d: def.d * 30, cellPx: 30, color: def.color, theme: "light", lod: 60, anim: 0.3, seed: 3 });
+        });
+      } catch (e) { drewOk = false; }
+      // the turntable rotation moves its through-track bar across phases. Use a
+      // QUARTER turn apart (0.0 -> horizontal, 0.25 -> vertical): the diametric
+      // bar is symmetric under a HALF turn, so 0/0.25 (not 0/0.5) reads distinct.
+      function turnFrame(a) {
+        var def = DM.ELEMENTS["turntable"], cv2 = document.createElement("canvas");
+        cv2.width = 130; cv2.height = 130;
+        S.draw2D(cv2.getContext("2d"), "turntable", { x: 8, y: 8, w: def.w * 24, d: def.d * 24, cellPx: 24, color: def.color, theme: "light", lod: 44, anim: a });
+        return cv2.toDataURL();
+      }
+      var rotates = turnFrame(0.0) !== turnFrame(0.25);
+      // place a turntable through the library path (its group is always visible)
+      var placed = false, typeOk = false;
+      if (haveApi && API.library && typeof API.library.placeAt === "function") {
+        var before = API.state.elements.length;
+        var lay = API.currentLayout();
+        var spots = [[0, 0], [1, 1], [0, (lay.gridH || 10) - 3], [(lay.gridW || 10) - 3, 0]];
+        for (var i = 0; i < spots.length && !placed; i++) {
+          API.library.placeAt("turntable", spots[i][0], spots[i][1]);
+          if (API.state.elements.length > before) placed = true;
+        }
+        var el = placed ? API.state.elements[API.state.elements.length - 1] : null;
+        typeOk = !!(el && el.type === "turntable");
+        if (el) API.state.elements = API.state.elements.filter(function (e) { return e.id !== el.id; });
+        API.render();
+      } else { placed = true; typeOk = true; } // no API -> render + registry checks still gate
+      return {
+        ok: registered && zeroCap && basedOk && drewOk && rotates && placed && typeOk,
+        detail: "reg=" + registered + " cap0=" + zeroCap + " base=" + basedOk + " drew=" + drewOk + " rotates=" + rotates + " placed=" + placed + " typeOk=" + typeOk,
+      };
+    });
+
     // ---- v2.6 FACTORY-B: GENERATE A WHOLE FACTORY (live) ---------------
     // Drive the REAL Generate handler in Factory mode for a factory profile:
     // it builds a complete production line (Source -> machining -> assembly

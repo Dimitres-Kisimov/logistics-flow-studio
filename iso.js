@@ -118,6 +118,15 @@
     "mfg-parallel-station": 2.2,
     "mfg-assembly": 2.4,
     "mfg-dismantle": 2.4,
+    // v3.4 FACTORY-A2 "flow-geometry components" (mirror domain heightM).
+    "converter": 0.9,
+    "angular-converter": 0.9,
+    "turntable": 0.9,
+    "turnplate": 0.9,
+    "flow-control": 1.0,
+    "cycle": 1.0,
+    "track": 0.4,
+    "two-lane-track": 0.4,
   };
 
   // Fallback used when a type is unknown to BOTH the domain model and the
