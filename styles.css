@@ -1333,3 +1333,40 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .about-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 0.84rem; }
 .about-honesty li { color: var(--text-dim); }
 .about-for { font-size: 0.82rem; color: var(--text-dim); line-height: 1.5; margin: 4px 0 0; }
+
+/* ================================================================
+ * v2.7 FACTORY-C: Factory line efficiency read-out (WT.process)
+ * Headline KPIs + a drill-in of per-station utilisation bars and
+ * editable cycle times. Calm, colourblind-safe, theme-aware.
+ * ================================================================ */
+.proc-headline .empty { color: var(--text-dim); font-size: 0.8rem; }
+.proc-kpi-row { display: flex; gap: 10px; margin: 4px 0 6px; }
+.proc-kpi {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.proc-kpi-val { font-size: 1.05rem; font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+.proc-kpi-lbl { font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.proc-sub { font-size: 0.78rem; color: var(--text); margin: 4px 0; }
+.proc-basis { font-size: 0.68rem; color: var(--text-dim); line-height: 1.45; margin: 4px 0 0; }
+.proc-details { margin-top: 8px; }
+.proc-bars { display: flex; flex-direction: column; gap: 5px; margin: 8px 0; }
+.proc-bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.74rem; }
+.proc-bar-name { flex: 0 0 34%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.proc-bar-row.is-bottleneck .proc-bar-name { color: var(--danger); font-weight: 700; }
+.proc-bar-track {
+  flex: 1 1 auto; height: 9px; border-radius: 5px; overflow: hidden;
+  background: color-mix(in srgb, var(--text-dim) 22%, transparent);
+}
+.proc-bar-fill { display: block; height: 100%; border-radius: 5px; background: var(--accent-2); }
+.proc-bar-row.is-bottleneck .proc-bar-fill { background: var(--danger); }
+.proc-bar-pct { flex: 0 0 34px; text-align: right; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.proc-cycle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 3px; color: var(--text-dim); font-size: 0.72rem; }
+.proc-cycle-inp {
+  width: 46px; padding: 2px 4px; text-align: right; border: 1px solid var(--border);
+  border-radius: 5px; background: var(--bg); color: var(--text); font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.proc-cycle-inp:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.proc-little { font-size: 0.74rem; color: var(--text); margin: 6px 0 4px; line-height: 1.5; }

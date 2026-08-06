@@ -127,6 +127,11 @@
     genMode: "auto", // "auto" | "guided" | "reserve"
     genLayout: null, // last generated { elements, config, meta } (steering context)
     genLog: [], // explainable action log entries {kind, echo, detail}
+    // v2.7 FACTORY-C: the optional `process` block (WT.process) for a FACTORY
+    // layout - operations bound to placed mfg-* elements, precedence, routing,
+    // shift/demand. null for a warehouse layout (so serialize stays byte-
+    // identical). Auto-derived on a factory generate; editable cycle times.
+    process: null,
     // P3: Live material-flow animation (flowsim.js). `sim` is the current
     // flowsim state; `on` gates whether MUs are drawn; `playing` gates the
     // requestAnimationFrame loop; `sig` is the layout signature the sim was
@@ -4157,6 +4162,12 @@
     // anywhere. embedInto() adds obj.library ONLY when custom types are
     // present, so a default (no-custom) layout stays byte-identical to before.
     if (WT.library && typeof WT.library.embedInto === "function") WT.library.embedInto(obj, state.elements);
+    // v2.7 FACTORY-C: embed the optional `process` block ONLY when the layout
+    // carries one (factory layouts). embedInto() is a strict no-op when
+    // state.process is null, so a warehouse layout serializes BYTE-IDENTICALLY.
+    if (WT.process && typeof WT.process.embedInto === "function" && state.process) {
+      WT.process.embedInto(obj, state.process);
+    }
     return obj;
   }
 
@@ -4215,10 +4226,15 @@
         weeklyOrders: Math.max(1, Math.round(numOr(obj.config.weeklyOrders, state.config.weeklyOrders))),
       });
     }
+    // v2.7 FACTORY-C: rebuild the optional `process` block from the layout
+    // (present only for factory layouts; null for a warehouse layout).
+    state.process = (WT.process && typeof WT.process.rebuild === "function")
+      ? WT.process.rebuild(obj) : null;
     pushConfigToUI();
     syncFloorInputs();
     renderProps();
     fitToFloor(); // show the whole (possibly resized) floor
+    renderProcessPanel(); // v2.7 FACTORY-C: refresh the factory line read-out
     markKPIsStale(); // any displayed KPIs describe the previous layout
     if (source) status("Loaded layout from " + source + ".");
   }
@@ -5093,10 +5109,17 @@
         demandSkew: numOr(gen.config.demandSkew, state.config.demandSkew),
       });
     }
+    // v2.7 FACTORY-C: auto-derive the `process` block for a FACTORY layout so
+    // the line sim + metrics "just work" on a generated/steered/example line.
+    // WT.process.derive returns null for a warehouse layout (no source+sink+
+    // station), so state.process stays null there and serialize is unchanged.
+    state.process = (WT.process && typeof WT.process.derive === "function")
+      ? WT.process.derive({ elements: state.elements, gridW: GRID_W, gridH: GRID_H, config: state.config }) : null;
     pushConfigToUI();
     syncFloorInputs();
     renderProps();
     fitToFloor(); // frame the whole generated/example floor
+    renderProcessPanel(); // v2.7 FACTORY-C: refresh the factory line read-out
     scheduleSave();
     markKPIsStale();
   }
@@ -5161,6 +5184,87 @@
         "</div>"
       )
       .join("");
+  }
+
+  // ================================================================
+  // v2.7 FACTORY-C: Factory line efficiency read-out (WT.process)
+  // ----------------------------------------------------------------
+  // Surface the process model + the deterministic line-sim metrics HONESTLY:
+  // headline (throughput + the named bottleneck) first; utilisation bars +
+  // WIP/lead time and EDITABLE cycle times on drill-in. Only meaningful for a
+  // FACTORY layout (state.process != null); a warehouse shows a hint.
+  // ================================================================
+  function procFmt(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "0";
+    return (Math.abs(n - Math.round(n)) < 0.05) ? String(Math.round(n)) : n.toFixed(1);
+  }
+  function procPct(v) { return Math.round((Number(v) || 0) * 100) + "%"; }
+
+  function renderProcessPanel() {
+    const head = $("procHeadline");
+    if (!head) return;
+    const detail = $("procDetail");
+    const block = state.process;
+    if (!block || !WT.process || typeof WT.process.metrics !== "function") {
+      head.innerHTML = '<p class="empty">Generate a factory line (switch to <strong>Factory</strong> mode, then Generate) to see the bottleneck, throughput, utilisation and WIP for the production line.</p>';
+      if (detail) detail.innerHTML = "";
+      return;
+    }
+    let m = null;
+    try { m = WT.process.metrics(block); } catch (_) { m = null; }
+    if (!m || !m.bottleneck) {
+      head.innerHTML = '<p class="empty">This layout has a process block but no timed operations to model.</p>';
+      if (detail) detail.innerHTML = "";
+      return;
+    }
+    head.innerHTML =
+      '<div class="proc-kpi-row">' +
+        '<div class="proc-kpi"><span class="proc-kpi-val">' + procFmt(m.throughputPerHr) + '</span><span class="proc-kpi-lbl">parts/hr — throughput</span></div>' +
+        '<div class="proc-kpi"><span class="proc-kpi-val">' + esc(m.bottleneck.name) + '</span><span class="proc-kpi-lbl">bottleneck · ' + procFmt(m.bottleneck.effTimeSec) + ' s/unit</span></div>' +
+      '</div>' +
+      '<p class="proc-sub">Takt ' + procFmt(m.taktSec) + ' s · line efficiency ' + procPct(m.lineEfficiency) +
+        ' · ' + m.stationsUsed + ' stations (theoretical min ' + m.theoreticalMinStations + ') · ' +
+        (m.demandMet ? 'meets demand pace' : 'below demand pace') + '</p>' +
+      '<p class="proc-basis">Modelled, not measured; deterministic, teaching-scale. Basis: ' + esc(m.basis) + '.</p>';
+
+    if (detail) {
+      const bars = m.stations.map((s) => {
+        const w = Math.max(0, Math.min(100, Math.round(s.utilisation * 100)));
+        return '<div class="proc-bar-row' + (s.isBottleneck ? ' is-bottleneck' : '') + '">' +
+          '<span class="proc-bar-name">' + esc(s.name) + (s.isBottleneck ? ' — bottleneck' : '') + '</span>' +
+          '<span class="proc-bar-track" title="Utilisation ' + w + '% (busy/available at the line pace)">' +
+            '<span class="proc-bar-fill" style="width:' + w + '%"></span></span>' +
+          '<span class="proc-bar-pct">' + w + '%</span>' +
+          '<label class="proc-cycle" title="Cycle time (s) per part — editable, modelled">' +
+            '<input type="number" min="1" max="3600" step="1" value="' + s.cycleSec + '" ' +
+            'data-op="' + esc(s.opId) + '" class="proc-cycle-inp" ' +
+            'aria-label="Cycle time in seconds for ' + esc(s.name) + '" /> s ×' + s.servers + '</label>' +
+          '</div>';
+      }).join("");
+      detail.innerHTML =
+        '<div class="proc-bars" role="group" aria-label="Per-station utilisation and editable cycle times">' + bars + '</div>' +
+        '<p class="proc-little">WIP ≈ ' + procFmt(m.wip) + ' parts · lead time ≈ ' + procFmt(m.leadTimeSec) + ' s · part-flow ' + procFmt(m.partFlowPerHr) + '/hr. ' +
+          'Little’s Law (L = λW): modelled avg parts-in-line = flow rate × time in line (residual ' + procPct(m.little.residualRel) + ').</p>' +
+        '<p class="proc-basis">Utilisation = busy/available at the line’s own pace (the bottleneck runs at 100%). Every figure is modelled, not measured; deterministic; teaching-scale — NOT a validated DES, NOT CAD/BIM, NOT a certification.</p>';
+      const inputs = detail.querySelectorAll(".proc-cycle-inp");
+      for (let i = 0; i < inputs.length; i++) inputs[i].addEventListener("change", onProcCycleEdit);
+    }
+  }
+
+  // Edit a station cycle time (modelled). Mutates the bound operation, re-runs
+  // the deterministic metrics + sim, and persists. The bottleneck can move.
+  function onProcCycleEdit(ev) {
+    if (!state.process || !Array.isArray(state.process.operations)) return;
+    const opId = ev.target.getAttribute("data-op");
+    const v = Math.max(1, Math.min(3600, Math.round(Number(ev.target.value) || 0)));
+    const op = state.process.operations.find((o) => o.id === opId);
+    if (!op) return;
+    op.cycleSec = v;
+    op.source = "user-edited (modelled)";
+    scheduleSave();
+    renderProcessPanel();
+    status("Updated cycle time for " + op.name + " to " + v + " s (modelled). The bottleneck may have moved.");
   }
 
   // Reserved-zone overlay (dashed hatch + label) from the last generated
@@ -6862,6 +6966,9 @@
       flowStep: flowStep,
       flowReset: flowReset,
       drawFlowKpis: drawFlowKpis,
+      // v2.7 FACTORY-C: the factory line read-out (process model + line sim)
+      renderProcessPanel: renderProcessPanel,
+      processMetrics: () => (state.process && WT.process ? WT.process.metrics(state.process) : null),
       render: render,
       setViewMode: setViewMode,
       toggleViewMode: toggleViewMode,

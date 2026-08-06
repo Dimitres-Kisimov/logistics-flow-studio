@@ -646,6 +646,25 @@
         </div>
       </section>
 
+      <!-- v2.7 FACTORY-C: Factory line efficiency — the process data model +
+           the deterministic LINE simulation surfaced honestly. Headline first
+           (throughput + the named bottleneck); utilisation bars + WIP/lead and
+           editable cycle times on drill-in. Only meaningful for a FACTORY
+           layout (a `process` block); a warehouse shows a hint. Pure metrics
+           in process.js (WT.process); verify_process.js covers it headlessly. -->
+      <section class="card" id="procCard" data-default-collapsed>
+        <h2 class="card-title">Factory line efficiency</h2>
+        <div class="wms-disclaimer">
+          <strong>MODELLED, not measured; DETERMINISTIC; TEACHING-SCALE.</strong>
+          Line metrics use standard industrial-engineering formulas — Theory of Constraints (bottleneck = max cycle/servers), takt time, line efficiency and Little's Law (WIP = throughput × lead time). <strong>NOT</strong> a validated discrete-event simulation, <strong>NOT</strong> CAD/BIM and <strong>NOT</strong> a certification. Cycle times are synthetic REFA/MTM-style estimates unless imported — and are editable below.
+        </div>
+        <div id="procHeadline" class="proc-headline"><p class="empty">Generate a factory line (switch to <strong>Factory</strong> mode, then Generate) to see the bottleneck, throughput, utilisation and WIP for the production line.</p></div>
+        <details id="procDetails" class="proc-details">
+          <summary class="std-summary">Line detail — utilisation, WIP/lead time &amp; editable cycle times</summary>
+          <div id="procDetail" class="proc-detail"><!-- filled by app.js renderProcessPanel() --></div>
+        </details>
+      </section>
+
       <!-- P3: unit-load catalog (pallets, cartons, totes) -->
       <section class="card">
         <details id="catalogDetails">
@@ -926,6 +945,7 @@
   <script src="scenarios.js"></script>
   <script src="compare.js"></script>
   <script src="orderpool.js"></script>
+  <script src="process.js"></script>
   <script src="app.js"></script>
   <!-- In-browser E2E self-test. INERT unless the URL carries ?selftest=1;
        a normal load never runs it. Loaded LAST so the app has booted. -->

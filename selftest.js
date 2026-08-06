@@ -774,6 +774,55 @@
       return { ok: okAll, detail: detail };
     });
 
+    // ---- v2.7 FACTORY-C: GENERATE FACTORY -> LINE SIM -> METRICS RENDER --
+    // Drive the REAL Generate handler in Factory mode, then assert the process
+    // model + the deterministic line sim produce honest metrics AND the
+    // Factory-line read-out renders them (headline throughput + the named
+    // bottleneck, not the empty hint). Restores to a warehouse example after.
+    check("factory-line-process-model-sim-and-metrics-render", function () {
+      if (!haveApi || !API.plantMode || typeof API.runGenerate !== "function") {
+        return { ok: false, detail: "no plantMode/runGenerate API" };
+      }
+      if (!WT.process || typeof WT.process.metrics !== "function") {
+        return { ok: false, detail: "no WT.process" };
+      }
+      var original = API.plantMode.mode();
+      var okAll = false, detail = "";
+      try {
+        API.plantMode.set("factory");
+        API.runGenerate("assembly-line"); // the REAL Generate handler
+        var block = API.state.process;
+        var blockOk = !!block && block.version === "wt-proc-1" &&
+          block.operations.length >= 3 &&
+          block.operations.every(function (o) {
+            return API.state.elements.some(function (e) { return e.id === o.elementId; });
+          });
+        var m = WT.process.metrics(block);
+        var utilOk = m && m.stations.every(function (s) { return s.utilisation >= 0 && s.utilisation <= 1; });
+        var metricsOk = !!m && m.throughputPerHr > 0 && !!m.bottleneck && utilOk &&
+          m.lineEfficiency >= 0 && m.lineEfficiency <= 1 && m.little.residualRel < 0.1 &&
+          Math.abs(m.throughputPerHr - 3600 / m.bottleneck.effTimeSec) < 1e-3;
+        API.renderProcessPanel();
+        var head = document.getElementById("procHeadline");
+        var txt = head ? (head.textContent || "") : "";
+        var rendered = txt.indexOf("throughput") !== -1 && txt.indexOf(m.bottleneck.name) !== -1 &&
+          txt.indexOf("Generate a factory line") === -1;
+        okAll = blockOk && metricsOk && rendered;
+        detail = "block=" + blockOk + " metrics=" + metricsOk + " rendered=" + rendered +
+          " (tp=" + (m && m.throughputPerHr) + "/hr bottleneck=" + (m && m.bottleneck && m.bottleneck.name) +
+          " little=" + (m && m.little.residualRel) + ")";
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      } finally {
+        try {
+          API.plantMode.set(original);
+          var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+          if (ex) API.loadExample(ex.id);
+        } catch (_) { /* best-effort restore */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

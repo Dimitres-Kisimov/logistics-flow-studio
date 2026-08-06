@@ -365,6 +365,24 @@
  *      the runner listing it). The live pixels are verified in the browser;
  *      every geometry PATH is covered here.
  *
+ *  34. verify_process.js   - Factory PROCESS model + deterministic LINE
+ *      simulation (v2.7 FACTORY-C): a generated factory carries a VALID,
+ *      backward-compatible `process` block (wt-proc-1: operations bound to
+ *      placed mfg-* elements, a linear precedence chain, a from-to routing
+ *      flow, shift/demand for takt), DERIVED deterministically with NO stored
+ *      distances; a warehouse layout has NO process block and embedInto() is a
+ *      strict no-op (serialize stays byte-identical); the process round-trips
+ *      through the embedInto()/rebuild() serialize path (idempotent, drops
+ *      unknown keys). The deterministic token line sim + analytical metrics:
+ *      throughput = 3600 / bottleneck effective cycle (Theory of Constraints),
+ *      per-station utilisation in [0,1] (analytical AND sim-measured), line
+ *      efficiency in [0,1], WIP obeys Little's Law (L = lambda*W) within
+ *      tolerance, byte-identical metrics across runs; REAL assembly (combine
+ *      inputs -> 1) and dismantle (1 -> outputs) change the gozinto multiplier
+ *      and flow tokens in the sim; editing a cycle time moves the bottleneck;
+ *      and the modelled / deterministic / teaching-scale / TOC / Little's Law
+ *      / NOT-a-DES / NOT-CAD-BIM / NOT-a-certification honesty labels present.
+ *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
  * ===================================================================== */
@@ -410,6 +428,7 @@ const HARNESSES = [
   { name: "Living-plant animation: P toggle + flow-in-3D + animated equipment (verify_animation.js)", args: ["verify_animation.js"] },
   { name: "Story Mode: cinematic guided tour plan + camera math (verify_story.js)", args: ["verify_story.js"] },
   { name: "User-definable object library (verify_library.js)", args: ["verify_library.js"] },
+  { name: "Factory process model + deterministic line sim (verify_process.js)", args: ["verify_process.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 
