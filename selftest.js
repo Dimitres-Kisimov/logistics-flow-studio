@@ -1202,9 +1202,66 @@
       return { ok: okAll, detail: detail };
     });
 
+    // ---- v3.6 UI-3: the Ctrl/Cmd-K COMMAND PALETTE opens on the real global
+    // shortcut, filtering narrows the list, Enter runs a command, Esc closes;
+    // and the model is built from the real registries (every component has an
+    // Add command; core actions + a Generate command present). ----------------
+    check("cmdk-palette-open-filter-run-close", function () {
+      if (!haveApi || !API.commandPalette) return { ok: false, detail: "no command-palette API" };
+      var CP = API.commandPalette;
+      var overlay = $("cmdPalette"), input = $("cmdPaletteInput"), list = $("cmdPaletteList");
+      if (!overlay || !input || !list) return { ok: false, detail: "palette DOM missing" };
+      function key(target, opts) {
+        var ev;
+        try { ev = new KeyboardEvent("keydown", opts); }
+        catch (e) {
+          ev = document.createEvent("Event"); ev.initEvent("keydown", true, true);
+          try { ev.key = opts.key; ev.ctrlKey = !!opts.ctrlKey; } catch (_) { /* read-only */ }
+        }
+        target.dispatchEvent(ev);
+      }
+      var okAll = false, detail = "";
+      try {
+        CP.close();
+        // 1) Ctrl-K opens via the REAL global shortcut (dispatched on window).
+        key(window, { key: "k", ctrlKey: true, bubbles: true });
+        var opened = CP.isOpen() && overlay.hidden === false;
+        var full = list.querySelectorAll(".cmdk-opt").length;
+        // 2) typing narrows the list.
+        input.value = "analyze";
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        var narrowed = list.querySelectorAll(".cmdk-opt").length;
+        var filters = opened && full > 0 && narrowed > 0 && narrowed < full;
+        // 3) Esc closes.
+        key(input, { key: "Escape", bubbles: true });
+        var escClosed = !CP.isOpen() && overlay.hidden === true;
+        // 4) reopen, filter to a safe command, Enter runs it + closes.
+        key(window, { key: "k", ctrlKey: true, bubbles: true });
+        input.value = "fit view";
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        var hasHit = list.querySelectorAll(".cmdk-opt").length > 0;
+        key(input, { key: "Enter", bubbles: true });
+        var enterClosed = !CP.isOpen() && overlay.hidden === true;
+        // model: built from the real registries.
+        var cmds = CP.commands();
+        var addCount = cmds.filter(function (c) { return c.kind === "place"; }).length;
+        var genOk = cmds.some(function (c) { return c.kind === "generate"; });
+        var coreOk = cmds.some(function (c) { return c.id === "act:analyze"; }) &&
+                     cmds.some(function (c) { return c.id === "act:export-ifc"; });
+        okAll = opened && filters && escClosed && hasHit && enterClosed && addCount > 0 && genOk && coreOk;
+        detail = "opened=" + opened + " full=" + full + " narrowed=" + narrowed +
+          " escClosed=" + escClosed + " enterClosed=" + enterClosed +
+          " addCmds=" + addCount + " gen=" + genOk + " core=" + coreOk;
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      }
+      return { ok: okAll, detail: detail };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {
+        if (API.commandPalette) API.commandPalette.close(); // ensure the palette isn't left open
         API.story.stop(); // ensure no lingering tour timers/rAF
         API.flowPause();
         API.setViewMode("top");

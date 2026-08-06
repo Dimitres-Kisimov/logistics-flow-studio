@@ -103,6 +103,19 @@
            synthetic scenario → run WMS ops → play the flow → surface the
            live KPIs → offer the report). Interruptible; see app.js. -->
       <button id="guidedDemoBtn" class="btn accent" type="button" aria-label="Run guided demo tour" title="Run a one-click guided tour of the whole app end-to-end on a synthetic example scenario (interruptible)">▶ Guided demo</button>
+      <!-- v3.6 UI-3: the Ctrl/Cmd-K COMMAND PALETTE affordance. A calm,
+           minimal chrome hint - power users press Ctrl-K (or click here) to
+           reach ANY action or drop ANY Class Library component in one
+           keystroke, so the visible toolbar can stay small. Additive: every
+           control still works; see palette.js. -->
+      <button id="cmdPaletteBtn" class="btn ghost cmdk-btn" type="button"
+              aria-haspopup="dialog" aria-controls="cmdPalette"
+              aria-keyshortcuts="Control+K Meta+K"
+              title="Command palette — press Ctrl-K (⌘-K on Mac) to search and run any action or drop any component in one keystroke.">
+        <span class="cmdk-btn-icon" aria-hidden="true">⌕</span>
+        <span class="cmdk-btn-label">Search actions</span>
+        <kbd class="cmdk-btn-kbd" aria-hidden="true">Ctrl K</kbd>
+      </button>
       <!-- P8: concise, honest "About / why this" panel -->
       <button id="aboutBtn" class="btn ghost" type="button" title="What WarehouseTwin is, what it does, and how it stays honest (offline, synthetic-unless-imported, not a certification)">About</button>
       <!-- P5: the network-level companion app (lsp/) -->
@@ -953,6 +966,32 @@
     </div>
   </div>
 
+  <!-- v3.6 UI-3: the Ctrl/Cmd-K COMMAND PALETTE overlay. A modal, focus-
+       trapped, ARIA combobox/listbox search box over the command list. The
+       shell is static (accessible + precached); palette.js fills #cmdPaletteList
+       from the LIVE registries each time it opens and dispatches the chosen
+       command to the SAME handler the corresponding control uses. Hidden on a
+       normal load; opened on Ctrl-K / the toolbar affordance. -->
+  <div id="cmdPalette" class="cmdk" hidden>
+    <div id="cmdPaletteBackdrop" class="cmdk-backdrop"></div>
+    <div class="cmdk-dialog" role="dialog" aria-modal="true" aria-labelledby="cmdPaletteTitle" aria-describedby="cmdPaletteFoot">
+      <h2 id="cmdPaletteTitle" class="sr-only">Command palette — search and run any action or component</h2>
+      <div class="cmdk-search">
+        <span class="cmdk-search-icon" aria-hidden="true">⌕</span>
+        <input id="cmdPaletteInput" class="cmdk-input" type="text"
+               role="combobox" aria-expanded="true" aria-controls="cmdPaletteList"
+               aria-autocomplete="list" aria-activedescendant=""
+               aria-label="Search commands and components"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+               placeholder="Type a command or component — e.g. Generate, Analyze, Add conveyor…" />
+        <kbd class="cmdk-esc" aria-hidden="true">Esc</kbd>
+      </div>
+      <ul id="cmdPaletteList" class="cmdk-list" role="listbox" aria-label="Commands and components"></ul>
+      <p id="cmdPaletteEmpty" class="cmdk-empty" hidden>No commands match your search.</p>
+      <p id="cmdPaletteFoot" class="cmdk-foot" aria-hidden="true">↑↓ move · Enter run · Esc close — every action &amp; component, one keystroke</p>
+    </div>
+  </div>
+
   <!-- Custom tooltip + toast -->
   <div id="tooltip" class="tooltip" hidden></div>
   <div id="toast" class="toast" hidden></div>
@@ -1004,6 +1043,7 @@
   <script src="optimize_factory.js"></script>
   <script src="analytics.js"></script>
   <script src="howwecompare.js"></script>
+  <script src="palette.js"></script>
   <script src="app.js"></script>
   <!-- In-browser E2E self-test. INERT unless the URL carries ?selftest=1;
        a normal load never runs it. Loaded LAST so the app has booted. -->

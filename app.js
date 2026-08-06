@@ -7522,6 +7522,93 @@
     if (btn) btn.addEventListener("click", togglePlantMode);
   }
 
+  // ================================================================
+  // v3.6 UI-3: the Ctrl/Cmd-K COMMAND PALETTE (WT.palette).
+  // An ADDITIVE overlay - a faster path to every action + component, never a
+  // replacement. It builds its command list from the REAL registries
+  // (WT.library.paletteTree for the components, WT.generate for the profiles,
+  // WT.palette.CORE_ACTIONS for the toolbar actions) and DISPATCHES each
+  // command to the SAME handler the corresponding control uses, so behaviour
+  // is byte-identical to clicking the button. Nothing here re-implements an
+  // action; the palette just reaches the existing ones.
+  // ================================================================
+  let cmdPaletteCtl = null;
+
+  // Build the live command list from the current registries. No mode filter on
+  // the palette tree, so EVERY Class Library component (warehouse + factory +
+  // custom) is reachable from the palette regardless of the current Mode.
+  function buildPaletteCommands() {
+    if (!WT.palette) return [];
+    const tree = WT.library ? WT.library.paletteTree({}) : [];
+    return WT.palette.buildCommands({ tree: tree, elements: ELEMENTS, generate: WT.generate });
+  }
+
+  // Expand the collapsible card that contains a control, so the effect of a
+  // palette-invoked command is visible (a collapsed card's button still fires,
+  // but the user wouldn't see the result otherwise).
+  function revealControl(el) {
+    if (!el || !el.closest) return;
+    const card = el.closest("section.card");
+    if (card && card.classList.contains("card--collapsed")) {
+      const title = card.querySelector(":scope > .card-title");
+      if (title) title.click(); // toggles the collapsed card open (same handler)
+    }
+  }
+
+  // Open the Analysis panel via the SAME handler the Analyze button uses, then
+  // bring the requested sub-view (bottleneck / sankey / cost / energy) into
+  // view. renderAnalyzePanel renders all four together, so the sub-view
+  // commands share the one real handler and just scroll to the section.
+  function openAnalyzeAt(hostId) {
+    const btn = $("analyzeBtn");
+    if (btn) revealControl(btn);
+    renderAnalyzePanel(); // the real Analyze handler
+    const host = $(hostId);
+    if (host) { revealControl(host); try { host.scrollIntoView({ block: "center" }); } catch (_) { /* older engines */ } }
+  }
+
+  // The named-action dispatcher for palette commands with an `actionKey` (the
+  // Analyze sub-views). Every key here is listed in WT.palette.ACTION_KEYS so
+  // verify_palette can prove no command dangles.
+  function runPaletteActionKey(key) {
+    switch (key) {
+      case "analyze-bottleneck": openAnalyzeAt("analyzeBottleneck"); break;
+      case "analyze-sankey": openAnalyzeAt("analyzeSankey"); break;
+      case "analyze-cost": openAnalyzeAt("analyzeCost"); break;
+      case "analyze-energy": openAnalyzeAt("analyzeEnergy"); break;
+      default: break;
+    }
+  }
+
+  // Dispatch ONE chosen command to the real handler behind it.
+  function runPaletteCommand(cmd) {
+    if (!cmd) return;
+    if (cmd.kind === "place" && cmd.type) {
+      if (!ELEMENTS[cmd.type]) { toast("That component is unavailable.", "warn"); return; }
+      setTool(cmd.type); // arm placement — the SAME handler a palette item click uses
+      toast('Placing “' + ELEMENTS[cmd.type].label + '” — click the floor to drop it (Esc to stop).');
+      return;
+    }
+    if (cmd.kind === "generate" && cmd.profileKey) { runGenerate(cmd.profileKey); return; } // the SAME Generate handler
+    if (cmd.kind === "act" && cmd.actionKey) { runPaletteActionKey(cmd.actionKey); return; }
+    if (cmd.kind === "el" && cmd.elementId) {
+      const el = $(cmd.elementId);
+      if (!el) { toast("That control isn’t available.", "warn"); return; }
+      revealControl(el);
+      el.click(); // invoke the EXACT same click handler the button uses
+      return;
+    }
+  }
+
+  function mountCommandPalette() {
+    if (!WT.palette || typeof WT.palette.mount !== "function") return;
+    cmdPaletteCtl = WT.palette.mount({
+      getCommands: buildPaletteCommands,
+      run: runPaletteCommand,
+      reducedMotion: prefersReducedMotion,
+    });
+  }
+
   // In-browser self-test hook. ATTACHED ONLY under ?selftest=1 - a normal
   // load never exposes these internals. selftest.js drives the LIVE app
   // through the SAME functions the UI uses (no re-implementation), so the
@@ -7616,6 +7703,17 @@
         toggleGroup: (label) => togglePalGroup(label),
         collapsedState: () => Object.assign({}, palCollapsed),
       },
+      // v3.6 UI-3: the Ctrl/Cmd-K command palette. Drive open/close/run through
+      // the SAME controller + dispatcher the live UI uses, and read the live
+      // command list, for the in-browser self-test.
+      commandPalette: {
+        open: () => cmdPaletteCtl && cmdPaletteCtl.open(),
+        close: () => cmdPaletteCtl && cmdPaletteCtl.close(),
+        isOpen: () => !!(cmdPaletteCtl && cmdPaletteCtl.isOpen()),
+        commands: buildPaletteCommands,
+        run: runPaletteCommand,
+        controller: () => cmdPaletteCtl,
+      },
     };
   }
 
@@ -7635,6 +7733,7 @@
     buildAbout(); // P8: render the About / why-this copy from WT.demo.ABOUT
     initCollapsibleCards(); // v1.0: make the side-panel cards collapsible (default expanded)
     wireButtons();
+    mountCommandPalette(); // v3.6 UI-3: the Ctrl/Cmd-K command palette (additive overlay)
     wireDefineObject(); // user-definable object library (Define Object + import/export)
     wireDataPanel();
     wireWmsDataPanel();

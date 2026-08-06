@@ -1498,3 +1498,87 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .an-rate-unit { font-size: 0.68rem; color: var(--text-dim); white-space: nowrap; }
 .an-rate-table td.an-val { text-align: right; }
 .an-rate-actions { margin: 6px 0 2px; }
+
+/* =====================================================================
+ * v3.6 UI-3: the Ctrl/Cmd-K COMMAND PALETTE (palette.js).
+ * A calm toolbar affordance + a modal, focus-trapped, theme-aware search
+ * overlay. Additive chrome only. Reduced-motion safe (transitions dropped
+ * under prefers-reduced-motion).
+ * ===================================================================== */
+.cmdk-btn { display: inline-flex; align-items: center; gap: 6px; }
+.cmdk-btn-icon { font-size: 0.95rem; line-height: 1; opacity: 0.85; }
+.cmdk-btn-kbd {
+  font-family: var(--mono); font-size: 0.66rem; line-height: 1;
+  padding: 2px 5px; border: 1px solid var(--border); border-radius: 5px;
+  color: var(--text-dim); background: var(--surface-2); white-space: nowrap;
+}
+@media (max-width: 720px) { .cmdk-btn-label, .cmdk-btn-kbd { display: none; } }
+
+/* The overlay: a dim backdrop with the dialog near the top (command-bar feel). */
+.cmdk {
+  position: fixed; inset: 0; z-index: 1200;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: clamp(24px, 12vh, 140px) 16px 16px;
+}
+.cmdk[hidden] { display: none; }
+.cmdk-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+@media (prefers-color-scheme: dark) { .cmdk-backdrop { background: rgba(0, 0, 0, 0.55); } }
+
+.cmdk-dialog {
+  position: relative; width: min(640px, 100%);
+  max-height: min(70vh, 560px); display: flex; flex-direction: column;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28), var(--shadow);
+  overflow: hidden;
+  animation: cmdk-pop 0.12s ease-out;
+}
+@keyframes cmdk-pop { from { transform: translateY(-6px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.cmdk-search {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+}
+.cmdk-search-icon { font-size: 1.05rem; color: var(--text-dim); }
+.cmdk-input {
+  flex: 1; border: 0; outline: 0; background: transparent;
+  font: inherit; font-size: 1rem; color: var(--text); padding: 4px 0;
+}
+.cmdk-input::placeholder { color: var(--text-dim); }
+.cmdk-esc {
+  font-family: var(--mono); font-size: 0.66rem; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px;
+  background: var(--surface-2);
+}
+
+.cmdk-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
+.cmdk-opt {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  color: var(--text);
+}
+.cmdk-opt.active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+@supports not (background: color-mix(in srgb, red, blue)) {
+  .cmdk-opt.active { background: var(--surface-2); }
+}
+.cmdk-opt-label { flex: 1; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmdk-opt-group { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; }
+.cmdk-opt-hint {
+  font-family: var(--mono); font-size: 0.66rem; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px;
+  background: var(--surface-2);
+}
+.cmdk-empty { margin: 0; padding: 18px 14px; color: var(--text-dim); font-size: 0.9rem; }
+.cmdk-foot {
+  margin: 0; padding: 8px 14px; border-top: 1px solid var(--border);
+  color: var(--text-dim); font-size: 0.72rem; background: var(--surface-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmdk-dialog { animation: none; }
+  .cmdk-backdrop { backdrop-filter: none; }
+}

@@ -440,6 +440,23 @@
  *      WT.analytics models over the SAME sim run (can't drift), with the
  *      factory line-sim + accepted-optimiser before/after included.
  *
+ *  38. verify_palette.js  - Ctrl/Cmd-K COMMAND PALETTE (v3.6 UI-3): the PURE,
+ *      DOM-free command MODEL + filter behind the modal overlay. Asserts the
+ *      list is NON-EMPTY and built from the REAL registries (every Class
+ *      Library component + every domain paletteOrder built-in has an "Add"
+ *      command; a "Generate <profile>" per WT.generate profile), the core
+ *      toolbar actions are all present (Optimise/Analyze + the four sub-views/
+ *      Story/2D-3D/Measure/Play-Pause/Define object/Mode/Density/Export IFC/
+ *      WMS report/Save-Load/Fit), NO command dangles (each `el` id EXISTS in
+ *      index.html, each `act` key is declared + dispatched in app.js, each
+ *      `place` type resolves in ELEMENTS, each `generate` profile exists),
+ *      buildCommands is byte-deterministic, filter() narrows on substring +
+ *      fuzzy subsequence (empty->whole list, impossible->[], stable ranking),
+ *      the shipped wiring (palette.js before app.js, the accessible overlay +
+ *      affordance, app.js mounts + dispatches to setTool/runGenerate/click/the
+ *      actionKey switch, sw precache at wt-v59), and offline + NO Date/RNG +
+ *      no eval. The live open/filter/run/close runs in the browser self-test.
+ *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
  * ===================================================================== */
@@ -489,6 +506,7 @@ const HARNESSES = [
   { name: "Factory efficiency optimizer: CRAFT placement + RPW balance + TOC (verify_optimize.js)", args: ["verify_optimize.js"] },
   { name: "Analytics: Bottleneck + Sankey + Cost + Energy analyzers (verify_analytics.js)", args: ["verify_analytics.js"] },
   { name: "Honest 'How we compare' page (verify_howwecompare.js)", args: ["verify_howwecompare.js"] },
+  { name: "Ctrl/Cmd-K command palette: model + wiring (verify_palette.js)", args: ["verify_palette.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 
