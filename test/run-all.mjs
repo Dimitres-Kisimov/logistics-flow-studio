@@ -507,6 +507,7 @@ const HARNESSES = [
   { name: "Analytics: Bottleneck + Sankey + Cost + Energy analyzers (verify_analytics.js)", args: ["verify_analytics.js"] },
   { name: "Honest 'How we compare' page (verify_howwecompare.js)", args: ["verify_howwecompare.js"] },
   { name: "Ctrl/Cmd-K command palette: model + wiring (verify_palette.js)", args: ["verify_palette.js"] },
+  { name: "Material-flow connection overlay / Flow links (verify_flowlinks.js)", args: ["verify_flowlinks.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

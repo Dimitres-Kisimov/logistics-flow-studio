@@ -101,6 +101,13 @@
     // untouched. Default ON so a big plant reads like a real facility; the
     // fine detail is LOD-gated so it stays subtle + smooth. Toggle: measureBtn.
     showMeasure: true,
+    // v3.12: the material-flow CONNECTION overlay ("Flow links"). When ON,
+    // the directed connections the material flow actually follows (the app's
+    // OWN routing model - WT.flowsim.buildWaypoints, via WT.flowlinks) are
+    // drawn as subtle directed arrows + stage nodes, so the connected network
+    // reads like a plant-sim model's wired connectors. Render-only + additive;
+    // default OFF (on-demand, calm). Persisted + toggled via flowLinksBtn.
+    showFlowLinks: false,
     // P4 storage & inventory (storage.js): the current physical slotting
     // assignment (SKUs -> storage locations). `storageAssignmentSig` is the
     // layout signature it was built for, so a stale assignment is never fed
@@ -642,6 +649,12 @@
     // (world-anchored, so still inside the zoom/pan transform).
     drawCalibMarkers();
 
+    // v3.12: the material-flow CONNECTION overlay ("Flow links"), drawn in
+    // WORLD space UNDER the animated boxes so the connected network reads
+    // behind the live flow. Independent of Play (shows the routed network
+    // whether or not the sim is running); toggled by flowLinksBtn.
+    if (state.showFlowLinks) drawFlowLinks();
+
     // P3: live material-flow MUs (animated boxes). Drawn in WORLD space,
     // inside the same transform as every other overlay, so zoom / pan /
     // Fit all apply and the boxes stay glued to the floor.
@@ -910,6 +923,10 @@
       wallHeightM: 3,
       wallColor: COLORS.gridStrong,
     });
+    // v3.12: the material-flow CONNECTION overlay, HINTED into 2.5D too -
+    // projPx projects the links/nodes into the iso scene (illustrative, not
+    // true per-pixel occlusion). Drawn under the animated boxes.
+    if (state.showFlowLinks) drawFlowLinks();
     // Live material-flow overlay, projected into the iso scene. Drawn
     // AFTER the blocks so the animation stays visible (an honest,
     // illustrative overlay - not true per-pixel occlusion).
@@ -1073,6 +1090,52 @@
     if (!b) return;
     b.classList.toggle("active", state.showMeasure);
     b.setAttribute("aria-pressed", String(state.showMeasure));
+  }
+
+  // v3.12: the "Flow links" material-flow CONNECTION overlay toggle. Mirrors
+  // the Measure/Heatmap overlay pattern (a labelled, aria-pressed toolbar
+  // button) and PERSISTS the choice to localStorage on this device. Default
+  // OFF (on-demand, calm). The overlay itself is drawn by drawFlowLinks() and
+  // reflects the app's OWN routing (WT.flowlinks.buildLinks) - no phantom
+  // links: stages the layout does not contain get no node/link.
+  const FLOWLINKS_KEY = "wt.ui.flowlinks.v1";
+  function readFlowLinks() {
+    try { return localStorage.getItem(FLOWLINKS_KEY) === "1"; } catch (_) { return false; }
+  }
+  function syncFlowLinksBtn() {
+    const b = $("flowLinksBtn");
+    if (!b) return;
+    b.classList.toggle("active", state.showFlowLinks);
+    b.setAttribute("aria-pressed", String(state.showFlowLinks));
+  }
+  function applyFlowLinks(on) {
+    state.showFlowLinks = !!on;
+    syncFlowLinksBtn();
+  }
+  function setFlowLinks(on) {
+    applyFlowLinks(on);
+    try { localStorage.setItem(FLOWLINKS_KEY, state.showFlowLinks ? "1" : "0"); } catch (_) { /* storage may be unavailable */ }
+  }
+  function toggleFlowLinks() {
+    setFlowLinks(!state.showFlowLinks);
+    render();
+    if (state.showFlowLinks) {
+      let detail = "";
+      try {
+        const m = WT.flowlinks && WT.flowlinks.buildLinks(currentLayout());
+        detail = m && !m.empty
+          ? " — " + m.nodes.length + " stages, " + m.links.length + " directed links" + (m.routed ? " (conveyor-routed)" : "")
+          : " — no connected flow on this layout yet (add docks/storage/stations, or load an example).";
+      } catch (_) { detail = ""; }
+      status("Flow links on" + detail + ". Illustrative schematic of the app's OWN routing (the path the boxes follow) — not a CAD/BIM drawing or a validated process graph.");
+    } else {
+      status("Flow links off.");
+    }
+  }
+  function initFlowLinks() {
+    applyFlowLinks(readFlowLinks()); // default OFF on a fresh profile
+    const b = $("flowLinksBtn");
+    if (b) b.addEventListener("click", toggleFlowLinks);
   }
 
   /* ==================================================================
@@ -1294,6 +1357,31 @@
    * ================================================================== */
   const FLOW_BASE_DT = 1; // sim ticks advanced per animation frame at speed 1
   const FLOW_STEP_TICKS = 8; // ticks advanced by a single "Step" press
+
+  // v3.12: draw the material-flow CONNECTION overlay ("Flow links"). The
+  // directed links come from WT.flowlinks.buildLinks(), which reads the app's
+  // OWN routing spine (WT.flowsim.buildWaypoints) - NO new graph. Drawn in
+  // WORLD space (via projPx, so it works in BOTH top-down and 2.5D iso and
+  // stays glued to the floor under zoom/pan/Fit) and UNDER the animated MUs.
+  // Theme-aware + LOD-aware + deterministic; honest illustrative schematic.
+  function drawFlowLinks() {
+    if (!WT.flowlinks) return;
+    const model = WT.flowlinks.buildLinks(currentLayout());
+    if (!model || model.empty) return;
+    const stages = COLORS.flowStages || {};
+    WT.flowlinks.draw(ctx, model, {
+      project: (wx, wy) => projPx(wx, wy, 0.02),
+      cellPx: cellPx,
+      onCell: cellPx * view.scale, // px per world cell on screen (LOD signal)
+      colors: {
+        stages: stages,
+        link: COLORS.dim,
+        nodeBg: COLORS.bg,
+        nodeText: COLORS.text,
+      },
+      reducedMotion: typeof prefersReducedMotion === "function" ? prefersReducedMotion() : false,
+    });
+  }
 
   // Congestion threshold (queue length at/above which a station is "hot").
   function flowCongestThreshold() {
@@ -7607,6 +7695,7 @@
     $("runBtn").addEventListener("click", () => runSimulation("run"));
     $("heatBtn").addEventListener("click", toggleHeat);
     if ($("measureBtn")) { $("measureBtn").addEventListener("click", toggleMeasure); syncMeasureBtn(); }
+    initFlowLinks(); // v3.12: seed the Flow-links overlay toggle (persisted, default OFF)
     $("histClearBtn").addEventListener("click", clearHistory);
     $("adviseBtn").addEventListener("click", runAdvisor);
     $("complBtn").addEventListener("click", runCompliance);
@@ -8011,6 +8100,16 @@
       flowStep: flowStep,
       flowReset: flowReset,
       drawFlowKpis: drawFlowKpis,
+      // v3.12: drive + read the material-flow CONNECTION overlay ("Flow
+      // links") through the SAME toggle + model the toolbar button uses, for
+      // the live self-test. `model()` is the pure link set for the current
+      // layout (WT.flowlinks.buildLinks) - what drawFlowLinks() renders.
+      flowLinks: {
+        on: () => !!state.showFlowLinks,
+        set: (v) => setFlowLinks(v),
+        toggle: () => toggleFlowLinks(),
+        model: () => (WT.flowlinks ? WT.flowlinks.buildLinks(currentLayout()) : null),
+      },
       // v3.11: drive Run through the SAME handler the ▶ Run button uses, and
       // read the empty/insufficient pre-flight the guard checks, for the live
       // self-test (empty floor -> guidance; populated floor -> unchanged run).

@@ -515,6 +515,7 @@
         <div class="tb-group" role="group" aria-label="Floor overlays">
           <button id="heatBtn" class="btn small" type="button" aria-pressed="false" data-density="expert" title="Shade the floor by metres walked in the last run's pick tours. Goods-to-person picks (AS/RS, shuttle) add no walking, so they leave no trace.">Heatmap</button>
           <button id="measureBtn" class="btn small" type="button" aria-pressed="true" title="Measurements: a metre scale ruler along the top and left floor edges, the selected element's dimensions (w x d m), and faint floor markings (facility perimeter, aisle centre guides, dock-approach hatching, functional zone tints). Illustrative — the measurements are the model's own metre grid (1 cell = 1 m), not a site survey.">Measure</button>
+          <button id="flowLinksBtn" class="btn small" type="button" aria-pressed="false" title="Flow links: overlay the DIRECTED connections the material flow actually follows — source/receiving → storage → pick → pack → ship/drain (in factory mode Source → stations → Drain) — as subtle arrows + stage nodes, so the connected network reads like a plant-sim model's wired connectors. Illustrative schematic of the app's OWN routing (the path the animated boxes follow), NOT a CAD/BIM drawing or a validated process graph; stages your layout does not contain get no link. Your choice is remembered on this device.">Flow links</button>
         </div>
       </div>
       <div class="canvas-toolbar view-toolbar">
@@ -1165,6 +1166,7 @@
   <script src="wms.js"></script>
   <script src="automation.js"></script>
   <script src="flowsim.js"></script>
+  <script src="flowlinks.js"></script>
   <script src="kpicharts.js"></script>
   <script src="wmsdata.js"></script>
   <script src="iso.js"></script>

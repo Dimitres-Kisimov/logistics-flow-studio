@@ -243,6 +243,37 @@
       return { ok: !!sim1 && sim1.tick > tick0, detail: "tick " + tick0 + " -> " + (sim1 ? sim1.tick : "?") };
     });
 
+    // ---- v3.12: toggle Flow links -> the CONNECTION overlay renders on a
+    // routed scenario. Drives the SAME toggle + model the toolbar button uses,
+    // asserts the directed link set is non-empty on a real layout, then draws
+    // it through the LIVE render() without throwing, and restores the toggle.
+    check("flow-links-overlay-renders", function () {
+      if (!haveApi || !API.flowLinks || !WT.flowlinks) return { ok: false, detail: "no flowLinks test API / module" };
+      // Ensure a routed scenario is on the floor (first example = a real plant).
+      var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+      if (ex) API.loadExample(ex.id);
+      var was = API.flowLinks.on();
+      API.flowLinks.set(true);
+      var onNow = API.flowLinks.on();
+      var btn = $("flowLinksBtn");
+      var pressed = btn && btn.getAttribute("aria-pressed") === "true";
+      var model = API.flowLinks.model();
+      var hasNetwork = !!model && !model.empty && model.nodes.length >= 2 && model.links.length >= 1;
+      // Every link is directed downstream along the flow spine (no skips).
+      var order = WT.flowlinks.STAGE_ORDER;
+      var directed = hasNetwork && model.links.every(function (l) {
+        return order.indexOf(l.fromStage) < order.indexOf(l.toStage);
+      });
+      var threw = "";
+      try { API.render(); } catch (e) { threw = e && e.message ? e.message : String(e); }
+      API.flowLinks.set(!!was); // restore
+      return {
+        ok: onNow && pressed && hasNetwork && directed && !threw,
+        detail: threw ? ("render threw: " + threw)
+          : (model ? (model.nodes.length + " stages, " + model.links.length + " links, routed=" + model.routed + ", pressed=" + pressed) : "no model"),
+      };
+    });
+
     // ---- v2.1: curved conveyor + worker figures wired into the live app -
     // The curved segment is registered + 0-capacity, its pure arc sampler
     // rides a quarter-arc, buildWaypoints routes a box ALONG the arc, and a
