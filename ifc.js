@@ -31,6 +31,20 @@
  *     (A/B/C) DERIVED from the same ABC idea the simulator teaches:
  *     storage ranked by distance to the I/O point, nearest ~20% of
  *     capacity = A, next ~30% = B, rest = C. Derived, not measured.
+ *   - FACTORY coverage: the whole ELEMENTS palette exports (warehouse
+ *     racking/docks/vehicles AND the manufacturing + flow-geometry
+ *     components - Source/Drain/Station/Parallel/Assembly/Dismantle and
+ *     Converter/AngularConverter/Turntable/Turnplate/FlowControl/Cycle/
+ *     Track/TwoLaneTrack) through the SAME generic proxy-solid loop, so a
+ *     generated factory line exports as placed solids just like a
+ *     warehouse. Factory/flow-geometry components ADDITIONALLY carry their
+ *     MaterialFlow behaviour class, metre footprint and the synthetic
+ *     process/flow attributes (cycle time, servers, emit rate, assembly
+ *     inputs, routing outputs, throughput, guide lanes) plus an explicit
+ *     ModelKind honesty flag in the pset. This block keys on the `base`
+ *     field only the new components declare, so a warehouse-only export is
+ *     BYTE-IDENTICAL to before. Everything here is SCHEMATIC geometry from
+ *     the synthetic model - NOT a validated or certified BIM deliverable.
  *
  * Axis convention: IFC plan views put +Y "up" while the canvas grid's
  * y grows downward, so the writer flips y (ifcY = floorDepth - y - d).
@@ -314,6 +328,44 @@
           (vClasses[el.id] || "C") + "'),$)"
         ));
         props.push(ref("IFCPROPERTYSINGLEVALUE('PalletPositions',$,IFCCOUNTMEASURE(" + fmt(D.elementCapacity(el)) + "),$)"));
+      }
+      // ---- FACTORY / flow-geometry metadata (ADDITIVE). The manufacturing
+      //      (Source/Drain/Station/Parallel/Assembly/Dismantle) and flow-
+      //      geometry (Converter/AngularConverter/Turntable/Turnplate/
+      //      FlowControl/Cycle/Track/TwoLaneTrack) components are the only
+      //      ELEMENTS that DECLARE a `base` MaterialFlow behaviour class;
+      //      every WAREHOUSE built-in declares none, so this whole block is
+      //      a strict NO-OP for a warehouse-only layout and that export stays
+      //      BYTE-IDENTICAL. For a factory it records the behaviour class, the
+      //      element's metre footprint, whichever synthetic process/flow
+      //      attributes the schema carries, and an explicit honesty flag so a
+      //      reader can never mistake the proxy for a certified BIM object.
+      if (def.base) {
+        props.push(ref(
+          "IFCPROPERTYSINGLEVALUE('MechClass','MaterialFlow behaviour class the synthetic component rides (dock/station/conveyor/transporter) - a teaching abstraction, not a product class',IFCLABEL('" +
+          stepString(def.base) + "'),$)"
+        ));
+        props.push(ref("IFCPROPERTYSINGLEVALUE('WidthM','Footprint width (integer-metre grid); illustrative teaching-scale, not a survey',IFCLENGTHMEASURE(" + fmt(wM) + "),$)"));
+        props.push(ref("IFCPROPERTYSINGLEVALUE('DepthM','Footprint depth (integer-metre grid); illustrative teaching-scale, not a survey',IFCLENGTHMEASURE(" + fmt(dM) + "),$)"));
+        // Synthetic process/flow attributes, emitted only when the schema
+        // carries them. fmt() (a STEP real) matches the existing writer style.
+        const FACTORY_ATTRS = [
+          ["emitRatePerHr", "EmitRatePerHr", "IFCREAL"],   // Source part-emission rate
+          ["cycleSec", "CycleSec", "IFCREAL"],             // per-part process time
+          ["servers", "Servers", "IFCCOUNTMEASURE"],       // machines in parallel
+          ["inputs", "AssemblyInputs", "IFCCOUNTMEASURE"], // Assembly BOM combine
+          ["outputs", "RoutingOutputs", "IFCCOUNTMEASURE"],// Dismantle / FlowControl fan-out
+          ["unitsPerHr", "UnitsPerHr", "IFCREAL"],         // conveying / transfer throughput
+          ["lanes", "GuideLanes", "IFCCOUNTMEASURE"],      // Track / TwoLaneTrack guide lanes
+        ];
+        for (const a of FACTORY_ATTRS) {
+          if (typeof def[a[0]] === "number" && isFinite(def[a[0]])) {
+            props.push(ref("IFCPROPERTYSINGLEVALUE('" + a[1] + "',$," + a[2] + "(" + fmt(def[a[0]]) + "),$)"));
+          }
+        }
+        props.push(ref(
+          "IFCPROPERTYSINGLEVALUE('ModelKind','Schematic factory geometry derived from a synthetic model - NOT a validated or certified BIM deliverable; dimensions and heights are illustrative teaching-scale, not a survey',IFCLABEL('schematic-synthetic'),$)"
+        ));
       }
       const pset = ref(
         "IFCPROPERTYSET('" + guid("wt-pset|" + el.id) + "'," + oh + ",'WT_ElementType',$,(" + props.join(",") + "))"

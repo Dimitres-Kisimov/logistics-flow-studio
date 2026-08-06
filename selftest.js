@@ -828,6 +828,60 @@
       return { ok: okAll, detail: detail };
     });
 
+    // ---- v3.5 IFC/BIM: EXPORT A GENERATED FACTORY -> WELL-FORMED IFC ----
+    // Drive the REAL Generate handler in Factory mode, then export the layout
+    // through WT.ifc (the SAME writer the IFC button uses) and assert the file
+    // is well-formed (STEP framing + IfcProject + IFC4), covers the factory
+    // components (one proxy per element + the MechClass behaviour class + the
+    // ModelKind honesty flag + the process attributes) and is deterministic.
+    // Schematic geometry from a synthetic model - NOT a certified BIM.
+    // Restores the app to a warehouse example after.
+    check("ifc-export-covers-factory-components-and-well-formed", function () {
+      if (!haveApi || !API.plantMode || typeof API.runGenerate !== "function") {
+        return { ok: false, detail: "no plantMode/runGenerate API" };
+      }
+      if (!WT.ifc || typeof WT.ifc.generate !== "function") {
+        return { ok: false, detail: "no WT.ifc" };
+      }
+      var original = API.plantMode.mode();
+      var okAll = false, detail = "";
+      try {
+        API.plantMode.set("factory");
+        API.runGenerate("assembly-line"); // the REAL Generate handler
+        var lay = API.currentLayout();
+        var els = lay.elements || [];
+        var step = WT.ifc.generate(lay);
+        var framed = step.indexOf("ISO-10303-21;") === 0 &&
+          step.indexOf("END-ISO-10303-21;") !== -1 &&
+          step.indexOf("FILE_SCHEMA(('IFC4'));") !== -1 &&
+          step.indexOf("IFCPROJECT(") !== -1;
+        var proxies = (step.match(/IFCBUILDINGELEMENTPROXY/g) || []).length;
+        var proxyPerEl = proxies === els.length && els.length > 0;
+        var baseEls = els.filter(function (e) {
+          var d = WT.domain.ELEMENTS[e.type]; return d && d.base;
+        }).length;
+        var mech = (step.match(/'MechClass'/g) || []).length;
+        var honesty = (step.match(/schematic-synthetic/g) || []).length;
+        var factoryMeta = baseEls > 0 && mech === baseEls && honesty === baseEls &&
+          step.indexOf("'EmitRatePerHr'") !== -1 && step.indexOf("'CycleSec'") !== -1;
+        var clean = step.indexOf("undefined") === -1 && step.indexOf("NaN") === -1;
+        var deterministic = WT.ifc.generate(lay) === step;
+        okAll = framed && proxyPerEl && factoryMeta && clean && deterministic;
+        detail = "framed=" + framed + " proxies=" + proxies + "/" + els.length +
+          " factoryComponents=" + baseEls + " (mech=" + mech + " honesty=" + honesty + ")" +
+          " clean=" + clean + " deterministic=" + deterministic;
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      } finally {
+        try {
+          API.plantMode.set(original);
+          var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+          if (ex) API.loadExample(ex.id);
+        } catch (_) { /* best-effort restore */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
     // ---- v2.7 FACTORY-C: GENERATE FACTORY -> LINE SIM -> METRICS RENDER --
     // Drive the REAL Generate handler in Factory mode, then assert the process
     // model + the deterministic line sim produce honest metrics AND the

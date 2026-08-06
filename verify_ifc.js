@@ -1,9 +1,10 @@
 /* =====================================================================
  * verify_ifc.js - IFC export bridge verification harness (W4).
  *
- * Runs the REAL app modules (domain.js, ifc.js) in Node with the same
- * window shim the other harnesses use, generates IFC for the starter
- * layout and the MRO preset, and validates the files STRUCTURALLY:
+ * Runs the REAL app modules (domain.js, generate.js, ifc.js) in Node with
+ * the same window shim the other harnesses use, generates IFC for the
+ * starter layout, the MRO preset, EVERY generated FACTORY profile and a
+ * one-of-every-element-type layout, and validates the files STRUCTURALLY:
  *
  *   1. STEP framing: ISO-10303-21 / HEADER / ENDSEC / DATA / ENDSEC /
  *      END-ISO-10303-21 present and in order.
@@ -20,7 +21,16 @@
  *   7. String escaping: quotes, backslashes and non-ASCII survive per
  *      ISO 10303-21 rules (checked on the writer AND in a file).
  *   8. Determinism: same layout -> byte-identical file.
- *   9. File sizes printed for the starter + MRO exports.
+ *   9. File sizes printed for the starter + MRO + factory + all-types exports.
+ *  8f. FACTORY coverage (v3.5): every manufacturing + flow-geometry
+ *      component (Source/Drain/Station/Parallel/Assembly/Dismantle,
+ *      Converter/AngularConverter/Turntable/Turnplate/FlowControl/Cycle/
+ *      Track/TwoLaneTrack) exports through the SAME writer - all 3 generated
+ *      factory profiles + a one-of-every-type layout validate structurally,
+ *      are deterministic, carry a MechClass + ModelKind honesty flag on
+ *      every factory component + the synthetic process attributes, and the
+ *      warehouse starter/MRO exports stay BYTE-STABLE (the factory metadata
+ *      keys on the `base` field only the new components declare).
  *  10. GOLD STANDARD (optional): if Python + ifcopenshell are present,
  *      tools/validate_ifc.py opens both files with ifcopenshell and
  *      asserts schema + entity counts. Skips with a printed note when
@@ -36,7 +46,7 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 global.window = global; // the app modules attach themselves to window.WT
-for (const f of ["domain.js", "ifc.js"]) {
+for (const f of ["domain.js", "generate.js", "ifc.js"]) {
   // eslint-disable-next-line no-eval
   (0, eval)(fs.readFileSync(path.join(__dirname, f), "utf8"));
 }
@@ -95,6 +105,29 @@ function balancedParens(s) {
     else if (ch === ")") { depth--; if (depth < 0) return false; }
   }
   return depth === 0;
+}
+
+// Expected IFCPROPERTYSINGLEVALUE count for a layout, mirroring ifc.js:
+//   - 5 base props on every element,
+//   - +2 for storage (VelocityClass + PalletPositions),
+//   - +4 for a factory/flow-geometry component (declares `base`:
+//     MechClass + WidthM + DepthM + ModelKind) plus one per synthetic
+//     process/flow attribute the schema carries.
+// For a WAREHOUSE layout (no `base` on any element) this reduces to the
+// pre-factory 5N + 2S, so the STARTER/MRO counts are byte-stable.
+const FACTORY_ATTR_KEYS = ["emitRatePerHr", "cycleSec", "servers", "inputs", "outputs", "unitsPerHr", "lanes"];
+function expectedSingleValues(elements) {
+  let n = 0;
+  for (const e of elements) {
+    const def = D.ELEMENTS[e.type];
+    n += 5;
+    if (def.category === "storage") n += 2;
+    if (def.base) {
+      n += 4;
+      for (const k of FACTORY_ATTR_KEYS) if (typeof def[k] === "number" && isFinite(def[k])) n += 1;
+    }
+  }
+  return n;
 }
 
 function validateStep(name, step, elements) {
@@ -161,7 +194,7 @@ function validateStep(name, step, elements) {
     IFCPRODUCTDEFINITIONSHAPE: N, IFCPROPERTYSET: N,
     IFCRELDEFINESBYPROPERTIES: N,
     IFCLOCALPLACEMENT: N + 3, // one per element + site/building/storey
-    IFCPROPERTYSINGLEVALUE: 5 * N + 2 * S, // 5 base props + VelocityClass/PalletPositions on storage
+    IFCPROPERTYSINGLEVALUE: expectedSingleValues(elements), // 5 base + storage(2) + factory metadata
   };
   let countsOk = true;
   for (const t of Object.keys(expected)) {
@@ -227,10 +260,71 @@ check("velocity classes: every storage element classified A/B/C",
   vcVals.every((c) => c === "A" || c === "B" || c === "C"),
   "A:" + vcVals.filter((c) => c === "A").length + " B:" + vcVals.filter((c) => c === "B").length + " C:" + vcVals.filter((c) => c === "C").length);
 
+// ---- FACTORY coverage (v3.5): every manufacturing + flow-geometry -------
+// component exports as valid, well-formed, deterministic IFC through the
+// SAME writer. A GENERATED factory line (all 3 profiles) and a one-of-EVERY-
+// element-type layout are validated with the same structural rules, then the
+// factory-specific metadata (behaviour class + honesty flag + process attrs)
+// is asserted present. This is the "IFC export covers factories" gate.
+console.log("");
+console.log("Factory / all-element-type coverage:");
+
+const FACTORY_KEYS = ["assembly-line", "machining-shop", "general-factory"];
+let factoryStep = null, factoryElements = null;
+for (const key of FACTORY_KEYS) {
+  const gen = WT.generate.generateFactoryLayout(key, { seed: 7 });
+  const lay = { version: "wt-1", gridW: gen.gridW, gridH: gen.gridH, cell: D.METRES_PER_CELL, elements: gen.elements };
+  const step = WT.ifc.generate(lay);
+  validateStep("factory:" + key, step, gen.elements);
+  check("factory:" + key + ": deterministic (byte-identical re-run)", WT.ifc.generate(lay) === step);
+  check("factory:" + key + ": no undefined / NaN in output",
+    step.indexOf("undefined") === -1 && step.indexOf("NaN") === -1);
+  // MechClass + ModelKind honesty flag on EVERY base-bearing component.
+  const baseEls = gen.elements.filter((e) => D.ELEMENTS[e.type].base);
+  const mechCount = (step.match(/'MechClass'/g) || []).length;
+  const modelKindCount = (step.match(/schematic-synthetic/g) || []).length;
+  check("factory:" + key + ": MechClass + ModelKind on every factory component",
+    mechCount === baseEls.length && modelKindCount === baseEls.length,
+    baseEls.length + " components (MechClass:" + mechCount + " ModelKind:" + modelKindCount + ")");
+  // Every generated component appears as a proxy carrying its type label.
+  const labels = [...new Set(gen.elements.map((e) => D.ELEMENTS[e.type].label))];
+  const allLabelled = labels.every((lbl) => step.indexOf("'" + WT.ifc.stepString(lbl) + "'") !== -1);
+  check("factory:" + key + ": every component label present as a proxy ObjectType",
+    allLabelled, labels.length + " distinct component types");
+  if (key === "assembly-line") { factoryStep = step; factoryElements = gen.elements; }
+}
+
+// The synthetic process attributes are actually emitted (Source emit rate,
+// Station cycle time) - the factory export carries process semantics, not
+// just boxes.
+check("factory: Source EmitRatePerHr + Station CycleSec present in the pset",
+  factoryStep.indexOf("'EmitRatePerHr'") !== -1 && factoryStep.indexOf("'CycleSec'") !== -1);
+
+// One-of-EVERY-element-type layout: the WHOLE ELEMENTS palette (warehouse +
+// factory + flow-geometry) exports as proxies with no throw, NaN or undefined.
+let allIdc = 0;
+const ALL_TYPES = Object.keys(D.ELEMENTS).map((type) => {
+  const def = D.ELEMENTS[type];
+  return { id: "el-" + ++allIdc, type, x: (allIdc * 3) % 48, y: Math.floor((allIdc * 3) / 48) * 8, w: def.w || 2, d: def.d || 2 };
+});
+const allLayout = { version: "wt-1", gridW: 64, gridH: 64, cell: D.METRES_PER_CELL, elements: ALL_TYPES };
+const allStep = WT.ifc.generate(allLayout);
+validateStep("all-element-types", allStep, ALL_TYPES);
+check("all-element-types: one proxy per ELEMENTS type (" + ALL_TYPES.length + " types)",
+  (allStep.match(/IFCBUILDINGELEMENTPROXY/g) || []).length === ALL_TYPES.length);
+check("all-element-types: deterministic (byte-identical re-run)", WT.ifc.generate(allLayout) === allStep);
+check("all-element-types: no undefined / NaN in output",
+  allStep.indexOf("undefined") === -1 && allStep.indexOf("NaN") === -1);
+check("all-element-types: all 14 factory/flow-geometry components covered",
+  Object.keys(D.ELEMENTS).filter((t) => D.ELEMENTS[t].base)
+    .every((t) => allStep.indexOf("'" + WT.ifc.stepString(D.ELEMENTS[t].label) + "'") !== -1));
+
 // ---- file sizes -----------------------------------------------------
 console.log("");
 console.log("       starter export: " + Buffer.byteLength(starterStep, "utf8") + " bytes (" + STARTER.length + " elements)");
 console.log("       MRO export:     " + Buffer.byteLength(mroStep, "utf8") + " bytes (" + MRO.length + " elements)");
+console.log("       factory export: " + Buffer.byteLength(factoryStep, "utf8") + " bytes (" + factoryElements.length + " elements, assembly-line)");
+console.log("       all-types export: " + Buffer.byteLength(allStep, "utf8") + " bytes (" + ALL_TYPES.length + " element types)");
 
 // ---- gold standard: ifcopenshell (optional, skips gracefully) -------
 console.log("");
@@ -238,8 +332,10 @@ console.log("Gold-standard check (ifcopenshell via tools/validate_ifc.py):");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wt-ifc-"));
 const starterFile = path.join(tmp, "starter.ifc");
 const mroFile = path.join(tmp, "mro.ifc");
+const factoryFile = path.join(tmp, "factory.ifc");
 fs.writeFileSync(starterFile, starterStep);
 fs.writeFileSync(mroFile, mroStep);
+fs.writeFileSync(factoryFile, factoryStep);
 
 function goldStandard(label, file, expectedProxies) {
   const res = spawnSync("python", [path.join(__dirname, "tools", "validate_ifc.py"), file, String(expectedProxies)], {
@@ -261,6 +357,7 @@ function goldStandard(label, file, expectedProxies) {
 
 goldStandard("starter", starterFile, STARTER.length);
 goldStandard("MRO", mroFile, MRO.length);
+goldStandard("factory (assembly-line)", factoryFile, factoryElements.length);
 
 try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
 

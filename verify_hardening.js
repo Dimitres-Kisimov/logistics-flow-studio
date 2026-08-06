@@ -27,7 +27,7 @@
  *   7.  app.js exposes window.__WT_TEST_API__ ONLY under the ?selftest=1
  *       guard (never on a normal load).
  *   8.  sw.js precaches errors.js + selftest.js and the cache is bumped to
- *       wt-v57 (v3.4 FACTORY-A2 flow-geometry components; previously wt-v56).
+ *       wt-v58 (v3.5 IFC/BIM factory export; previously wt-v57).
  *   9.  Offline guard on the two new files: no external hosts referenced.
  *
  * Everything is deterministic. Usage:  node verify_hardening.js
@@ -230,9 +230,9 @@ check(
   "both in APP_SHELL"
 );
 check(
-  "sw.js cache bumped to wt-v57 (and no longer wt-v56)",
-  /CACHE_VERSION\s*=\s*"wt-v57"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v56"/.test(swJs),
-  "CACHE_VERSION = wt-v57"
+  "sw.js cache bumped to wt-v58 (and no longer wt-v57)",
+  /CACHE_VERSION\s*=\s*"wt-v58"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v57"/.test(swJs),
+  "CACHE_VERSION = wt-v58"
 );
 
 // ---- 9. the two new files reference no external hosts -------------------

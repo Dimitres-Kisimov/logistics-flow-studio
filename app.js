@@ -4362,9 +4362,9 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast(
       "Exported warehousetwin-layout.ifc (IFC4, " + state.elements.length +
-      " elements as proxy solids). Scoped coordination export - heights are stated assumptions, not full BIM authoring."
+      " elements as proxy solids - warehouse AND factory components). Schematic geometry from this synthetic model: heights/dimensions are illustrative teaching-scale assumptions, NOT a validated or certified BIM deliverable."
     );
-    status("IFC export written. Open it in a free viewer (BIMvision, usBIM.viewer, Open IFC Viewer) or any BIM tool.");
+    status("IFC export written (schematic coordination geometry, not a certified BIM). Open it in a free viewer (BIMvision, usBIM.viewer, Open IFC Viewer) or any BIM tool.");
   }
 
   // ================================================================
