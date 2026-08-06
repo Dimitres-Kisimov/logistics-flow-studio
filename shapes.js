@@ -170,6 +170,46 @@
   }
 
   /* ==================================================================
+   * QUARTER-ARC (90 deg) GEOMETRY for the CURVED CONVEYOR. The belt wraps a
+   * quarter turn around ONE corner of the footprint (the `arc` orientation),
+   * connecting the midpoints of the two edges adjacent to that corner. Shared
+   * by the 2D glyph, the 3D form and (mirrored) the flow-routing arc sampler,
+   * so all three agree. PURE geometry - NO Date, NO RNG. Works in px (2D) or
+   * world cells (3D): the caller passes whichever units its footprint is in.
+   *   arc: "tr" top-right | "br" bottom-right | "bl" bottom-left | "tl" top-left.
+   * Returns { cx, cy (the corner = ellipse centre), rx, ry (per-axis radii),
+   * a0, a1 (start/end angles - the sweep is exactly +/-90 deg) }.
+   * ================================================================== */
+  function arcCorner(arc) {
+    return (arc === "br" || arc === "bl" || arc === "tl") ? arc : "tr"; // default top-right
+  }
+  function curveGeom(x, y, w, d, arc) {
+    const c = arcCorner(arc);
+    const rx = w / 2, ry = d / 2;
+    let cx, cy, a0, a1;
+    if (c === "tr") { cx = x + w; cy = y; a0 = Math.PI; a1 = Math.PI / 2; }        // top <-> right
+    else if (c === "br") { cx = x + w; cy = y + d; a0 = -Math.PI / 2; a1 = -Math.PI; } // right <-> bottom
+    else if (c === "bl") { cx = x; cy = y + d; a0 = 0; a1 = -Math.PI / 2; }         // bottom <-> left
+    else { cx = x; cy = y; a0 = 0; a1 = Math.PI / 2; }                              // "tl": top <-> left
+    return { cx: cx, cy: cy, rx: rx, ry: ry, a0: a0, a1: a1 };
+  }
+  // A point on the belt arc at parameter t in [0,1]; radius fraction f of the
+  // ellipse (f=1 rides the edge-midpoint belt centreline). Finite for finite in.
+  function curvePt(g, t, f) {
+    const ang = g.a0 + (g.a1 - g.a0) * t;
+    const rf = (f == null ? 1 : f);
+    return { x: g.cx + g.rx * rf * Math.cos(ang), y: g.cy + g.ry * rf * Math.sin(ang) };
+  }
+  // Stroke the belt arc at radius fraction f as a sampled polyline (finite +
+  // mock-context-safe; no dependence on ctx.ellipse).
+  function strokeArc(ctx, g, f, steps) {
+    const n = Math.max(3, steps | 0);
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) { const p = curvePt(g, i / n, f); if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }
+    ctx.stroke();
+  }
+
+  /* ==================================================================
    * PER-TYPE 2D GLYPHS. Signature: (ctx, x, y, w, d, cell, gc, color).
    * `cell` = px per grid cell (feature density); `gc` = {stroke,fill}.
    * Each keeps the type's colour and draws only inside [x,y,w,d].
@@ -440,6 +480,63 @@
     }
   }
 
+  // Curved conveyor (90 deg): a belt ARC turning around a corner - inner +
+  // outer belt edges as arcs, rollers as radial ticks following the arc, and a
+  // flow arrow along the arc. When `anim` is a phase in [0,1) a few unit-loads
+  // SCROLL along the arc (the curved belt visibly runs). `arc` picks the corner
+  // the belt wraps ("tr"/"br"/"bl"/"tl"). Distinct from the straight belt bed.
+  function d2ConveyorCurve(ctx, x, y, w, d, cell, gc, color, theme, anim, arc) {
+    pen(ctx, gc, cell);
+    const g = curveGeom(x, y, w, d, arc);
+    // belt half-width as a fraction of the ellipse radius (~one belt lane wide).
+    const hw = clampN((Math.min(w, d) / 6) / Math.max(1e-6, Math.min(g.rx, g.ry)), 0.14, 0.45);
+    const fi = 1 - hw, fo = 1 + hw;
+    const steps = clampN(Math.round(Math.max(w, d) / (cell * 0.35)), 8, 28);
+    strokeArc(ctx, g, fi, steps); // inner belt edge
+    strokeArc(ctx, g, fo, steps); // outer belt edge
+    const rollers = clampN(Math.round(steps * 0.6), 3, 14);
+    for (let i = 1; i < rollers; i++) {
+      const t = i / rollers, pin = curvePt(g, t, fi), pout = curvePt(g, t, fo);
+      seg(ctx, pin.x, pin.y, pout.x, pout.y); // roller ticks across the belt, radial to the arc
+    }
+    const pa = curvePt(g, 0.4, 1), pb = curvePt(g, 0.62, 1);
+    arr(ctx, pa.x, pa.y, pb.x, pb.y, clampN(cell * 0.3, 3, 7)); // flow-direction arrow along the arc
+    if (typeof anim === "number" && isFinite(anim)) {
+      const items = 3, isz = clampN(Math.min(w, d) * 0.16, 3, 10);
+      ctx.fillStyle = gc.stroke;
+      for (let i = 0; i < items; i++) {
+        const p = curvePt(g, ((i / items) + anim) % 1, 1);
+        ctx.fillRect(p.x - isz / 2, p.y - isz / 2, isz, isz);
+      }
+    }
+  }
+
+  /* ==================================================================
+   * WORKER FIGURE (v2.1). A schematic, ILLUSTRATIVE person drawn at manned
+   * stations - a synthetic model, NOT a real person, NOT a scan or CAD/BIM.
+   * 2D top-down: a head disc + a shoulder bar + two arms reaching the bench.
+   * `anim` (a phase in [0,1) from the sim clock - NO Date, NO RNG) gives a
+   * subtle working motion (arms bob, the figure sways at the bench); omit it
+   * for a static figure (paused sim / prefers-reduced-motion). Kept inside a
+   * small radius r so it is LOD-gated to the rich (zoomed-in) tier only.
+   * ================================================================== */
+  function person2D(ctx, cx, cy, r, gc, color, theme, anim) {
+    const sway = (typeof anim === "number" && isFinite(anim)) ? Math.sin(anim * TAU) : 0;
+    const armDrop = r * (0.85 + 0.2 * sway); // arms bob toward the bench as the worker works
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.lineWidth = clampN(r * 0.16, 1, 2.4);
+    ctx.strokeStyle = gc.stroke;
+    ctx.fillStyle = theme === "dark" ? lighten(color, 0.28) : shade(color, 0.7);
+    seg(ctx, cx - r * 0.62, cy + r * 0.18, cx - r * 0.5, cy + armDrop); // left arm
+    seg(ctx, cx + r * 0.62, cy + r * 0.18, cx + r * 0.5, cy + armDrop); // right arm
+    const sw = r * 1.4, sh = r * 0.78;
+    ctx.fillRect(cx - sw / 2, cy + r * 0.02, sw, sh);   // shoulders / torso (top-down)
+    ctx.strokeRect(cx - sw / 2, cy + r * 0.02, sw, sh);
+    ctx.beginPath(); ctx.arc(cx + r * 0.16 * sway, cy - r * 0.4, r * 0.5, 0, TAU); ctx.fill(); ctx.stroke(); // head
+    ctx.restore();
+  }
+
   // A control-station workbench with a flow arrow (dir "push"/"pull").
   function d2Station(ctx, x, y, w, d, cell, gc, kind) {
     pen(ctx, gc, cell);
@@ -691,6 +788,16 @@
   function icTower(ctx, cx, cy, r) { ctx.strokeRect(cx - r * 0.6, cy - r, r * 1.2, r * 2); seg(ctx, cx, cy - r, cx, cy + r); }
   function icPlatform(ctx, cx, cy, r) { seg(ctx, cx - r, cy - r * 0.3, cx + r, cy - r * 0.3); seg(ctx, cx - r * 0.7, cy - r * 0.3, cx - r * 0.7, cy + r); seg(ctx, cx + r * 0.7, cy - r * 0.3, cx + r * 0.7, cy + r); }
   function icBelt(ctx, cx, cy, r) { arr(ctx, cx - r, cy, cx + r, cy, r * 0.6); }
+  // Curved-conveyor icon: a quarter-arc turn with an arrowhead.
+  function icCurve(ctx, cx, cy, r) {
+    const g = { cx: cx + r * 0.6, cy: cy - r * 0.6, rx: r * 1.3, ry: r * 1.3, a0: Math.PI, a1: Math.PI / 2 };
+    ctx.beginPath();
+    let last = null;
+    for (let i = 0; i <= 6; i++) { const p = curvePt(g, i / 6, 1); if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); last = p; }
+    ctx.stroke();
+    const prev = curvePt(g, 5 / 6, 1);
+    arr(ctx, prev.x, prev.y, last.x, last.y, r * 0.5); // arrowhead at the arc exit
+  }
   function icBench(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r * 0.4, r * 2, r * 0.8); }
   function icCart(ctx, cx, cy, r) { ctx.fillRect(cx - r * 0.7, cy - r * 0.5, r * 1.4, r); seg(ctx, cx - r, cy + r * 0.7, cx + r, cy + r * 0.7); }
   function icRobot(ctx, cx, cy, r) { ctx.beginPath(); ctx.arc(cx, cy, r * 0.8, 0, TAU); ctx.stroke(); }
@@ -933,6 +1040,56 @@
         runner3D(ctx, P, x, y, w, d, ((i / items) + anim) % 1, horiz, rw, rd, top, litc);
       }
     }
+  }
+
+  // Curved conveyor (90 deg) 3D: a SWEPT curved belt bed - the belt band
+  // extruded along the quarter-arc (top surface + outer side wall) with roller
+  // ticks across it and, when animating, unit-loads riding the arc. Distinct
+  // from the straight belt bed. Extruded by the domain heightM (taller -> higher).
+  function d3ConveyorCurve(ctx, P, x, y, w, d, h, color, theme, anim, arc) {
+    const g = curveGeom(x, y, w, d, arc);
+    const bh = clampN(h, 0.2, 4000); // belt-bed height (domain heightM)
+    const hw = clampN((Math.min(w, d) / 6) / Math.max(1e-6, Math.min(g.rx, g.ry)), 0.14, 0.45);
+    const fi = 1 - hw, fo = 1 + hw;
+    const steps = 14;
+    const topc = shade(color, FACE.top), tops = shade(color, 0.85);
+    const outc = shade(color, FACE.right), outs = shade(color, FACE.right * 0.7);
+    let pIn = curvePt(g, 0, fi), pOut = curvePt(g, 0, fo);
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps, inn = curvePt(g, t, fi), out = curvePt(g, t, fo);
+      quad(ctx, P(pIn.x, pIn.y, bh), P(pOut.x, pOut.y, bh), P(out.x, out.y, bh), P(inn.x, inn.y, bh), topc, tops); // top belt band
+      quad(ctx, P(pOut.x, pOut.y, 0), P(out.x, out.y, 0), P(out.x, out.y, bh), P(pOut.x, pOut.y, bh), outc, outs); // outer side wall
+      pIn = inn; pOut = out;
+    }
+    const bm = beamColor(color, theme);
+    const rollers = 7;
+    for (let i = 1; i < rollers; i++) {
+      const t = i / rollers, rin = curvePt(g, t, fi), rout = curvePt(g, t, fo);
+      edge(ctx, P, rin.x, rin.y, bh, rout.x, rout.y, bh, bm); // rollers across the belt
+    }
+    if (typeof anim === "number" && isFinite(anim)) {
+      const items = 3, litc = lighten(color, 0.26), ls = clampN(Math.min(w, d) * 0.2, 0.3, 1.2);
+      const top = bh + clampN(bh * 0.9, 0.3, 1.3);
+      for (let i = 0; i < items; i++) {
+        const p = curvePt(g, ((i / items) + anim) % 1, 1);
+        box3dZ(ctx, P, p.x - ls / 2, p.y - ls / 2, ls, ls, bh, top, litc); // unit-load riding the arc
+      }
+    }
+  }
+
+  // 3D iso WORKER FIGURE (v2.1): a schematic standing person - a base (legs) +
+  // torso + head extruded upward. ILLUSTRATIVE synthetic model, NOT a real
+  // person / scan / CAD-BIM. `anim` gives a subtle torso/head bob (from the sim
+  // clock - NO Date, NO RNG); omit it for a static figure (paused / reduced-motion).
+  function person3D(ctx, P, fx, fy, s, color, theme, anim) {
+    const bob = (typeof anim === "number" && isFinite(anim)) ? Math.sin(anim * TAU) : 0;
+    const skin = theme === "dark" ? lighten(color, 0.3) : shade(color, 0.72);
+    const legH = s * 0.85, torsoH = s * 1.05, headH = s * 0.5, lift = s * 0.06 * bob;
+    const bw = s * 0.5, bd = s * 0.42, bx = fx - bw / 2, by = fy - bd / 2;
+    box3d(ctx, P, bx, by, bw, bd, legH, shade(color, 0.85));                             // legs / base
+    box3dZ(ctx, P, bx, by, bw, bd, legH, legH + torsoH + lift, skin);                    // torso
+    const hw = s * 0.34, hbx = fx - hw / 2, hby = fy - hw / 2;
+    box3dZ(ctx, P, hbx, hby, hw, hw, legH + torsoH + lift, legH + torsoH + headH + lift, skin); // head
   }
 
   function d3Station(ctx, P, x, y, w, d, h, color, theme, kind) {
@@ -1226,6 +1383,18 @@
     }
     ctx.restore();
   }
+  function r2ConveyorCurve(ctx, x, y, w, d, cell, gc, color, theme, seed, anim, arc) {
+    if (typeof anim === "number" && isFinite(anim)) return; // base already scrolls loads along the arc
+    const g = curveGeom(x, y, w, d, arc);
+    const isz = clampN(Math.min(w, d) * 0.16, 3, 12);
+    ctx.save();
+    ctx.fillStyle = gc.fill; ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
+    for (let i = 0; i < 2; i++) {
+      const p = curvePt(g, 0.3 + 0.4 * i, 1);
+      ctx.fillRect(p.x - isz / 2, p.y - isz / 2, isz, isz); ctx.strokeRect(p.x - isz / 2, p.y - isz / 2, isz, isz);
+    }
+    ctx.restore();
+  }
   function r2Bench(ctx, x, y, w, d, cell, gc, color, theme, seed) {
     const m = clampN(Math.min(w, d) * 0.2, 2, 6);
     const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
@@ -1236,6 +1405,14 @@
     ctx.fillRect(bx, by, s, s); ctx.strokeRect(bx, by, s, s);
     seg(ctx, bx, by + s * 0.4, bx + s, by + s * 0.4); // tote lip
     ctx.restore();
+  }
+  // Manned station (rich): the bench tote PLUS a worker figure at the operating
+  // side. The worker is the illustrative person (person2D); it bobs when `anim`
+  // is supplied (sim playing) and stands static otherwise (paused/reduced-motion).
+  function r2StationWorker(ctx, x, y, w, d, cell, gc, color, theme, seed, anim) {
+    r2Bench(ctx, x, y, w, d, cell, gc, color, theme, seed);
+    const r = clampN(Math.min(w, d) * 0.17, 3, 13);
+    person2D(ctx, x + w * 0.66, y + d * 0.5, r, gc, color, theme, anim);
   }
   function r2Dock(ctx, x, y, w, d, cell, gc, color, theme, seed) {
     const m = clampN(Math.min(w, d) * 0.16, 2, 5);
@@ -1341,16 +1518,18 @@
     "push-back": r2Rack, "pallet-flow": r2Rack, "carton-flow": r2Rack,
     "mobile-racking": r2Rack, "vna": r2Rack, "pick-to-light": r2Rack,
     "cantilever": r2Cantilever, "asrs": r2Asrs, "shuttle": r2Shuttle,
-    "conveyor": r2Conveyor,
-    "push-station": r2Bench, "pull-station": r2Bench, "pack-station": r2Bench, "returns-station": r2Bench,
+    "conveyor": r2Conveyor, "conveyor-curve": r2ConveyorCurve,
+    // Manned stations gain a WORKER FIGURE at the rich (zoomed-in) tier.
+    "push-station": r2StationWorker, "pull-station": r2StationWorker,
+    "pack-station": r2StationWorker, "returns-station": r2StationWorker,
     "dock-in": r2Dock, "dock-out": r2Dock, "mezzanine": r2Mezz,
     "forklift": r2Forklift, "rgv": r2CartLoad, "agv": r2CartLoad,
     "staging": r2Staging, "sorter": r2Sorter, "stretch-wrap": r2StretchWrap,
     "charging-station": r2Charging, "gate": r2Gate,
   };
-  function richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim) {
+  function richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim, arc) {
     const fn = RICH2D[type];
-    if (fn) fn(ctx, x, y, w, d, cell, gc, color, theme, seed, anim);
+    if (fn) fn(ctx, x, y, w, d, cell, gc, color, theme, seed, anim, arc);
   }
 
   /* ---- rich 3D primitives ------------------------------------------ */
@@ -1417,6 +1596,18 @@
     const top = h + clampN(h * 0.9, 0.4, 1.3), litc = lighten(color, 0.2);
     for (let i = 0; i < 2; i++) runner3D(ctx, P, x, y, w, d, 0.3 + 0.4 * i, horiz, rw, rd, top, litc);
   }
+  function f3ConveyorCurve(ctx, P, x, y, w, d, h, color, theme, seed, anim, arc) {
+    if (typeof anim === "number" && isFinite(anim)) return; // base already scrolls loads along the arc
+    const g = curveGeom(x, y, w, d, arc);
+    const bh = clampN(h, 0.2, 4000), litc = lighten(color, 0.2);
+    const ls = clampN(Math.min(w, d) * 0.2, 0.3, 1.2), top = bh + clampN(bh * 0.9, 0.3, 1.3);
+    for (let i = 0; i < 2; i++) { const p = curvePt(g, 0.3 + 0.4 * i, 1); box3dZ(ctx, P, p.x - ls / 2, p.y - ls / 2, ls, ls, bh, top, litc); }
+  }
+  // Rich 3D manned station: a WORKER FIGURE standing at the bench (person3D).
+  function f3StationWorker(ctx, P, x, y, w, d, h, color, theme, seed, anim) {
+    const s = clampN(Math.min(w, d) * 0.5, 0.3, 1.3);
+    person3D(ctx, P, x + w * 0.66, y + d * 0.72, s, color, theme, anim);
+  }
   function f3Forklift(ctx, P, x, y, w, d, h, color, theme, seed) {
     const s = clampN(Math.min(w, d) * 0.34, 0.3, 1.6);
     box3dZ(ctx, P, x + w * 0.62, y + (d - s) / 2, s, s, 0.05, 0.05 + clampN(h * 0.5, 0.3, 1.4), lighten(color, 0.16)); // pallet on the forks
@@ -1430,11 +1621,14 @@
     "push-back": f3Rack(3), "pallet-flow": f3Rack(3), "carton-flow": f3Rack(4),
     "mobile-racking": f3Rack(4), "vna": f3Rack(5), "pick-to-light": f3Rack(4),
     "asrs": f3Asrs, "shuttle": f3Shuttle, "mezzanine": f3Mezz,
-    "conveyor": f3Conveyor, "forklift": f3Forklift, "rgv": f3Vehicle, "agv": f3Vehicle,
+    "conveyor": f3Conveyor, "conveyor-curve": f3ConveyorCurve, "forklift": f3Forklift, "rgv": f3Vehicle, "agv": f3Vehicle,
+    // Manned stations gain a standing WORKER FIGURE at the rich (zoomed-in) tier.
+    "push-station": f3StationWorker, "pull-station": f3StationWorker,
+    "pack-station": f3StationWorker, "returns-station": f3StationWorker,
   };
-  function richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim) {
+  function richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim, arc) {
     const fn = RICH3D[type];
-    if (fn) fn(ctx, P, x, y, w, d, h, color, theme, seed, anim);
+    if (fn) fn(ctx, P, x, y, w, d, h, color, theme, seed, anim, arc);
   }
 
   /* ==================================================================
@@ -1530,6 +1724,7 @@
     "dock-out": { d2: d2DockOut, d3: d3Dock, icon: icDoor, g2: "door notch + outbound arrow", f3: "low wall with a recessed door opening" },
     "staging": { d2: d2Staging, d3: d3Staging, icon: icDash, g2: "dashed holding-area outline + lane", f3: "low outlined holding pad" },
     "conveyor": { d2: d2Conveyor, d3: d3Conveyor, icon: icBelt, g2: "belt side lines + rollers + direction", f3: "low belt bed with roller ticks" },
+    "conveyor-curve": { d2: d2ConveyorCurve, d3: d3ConveyorCurve, icon: icCurve, g2: "curved belt arc + rollers following the arc + flow arrow", f3: "swept curved belt bed with roller ticks" },
     "push-station": { d2: d2Push, d3: d3Push, icon: icBench, g2: "workbench + outward push arrow", f3: "bench on legs + push arrow" },
     "pull-station": { d2: d2Pull, d3: d3Pull, icon: icBench, g2: "workbench + inward pull arrow", f3: "bench on legs + pull arrow" },
     "pack-station": { d2: d2Pack, d3: d3Pack, icon: icBench, g2: "workbench + parcel with tape", f3: "bench on legs + a parcel on top" },
@@ -1601,10 +1796,12 @@
       // their moving part, all others ignore the extra argument.
       const anim = (isFinite(g.anim) && g.anim >= 0) ? g.anim : undefined;
       if (r) {
-        r.d2(ctx, x, y, w, d, cell, gc, color, theme, anim);
+        // `g.arc` (curved-conveyor orientation) rides as a trailing arg; every
+        // other per-type drawer ignores the extra parameter (byte-identical).
+        r.d2(ctx, x, y, w, d, cell, gc, color, theme, anim, g.arc);
         // Rich (zoomed-in) tier: layer the high-detail overlay ON TOP of the
         // base glyph so animated parts keep moving and the fill is additive.
-        if (level === "rich") richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim);
+        if (level === "rich") richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim, g.arc);
       } else {
         // Custom type: generic glyph parameterised by g.glyph.
         genericGlyph2D(ctx, g.glyph, x, y, w, d, cell, gc, color, theme, anim);
@@ -1634,7 +1831,9 @@
     ctx.lineJoin = "round";
     ctx.lineWidth = 1;
     if (r) {
-      r.d3(ctx, P, x, y, w, d, h, color, theme, anim);
+      // `o.arc` (curved-conveyor orientation) rides as a trailing arg; every
+      // other per-type form ignores the extra parameter (byte-identical).
+      r.d3(ctx, P, x, y, w, d, h, color, theme, anim, o.arc);
       // Rich (zoomed-in) tier: layer pallets / decked posts / vehicle loads on
       // top of the base extruded form. Gated on the caller supplying an
       // ON-SCREEN px/cell (o.lod) that reaches the rich tier; when absent (the
@@ -1643,7 +1842,7 @@
       // element (o.seed, else its world corner) - stable, testable, no random.
       if (isFinite(o.lod) && detailLevel(o.lod) === "rich") {
         const seed = isFinite(o.seed) ? (o.seed | 0) : (((x | 0) * 73856093) ^ ((y | 0) * 19349663));
-        richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim);
+        richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim, o.arc);
       }
     } else {
       // Custom type: generic extruded form parameterised by o.base.

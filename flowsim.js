@@ -162,14 +162,15 @@
   }
 
   function isTransport(e) {
-    if (e.type === "conveyor" || e.type === "rgv" || e.type === "agv" || e.type === "track") return true;
+    if (e.type === "conveyor" || e.type === "conveyor-curve" || e.type === "rgv" || e.type === "agv" || e.type === "track") return true;
     const b = baseOf(e); // custom conveying / transporter objects CARRY loads
     return b === "conveyor" || b === "transporter";
   }
 
   // Cell types that form a conveyor-following PATH (a box can ride ALONG
   // these). Same movement family as isTransport; documented as synthetic.
-  const CONVEYOR_CELL_TYPES = { conveyor: 1, track: 1, rgv: 1, agv: 1 };
+  // The curved conveyor rides here too, so a box turns the corner ALONG the arc.
+  const CONVEYOR_CELL_TYPES = { conveyor: 1, "conveyor-curve": 1, track: 1, rgv: 1, agv: 1 };
   function isConveyorCellEl(e) {
     if (CONVEYOR_CELL_TYPES[e.type]) return true;
     const b = baseOf(e);
@@ -294,6 +295,80 @@
     return Array.from(cells.values());
   }
 
+  /* ==================================================================
+   * CURVED-CONVEYOR ARC SAMPLING (v2.1). A curved conveyor turns a belt run
+   * 90 degrees around one corner of its footprint (the element's `arc`
+   * orientation). The belt CENTRELINE is the quarter-arc through the midpoints
+   * of the two edges adjacent to that corner - the same geometry shapes.js
+   * draws. A box crossing a curved conveyor rides THIS arc (sampled points),
+   * not the straight chord, so it follows the turn smoothly. PURE geometry -
+   * NO Date, NO RNG. Deterministic and testable in isolation.
+   * ================================================================== */
+  const ARC_SAMPLES = 8; // segments the quarter-arc is split into for routing
+  function arcCornerOf(el) {
+    const a = el && el.arc;
+    return (a === "br" || a === "bl" || a === "tl") ? a : "tr"; // default top-right
+  }
+  function curveGeomWorld(el) {
+    const x = el.x, y = el.y;
+    const w = Math.max(1, Math.round(el.w || 1)), d = Math.max(1, Math.round(el.d || 1));
+    const c = arcCornerOf(el);
+    const rx = w / 2, ry = d / 2;
+    let cx, cy, a0, a1;
+    if (c === "tr") { cx = x + w; cy = y; a0 = Math.PI; a1 = Math.PI / 2; }
+    else if (c === "br") { cx = x + w; cy = y + d; a0 = -Math.PI / 2; a1 = -Math.PI; }
+    else if (c === "bl") { cx = x; cy = y + d; a0 = 0; a1 = -Math.PI / 2; }
+    else { cx = x; cy = y; a0 = 0; a1 = Math.PI / 2; }
+    return { cx: cx, cy: cy, rx: rx, ry: ry, a0: a0, a1: a1 };
+  }
+  // Public: n+1 points sampled along the belt centreline arc of a curved
+  // conveyor element (world cells), from one edge-midpoint port to the other.
+  function curveArcPoints(el, n) {
+    const steps = Math.max(2, (n | 0) || ARC_SAMPLES);
+    const g = curveGeomWorld(el);
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const ang = g.a0 + (g.a1 - g.a0) * (i / steps);
+      pts.push({ x: g.cx + g.rx * Math.cos(ang), y: g.cy + g.ry * Math.sin(ang) });
+    }
+    return pts;
+  }
+  function curveElements(els) {
+    const out = [];
+    for (const e of els || []) if (e && e.type === "conveyor-curve") out.push(e);
+    return out;
+  }
+  function pointInFootprint(p, e) {
+    const x0 = Math.round(e.x), y0 = Math.round(e.y);
+    const w = Math.max(1, Math.round(e.w || 1)), d = Math.max(1, Math.round(e.d || 1));
+    return p.x >= x0 - 1e-6 && p.x <= x0 + w + 1e-6 && p.y >= y0 - 1e-6 && p.y <= y0 + d + 1e-6;
+  }
+  function d2(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return dx * dx + dy * dy; }
+  // Replace any routed cell-centre that falls inside a curved conveyor with the
+  // element's quarter-arc centreline (oriented to the travel direction), so the
+  // box follows the ARC instead of cutting a right-angle corner. Each arc point
+  // is flagged onCurve. Only elements the polyline actually TURNS inside are
+  // splied; a belt passing straight through is left untouched.
+  function spliceCurveArcs(points, curves, prevPt) {
+    const out = [];
+    let prev = prevPt || (points.length ? points[0] : null);
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      let ce = null;
+      for (const e of curves) { if (pointInFootprint(p, e)) { ce = e; break; } }
+      if (ce) {
+        let arc = curveArcPoints(ce, ARC_SAMPLES);
+        if (prev && arc.length > 1 && d2(arc[arc.length - 1], prev) < d2(arc[0], prev)) arc = arc.slice().reverse();
+        for (const a of arc) out.push({ x: a.x, y: a.y, onCurve: true });
+        prev = arc[arc.length - 1];
+      } else {
+        out.push(p);
+        prev = p;
+      }
+    }
+    return out;
+  }
+
   /* ------------------------------------------------------------------
    * Build the ordered waypoint list (world cells) for a layout. Each
    * waypoint carries the flow STAGE a unit is performing while it travels
@@ -361,7 +436,12 @@
     const route = conveyorRoute(els, storage, picking);
     let routed = false;
     if (route && route.points.length) {
-      for (const p of route.points) wp.push({ x: p.x, y: p.y, stage: "storage", onConveyor: true });
+      // Where the route turns INSIDE a curved conveyor, ride the ARC (sampled
+      // centreline) instead of the right-angle cell corner. Gated on a curved
+      // conveyor being present, so a layout without one is BYTE-IDENTICAL.
+      const curves = curveElements(els);
+      const pts = curves.length ? spliceCurveArcs(route.points, curves, storage) : route.points;
+      for (const p of pts) wp.push({ x: p.x, y: p.y, stage: "storage", onConveyor: true, onCurve: !!p.onCurve });
       routed = true;
     } else {
       const transport = centroidOf(els, isTransport);
@@ -375,7 +455,11 @@
     // Clamp every waypoint inside the floor so MUs can never render off it.
     const out = wp.map((p) => {
       const c = clampPt(p, gridW, gridH);
-      return { x: c.x, y: c.y, stage: p.stage, onConveyor: !!p.onConveyor };
+      const o = { x: c.x, y: c.y, stage: p.stage, onConveyor: !!p.onConveyor };
+      // Add onCurve ONLY when the waypoint rides a curved conveyor's arc, so a
+      // layout without one keeps the exact prior waypoint shape (byte-identical).
+      if (p.onCurve) o.onCurve = true;
+      return o;
     });
     out.conveyorRouted = routed; // non-enumerable-ish flag (array property)
     out.retrievalAnchored = retrievalAnchored; // P4: storage waypoint = real slotting anchor
@@ -406,7 +490,7 @@
     const els = (layout && layout.elements) || [];
     let automationIndex = 0;
     for (const e of els) {
-      if (e.type === "conveyor" || e.type === "rgv" || e.type === "agv" || e.type === "asrs" || e.type === "shuttle") automationIndex++;
+      if (e.type === "conveyor" || e.type === "conveyor-curve" || e.type === "rgv" || e.type === "agv" || e.type === "asrs" || e.type === "shuttle") automationIndex++;
     }
     const autoFactor = Math.min(PARAMS.autoFactorMax, 1 + PARAMS.autoBoostPerLane * automationIndex);
     return { caps: caps, capByStage: capByStage, lineThroughput: lineThroughput, automationIndex: automationIndex, autoFactor: autoFactor };
@@ -800,5 +884,8 @@
     buildStationSpecs: buildStationSpecs,
     conveyorCells: conveyorCells,
     conveyorRoute: conveyorRoute,
+    // v2.1: quarter-arc centreline samples for a curved conveyor element (world
+    // cells) - the path a box rides through the turn. Pure + deterministic.
+    curveArcPoints: curveArcPoints,
   };
 })();

@@ -288,7 +288,7 @@ check(
   const storyBeforeApp = html.indexOf('src="story.js"') !== -1 &&
     html.indexOf('src="story.js"') < html.indexOf('src="app.js"');
   const btnPresent = /id="storyBtn"/.test(html);
-  const swCaches = /["']\.\/story\.js["']/.test(sw) && /wt-v45/.test(sw);
+  const swCaches = /["']\.\/story\.js["']/.test(sw) && /wt-v46/.test(sw);
   const appWires = /storyBtn/.test(appSrc) && /WT\.story\.run\(/.test(appSrc) &&
     /startStory/.test(appSrc) && /finishStory/.test(appSrc);
   check(
@@ -296,7 +296,7 @@ check(
     storyBeforeApp && btnPresent, "beforeApp=" + storyBeforeApp + " btn=" + btnPresent
   );
   check(
-    "sw.js precaches ./story.js at the bumped wt-v45 cache; app.js wires + sequences it",
+    "sw.js precaches ./story.js at the bumped wt-v46 cache; app.js wires + sequences it",
     swCaches && appWires, "sw=" + swCaches + " app=" + appWires
   );
 

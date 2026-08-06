@@ -267,7 +267,9 @@
   // frame). One source of truth (WT.shapes.equipmentPhase) drives BOTH the
   // top-down glyph and the 2.5D form. Equipment animates ONLY while the flow
   // is actively PLAYING (not on Step/Pause) and never under reduced-motion.
-  const ANIMATABLE_TYPES = { conveyor: 1, rgv: 1, agv: 1, asrs: 1, shuttle: 1, sorter: 1, "stretch-wrap": 1 };
+  // v2.1: the curved conveyor scrolls loads along its arc; manned stations
+  // (pick/put/pack/returns) get a WORKER FIGURE that bobs at the rich tier.
+  const ANIMATABLE_TYPES = { conveyor: 1, "conveyor-curve": 1, rgv: 1, agv: 1, asrs: 1, shuttle: 1, sorter: 1, "stretch-wrap": 1, "pack-station": 1, "returns-station": 1, "push-station": 1, "pull-station": 1 };
   // A stable per-element seed from its (integer) floor position: deterministic
   // and allocation-free, so identical equipment at different spots is out of
   // phase (the plant doesn't move in lockstep).
@@ -439,6 +441,9 @@
           cellPx: cellPx, color: def.color, theme: themeName, lod: cellPx * view.scale,
           // User-defined types route through the generic renderer via glyph/base.
           glyph: def.glyph, base: def.base,
+          // Curved-conveyor orientation (which corner the arc wraps); other
+          // types ignore it. Falls back to the type's default when unset.
+          arc: e.arc || def.arc,
           // Deterministic per-element seed for the rich-tier load-unit fill
           // (stable frame-to-frame; identical racks at different spots differ).
           seed: elemAnimSeed(e),
@@ -2842,6 +2847,13 @@
     const cand = { x: el.x, y: el.y, w: el.d, d: el.w };
     if (!inBounds(cand) || overlapsAny(cand, el.id)) { toast("Not enough room to rotate here.", "warn"); return; }
     el.w = cand.w; el.d = cand.d;
+    // Curved conveyor: rotating also cycles WHICH corner the belt arc wraps, so
+    // all four corner orientations are reachable (tr -> br -> bl -> tl -> tr).
+    if (el.type === "conveyor-curve") {
+      const seq = ["tr", "br", "bl", "tl"];
+      const cur = seq.indexOf(el.arc || (ELEMENTS[el.type] && ELEMENTS[el.type].arc) || "tr");
+      el.arc = seq[(cur + 1) % seq.length];
+    }
     scheduleSave();
     render();
     renderProps();
@@ -3952,7 +3964,10 @@
       gridW: GRID_W,
       gridH: GRID_H,
       cell: CELL_M,
-      elements: state.elements.map((e) => ({ id: e.id, type: e.type, x: e.x, y: e.y, w: e.w, d: e.d })),
+      // `arc` (curved-conveyor corner orientation) is included only when set;
+      // JSON.stringify omits an undefined value, so a layout with no curved
+      // conveyor serializes BYTE-IDENTICALLY to before.
+      elements: state.elements.map((e) => ({ id: e.id, type: e.type, x: e.x, y: e.y, w: e.w, d: e.d, arc: e.arc })),
       config: Object.assign({}, state.config),
       savedAt: new Date().toISOString(),
     };
@@ -3991,6 +4006,8 @@
         w: clampInt(raw.w, 1, GRID_W, def.w),
         d: clampInt(raw.d, 1, GRID_H, def.d),
       };
+      // Restore the curved-conveyor corner orientation when present.
+      if (typeof raw.arc === "string") el.arc = raw.arc;
       // keep in-bounds
       el.x = Math.min(el.x, GRID_W - el.w);
       el.y = Math.min(el.y, GRID_H - el.d);

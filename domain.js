@@ -271,6 +271,19 @@
       unitsPerHr: 180,
       desc: "Powered conveyor segment for internal material flow between zones.",
     },
+    "conveyor-curve": {
+      id: "conveyor-curve", label: "Curved conveyor (90 deg)", category: "flow",
+      // Square footprint so the quarter-arc belt turns cleanly inside it; the
+      // `arc` field is the corner the belt wraps around ("tr" top-right, "br"
+      // bottom-right, "bl" bottom-left, "tl" top-left) and rotate cycles it.
+      w: 3, d: 3, color: "#475569", resizable: true, heightM: 0.9, arc: "tr",
+      // unitsPerHr mirrors the straight conveyor: a curved segment carries the
+      // SAME synthetic order-of-magnitude throughput (a turn, not a bottleneck).
+      // Informed by general material-flow throughput practice (VDI 4480 family).
+      // NOT a vendor spec.
+      unitsPerHr: 180,
+      desc: "Powered 90-degree curved conveyor segment - turns a belt run around a corner so a layout is not limited to straight runs. Material rides the ARC. Synthetic teaching element, not a vendor spec.",
+    },
     "push-station": {
       id: "push-station", label: "Push station", category: "flow",
       w: 2, d: 2, color: "#0ea5e9", flow: "push", heightM: 1.2,
@@ -546,7 +559,7 @@
    *   inboundCovered   Set of STORAGE ids fed from receiving by chain
    *   warnings         [{code,severity,msg,elId?}] broken-chain findings
    * ------------------------------------------------------------------ */
-  const CONNECTOR_TYPES = { conveyor: 1, staging: 1, "push-station": 1, "pull-station": 1, "pack-station": 1 };
+  const CONNECTOR_TYPES = { conveyor: 1, "conveyor-curve": 1, staging: 1, "push-station": 1, "pull-station": 1, "pack-station": 1 };
 
   function isConnector(el) {
     if (CONNECTOR_TYPES[el.type]) return true;
@@ -756,7 +769,7 @@
       "push-back", "pallet-flow", "carton-flow", "mobile-racking",
       "cantilever", "asrs", "shuttle", "mezzanine",
       "pick-to-light", "vna",
-      "dock-in", "dock-out", "staging", "conveyor",
+      "dock-in", "dock-out", "staging", "conveyor", "conveyor-curve",
       "push-station", "pull-station", "pack-station",
       "rgv", "agv",
       "forklift", "charging-station", "sorter", "stretch-wrap",

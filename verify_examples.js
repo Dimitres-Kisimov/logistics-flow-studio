@@ -235,10 +235,15 @@ if (megaEx) {
     mb.gridW > 40 && mb.gridW <= 400 && mb.gridH > 24 && mb.gridH <= 250,
     mb.gridW + " x " + mb.gridH + " m");
   const megaTypes = {}; for (const e of mels) megaTypes[e.type] = true;
-  const missingPalette = D.paletteOrder.filter((t) => !megaTypes[t]);
-  check("showcase exercises the FULL 29-type equipment palette",
+  // conveyor-curve (v2.1) is an ADDITIVE palette type placed from the palette /
+  // by rotating a corner; it is NOT retro-fitted into the byte-identical mega
+  // builder, so it is exempt from the showcase's "covers the palette" property.
+  const MEGA_EXEMPT = { "conveyor-curve": 1 };
+  const megaRequired = D.paletteOrder.filter((t) => !MEGA_EXEMPT[t]);
+  const missingPalette = megaRequired.filter((t) => !megaTypes[t]);
+  check("showcase exercises the full core equipment palette (additive v2.1 curved conveyor exempt)",
     missingPalette.length === 0,
-    missingPalette.length ? "missing: " + missingPalette.join(", ") : Object.keys(megaTypes).length + "/" + D.paletteOrder.length + " types");
+    missingPalette.length ? "missing: " + missingPalette.join(", ") : Object.keys(megaTypes).length + "/" + megaRequired.length + " core types");
   check("showcase is overlap-free at 800+ elements", overlapFree(mels));
   // Every facing storage-row gap is 0 (back-to-back) or >= MIN_AISLE; NONE
   // lands in the (0, MIN_AISLE) band, so aisle-width can warn but never fail.

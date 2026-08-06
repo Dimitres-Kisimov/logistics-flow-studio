@@ -243,6 +243,40 @@
       return { ok: !!sim1 && sim1.tick > tick0, detail: "tick " + tick0 + " -> " + (sim1 ? sim1.tick : "?") };
     });
 
+    // ---- v2.1: curved conveyor + worker figures wired into the live app -
+    // The curved segment is registered + 0-capacity, its pure arc sampler
+    // rides a quarter-arc, buildWaypoints routes a box ALONG the arc, and a
+    // worker figure draws at a manned station on a REAL canvas without throwing.
+    check("curved-conveyor-and-worker-figures", function () {
+      var S = WT.shapes, F = WT.flowsim, DM = WT.domain;
+      if (!S || !F || !DM) return { ok: false, detail: "shapes/flowsim/domain missing" };
+      var hasCurve = S.has("conveyor-curve") === true && !!DM.ELEMENTS["conveyor-curve"];
+      var cap = DM.elementCapacity({ type: "conveyor-curve", w: 3, d: 3 });
+      var pts = F.curveArcPoints({ type: "conveyor-curve", x: 18, y: 3, w: 3, d: 3, arc: "bl" }, 8);
+      var onArc = pts.length === 9 && pts.every(function (p) { return Math.abs(Math.hypot(p.x - 18, p.y - 6) - 1.5) < 1e-6; });
+      var lay = { elements: [
+        { id: "a", type: "selective-racking", x: 2, y: 4, w: 6, d: 1 },
+        { id: "b", type: "conveyor", x: 8, y: 4, w: 10, d: 1 },
+        { id: "c", type: "conveyor-curve", x: 18, y: 3, w: 3, d: 3, arc: "bl" },
+        { id: "d", type: "conveyor", x: 19, y: 6, w: 1, d: 10 },
+        { id: "e", type: "carton-flow", x: 18, y: 16, w: 4, d: 2 },
+      ], gridW: 40, gridH: 24, cell: 1, config: { seed: 4 } };
+      var wps = F.buildWaypoints(lay);
+      var arcWps = wps.filter(function (w) { return w.onCurve; });
+      var routed = arcWps.length >= 5 && arcWps.every(function (w) { return Math.abs(Math.hypot(w.x - 18, w.y - 6) - 1.5) < 1e-6; });
+      var workerOk = true;
+      try {
+        var cv = document.createElement("canvas"); cv.width = 200; cv.height = 200;
+        var g = cv.getContext("2d");
+        // rich (zoomed-in) tier -> the manned station draws its worker figure
+        S.draw2D(g, "pack-station", { x: 10, y: 10, w: 90, d: 60, cellPx: 30, color: "#eab308", theme: "light", lod: 60, anim: 0.3 });
+      } catch (e) { workerOk = false; }
+      return {
+        ok: hasCurve && cap === 0 && onArc && routed && workerOk,
+        detail: "curve=" + hasCurve + " cap=" + cap + " arc9=" + onArc + " arcWps=" + arcWps.length + " routed=" + routed + " worker=" + workerOk,
+      };
+    });
+
     // ---- Flow: play starts the animation, then it stops cleanly --------
     // Awaits a couple of real animation frames, then pauses (async check).
     var playOk = false;

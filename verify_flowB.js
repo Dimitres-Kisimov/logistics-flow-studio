@@ -79,7 +79,9 @@ function mk(list) {
   let i = 0;
   return list.map((e) => {
     const def = D.ELEMENTS[e.type] || {};
-    return { id: "el-" + ++i, type: e.type, x: e.x, y: e.y, w: e.w || def.w, d: e.d || def.d };
+    const el = { id: "el-" + ++i, type: e.type, x: e.x, y: e.y, w: e.w || def.w, d: e.d || def.d };
+    if (e.arc) el.arc = e.arc; // preserve curved-conveyor orientation
+    return el;
   });
 }
 function examplesLayout(id) {
@@ -257,6 +259,73 @@ const withoutConveyor = {
   check("no conveyor -> straight-segment fallback (no onConveyor waypoints, clean spine)",
     !plan.conveyorRouted && onC.length === 0 && spineOk,
     "onConveyor=" + onC.length + " routed=" + plan.conveyorRouted + " spine=" + stages.join(">"));
+}
+
+/* ---------------------------------------------------------------------
+ * 8b. CURVED CONVEYOR (v2.1): a box turns the corner ALONG the arc.
+ * A storage -> horizontal belt -> 90 deg CURVED conveyor -> vertical belt ->
+ * pick-face spine. The routed path must ride the curve's quarter-arc (sampled
+ * centreline) rather than cutting the right-angle corner, and a live MU must
+ * physically traverse that arc region while staying in bounds + deterministic.
+ * ------------------------------------------------------------------- */
+const curvedLayout = {
+  elements: mk([
+    { type: "dock-in", x: 2, y: 0 },
+    { type: "selective-racking", x: 2, y: 4, w: 6, d: 1 },
+    { type: "conveyor", x: 8, y: 4, w: 10, d: 1 },        // horizontal belt from storage
+    { type: "conveyor-curve", x: 18, y: 3, w: 3, d: 3, arc: "bl" }, // 90 deg turn (west port -> south port)
+    { type: "conveyor", x: 19, y: 6, w: 1, d: 10 },       // vertical belt down to picking
+    { type: "carton-flow", x: 18, y: 16, w: 4, d: 2 },    // pick face
+    { type: "pack-station", x: 24, y: 20 },
+    { type: "dock-out", x: 24, y: 23 },
+  ]),
+  gridW: 40, gridH: 24, cell: 1, config: { seed: 4 },
+};
+{
+  // The pure arc sampler: 9 points along the belt centreline of the curve.
+  const curveEl = curvedLayout.elements.find((e) => e.type === "conveyor-curve");
+  const pts = F.curveArcPoints(curveEl, 8);
+  // For this SQUARE (3x3) "bl" curve the centre is the bottom-left corner
+  // (18, 6) and every centreline point sits at radius 1.5 (rides a circle).
+  const cx = 18, cy = 6, R = 1.5;
+  const radii = pts.map((p) => Math.hypot(p.x - cx, p.y - cy));
+  const onCircle = radii.every((r) => Math.abs(r - R) < 1e-6);
+  // The arc BULGES: its midpoint is well off the straight chord between ports.
+  const a = pts[0], b = pts[pts.length - 1], mid = pts[(pts.length - 1) / 2 | 0];
+  const chordMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const bulge = Math.hypot(mid.x - chordMid.x, mid.y - chordMid.y);
+  check("curveArcPoints samples the quarter-arc: 9 points on the belt-centreline circle (r=1.5), bulging off the chord",
+    pts.length === 9 && onCircle && bulge > 0.3,
+    "n=" + pts.length + " onCircle=" + onCircle + " bulge=" + bulge.toFixed(3));
+}
+{
+  const plan = F.spawnPlan(curvedLayout, { seed: 4 });
+  const arcWps = plan.waypoints.filter((w) => w.onCurve);
+  const cx = 18, cy = 6, R = 1.5;
+  const allOnArc = arcWps.length > 0 && arcWps.every((w) => Math.abs(Math.hypot(w.x - cx, w.y - cy) - R) < 1e-6);
+  check("curved layout: storage->picking routes ALONG the arc (onCurve waypoints, all on the belt-centreline circle)",
+    plan.conveyorRouted && arcWps.length >= 5 && allOnArc,
+    arcWps.length + " onCurve waypoints, routed=" + plan.conveyorRouted + ", allOnArc=" + allOnArc);
+}
+{
+  // A live MU must physically ride through the curve footprint on the arc (not
+  // cut the inner corner) while staying in bounds, and the run is deterministic.
+  const s = runTicks(curvedLayout, { seed: 4, loop: true }, 400, 1);
+  const cx = 18, cy = 6, R = 1.5;
+  let rodeArc = false, inBounds = true;
+  const s2 = F.state(curvedLayout, { seed: 4, loop: true });
+  for (let i = 0; i < 400; i++) {
+    F.step(s2, 1);
+    for (const m of s2.mus) {
+      if (m.cx < 0 || m.cy < 0 || m.cx > curvedLayout.gridW || m.cy > curvedLayout.gridH) inBounds = false;
+      // inside the 3x3 curve footprint AND close to the arc radius (riding it)
+      if (m.cx >= 18 && m.cx <= 21 && m.cy >= 3 && m.cy <= 6 && Math.abs(Math.hypot(m.cx - cx, m.cy - cy) - R) < 0.6) rodeArc = true;
+    }
+  }
+  const deterministic = snapshot(s) === snapshot(s2);
+  check("a live box TRAVERSES the curved conveyor's arc (rides the arc region, stays in bounds, deterministic)",
+    rodeArc && inBounds && deterministic,
+    "rodeArc=" + rodeArc + " inBounds=" + inBounds + " deterministic=" + deterministic);
 }
 
 /* ---------------------------------------------------------------------

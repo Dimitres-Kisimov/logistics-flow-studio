@@ -366,8 +366,121 @@ const FLOW_NEW = ["forklift", "charging-station", "sorter", "stretch-wrap", "ret
     fail === null, fail || "sorter + stretch-wrap animate");
 })();
 
+/* =====================================================================
+ * v2.1 CURVED CONVEYOR + WORKER FIGURES - focused checks.
+ * The all-types smoke above already exercises conveyor-curve and the manned
+ * stations; these assert the NEW behaviour specifically: the curved segment is
+ * registered/palette-listed with 0 capacity, draws in all 4 corner
+ * orientations (2D+3D, light/dark, small/large) without throwing or mutating,
+ * its belt animates + is a DISTINCT glyph from the straight belt, each corner
+ * orientation is geometrically distinct, and a WORKER FIGURE renders at manned
+ * stations (rich tier only, animated, LOD-gated).
+ * ===================================================================== */
+const CURVE = "conveyor-curve";
+const ARCS = ["tr", "br", "bl", "tl"];
+const MANNED = ["pack-station", "returns-station", "push-station", "pull-station"];
+
+// A recording context that logs every drawn coordinate (for movement diffs)
+// and flags non-finite values.
+function recCtx() {
+  const pts = [], bad = [];
+  const rec = (x, y) => { if (typeof x === "number" && typeof y === "number" && isFinite(x) && isFinite(y)) pts.push(Math.round(x * 100) + "," + Math.round(y * 100)); };
+  const num = (n, a) => { for (const v of a) if (typeof v === "number" && !isFinite(v)) bad.push(n + "=" + v); };
+  return {
+    _pts: pts, _bad: bad,
+    save() {}, restore() {}, beginPath() {}, closePath() {}, fill() {}, stroke() {},
+    moveTo(x, y) { num("moveTo", [x, y]); rec(x, y); }, lineTo(x, y) { num("lineTo", [x, y]); rec(x, y); },
+    arc(x, y, r, a, b) { num("arc", [x, y, r, a, b]); rec(x, y); }, arcTo() {},
+    rect(x, y, w, h) { num("rect", [x, y, w, h]); rec(x, y); }, fillRect(x, y, w, h) { num("fillRect", [x, y, w, h]); rec(x, y); }, strokeRect(x, y, w, h) { num("strokeRect", [x, y, w, h]); rec(x, y); },
+    setLineDash() {}, measureText(t) { return { width: String(t).length * 6 }; }, fillText() {}, strokeText() {},
+    fillStyle: "", strokeStyle: "", lineWidth: 1, lineJoin: "", font: "", textAlign: "", textBaseline: "", globalAlpha: 1,
+  };
+}
+
+/* ---- 18. curved conveyor: domain + registry + palette + 0 capacity --- */
+(() => {
+  const inDomain = !!D.ELEMENTS[CURVE];
+  const inReg = S.has(CURVE) === true;
+  const inPalette = (D.paletteOrder || []).indexOf(CURVE) >= 0;
+  const def = D.ELEMENTS[CURVE] || {};
+  const cap = D.elementCapacity({ type: CURVE, w: def.w || 3, d: def.d || 3 });
+  check("curved conveyor is in the domain, the shape registry (2D+3D) and the palette, with a 0-capacity (flow) schema",
+    inDomain && inReg && inPalette && cap === 0,
+    "domain=" + inDomain + " reg=" + inReg + " palette=" + inPalette + " capacity=" + cap);
+})();
+
+/* ---- 19. curved conveyor 2D+3D smoke: 4 orientations x themes x scales  */
+(() => {
+  const cell = 20, def = D.ELEMENTS[CURVE], P = makeP();
+  let bad = null, notFinite = null, ret = null, mutated = null;
+  for (const arc of ARCS) {
+    for (const theme of THEMES) {
+      for (const lod of [3, 44]) {
+        const g = { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme, lod, arc, anim: 0.3 };
+        const before = JSON.stringify(g);
+        const c = makeCtx();
+        try { if (S.draw2D(c, CURVE, g) !== true) ret = ret || "2D " + arc + "/" + theme + "/" + lod; }
+        catch (e) { bad = bad || "2D " + arc + ": " + e.message; }
+        if (c._bad.length) notFinite = notFinite || "2D " + arc + " " + c._bad[0];
+        if (JSON.stringify(g) !== before) mutated = mutated || "2D " + arc;
+      }
+      const o = { cx: 4, cy: 3, w: def.w, d: def.d, heightM: def.heightM, color: def.color, theme, arc, lod: 60, anim: 0.3, selected: true, selColor: "#38bdf8" };
+      const beforeO = JSON.stringify(o);
+      const c3 = makeCtx();
+      try { if (S.draw3D(c3, CURVE, P, o) !== true) ret = ret || "3D " + arc + "/" + theme; }
+      catch (e) { bad = bad || "3D " + arc + ": " + e.message; }
+      if (c3._bad.length) notFinite = notFinite || "3D " + arc + " " + c3._bad[0];
+      if (JSON.stringify(o) !== beforeO) mutated = mutated || "3D " + arc;
+    }
+  }
+  check("curved conveyor draws 2D+3D across all 4 corner orientations x light/dark x small/large - no throw, all finite, no mutation",
+    !bad && !notFinite && !ret && !mutated,
+    bad || notFinite || (ret ? "ret " + ret : (mutated ? "mutated " + mutated : (ARCS.length * 2 * 2) + " 2D + " + (ARCS.length * 2) + " 3D draws clean")));
+})();
+
+/* ---- 20. curved belt animates + is a DISTINCT glyph from the straight - */
+(() => {
+  const cell = 20, def = D.ELEMENTS[CURVE], sDef = D.ELEMENTS["conveyor"];
+  const drawC = (anim) => { const c = recCtx(); S.draw2D(c, CURVE, { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod: 44, arc: "tr", anim }); return c._pts.join("|"); };
+  const moves = drawC(0.05) !== drawC(0.55);
+  const cCurve = recCtx(); S.draw2D(cCurve, CURVE, { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod: 44, arc: "tr" });
+  const cStr = recCtx(); S.draw2D(cStr, "conveyor", { x: 100, y: 80, w: sDef.w * cell, d: sDef.d * cell, cellPx: cell, color: sDef.color, theme: "light", lod: 44 });
+  const distinct = cCurve._pts.join("|") !== cStr._pts.join("|");
+  check("curved belt animates (unit-loads scroll along the arc across phases) and is a DISTINCT glyph from the straight belt bed",
+    moves && distinct, "moves=" + moves + " distinct=" + distinct);
+})();
+
+/* ---- 21. each of the 4 corner orientations renders a distinct arc ---- */
+(() => {
+  const cell = 20, def = D.ELEMENTS[CURVE];
+  const draw = (arc) => { const c = recCtx(); S.draw2D(c, CURVE, { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod: 44, arc }); return c._pts.join("|"); };
+  const uniq = new Set(ARCS.map(draw));
+  check("the 4 curved-conveyor corner orientations each render a distinct arc geometry",
+    uniq.size === ARCS.length, uniq.size + "/" + ARCS.length + " distinct");
+})();
+
+/* ---- 22. WORKER FIGURE at manned stations: rich adds it + animates + LOD-gated */
+(() => {
+  const cell = 20;
+  let addFail = null, moveFail = null, gateFail = null;
+  const draw = (t, lod, anim) => { const def = D.ELEMENTS[t]; const c = recCtx(); S.draw2D(c, t, { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod, anim, seed: 5 }); return c; };
+  for (const t of MANNED) {
+    const glyphN = draw(t, 24)._pts.length;
+    const richN = draw(t, 60)._pts.length;
+    if (!(richN > glyphN)) addFail = addFail || t + " (rich " + richN + " !> glyph " + glyphN + ")";
+    const a = draw(t, 60, 0.12)._pts.join("|");
+    const b = draw(t, 60, 0.63)._pts.join("|");
+    if (a === b) moveFail = moveFail || t + " (worker static across phases at rich)";
+    const justBelow = draw(t, S.DETAIL_RICH_MIN - 0.5)._pts.join("|");
+    const midGlyph = draw(t, 24)._pts.join("|");
+    if (justBelow !== midGlyph) gateFail = gateFail || t + " (below-threshold != mid glyph)";
+  }
+  check("worker figures render at manned stations (rich tier ADDS the figure), animate across phases, and are LOD-gated to the zoomed-in tier",
+    !addFail && !moveFail && !gateFail, addFail || moveFail || gateFail || MANNED.length + " manned stations OK");
+})();
+
 console.log("");
 console.log(failures === 0
-  ? "ALL SHAPES CHECKS PASSED (17 checks)"
+  ? "ALL SHAPES CHECKS PASSED (22 checks)"
   : failures + " SHAPES CHECK(S) FAILED");
 process.exit(failures === 0 ? 0 : 1);

@@ -230,9 +230,9 @@ check(
   "both in APP_SHELL"
 );
 check(
-  "sw.js cache bumped to wt-v45 (and no longer wt-v44)",
-  /CACHE_VERSION\s*=\s*"wt-v45"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v44"/.test(swJs),
-  "CACHE_VERSION = wt-v45"
+  "sw.js cache bumped to wt-v46 (and no longer wt-v45)",
+  /CACHE_VERSION\s*=\s*"wt-v46"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v45"/.test(swJs),
+  "CACHE_VERSION = wt-v46"
 );
 
 // ---- 9. the two new files reference no external hosts -------------------

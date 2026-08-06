@@ -96,6 +96,7 @@
     "dock-out": 4.5,
     "staging": 1.5,
     "conveyor": 0.9,
+    "conveyor-curve": 0.9,
     "push-station": 1.2,
     "pull-station": 1.2,
     "pack-station": 1.1,
@@ -323,6 +324,8 @@
           cx: e.x, cy: e.y, w: e.w, d: e.d, heightM: h, color: color, theme: theme,
           // User-defined types route through the generic 3D form via base/glyph.
           base: def.base, glyph: def.glyph,
+          // Curved-conveyor corner orientation (ignored by other types).
+          arc: e.arc || def.arc,
           selected: e.id === o.selectedId, selColor: colors.sel,
           anim: animFor ? animFor(e) : undefined,
           lod: pxc, // ON-SCREEN px/cell so the form can pick its rich LOD tier
