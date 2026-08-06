@@ -663,6 +663,19 @@
           <summary class="std-summary">Line detail — utilisation, WIP/lead time &amp; editable cycle times</summary>
           <div id="procDetail" class="proc-detail"><!-- filled by app.js renderProcessPanel() --></div>
         </details>
+
+        <!-- v2.8 FACTORY-D: the FACTORY EFFICIENCY OPTIMISER. One calm action:
+             arrange + balance the line for maximum efficiency. It PREVIEWS the
+             proposed placement (dashed ghosts on the floor) with a headline
+             (MHI down X%, line efficiency Y%->Z%, constraint) and Accept /
+             Cancel. Detail on demand: Placement / Balance / Flow groups + an
+             Advanced/methodology expander (raw F/D matrices, RPW table, the
+             standards basis). Pure engine in optimize_factory.js
+             (WT.factoryOpt); verify_optimize.js covers it headlessly. -->
+        <div class="proc-optimise">
+          <button id="procOptBtn" class="btn primary wide" type="button">Optimise (preview → accept)</button>
+          <div id="procOptOut" class="proc-opt-out"><p class="empty">Arrange + balance the production line for maximum efficiency — CRAFT material-flow placement (min Σ flow × distance) + Ranked-Positional-Weight line-balancing to takt. Previews the change on the floor; nothing moves until you <strong>Accept</strong>. Heuristic (local optimum), modelled — not measured.</p></div>
+        </div>
       </section>
 
       <!-- P3: unit-load catalog (pallets, cartons, totes) -->
@@ -946,6 +959,7 @@
   <script src="compare.js"></script>
   <script src="orderpool.js"></script>
   <script src="process.js"></script>
+  <script src="optimize_factory.js"></script>
   <script src="app.js"></script>
   <!-- In-browser E2E self-test. INERT unless the URL carries ?selftest=1;
        a normal load never runs it. Loaded LAST so the app has booted. -->

@@ -562,6 +562,36 @@
       ctx.restore();
     }
 
+    // v2.8 FACTORY-D: factory-optimiser preview ghosts. Unlike the golden-zone
+    // preview (storage only), this shows the proposed NEW positions of the
+    // moved mfg-* stations (any type) as dashed ghosts with a move arrow, so
+    // the CRAFT placement is visible before Accept. Nothing is applied until
+    // the user Accepts; Cancel clears it.
+    if (state.procPreview && state.procPreview.length) {
+      ctx.save();
+      ctx.setLineDash([5, 3]);
+      ctx.lineWidth = 2;
+      for (const g of state.procPreview) {
+        const def = ELEMENTS[g.type];
+        const gx = g.x * cellPx, gy = g.y * cellPx, gw = g.w * cellPx, gh = g.d * cellPx;
+        roundRect(gx + 2, gy + 2, gw - 4, gh - 4, 6);
+        ctx.strokeStyle = COLORS.sel;
+        ctx.fillStyle = def ? hexA(def.color, 0.12) : hexA(COLORS.sel, 0.1);
+        ctx.fill();
+        ctx.stroke();
+        const cur = state.elements.find((e) => e.id === g.id);
+        if (cur && (cur.x !== g.x || cur.y !== g.y)) {
+          const fx = (cur.x + cur.w / 2) * cellPx, fy = (cur.y + cur.d / 2) * cellPx;
+          const tx = (g.x + g.w / 2) * cellPx, ty = (g.y + g.d / 2) * cellPx;
+          ctx.beginPath();
+          ctx.moveTo(fx, fy);
+          ctx.lineTo(tx, ty);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
     // I/O marker. When the point sits inside a dock (the usual case) the
     // diamond used to cover the dock's own IN/OUT label — hop it to the
     // dock's floor-facing side so both stay readable.
@@ -4230,6 +4260,7 @@
     // (present only for factory layouts; null for a warehouse layout).
     state.process = (WT.process && typeof WT.process.rebuild === "function")
       ? WT.process.rebuild(obj) : null;
+    state.procPreview = null; // v2.8 FACTORY-D: drop any stale optimiser preview
     pushConfigToUI();
     syncFloorInputs();
     renderProps();
@@ -5097,6 +5128,7 @@
     });
     state.selectedId = null;
     state.preview = null;
+    state.procPreview = null; // v2.8 FACTORY-D: drop any stale optimiser preview
     state.complianceHighlight = null;
     if (gen.config) {
       state.config = Object.assign(state.config, {
@@ -5265,6 +5297,191 @@
     scheduleSave();
     renderProcessPanel();
     status("Updated cycle time for " + op.name + " to " + v + " s (modelled). The bottleneck may have moved.");
+  }
+
+  // ================================================================
+  // v2.8 FACTORY-D: the FACTORY EFFICIENCY OPTIMISER UX (WT.factoryOpt).
+  // One calm action: arrange + balance the line for maximum efficiency.
+  // It PREVIEWS the proposed placement (dashed ghosts on the floor) with a
+  // headline, and Accept / Cancel. Detail on demand: Placement / Balance /
+  // Flow collapsible groups + an Advanced/methodology expander (raw F/D
+  // matrices, RPW table, standards basis). The engine is pure + deterministic
+  // in optimize_factory.js; Accept only moves mfg element positions (legal).
+  // ================================================================
+  let procOptResult = null;
+
+  function runFactoryOptimise() {
+    const out = $("procOptOut");
+    if (!out) return;
+    if (!state.process || !WT.factoryOpt || typeof WT.factoryOpt.optimize !== "function") {
+      out.innerHTML = '<p class="empty">Generate a factory line first (switch to <strong>Factory</strong> mode, then Generate), then optimise.</p>';
+      state.procPreview = null; render();
+      return;
+    }
+    readConfigFromUI();
+    let opt = null;
+    try { opt = WT.factoryOpt.optimize(currentLayout(), state.process, simConfig()); } catch (_) { opt = null; }
+    if (!opt || !opt.ok) {
+      out.innerHTML = '<p class="empty">' + esc(opt && opt.reason ? opt.reason : "Nothing to optimise on this layout.") + "</p>";
+      state.procPreview = null; render();
+      return;
+    }
+    procOptResult = opt;
+    // Preview = the moved stations at their PROPOSED positions (dashed ghosts).
+    const moved = opt.placement.moves.map((m) => {
+      const e = state.elements.find((x) => x.id === m.id);
+      return e ? { id: e.id, type: e.type, x: m.to.x, y: m.to.y, w: e.w, d: e.d } : null;
+    }).filter(Boolean);
+    state.procPreview = moved.length ? moved : null;
+    render();
+    out.innerHTML = renderOptimiseReport(opt);
+    const a = $("procOptAccept"), c = $("procOptCancel");
+    if (a) a.addEventListener("click", () => acceptFactoryOptimise(opt));
+    if (c) c.addEventListener("click", cancelFactoryOptimise);
+    const dpct = opt.placement.deltaPct;
+    status(
+      (moved.length
+        ? "Optimiser preview: material flow (MHI) −" + procFmt(dpct) + "%, " + moved.length + " station(s) proposed to move. "
+        : "Optimiser preview: placement already near-optimal. ") +
+      "Line efficiency " + procPct(opt.balance.lineEffBefore) + " → " + procPct(opt.balance.lineEffAfter) +
+      ". Accept or Cancel."
+    );
+  }
+
+  function acceptFactoryOptimise(opt) {
+    for (const g of opt.placement.proposedElements) {
+      const e = state.elements.find((x) => x.id === g.id);
+      if (e) { e.x = g.x; e.y = g.y; }
+    }
+    state.procPreview = null;
+    procOptResult = null;
+    scheduleSave();
+    render();
+    renderProps();
+    renderProcessPanel(); // refresh the line read-out (metrics unchanged by a move)
+    const o = $("procOptOut");
+    if (o) o.innerHTML = '<p class="opt-none">Applied — the line was re-laid-out (still legal). Material flow (MHI) reduced ' +
+      procFmt(opt.placement.deltaPct) + "% (" + opt.placement.movedCount + " station move(s)). The layout stays in-bounds, overlap-free and aisle-valid.</p>";
+    toast("Optimised factory layout applied.");
+  }
+
+  function cancelFactoryOptimise() {
+    state.procPreview = null;
+    procOptResult = null;
+    render();
+    const o = $("procOptOut");
+    if (o) o.innerHTML = '<p class="empty">Cancelled — layout unchanged.</p>';
+  }
+
+  // ---- Optimise report HTML (headline + preview actions + groups) --------
+  function renderOptimiseReport(opt) {
+    const p = opt.placement, b = opt.balance, toc = opt.toc;
+    const moved = p.movedCount;
+    const mhiLine = moved
+      ? "Material flow (MHI) <strong>" + procFmt(p.mhiBefore) + " → " + procFmt(p.mhiAfter) +
+        '</strong> <span class="proc-delta-good">−' + procFmt(p.deltaPct) + "%</span>"
+      : "Material-flow placement is <strong>already near-optimal</strong> (no beneficial legal swap)";
+    const effLine = "line efficiency <strong>" + procPct(b.lineEffBefore) + " → " + procPct(b.lineEffAfter) + "</strong>";
+    const constraint = toc && toc.bottleneckName
+      ? "constraint <strong>" + esc(toc.bottleneckName) + "</strong> · " + procFmt(toc.throughputPerHr) + " parts/hr"
+      : "";
+
+    // Headline + Accept/Cancel.
+    let html =
+      '<div class="opt-headline">' + mhiLine + " · " + effLine + (constraint ? " · " + constraint : "") + "</div>" +
+      '<p class="hint">' + (moved ? "Dashed ghosts show " + moved + " station(s) proposed to move toward shorter material flow. " : "") +
+      "Nothing changes until you Accept. Heuristic (local optimum) — modelled, not measured.</p>" +
+      '<div class="prop-actions"><button id="procOptAccept" class="btn primary" type="button">Accept</button>' +
+      '<button id="procOptCancel" class="btn" type="button">Cancel</button></div>';
+
+    // ---- Placement group ----
+    html += optGroup("Placement — material-flow (CRAFT)",
+      optRows([
+        ["Flow intensity MHI (Σ flow × distance)", procFmt(p.mhiBefore) + " → " + procFmt(p.mhiAfter) + " (−" + procFmt(p.deltaPct) + "%)"],
+        ["Stations moved", String(moved) + " of " + p.elementIds.length + " (equal-footprint swaps)"],
+        ["Swaps committed / candidates evaluated", p.swaps + " / " + p.evaluated],
+        ["Aisle violations (DIN 15185-informed)", p.aisleBefore + " → " + p.aisleAfter + " (never increased)"],
+      ]) +
+      '<p class="proc-basis">CRAFT pairwise-exchange on rectilinear (aisle-following) centroid distances; every candidate passes the app’s in-bounds / overlap / aisle guards.</p>');
+
+    // ---- Balance group ----
+    const bars = b.stations.map((s) => {
+      const w = Math.max(0, Math.min(100, Math.round((s.load / (b.taktSec || 1)) * 100)));
+      return '<div class="proc-bar-row' + (s.overTakt ? " is-bottleneck" : "") + '">' +
+        '<span class="proc-bar-name">S' + s.index + ": " + esc(s.names.join(" + ")) + (s.overTakt ? " — over takt" : "") + "</span>" +
+        '<span class="proc-bar-track" title="Load ' + procFmt(s.load) + " s vs takt " + procFmt(b.taktSec) + ' s">' +
+          '<span class="proc-bar-fill" style="width:' + w + '%"></span></span>' +
+        '<span class="proc-bar-pct">' + procFmt(s.load) + "s</span></div>";
+    }).join("");
+    html += optGroup("Balance — line to takt (RPW)",
+      optRows([
+        ["Takt (shift ÷ demand)", procFmt(b.taktSec) + " s/unit"],
+        ["Workstations", b.nStationsBefore + " → " + b.nStationsAfter + " (theoretical min " + b.theoreticalMinStations + ")"],
+        ["Line efficiency (Σ cycle ÷ n × takt)", procPct(b.lineEffBefore) + " → " + procPct(b.lineEffAfter)],
+        ["Balance delay (idle %)", procFmt(b.balanceDelayBefore) + "% → " + procFmt(b.balanceDelayAfter) + "%"],
+        ["Smoothness index (0 = even)", procFmt(b.smoothnessAfter)],
+      ]) +
+      '<div class="proc-bars" role="group" aria-label="Proposed balanced workstation loads vs takt">' + bars + "</div>" +
+      '<p class="proc-basis">Ranked Positional Weight (Helgeson–Birnie): tasks packed by descending RPW into workstations ≤ takt, honouring precedence. A balance recommendation — it does not move machines.</p>');
+
+    // ---- Flow group (TOC) ----
+    if (toc) {
+      html += optGroup("Flow — throughput &amp; constraint (TOC)",
+        optRows([
+          ["Throughput (Theory of Constraints)", procFmt(toc.throughputPerHr) + " parts/hr"],
+          ["Constraint station", esc(toc.bottleneckName || "—") + " · " + procFmt(toc.bottleneckEffTimeSec) + " s/unit"],
+          ["Demand pace", (toc.demandMet ? "meets" : "below") + " takt " + procFmt(toc.taktSec) + " s"],
+        ]) +
+        '<p class="proc-basis">Throughput is capped by the constraint (max effective cycle) and is unchanged by re-arranging positions — placement shortens travel; to lift throughput, elevate the constraint (add servers / cut its cycle).</p>');
+    }
+
+    // ---- Advanced / methodology (expert density only) ----
+    html += renderOptAdvanced(opt);
+    return html;
+  }
+
+  function optGroup(title, inner) {
+    return '<details class="opt-group"><summary class="std-summary">' + esc(title) + "</summary>" +
+      '<div class="opt-group-body">' + inner + "</div></details>";
+  }
+  function optRows(pairs) {
+    return '<div class="opt-delta">' + pairs.map(
+      (kv) => '<div class="dl-row"><span class="dl-k">' + esc(kv[0]) + '</span><span class="dl-v">' + kv[1] + "</span></div>"
+    ).join("") + "</div>";
+  }
+
+  // Raw F/D matrices + the RPW table + the standards basis. Expert density.
+  function renderOptAdvanced(opt) {
+    const p = opt.placement, b = opt.balance;
+    const short = (nm, i) => "n" + (i + 1);
+    const labels = p.names.map((nm, i) => esc(nm));
+    const idxHdr = p.names.map((nm, i) => '<abbr title="' + esc(nm) + '">' + short(nm, i) + "</abbr>");
+
+    function matrix(M, fmt) {
+      let t = '<table class="opt-matrix"><thead><tr><th></th>' + idxHdr.map((h) => "<th>" + h + "</th>").join("") + "</tr></thead><tbody>";
+      for (let i = 0; i < M.length; i++) {
+        t += "<tr><th>" + idxHdr[i] + "</th>" +
+          M[i].map((v) => "<td>" + fmt(v) + "</td>").join("") + "</tr>";
+      }
+      return t + "</tbody></table>";
+    }
+    const legend = '<p class="opt-legend">' +
+      p.names.map((nm, i) => "<span>" + short(nm, i) + " = " + esc(nm) + "</span>").join(" · ") + "</p>";
+
+    const rpwRows = b.tasks.map((t) =>
+      "<tr><td>" + esc(t.name) + "</td><td>" + t.cycleSec + "</td><td>×" + t.servers + "</td><td>" + procFmt(t.rpw) + "</td></tr>"
+    ).join("");
+
+    return '<details class="opt-advanced" data-density="expert"><summary class="std-summary">Advanced / methodology — F &amp; D matrices, RPW table, standards basis</summary>' +
+      '<div class="opt-group-body">' +
+      "<h4>From-to FLOW matrix F (units/hr)</h4>" + matrix(p.F, (v) => (v ? String(Math.round(v)) : "·")) +
+      "<h4>Rectilinear DISTANCE matrix D (m, centroid → centroid)</h4>" + matrix(p.D, (v) => (v ? procFmt(v) : "·")) +
+      legend +
+      "<h4>Ranked Positional Weight (RPW) table</h4>" +
+      '<table class="opt-rpw"><thead><tr><th>Task</th><th>Cycle s</th><th>Servers</th><th>RPW</th></tr></thead><tbody>' + rpwRows + "</tbody></table>" +
+      '<p class="proc-basis"><strong>Basis.</strong> ' + esc(opt.basis) + "</p>" +
+      '<p class="proc-basis"><strong>Honesty.</strong> ' + esc(opt.honesty) + "</p>" +
+      "</div></details>";
   }
 
   // Reserved-zone overlay (dashed hatch + label) from the last generated
@@ -6732,6 +6949,7 @@
     if ($("autoOverlayBtn")) $("autoOverlayBtn").addEventListener("click", toggleAutoUtil);
     wireFlowControls();
     $("optimizeBtn").addEventListener("click", runOptimize);
+    if ($("procOptBtn")) $("procOptBtn").addEventListener("click", runFactoryOptimise);
     $("compareBtn").addEventListener("click", runCompare);
     $("helpBtn").addEventListener("click", () => { $("onboard").hidden = false; });
     $("onboardClose").addEventListener("click", closeOnboard);
@@ -6969,6 +7187,12 @@
       // v2.7 FACTORY-C: the factory line read-out (process model + line sim)
       renderProcessPanel: renderProcessPanel,
       processMetrics: () => (state.process && WT.process ? WT.process.metrics(state.process) : null),
+      // v2.8 FACTORY-D: drive the factory efficiency optimiser (preview/accept)
+      // through the SAME handlers the button uses, for the live self-test.
+      runFactoryOptimise: runFactoryOptimise,
+      acceptFactoryOptimise: acceptFactoryOptimise,
+      cancelFactoryOptimise: cancelFactoryOptimise,
+      lastOptResult: () => procOptResult,
       render: render,
       setViewMode: setViewMode,
       toggleViewMode: toggleViewMode,

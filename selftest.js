@@ -823,6 +823,76 @@
       return { ok: okAll, detail: detail };
     });
 
+    // ---- v2.8 FACTORY-D: efficiency optimiser preview -> accept --------
+    // Generate a factory line, run the REAL optimise handler (which renders
+    // a before/after headline + dashed preview ghosts), then Accept and
+    // assert the line was re-laid-out LEGALLY (in-bounds, overlap-free, aisle
+    // count NOT increased) and that placement actually moved the stations.
+    check("factory-optimise-preview-accept-relays-out-legally", function () {
+      if (!haveApi || !API.plantMode || typeof API.runGenerate !== "function" ||
+        typeof API.runFactoryOptimise !== "function" || typeof API.acceptFactoryOptimise !== "function") {
+        return { ok: false, detail: "no optimise API" };
+      }
+      if (!WT.factoryOpt || !WT.domain) return { ok: false, detail: "no WT.factoryOpt/domain" };
+      var original = API.plantMode.mode();
+      var okAll = false, detail = "";
+      try {
+        API.plantMode.set("factory");
+        API.runGenerate("assembly-line"); // the REAL Generate handler
+        var lay0 = API.currentLayout();
+        var gw = lay0.gridW, gh = lay0.gridH;
+        var minAisle = API.state.config.minAisleMetres;
+        function legal(els) {
+          for (var i = 0; i < els.length; i++) {
+            var e = els[i];
+            if (!(e.x >= 0 && e.y >= 0 && e.x + e.w <= gw && e.y + e.d <= gh)) return false;
+          }
+          for (var a = 0; a < els.length; a++) for (var b = a + 1; b < els.length; b++) {
+            var p = els[a], q = els[b];
+            if (p.x < q.x + q.w && q.x < p.x + p.w && p.y < q.y + q.d && q.y < p.y + p.d) return false;
+          }
+          return true;
+        }
+        var aisleBefore = WT.domain.aisleViolations(API.state.elements, minAisle).length;
+        var pos0 = {};
+        API.state.elements.forEach(function (e) { pos0[e.id] = e.x + "," + e.y; });
+        // Run the REAL preview handler: headline into #procOptOut + ghosts.
+        API.runFactoryOptimise();
+        var out = document.getElementById("procOptOut");
+        var txt = out ? (out.textContent || "") : "";
+        var opt = API.lastOptResult();
+        var previewOk = !!opt && opt.ok && txt.indexOf("→") !== -1 && // an arrow (before -> after)
+          /line efficiency/i.test(txt) && !!document.getElementById("procOptAccept") &&
+          opt.placement.mhiAfter <= opt.placement.mhiBefore + 1e-6;
+        var movedExpected = opt ? opt.placement.movedCount : 0;
+        // Accept -> apply the placement to the real layout.
+        API.acceptFactoryOptimise(opt);
+        var afterLegal = legal(API.state.elements) &&
+          WT.domain.aisleViolations(API.state.elements, minAisle).length <= aisleBefore;
+        var moved = 0;
+        API.state.elements.forEach(function (e) { if (pos0[e.id] !== e.x + "," + e.y) moved++; });
+        var relayedOut = movedExpected === 0 ? moved === 0 : moved === movedExpected;
+        var procStillValid = !!API.state.process && API.state.process.operations.length >= 3 &&
+          API.state.process.operations.every(function (o) {
+            return API.state.elements.some(function (e) { return e.id === o.elementId; });
+          });
+        okAll = previewOk && afterLegal && relayedOut && procStillValid;
+        detail = "preview=" + previewOk + " legalAfter=" + afterLegal + " moved=" + moved +
+          "/" + movedExpected + " procValid=" + procStillValid +
+          " (MHI " + (opt && opt.placement.mhiBefore) + "->" + (opt && opt.placement.mhiAfter) +
+          ", eff " + (opt && opt.balance.lineEffBefore) + "->" + (opt && opt.balance.lineEffAfter) + ")";
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      } finally {
+        try {
+          API.plantMode.set(original);
+          var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+          if (ex) API.loadExample(ex.id);
+        } catch (_) { /* best-effort restore */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

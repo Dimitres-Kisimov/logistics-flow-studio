@@ -1370,3 +1370,36 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 .proc-cycle-inp:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .proc-little { font-size: 0.74rem; color: var(--text); margin: 6px 0 4px; line-height: 1.5; }
+
+/* ================================================================
+ * v2.8 FACTORY-D: Factory efficiency optimiser (WT.factoryOpt)
+ * Preview -> Accept UX. Calm headline + collapsible Placement / Balance
+ * / Flow groups + an Advanced/methodology expander (F/D matrices, RPW
+ * table). Theme-aware, colourblind-safe, respects reduced motion.
+ * ================================================================ */
+.proc-optimise { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.proc-opt-out { margin-top: 8px; }
+.proc-opt-out .empty, .proc-opt-out .opt-none { color: var(--text-dim); font-size: 0.8rem; line-height: 1.5; }
+.opt-headline {
+  font-size: 0.85rem; color: var(--text); line-height: 1.55; margin: 2px 0 6px;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.proc-delta-good { color: var(--ok, #16a34a); font-weight: 700; }
+.opt-group { margin-top: 8px; }
+.opt-group > summary { cursor: pointer; }
+.opt-group-body { padding: 6px 0 2px; }
+.opt-group-body h4 { font-size: 0.72rem; margin: 8px 0 4px; color: var(--text); text-transform: uppercase; letter-spacing: 0.03em; }
+.opt-matrix, .opt-rpw {
+  width: 100%; border-collapse: collapse; font-size: 0.7rem; margin: 2px 0 4px;
+  font-variant-numeric: tabular-nums; display: block; overflow-x: auto;
+}
+.opt-matrix th, .opt-matrix td, .opt-rpw th, .opt-rpw td {
+  border: 1px solid var(--border); padding: 2px 6px; text-align: right; white-space: nowrap;
+}
+.opt-matrix thead th, .opt-rpw thead th { background: color-mix(in srgb, var(--text-dim) 10%, transparent); color: var(--text-dim); }
+.opt-matrix tbody th { background: color-mix(in srgb, var(--text-dim) 10%, transparent); color: var(--text-dim); text-align: left; }
+.opt-rpw td:first-child { text-align: left; }
+.opt-matrix abbr { text-decoration: none; cursor: help; border-bottom: 1px dotted var(--text-dim); }
+.opt-legend { font-size: 0.66rem; color: var(--text-dim); line-height: 1.5; margin: 2px 0 4px; }
+.opt-legend span { display: inline-block; margin-right: 4px; }

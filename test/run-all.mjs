@@ -383,6 +383,22 @@
  *      and the modelled / deterministic / teaching-scale / TOC / Little's Law
  *      / NOT-a-DES / NOT-CAD-BIM / NOT-a-certification honesty labels present.
  *
+ *  35. verify_optimize.js  - Factory EFFICIENCY OPTIMIZER (v2.8 FACTORY-D):
+ *      the CRAFT material-flow placement + RPW line-balancing + TOC read-out
+ *      (WT.factoryOpt) on top of the process model. buildFD() builds F (from
+ *      routing) + D (rectilinear centroid distance) correctly from a KNOWN
+ *      process; craft() minimises MHI = SUM F*D by equal-footprint pairwise
+ *      exchange - MHI monotone NON-INCREASING, the result always LEGAL (in-
+ *      bounds, overlap-free, aisle count not increased) and byte-identical
+ *      across runs (deterministic), on the known case AND every generated
+ *      factory; rpw() respects precedence, packs to takt and its takt-basis
+ *      line-efficiency formula is correct on a hand-computed example (an over-
+ *      takt task gets its own flagged station); optimize() reads throughput/
+ *      bottleneck back through WT.process.metrics; a WAREHOUSE layout is a
+ *      strict NO-OP (ok:false) and stays byte-identical; and the modelled /
+ *      deterministic / local-optimum / NOT-optimal / NOT-a-DES / NOT-CAD-BIM
+ *      / NOT-a-certification / does-not-beat-the-suites honesty is restated.
+ *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
  * ===================================================================== */
@@ -429,6 +445,7 @@ const HARNESSES = [
   { name: "Story Mode: cinematic guided tour plan + camera math (verify_story.js)", args: ["verify_story.js"] },
   { name: "User-definable object library (verify_library.js)", args: ["verify_library.js"] },
   { name: "Factory process model + deterministic line sim (verify_process.js)", args: ["verify_process.js"] },
+  { name: "Factory efficiency optimizer: CRAFT placement + RPW balance + TOC (verify_optimize.js)", args: ["verify_optimize.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 
