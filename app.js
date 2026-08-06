@@ -2713,9 +2713,14 @@
     const locked = !isCustom && !caps.paletteAllowed(type);
     const catLabel = isCustom ? def.base : def.category;
     btn.innerHTML =
-      `<span class="pal-swatch" style="background:${esc(def.color)}"></span>` +
+      `<span class="pal-swatch pal-glyph"></span>` +
       `<span class="pal-name">${esc(def.label)}</span>` +
       (locked ? WT.tiers.padlockSVG() : `<span class="pal-cat">${esc(catLabel)}</span>`);
+    // v3.9 REDESIGN-2 (icon-led library): paint the per-type WT.shapes glyph
+    // into the swatch so the palette icon MATCHES what lands on the floor (one
+    // source of truth). Falls back to the flat colour if shapes is unavailable.
+    const sw = btn.querySelector(".pal-swatch");
+    if (sw) paintPaletteGlyph(sw, type, def);
     if (locked) {
       btn.classList.add("locked");
       btn.setAttribute("aria-disabled", "true");
@@ -2744,6 +2749,39 @@
     }
     row.appendChild(mini);
     body.appendChild(row);
+  }
+
+  // v3.9 REDESIGN-2: render the per-type WT.shapes glyph into a Class Library
+  // swatch as a tiny offline canvas (currentColor/theme-aware via draw2D). One
+  // source of truth with the on-canvas glyph; degrades to a flat colour swatch.
+  function paintPaletteGlyph(host, type, def) {
+    try {
+      if (!host || !def) return;
+      if (!WT.shapes || typeof WT.shapes.draw2D !== "function") { host.style.background = def.color; return; }
+      const size = 28;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(size * dpr);
+      cv.height = Math.round(size * dpr);
+      const ctx = cv.getContext("2d");
+      if (!ctx) { host.style.background = def.color; return; }
+      ctx.scale(dpr, dpr);
+      const theme = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+      const w = def.w > 0 ? def.w : 1;
+      const d = def.d > 0 ? def.d : 1;
+      const pad = 3;
+      const avail = size - pad * 2;
+      const cellPx = Math.max(4, Math.floor(avail / Math.max(w, d)));
+      const gw = w * cellPx;
+      const gd = d * cellPx;
+      const g = { x: (size - gw) / 2, y: (size - gd) / 2, w: w, d: d, cellPx: cellPx, color: def.color, theme: theme, lod: cellPx };
+      if (def.custom && def.glyph) g.glyph = def.glyph;
+      const ok = WT.shapes.draw2D(ctx, type, g);
+      if (!ok) { host.style.background = def.color; return; }
+      host.appendChild(cv);
+    } catch (_) {
+      try { host.style.background = def.color; } catch (__) { /* best-effort */ }
+    }
   }
 
   // Clone a built-in SEED into a new editable custom object (the built-in is
@@ -5090,6 +5128,9 @@
   function revealCard(cardId) {
     const card = document.getElementById(cardId);
     if (!card) return null;
+    // v3.9 REDESIGN-2: open the drawer this card was re-homed into first.
+    const dn = drawerNameForCard(card);
+    if (dn && railState.openName !== dn) openDrawer(dn);
     const title = card.querySelector(":scope > .card-title");
     if (title && card.classList.contains("card--collapsed")) title.click();
     try { card.scrollIntoView({ block: "nearest" }); } catch (_) { /* best-effort */ }
@@ -7717,7 +7758,12 @@
   function revealControl(el) {
     if (!el || !el.closest) return;
     const card = el.closest("section.card");
-    if (card && card.classList.contains("card--collapsed")) {
+    if (!card) return;
+    // v3.9 REDESIGN-2: the card now lives in a flyout drawer - open it first so
+    // a Ctrl-K action or a deep-link actually SHOWS the control it targets.
+    const dn = drawerNameForCard(card);
+    if (dn && railState.openName !== dn) openDrawer(dn);
+    if (card.classList.contains("card--collapsed")) {
       const title = card.querySelector(":scope > .card-title");
       if (title) title.click(); // toggles the collapsed card open (same handler)
     }
@@ -7892,7 +7938,187 @@
         run: runPaletteCommand,
         controller: () => cmdPaletteCtl,
       },
+      // v3.9 REDESIGN-2: the slim icon rail + one-at-a-time flyout drawers.
+      // Drive open/close through the SAME functions the rail buttons call, and
+      // read which drawer is open + which drawer a card was re-homed into.
+      rail: {
+        open: (name) => openDrawer(name),
+        close: () => closeDrawer(false),
+        toggle: (name) => toggleDrawer(name, null),
+        openName: () => railState.openName,
+        drawerFor: (cardId) => drawerNameForCard(document.getElementById(cardId)),
+        names: () => RAIL_DRAWERS.map((d) => d.name),
+      },
     };
+  }
+
+  // ====================================================================
+  // v3.9 REDESIGN-2: slim ICON RAIL + one-at-a-time FLYOUT DRAWERS.
+  // The de-clutter: the canvas gets the space; the existing side-panel cards
+  // are RE-HOMED (moved, never rebuilt or deleted) into a single flyout drawer
+  // host, one drawer per rail icon, only ONE open at a time. Every control id
+  // + event handler is preserved (moving a DOM node keeps both); the Ctrl-K
+  // palette + the canvas empty-state stay as complementary fast paths.
+  // ====================================================================
+  const RAIL_DRAWERS = [
+    { name: "inspect",   title: "Select & inspect",    cards: ["propCard"] },
+    { name: "library",   title: "Class Library",       cards: ["paletteCard"] },
+    { name: "generate",  title: "Generate environment",cards: ["genCard"] },
+    { name: "examples",  title: "Example scenarios",   cards: ["examplesCard"] },
+    { name: "simulate",  title: "Simulate & operations", cards: ["simCard", "histCard", "wmsCard", "autoCard", "storageCard", "flowCard", "procCard"] },
+    { name: "analyze",   title: "Analyze",             cards: ["analyzeCard", "catalogCard", "advisorCard", "optCard", "abCard", "complCard"] },
+    { name: "report",    title: "Report & export",     cards: ["layoutCard"] },
+    { name: "saveshare", title: "Save & share",        cards: ["scenariosCard", "compareCard"] },
+    { name: "settings",  title: "Settings & data",     cards: ["dataCard", "wmsDataCard", "underlayCard", "kbCard", "stdCard"] },
+  ];
+  const railState = { openName: null, panels: null, btns: null, host: null, rail: null };
+
+  function drawerNameForCard(card) {
+    if (!card || !card.id) return null;
+    for (let i = 0; i < RAIL_DRAWERS.length; i++) {
+      if (RAIL_DRAWERS[i].cards.indexOf(card.id) !== -1) return RAIL_DRAWERS[i].name;
+    }
+    return null;
+  }
+
+  // Expand the FIRST card of a drawer when it opens, so a freshly-opened drawer
+  // never shows only a collapsed header (single-card drawers show their panel;
+  // multi-card drawers reveal their lead card, the rest stay a compact list).
+  function expandFirstCard(panel) {
+    if (!panel) return;
+    const card = panel.querySelector(".wt-drawer-body > section.card");
+    if (!card) return;
+    const title = card.querySelector(":scope > .card-title");
+    if (title && card.classList.contains("card--collapsed")) title.click();
+  }
+
+  function openDrawer(name) {
+    if (!railState.panels || !railState.panels[name]) return false;
+    if (railState.openName && railState.openName !== name) closeDrawer(false); // one-at-a-time
+    railState.host.hidden = false;
+    railState.host.setAttribute("aria-hidden", "false");
+    Object.keys(railState.panels).forEach((k) => {
+      const p = railState.panels[k];
+      const on = k === name;
+      p.hidden = !on;
+      p.classList.toggle("open", on);
+    });
+    railState.openName = name;
+    (railState.btns || []).forEach((b) => {
+      const on = b.getAttribute("data-drawer") === name;
+      b.classList.toggle("active", on);
+      if (b.hasAttribute("aria-expanded")) b.setAttribute("aria-expanded", on ? "true" : "false");
+    });
+    expandFirstCard(railState.panels[name]);
+    return true;
+  }
+
+  function closeDrawer(returnFocus) {
+    if (!railState.host) return;
+    const wasName = railState.openName;
+    Object.keys(railState.panels || {}).forEach((k) => {
+      const p = railState.panels[k];
+      p.hidden = true;
+      p.classList.remove("open");
+    });
+    railState.host.hidden = true;
+    railState.host.setAttribute("aria-hidden", "true");
+    railState.openName = null;
+    (railState.btns || []).forEach((b) => {
+      b.classList.remove("active");
+      if (b.hasAttribute("aria-expanded")) b.setAttribute("aria-expanded", "false");
+    });
+    if (returnFocus && wasName) {
+      const btn = (railState.btns || []).filter((b) => b.getAttribute("data-drawer") === wasName)[0];
+      if (btn) { try { btn.focus(); } catch (_) { /* best-effort */ } }
+    }
+  }
+
+  function toggleDrawer(name, btn) {
+    if (railState.openName === name) { closeDrawer(true); return; }
+    openDrawer(name);
+  }
+
+  function onRailKeydown(e, btns, i) {
+    let ni = -1;
+    switch (e.key) {
+      case "ArrowDown": case "ArrowRight": ni = (i + 1) % btns.length; break;
+      case "ArrowUp":   case "ArrowLeft":  ni = (i - 1 + btns.length) % btns.length; break;
+      case "Home": ni = 0; break;
+      case "End":  ni = btns.length - 1; break;
+      default: return;
+    }
+    e.preventDefault();
+    btns[i].tabIndex = -1;
+    btns[ni].tabIndex = 0;
+    try { btns[ni].focus(); } catch (_) { /* best-effort */ }
+  }
+
+  function initRail() {
+    const rail = document.getElementById("wtRail");
+    const host = document.getElementById("wtDrawerHost");
+    if (!rail || !host) return; // graceful: the app still works without the rail
+    const panels = {};
+    RAIL_DRAWERS.forEach((d) => {
+      const panel = document.createElement("section");
+      panel.className = "wt-drawer";
+      panel.setAttribute("data-drawer", d.name);
+      panel.setAttribute("role", "region");
+      panel.setAttribute("aria-label", d.title);
+      panel.hidden = true;
+      const head = document.createElement("div");
+      head.className = "wt-drawer-head";
+      const title = document.createElement("span");
+      title.className = "wt-drawer-title";
+      title.textContent = d.title;
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "wt-drawer-close";
+      close.setAttribute("aria-label", "Close " + d.title + " panel");
+      close.innerHTML = "&#10005;"; // multiplication X
+      close.addEventListener("click", () => closeDrawer(true));
+      head.appendChild(title);
+      head.appendChild(close);
+      const body = document.createElement("div");
+      body.className = "wt-drawer-body";
+      body.id = "wtDrawerBody-" + d.name;
+      // RE-HOME each existing card into this drawer body. appendChild MOVES the
+      // node out of its source column - id, inner controls + handlers intact.
+      d.cards.forEach((cid) => {
+        const card = document.getElementById(cid);
+        if (card) body.appendChild(card);
+      });
+      panel.appendChild(head);
+      panel.appendChild(body);
+      host.appendChild(panel);
+      panels[d.name] = panel;
+    });
+    railState.panels = panels;
+    railState.host = host;
+    railState.rail = rail;
+
+    const btns = Array.prototype.slice.call(rail.querySelectorAll(".wt-rail-btn"));
+    railState.btns = btns;
+    btns.forEach((btn, i) => {
+      btn.tabIndex = i === 0 ? 0 : -1; // roving tabindex
+      btn.addEventListener("click", () => {
+        const action = btn.getAttribute("data-rail-action");
+        if (action === "help") { const a = document.getElementById("aboutBtn"); if (a) a.click(); return; }
+        const drawer = btn.getAttribute("data-drawer");
+        if (drawer === "inspect") { try { setTool(null); } catch (_) { /* best-effort */ } }
+        toggleDrawer(drawer, btn);
+      });
+      btn.addEventListener("keydown", (e) => onRailKeydown(e, btns, i));
+    });
+
+    // Esc closes the open drawer when focus is inside the drawer or the rail,
+    // returning focus to the triggering rail button. Scoped so it never steals
+    // Esc from the canvas (placement cancel), a modal or the command palette.
+    const escClose = (e) => {
+      if (e.key === "Escape" && railState.openName) { e.stopPropagation(); closeDrawer(true); }
+    };
+    host.addEventListener("keydown", escClose);
+    rail.addEventListener("keydown", escClose);
   }
 
   function boot() {
@@ -7910,6 +8136,7 @@
     buildExampleQuickPick();
     buildAbout(); // P8: render the About / why-this copy from WT.demo.ABOUT
     initCollapsibleCards(); // v1.0: make the side-panel cards collapsible (default expanded)
+    initRail(); // v3.9 REDESIGN-2: slim icon rail + one-at-a-time flyout drawers (re-homes the cards)
     wireButtons();
     mountCommandPalette(); // v3.6 UI-3: the Ctrl/Cmd-K command palette (additive overlay)
     wireDefineObject(); // user-definable object library (Define Object + import/export)
@@ -7954,6 +8181,7 @@
       COLORS = themeColors();
       render();
       drawFlowKpis(); // repaint the cockpit in the new theme
+      if (typeof buildPalette === "function") buildPalette(); // v3.9: redraw the icon-led library glyphs for the new theme
     });
   }
 

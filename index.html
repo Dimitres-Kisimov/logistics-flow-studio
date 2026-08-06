@@ -131,6 +131,64 @@
 
   <!-- ================= MAIN LAYOUT ================= -->
   <main class="layout" aria-label="Warehouse planner">
+    <!-- v3.9 REDESIGN-2: a slim, always-visible ICON RAIL. Each button opens
+         its panel as a single FLYOUT DRAWER (one open at a time); clicking the
+         active icon again, or Esc, closes it, so the canvas keeps the space.
+         The existing side-panel cards are RE-HOMED into these drawers at
+         runtime by app.js (initRail) - the markup is moved, never rebuilt or
+         deleted, so every control id + handler is preserved and every panel is
+         one click away. Roving tabindex + aria-expanded + focus-visible are
+         wired by app.js; the icons are inline SVG (currentColor, offline,
+         theme-aware). The Ctrl-K palette + the canvas empty-state stay as
+         complementary fast paths. Static buttons = keyboard-accessible even
+         before JS; app.js only ADDS behaviour + ids for the rail/drawers. -->
+    <nav class="wt-rail" id="wtRail" aria-label="Primary tools" data-selftest="rail">
+      <button class="wt-rail-btn" type="button" data-drawer="inspect" aria-expanded="false" aria-controls="wtDrawerHost" aria-label="Select and inspect — pointer tool and element properties" title="Select / Inspect — pointer tool; opens the Properties inspector for the selected element">
+        <span class="wt-rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 8-6 1.5L9.5 19z"/></svg></span>
+        <span class="wt-rail-label">Select</span>
+      </button>
+      <button class="wt-rail-btn" type="button" data-drawer="library" aria-expanded="false" aria-controls="wtDrawerHost" aria-label="Class Library — components to place on the floor" title="Library — the Class Library of components (drag or click to place)">
+        <span class="wt-rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg></span>
+        <span class="wt-rail-label">Library</span>
+      </button>
+      <button class="wt-rail-btn" type="button" data-drawer="generate" aria-expanded="false" aria-controls="wtDrawerHost" aria-label="Generate an environment with AI" title="Generate — build a whole plant from a profile, then steer with plain-language commands">
+        <span class="wt-rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M18 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg></span>
+        <span class="wt-rail-label">Generate</span>
+      </button>
+      <button class="wt-rail-btn" type="button" data-drawer="examples" aria-expanded="false" aria-controls="wtDrawerHost" aria-label="Example scenarios to load onto the floor" title="Examples — ready-made synthetic scenarios to load and explore">
+        <span class="wt-rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="12" height="14" rx="1.5"/><path d="M8 3h11a1 1 0 0 1 1 1v13"/></svg></span>
+        <span class="wt-rail-label">Examples</span>
+      </button>
+      <button class="wt-rail-btn" type="button" data-drawer="simulate" aria-expanded="false" aria-controls="wtDrawerHost" aria-label="Simulate — run WMS operations, live flow and factory line" title="Simulate — run the simulation, WMS operations, live material flow and factory line">
+        <span class="wt-rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4l13 8-13 8z"/></svg></span>
+        <span class="wt-rail-label">Simulate</span>
+      </button>
+      <button class="wt-rail-btn" type="button" data-drawer="analyze" aria-expanded="false" aria-controls="wtDrawerHost" aria-label="Analyze — bottleneck, material-flow Sankey, advisor, optimizer, compliance" title="Analyze — bottleneck ranking, material-flow Sankey, advisor, optimizer and compliance">
+        <span class="wt-rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg></span>
+        <span class="wt-rail-label">Analyze</span>
+      </button>
+      <button class="wt-rail-btn" type="button" data-drawer="report" aria-expanded="false" aria-controls="wtDrawerHost" aria-label="Report and export — layout, WMS report, IFC export" title="Report / Export — the Layout hub: WMS report, IFC export, save/load/import/export/clear">
+        <span class="wt-rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg></span>
+        <span class="wt-rail-label">Report</span>
+      </button>
+      <button class="wt-rail-btn" type="button" data-drawer="saveshare" aria-expanded="false" aria-controls="wtDrawerHost" aria-label="Save and share — my scenarios and A/B compare" title="Save / Share — your saved scenarios and A/B compare">
+        <span class="wt-rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/></svg></span>
+        <span class="wt-rail-label">Save</span>
+      </button>
+      <button class="wt-rail-btn" type="button" data-drawer="settings" aria-expanded="false" aria-controls="wtDrawerHost" aria-label="Settings — data import, SKU/order data, underlay, standards knowledge base" title="Settings — import data, SKU/order data, floor-plan underlay, editable standards knowledge base">
+        <span class="wt-rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h4M12 17h8"/><circle cx="10" cy="17" r="2"/></svg></span>
+        <span class="wt-rail-label">Settings</span>
+      </button>
+      <button class="wt-rail-btn" type="button" data-rail-action="help" aria-haspopup="dialog" aria-label="Help and About" title="Help — About this app, what it is, and how it stays honest">
+        <span class="wt-rail-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.5 1.5c0 1.7-2 2-2 3.5"/><path d="M12 17.5h.01"/></svg></span>
+        <span class="wt-rail-label">Help</span>
+      </button>
+    </nav>
+    <!-- The single flyout-drawer host. app.js builds one drawer panel per rail
+         target inside it and MOVES the existing cards in; only one is shown at
+         a time. Starts closed (hidden) - no forbidden collapsed class, so
+         verify_ui holds. -->
+    <div class="wt-drawer-host" id="wtDrawerHost" hidden aria-hidden="true"></div>
     <!-- LEFT: palette + layout actions -->
     <aside class="col left" aria-label="Building tools: palette, generator, examples, scenarios and data">
       <!-- AI Environment Generator: build a whole valid layout from a plant
@@ -227,7 +285,7 @@
         <div id="palette" class="palette"><!-- filled by app.js buildPalette() as a categorised tree --></div>
       </section>
 
-      <section class="card">
+      <section class="card" id="layoutCard">
         <h2 class="card-title">Layout</h2>
         <div class="btn-grid">
           <button id="saveBtn" class="btn" type="button" title="Save to this browser">Save</button>
@@ -564,7 +622,7 @@
       </section>
 
       <!-- Round 2: run history (session-only experiment log) -->
-      <section class="card" data-default-collapsed>
+      <section class="card" id="histCard" data-default-collapsed>
         <h2 class="card-title">Run history</h2>
         <p class="hint">Every Run appends a row (newest first) so you can compare experiments without notes on paper. Green marks the best pick travel and throughput so far. <strong>Session-only</strong> — rows describe layouts that may have changed since, so the log is not saved with the layout. EUR/ord uses the wage set at that run. Same seed &amp; setup → identical row.</p>
         <div id="histWrap" class="hist-wrap"><p class="empty">Run the simulation — every run lands here as a comparable row.</p></div>
@@ -771,7 +829,7 @@
       </section>
 
       <!-- P3: unit-load catalog (pallets, cartons, totes) -->
-      <section class="card">
+      <section class="card" id="catalogCard">
         <details id="catalogDetails">
           <summary class="std-summary">Unit loads — pallets, cartons &amp; totes</summary>
           <div class="field-row" style="margin-top:10px">
@@ -789,7 +847,7 @@
       </section>
 
       <!-- P2: heuristic advisor -->
-      <section class="card" data-default-collapsed>
+      <section class="card" id="advisorCard" data-default-collapsed>
         <h2 class="card-title">Advisor</h2>
         <p class="hint">A <strong>heuristic advisor</strong> informed by operations-research &amp; warehousing best practice — a transparent rule engine, <em>not</em> a trained/black-box model. Impacts are estimated with the same simulation.</p>
         <button id="adviseBtn" class="btn primary wide" type="button">Analyze layout</button>
@@ -797,7 +855,7 @@
       </section>
 
       <!-- P2: spatial-layout optimizer -->
-      <section class="card" data-default-collapsed>
+      <section class="card" id="optCard" data-default-collapsed>
         <h2 class="card-title">Layout optimizer</h2>
         <p class="hint">Golden-zone heuristic: pulls storage toward the outbound dock, keeping aisles valid. Previews the change and the predicted KPIs before you apply it.</p>
         <button id="optimizeBtn" class="btn primary wide" type="button">Optimize (preview)</button>
@@ -805,7 +863,7 @@
       </section>
 
       <!-- P2: comparative A/B predictor -->
-      <section class="card" data-default-collapsed>
+      <section class="card" id="abCard" data-default-collapsed>
         <h2 class="card-title">Compare A/B</h2>
         <p class="hint">Runs the sim twice (same seed → deterministic) and diffs the KPIs.</p>
         <div class="ab-grid">
@@ -880,7 +938,7 @@
       </section>
 
       <!-- P2: German-standards panel (collapsible) -->
-      <section class="card">
+      <section class="card" id="stdCard">
         <details id="stdDetails">
           <summary class="std-summary">German standards this app is <em>informed by</em></summary>
           <p id="stdAisleLive" class="std-live">Live DIN 15185 check: —</p>

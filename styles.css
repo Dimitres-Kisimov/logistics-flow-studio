@@ -175,15 +175,164 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6
 a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); font-weight: 600; white-space: nowrap; }
 
 /* ---------------- Layout ---------------- */
+/* v3.9 REDESIGN-2: canvas-hero shell. A slim icon rail on the left + the
+   canvas filling the rest; the old left/right panel columns are RE-HOMED into
+   flyout drawers by app.js and hidden here (kept in the DOM as empty,
+   aria-labelled landmarks). position:relative anchors the absolute drawer. */
 .layout {
-  display: grid;
-  grid-template-columns: 250px minmax(0, 1fr) 320px;
+  display: flex;
+  align-items: stretch;
   gap: 14px;
   padding: 14px;
-  align-items: start;
+  position: relative;
 }
 .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.col.center { position: sticky; top: 64px; }
+.col.center { flex: 1 1 auto; min-width: 0; }
+/* The panels now live in drawers; their source columns are emptied at runtime
+   and hidden. They remain in the DOM (landmarks) but take no layout space. */
+.col.left, .col.right { display: none; }
+
+/* ---------------- v3.9 slim icon rail ---------------- */
+.wt-rail {
+  flex: 0 0 auto;
+  width: 56px;
+  align-self: stretch;
+  position: sticky;
+  top: 64px;
+  height: max-content;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 30;
+}
+.wt-rail-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 2px 5px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.wt-rail-btn:hover { background: var(--surface-2, rgba(127, 127, 127, 0.12)); }
+.wt-rail-ico { display: inline-flex; color: var(--text-dim); transition: color 0.14s ease; }
+.wt-rail-ico svg { display: block; }
+.wt-rail-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.01em;
+  color: var(--text-dim);
+  text-align: center;
+}
+.wt-rail-btn:hover .wt-rail-ico,
+.wt-rail-btn:hover .wt-rail-label { color: var(--text); }
+.wt-rail-btn.active {
+  background: color-mix(in srgb, var(--accent, #2563eb) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent, #2563eb) 40%, transparent);
+}
+.wt-rail-btn.active .wt-rail-ico,
+.wt-rail-btn.active .wt-rail-label { color: var(--accent, #2563eb); }
+.wt-rail-btn:focus-visible {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 2px;
+}
+
+/* ---------------- v3.9 flyout drawer (one open at a time) ---------------- */
+.wt-drawer-host {
+  position: absolute;
+  top: 0;
+  left: calc(56px + 14px + 14px);
+  bottom: 0;
+  width: min(380px, 82vw);
+  z-index: 40;
+  pointer-events: none;
+}
+.wt-drawer-host[hidden] { display: none; }
+.wt-drawer {
+  display: none;
+  flex-direction: column;
+  max-height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28), var(--shadow);
+  pointer-events: auto;
+  overflow: hidden;
+  transform: translateX(-8px);
+  opacity: 0;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+.wt-drawer.open { display: flex; transform: none; opacity: 1; }
+.wt-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.wt-drawer-title { font-size: 0.92rem; font-weight: 600; }
+.wt-drawer-close {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+.wt-drawer-close:hover { background: var(--surface-2, rgba(127, 127, 127, 0.12)); }
+.wt-drawer-close:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: 2px; }
+.wt-drawer-body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Cards inside a drawer body sit flush (the drawer supplies the surface). */
+.wt-drawer-body .card { box-shadow: none; }
+
+/* v3.9 icon-led Class Library item: the flat colour swatch is upgraded to a
+   mini WT.shapes glyph so the palette icon matches what lands on the floor. */
+.pal-swatch.pal-glyph {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  padding: 1px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.10)) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.pal-swatch.pal-glyph canvas { width: 28px; height: 28px; display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wt-drawer { transition: none; }
+  .wt-rail-btn { transition: none; }
+}
+
+/* Narrow screens: the rail stays; the drawer becomes a wider overlay. */
+@media (max-width: 820px) {
+  .wt-drawer-host { left: calc(56px + 14px + 10px); width: min(340px, 88vw); }
+}
 
 .card {
   background: var(--surface);

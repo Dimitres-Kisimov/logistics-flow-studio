@@ -1371,6 +1371,77 @@
       };
     });
 
+    // ---- v3.9 REDESIGN-2: slim ICON RAIL + one-at-a-time FLYOUT DRAWERS ----
+    // The de-clutter: a slim rail of labelled icon buttons; clicking one opens
+    // its panel as a single flyout drawer (only one open at a time); Esc / the
+    // active icon closes it. The existing cards were RE-HOMED into the drawers,
+    // so every previously-verified control still exists inside its drawer.
+    check("rail-renders-labelled-icon-buttons", function () {
+      var rail = document.getElementById("wtRail");
+      var btns = rail ? rail.querySelectorAll(".wt-rail-btn") : [];
+      var n = btns.length;
+      var allLabelled = n > 0;
+      var allIconed = n > 0;
+      for (var i = 0; i < n; i++) {
+        if (!btns[i].getAttribute("aria-label")) allLabelled = false;
+        if (!btns[i].querySelector(".wt-rail-ico svg")) allIconed = false;
+      }
+      return { ok: !!rail && n >= 10 && allLabelled && allIconed,
+        detail: "rail=" + !!rail + " buttons=" + n + " labelled=" + allLabelled + " iconed=" + allIconed };
+    });
+
+    check("rail-click-opens-its-drawer", function () {
+      var libBtn = document.querySelector('#wtRail [data-drawer="library"]');
+      if (!libBtn) return { ok: false, detail: "no library rail button" };
+      libBtn.click();
+      var host = document.getElementById("wtDrawerHost");
+      var panel = document.querySelector('.wt-drawer[data-drawer="library"]');
+      var open = !!panel && panel.classList.contains("open") && !panel.hidden;
+      var hostShown = !!host && !host.hidden;
+      var expanded = libBtn.getAttribute("aria-expanded") === "true";
+      var hasPalette = !!(panel && panel.querySelector("#palette"));
+      return { ok: open && hostShown && expanded && hasPalette,
+        detail: "open=" + open + " hostShown=" + hostShown + " aria-expanded=" + expanded + " containsPalette=" + hasPalette };
+    });
+
+    check("rail-one-drawer-open-at-a-time", function () {
+      var genBtn = document.querySelector('#wtRail [data-drawer="generate"]');
+      if (!genBtn) return { ok: false, detail: "no generate rail button" };
+      genBtn.click(); // opening Generate must CLOSE Library (one-at-a-time)
+      var gen = document.querySelector('.wt-drawer[data-drawer="generate"]');
+      var lib = document.querySelector('.wt-drawer[data-drawer="library"]');
+      var genOpen = !!gen && gen.classList.contains("open") && !gen.hidden;
+      var libClosed = !!lib && !lib.classList.contains("open") && lib.hidden;
+      var genHasBtn = !!(gen && gen.querySelector("#genBtn"));
+      return { ok: genOpen && libClosed && genHasBtn,
+        detail: "generateOpen=" + genOpen + " libraryClosed=" + libClosed + " containsGenBtn=" + genHasBtn };
+    });
+
+    check("rail-esc-closes-open-drawer", function () {
+      var panel = document.querySelector(".wt-drawer.open");
+      if (!panel) return { ok: false, detail: "no open drawer to close" };
+      var ev;
+      try { ev = new KeyboardEvent("keydown", { key: "Escape", bubbles: true }); }
+      catch (e) { ev = document.createEvent("Event"); ev.initEvent("keydown", true, true); ev.key = "Escape"; }
+      panel.dispatchEvent(ev);
+      var host = document.getElementById("wtDrawerHost");
+      var anyOpen = !!document.querySelector(".wt-drawer.open");
+      var hostHidden = !!host && host.hidden;
+      return { ok: !anyOpen && hostHidden, detail: "anyOpen=" + anyOpen + " hostHidden=" + hostHidden };
+    });
+
+    check("rail-relocated-controls-preserved-in-drawers", function () {
+      var probes = ["palette", "genBtn", "exampleList", "simCard", "analyzeBottleneck", "propPanel"];
+      var missing = [], outside = [];
+      probes.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) { missing.push(id); return; }
+        if (!el.closest || !el.closest(".wt-drawer")) outside.push(id);
+      });
+      return { ok: missing.length === 0 && outside.length === 0,
+        detail: "missing=[" + missing.join(",") + "] notInDrawer=[" + outside.join(",") + "]" };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {
