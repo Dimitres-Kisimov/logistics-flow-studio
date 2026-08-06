@@ -454,7 +454,7 @@
  *      fuzzy subsequence (empty->whole list, impossible->[], stable ranking),
  *      the shipped wiring (palette.js before app.js, the accessible overlay +
  *      affordance, app.js mounts + dispatches to setTool/runGenerate/click/the
- *      actionKey switch, sw precache at wt-v59), and offline + NO Date/RNG +
+ *      actionKey switch, sw precache at wt-v60), and offline + NO Date/RNG +
  *      no eval. The live open/filter/run/close runs in the browser self-test.
  *
  * Usage:  node test/run-all.mjs

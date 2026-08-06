@@ -375,6 +375,28 @@ check("FACTORY-A: cloning a manufacturing built-in SEED keeps its base (mfg-stat
   (() => { const c = L.clone("mfg-station", "My machine"); return c && c.custom === true && c.base === "station" && D.ELEMENTS["mfg-station"] && !D.ELEMENTS["mfg-station"].custom; })());
 
 /* ---------------------------------------------------------------------
+ * 13. v3.7 FLUIDS: the Fluids / Process group is mode-filtered like
+ * Production / Assembly - the seven fluid built-ins land in it; Warehouse
+ * mode HIDES it; Factory (and the default) SHOWS it; the six warehouse
+ * groups + the Production group are unaffected; nothing is deleted.
+ * ------------------------------------------------------------------- */
+const FLU = ["pipe", "fluid-source", "fluid-drain", "tank", "mixer", "portioner", "deportioner"];
+const FLUG = L.FLUIDS || "Fluids / Process";
+const fluFactory = groupOf(facTree, FLUG);
+check("FLUIDS: the seven fluid components land in the Fluids / Process group (Factory mode)",
+  !!fluFactory && FLU.every((t) => fluFactory.types.indexOf(t) !== -1),
+  fluFactory ? fluFactory.types.join(",") : "no Fluids group");
+
+check("FLUIDS: Warehouse mode HIDES the Fluids / Process group; Factory + default SHOW it",
+  groupOf(whTree, FLUG) === null && !!groupOf(facTree, FLUG) && !!groupOf(defTree, FLUG),
+  "warehouse=" + (groupOf(whTree, FLUG) ? "present" : "hidden") +
+  " factory=" + (groupOf(facTree, FLUG) ? "shown" : "MISSING") +
+  " default=" + (groupOf(defTree, FLUG) ? "shown" : "MISSING"));
+
+check("FLUIDS: cloning a fluid built-in SEED keeps its base (tank -> storage, pipe -> conveyor) and leaves the built-in intact",
+  (() => { const ct = L.clone("tank", "My tank"); const cp = L.clone("pipe", "My pipe"); return ct && ct.custom === true && ct.base === "storage" && cp && cp.base === "conveyor" && D.ELEMENTS["tank"] && !D.ELEMENTS["tank"].custom; })());
+
+/* ---------------------------------------------------------------------
  * Summary.
  * ------------------------------------------------------------------- */
 console.log("");

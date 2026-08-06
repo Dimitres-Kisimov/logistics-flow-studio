@@ -67,6 +67,11 @@
   // / Factory MODE switch (paletteTree({ mode })): hidden in Warehouse mode,
   // shown in Factory mode. Nothing is ever deleted - both modes are reachable.
   const PRODUCTION = "Production / Assembly";
+  // v3.7 FLUIDS: the process-industry fluid group (Pipe / FluidSource /
+  // FluidDrain / Tank / Mixer / Portioner / DePortioner). Filtered by the SAME
+  // MODE switch as PRODUCTION - hidden in Warehouse mode, shown in Factory
+  // (a warehouse layout needs no process-industry fluids). Nothing is deleted.
+  const FLUIDS = "Fluids / Process";
   const GROUP_ORDER = [
     "Storage & Racking",
     "Conveying & Sortation",
@@ -75,6 +80,7 @@
     "Docks & Endpoints",
     "Zones",
     PRODUCTION,
+    FLUIDS,
     MY_OBJECTS,
   ];
   // Which built-in type sits in which group (display only; the built-ins are
@@ -107,6 +113,9 @@
     "turntable": "Conveying & Sortation", "turnplate": "Conveying & Sortation",
     "flow-control": "Conveying & Sortation", "cycle": "Conveying & Sortation",
     "track": "Transport", "two-lane-track": "Transport",
+    // v3.7 FLUIDS process-industry components (Fluids / Process group).
+    "pipe": FLUIDS, "fluid-source": FLUIDS, "fluid-drain": FLUIDS, "tank": FLUIDS,
+    "mixer": FLUIDS, "portioner": FLUIDS, "deportioner": FLUIDS,
   };
   // The base each built-in maps onto (so a CLONE of a built-in gets a sane
   // base). Used only when cloning; the built-in itself is never modified.
@@ -132,6 +141,11 @@
     "converter": "conveyor", "angular-converter": "conveyor", "turntable": "conveyor",
     "turnplate": "conveyor", "flow-control": "conveyor", "cycle": "conveyor",
     "track": "transporter", "two-lane-track": "transporter",
+    // v3.7 FLUIDS: Pipe rides the conveyor connector path; FluidSource/Drain the
+    // dock endpoint path; the Tank the storage class; Mixer/Portioner/DePortioner
+    // the station-server path.
+    "pipe": "conveyor", "fluid-source": "dock", "fluid-drain": "dock", "tank": "storage",
+    "mixer": "station", "portioner": "station", "deportioner": "station",
   };
 
   // The live store of user-defined types, keyed by id (insertion order kept
@@ -350,6 +364,7 @@
   function paletteTree(opts) {
     const mode = opts && typeof opts.mode === "string" ? opts.mode : null;
     const hideProduction = mode === "warehouse"; // Factory (and default) shows it
+    const hideFluids = mode === "warehouse";     // v3.7: Fluids / Process rides the same mode lever
     const els = ELEMENTS();
     const order = (D().paletteOrder || []).slice();
     const groups = {};
@@ -374,7 +389,8 @@
     return groupList
       .map((label) => groups[label])
       .filter((g) => g.types.length > 0 || g.label === MY_OBJECTS)
-      .filter((g) => !(hideProduction && g.label === PRODUCTION));
+      .filter((g) => !(hideProduction && g.label === PRODUCTION))
+      .filter((g) => !(hideFluids && g.label === FLUIDS));
   }
 
   /* ------------------------------------------------------------------
@@ -502,6 +518,7 @@
     GROUP_ORDER: GROUP_ORDER,
     MY_OBJECTS: MY_OBJECTS,
     PRODUCTION: PRODUCTION,
+    FLUIDS: FLUIDS,
     BUILTIN_BASE: BUILTIN_BASE,
     buildDef: buildDef,
     define: define,

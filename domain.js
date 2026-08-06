@@ -530,6 +530,111 @@
       lanes: 2,
       desc: "TWO-LANE TRACK: a dual-lane AGV / vehicle guide path - two parallel guided lanes running OPPOSITE directions (bidirectional). Transport ONLY: 0 storage positions; occupies floor as a reserved twin lane. Maps onto the transporter path (same family as rgv / agv). Illustrative synthetic model, NOT a vendor spec.",
     },
+
+    // ==================================================================
+    // FLUIDS / PROCESS INDUSTRY (v3.7 FLUIDS). The LAST Siemens-Plant-
+    // Simulation-style component family: the FLUIDS objects for the
+    // continuous / batch PROCESS industry (chemicals, food & beverage,
+    // water) - a Pipe conveys fluid, a FluidSource supplies it and a
+    // FluidDrain consumes it, a Tank stores it, a Mixer blends input
+    // fluids, and a Portioner / DePortioner convert between a continuous
+    // fluid and discrete portions. This completes the placeable component
+    // parity with the screenshots.
+    //
+    // Like the FACTORY-A / A2 built-ins, each DECLARES a `base` behaviour
+    // class so it RIDES the existing flow machinery with NO re-invented sim:
+    //   - Pipe        -> "conveyor" (a fluid CONNECTOR: a fluid parcel passes
+    //                    THROUGH it, like a belt segment - isConnector /
+    //                    isTransport / conveyor-cell all treat it as a belt);
+    //   - FluidSource -> "dock" io "receiving" (a flow ENTRY endpoint);
+    //   - FluidDrain  -> "dock" io "shipping"  (a flow EXIT endpoint / sink);
+    //   - Tank        -> "storage" (it STORES fluid) but category "flow" so
+    //                    elementCapacity() returns 0: a tank holds cubic
+    //                    metres of FLUID, NOT pallet positions, so it never
+    //                    pollutes the pallet KPIs (honest). The fluid it holds
+    //                    is a STRUCTURAL capacityM3 + fillPct field;
+    //   - Mixer / Portioner / DePortioner -> "station" (the station-SERVER
+    //                    path: fluid passes THROUGH, like a process station).
+    // Every WAREHOUSE built-in still declares NO base, so every base-aware
+    // branch stays a strict NO-OP for a warehouse-only layout (behaviour
+    // BYTE-IDENTICAL; the new types are additive).
+    //
+    // Category "flow" -> 0 storage positions for all seven. The CONTINUOUS-
+    // FLOW physics (rate balancing, level / mass dynamics, batch scheduling,
+    // deep CFD) is DEFERRED and represented STRUCTURALLY / ILLUSTRATIVELY: a
+    // fluid "parcel" rides the EXISTING MU / flow-rendering - an honest
+    // SCHEMATIC of flow, NOT validated process simulation. The fill-level,
+    // agitator and pipe-fluid-scroll ANIMATIONS are DETERMINISTIC (seeded
+    // from equipmentPhase - NO Date, NO RNG), LOD-gated + reduced-motion-safe.
+    // Honest, synthetic teaching elements - no vendor spec, no real brand.
+    // ==================================================================
+    "pipe": {
+      id: "pipe", label: "Pipe (fluid conduit)", category: "flow",
+      base: "conveyor", w: 6, d: 1, color: "#0ea5e9", resizable: true, heightM: 0.6, fluid: true,
+      // flowRateM3h: the continuous throughput of fluid through the conduit
+      // (cubic metres per hour). Synthetic order-of-magnitude teaching value;
+      // the live parcel rides the EXISTING material-flow line rate (no separate
+      // rate solver - continuous-flow balancing is deferred, honest). Kept as
+      // a FLUID rate (m3/h), NOT units/hr, so it stays out of the discrete
+      // conveyor throughput KPIs (a pipe carries fluid, not unit loads).
+      flowRateM3h: 40,
+      desc: "Fluid PIPE: a continuous conduit that conveys FLUID (a liquid / slurry) at a set flow rate (~40 m3/h here). Maps onto the conveyor CONNECTOR path so a fluid parcel passes THROUGH the chain, reusing the existing material-flow animation; the fluid scrolls along the pipe (animated deterministically, paused / reduced-motion safe). Continuous-flow physics (rate balancing / CFD) is DEFERRED - represented STRUCTURALLY / illustratively. 0 storage positions. Illustrative synthetic model, NOT a vendor spec, NOT validated process simulation.",
+    },
+    "fluid-source": {
+      id: "fluid-source", label: "Fluid source (supply)", category: "flow",
+      base: "dock", io: "receiving", w: 2, d: 2, color: "#0891b2", resizable: false, heightM: 1.8, fluid: true,
+      // rateM3h: fluid SUPPLIED per hour (a continuous supply). The live fluid
+      // flow reuses the WMS / flow line rate (no separate clock).
+      rateM3h: 40,
+      desc: "Fluid SOURCE: supplies FLUID into the process at a set rate (~40 m3/h here). A flow ENTRY endpoint (maps onto the receiving-dock path) - fluid enters here and travels Source -> Pipe -> ... -> Drain along the connected conduits, reusing the existing material-flow animation. Continuous-flow rate balancing is DEFERRED (structural). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "fluid-drain": {
+      id: "fluid-drain", label: "Fluid drain (outfall)", category: "flow",
+      base: "dock", io: "shipping", w: 2, d: 2, color: "#155e75", resizable: false, heightM: 1.8, fluid: true, sink: true,
+      desc: "Fluid DRAIN / OUTFALL: consumes FLUID and counts throughput - the end of a fluid process line. A flow EXIT endpoint (maps onto the shipping-dock path). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "tank": {
+      id: "tank", label: "Tank (fluid storage)", category: "flow",
+      base: "storage", w: 3, d: 3, color: "#2563eb", resizable: true, heightM: 5.0, fluid: true,
+      // capacityM3: the fluid the tank holds (cubic metres); fillPct: the
+      // current fill level as a percent (0..100), used to drive the
+      // illustrative fill-level animation + the inspector read-out. Represented
+      // STRUCTURALLY (a stored volume + level) - the level DYNAMICS / mass
+      // balance are DEFERRED. NOTE category "flow" -> elementCapacity() returns
+      // 0: a tank holds fluid (m3), NOT pallet positions, so it never pollutes
+      // the pallet KPIs (honest). base "storage" is DECLARATIVE (it reads as a
+      // storage vessel + seeds a sane clone base); it is inert in the flow sim.
+      capacityM3: 200, fillPct: 60,
+      desc: "Fluid TANK: stores FLUID (a vessel / silo) - here ~200 m3 at ~60% fill. Declares base \"storage\" so it reads as a storage vessel, but as a FLUID store it contributes 0 PALLET positions (it holds cubic metres, not pallets - honest). The fill level bobs (animated deterministically from the sim clock, paused / reduced-motion safe). Level dynamics / mass balance are DEFERRED (structural). Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "mixer": {
+      id: "mixer", label: "Mixer (blend fluids)", category: "flow",
+      base: "station", w: 3, d: 3, color: "#4f46e5", resizable: true, heightM: 2.6, fluid: true,
+      // cycleSec: blend time per batch; servers: 1 vessel; inputs: how many
+      // input fluids combine into one (a simple blend count). A rotating
+      // AGITATOR animates deterministically. Deep blend / recipe / mass-balance
+      // logic is deferred (structural).
+      cycleSec: 45, servers: 1, inputs: 2,
+      desc: "Fluid MIXER: combines SEVERAL input fluids into ONE blended output (inputs = 2 here) in a stirred vessel. Maps onto the station-SERVER flow path (fluid passes THROUGH, like a process station). A rotating AGITATOR spins (animated deterministically, paused / reduced-motion safe). The deep blend / recipe / mass-balance logic is DEFERRED (structural). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "portioner": {
+      id: "portioner", label: "Portioner (fluid to portions)", category: "flow",
+      base: "station", w: 3, d: 2, color: "#7c3aed", resizable: true, heightM: 2.2, fluid: true,
+      // cycleSec: fill time per portion; servers: 1 filling head. Converts a
+      // CONTINUOUS fluid into DISCRETE portions (a filler / doser). The
+      // continuous -> discrete conversion is represented STRUCTURALLY (deferred).
+      cycleSec: 20, servers: 1,
+      desc: "PORTIONER: converts a CONTINUOUS fluid into DISCRETE portions (a filler / doser - e.g. bottling). Maps onto the station-SERVER flow path (parts pass THROUGH, like a process station). The continuous -> discrete conversion is represented STRUCTURALLY now (the deep dosing / fill logic is DEFERRED). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+    "deportioner": {
+      id: "deportioner", label: "DePortioner (portions to fluid)", category: "flow",
+      base: "station", w: 3, d: 2, color: "#9333ea", resizable: true, heightM: 2.2, fluid: true,
+      // cycleSec: empty time per portion; servers: 1 emptying head. Converts
+      // DISCRETE portions back into a CONTINUOUS fluid (an emptier / dumper -
+      // the inverse of the portioner). Represented STRUCTURALLY (deferred).
+      cycleSec: 20, servers: 1,
+      desc: "DEPORTIONER: converts DISCRETE portions back into a CONTINUOUS fluid (an emptier / dumper - the inverse of the portioner). Maps onto the station-SERVER flow path. The discrete -> continuous conversion is represented STRUCTURALLY now (deferred). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
   };
 
   /* ------------------------------------------------------------------
@@ -953,6 +1058,10 @@
       // Transport). Additive; a warehouse-only layout never uses them.
       "converter", "angular-converter", "turntable", "turnplate",
       "flow-control", "cycle", "track", "two-lane-track",
+      // v3.7 FLUIDS: process-industry fluid components (Fluids / Process
+      // group). Additive; a warehouse-only layout never uses them.
+      "pipe", "fluid-source", "fluid-drain", "tank",
+      "mixer", "portioner", "deportioner",
     ],
   };
 })();

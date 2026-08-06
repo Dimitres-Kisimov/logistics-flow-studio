@@ -1072,6 +1072,173 @@
   }
 
   /* ==================================================================
+   * FLUIDS / PROCESS 2D GLYPHS (v3.7 FLUIDS). Distinct schematic top-down
+   * glyphs for the process-industry fluid components: a Pipe conduit (fluid
+   * scrolls through), a FluidSource (drips fluid out), a FluidDrain (fluid
+   * funnels into a grate), a Tank (a bobbing fluid fill level), a Mixer (a
+   * rotating agitator), and a Portioner / DePortioner (fluid <-> discrete
+   * portions). The fluid MOTIONS (scroll / bob / spin) are seeded by the
+   * caller's anim phase - deterministic, NO Date/RNG, LOD-gated + reduced-
+   * motion-safe. Illustrative synthetic schematics - NOT CAD, NOT BIM, no
+   * brand, NOT validated process simulation.
+   * ================================================================== */
+  // A little fluid DROPLET: a rounded body + a pointed top, centred at (cx,cy).
+  function drop(ctx, cx, cy, r) {
+    disc(ctx, cx, cy + r * 0.25, r);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r * 1.5);
+    ctx.lineTo(cx - r * 0.72, cy + r * 0.2);
+    ctx.lineTo(cx + r * 0.72, cy + r * 0.2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // A wavy fluid SURFACE line across [x0, x0+ww] at y0, amplitude amp, scrolled
+  // by `phase` (a fluid-surface read). Sampled polyline - mock-context-safe.
+  function wave(ctx, x0, y0, ww, amp, phase, segs) {
+    const n = Math.max(4, segs | 0);
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const px = x0 + ww * t;
+      const py = y0 + Math.sin((t * 2 + (Number(phase) || 0)) * TAU) * amp;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+
+  // Pipe: a flanged fluid conduit with a fluid column + scrolling bubbles + a
+  // flow-direction arrow. Distinct from the conveyor belt (a filled fluid pipe
+  // with flanges + flowing fluid, not a roller belt bed).
+  function d2Pipe(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const horiz = w >= d;
+    const ph = (typeof anim === "number" && isFinite(anim)) ? ((anim % 1) + 1) % 1 : 0;
+    if (horiz) {
+      const m = clampN(d * 0.22, 1.5, 8), y0 = y + m, y1 = y + d - m, cy = (y0 + y1) / 2;
+      ctx.fillStyle = gc.fill; ctx.fillRect(x, y0, w, Math.max(1, y1 - y0)); // the fluid column
+      seg(ctx, x, y0, x + w, y0); seg(ctx, x, y1, x + w, y1);                // pipe walls
+      ctx.lineWidth = clampN(cell * 0.09, 1.5, 3);
+      seg(ctx, x, y, x, y + d); seg(ctx, x + w, y, x + w, y + d);            // end flanges
+      ctx.lineWidth = clampN(cell * 0.05, 1, 2.2);
+      arr(ctx, x + w * 0.28, cy, x + w * 0.72, cy, clampN(cell * 0.22, 3, 7)); // flow direction
+      ctx.fillStyle = gc.stroke;
+      const n = clampN(Math.round(w / cell), 2, 14);
+      for (let i = 0; i < n; i++) { const t = ((i + ph) % n) / n; disc(ctx, x + w * (0.04 + 0.92 * t), cy, clampN((y1 - y0) * 0.18, 1.2, 4)); }
+    } else {
+      const m = clampN(w * 0.22, 1.5, 8), x0 = x + m, x1 = x + w - m, cx = (x0 + x1) / 2;
+      ctx.fillStyle = gc.fill; ctx.fillRect(x0, y, Math.max(1, x1 - x0), d);
+      seg(ctx, x0, y, x0, y + d); seg(ctx, x1, y, x1, y + d);
+      ctx.lineWidth = clampN(cell * 0.09, 1.5, 3);
+      seg(ctx, x, y, x + w, y); seg(ctx, x, y + d, x + w, y + d);
+      ctx.lineWidth = clampN(cell * 0.05, 1, 2.2);
+      arr(ctx, cx, y + d * 0.28, cx, y + d * 0.72, clampN(cell * 0.22, 3, 7));
+      ctx.fillStyle = gc.stroke;
+      const n = clampN(Math.round(d / cell), 2, 14);
+      for (let i = 0; i < n; i++) { const t = ((i + ph) % n) / n; disc(ctx, cx, y + d * (0.04 + 0.92 * t), clampN((x1 - x0) * 0.18, 1.2, 4)); }
+    }
+  }
+
+  // Fluid source: a supply reservoir with a valved outlet + fluid DROPLETS
+  // flowing out along an arrow. Distinct from the parts Source (an emitter node
+  // radiating square parts) - here a reservoir dripping fluid.
+  function d2FluidSource(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const cy = y + d / 2, rw = w * 0.4, rh = d * 0.62, rx = x + w * 0.06, ry = cy - rh / 2;
+    ctx.fillStyle = gc.fill; ctx.fillRect(rx, ry, rw, rh); ctx.strokeRect(rx, ry, rw, rh); // the reservoir
+    arr(ctx, rx + rw, cy, x + w - clampN(w * 0.08, 2, 8), cy, clampN(cell * 0.28, 3, 8));   // outlet arrow
+    ctx.fillStyle = gc.stroke;
+    const base = rx + rw + clampN(w * 0.06, 2, 8), span = Math.max(1, (x + w - clampN(w * 0.08, 2, 8)) - base);
+    const ph = (typeof anim === "number" && isFinite(anim)) ? anim : 0;
+    for (let i = 0; i < 3; i++) { const t = ((i / 3) + ph) % 1; drop(ctx, base + t * span, cy, clampN(Math.min(w, d) * 0.09, 1.5, 5)); }
+  }
+
+  // Fluid drain: a V-funnel basin with a wavy fluid pool converging into a
+  // central drain GRATE; droplets fall in when animating. Distinct from the
+  // parts Drain (a bare sink hole) - here a fluid basin + a grate.
+  function d2FluidDrain(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const cx = x + w / 2, cy = y + d / 2, m = clampN(Math.min(w, d) * 0.16, 2, 7);
+    seg(ctx, x + m, y + m, cx - clampN(w * 0.06, 1, 5), cy + d * 0.12);         // funnel walls
+    seg(ctx, x + w - m, y + m, cx + clampN(w * 0.06, 1, 5), cy + d * 0.12);
+    const ph = (typeof anim === "number" && isFinite(anim)) ? anim : 0;
+    wave(ctx, x + m, y + d * 0.4, w - 2 * m, clampN(d * 0.04, 1, 4), ph, 6);    // pooling fluid
+    const r = clampN(Math.min(w, d) * 0.14, 2.5, 8), gy = cy + d * 0.16;
+    ring(ctx, cx, gy, r); seg(ctx, cx - r, gy, cx + r, gy); seg(ctx, cx, gy - r, cx, gy + r); // drain grate
+    ctx.fillStyle = gc.stroke;
+    for (let i = 0; i < 2; i++) { const t = ((i / 2) + ph) % 1; drop(ctx, cx, y + m + t * (gy - r - (y + m)), clampN(Math.min(w, d) * 0.08, 1.2, 4)); }
+  }
+
+  // Tank: an upright vessel with a FLUID FILL LEVEL (~60%) that gently bobs +
+  // side level ticks. The fill fraction is a fixed ILLUSTRATIVE ~0.6 read (the
+  // actual capacityM3 / fillPct live in the schema + Inspector - this glyph is
+  // a schematic "it holds fluid at a level", NOT the computed volume).
+  function d2Tank(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.16, 2, 8), ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    ctx.strokeRect(ix, iy, iw, ih);                        // the vessel body
+    seg(ctx, ix, iy + ih * 0.1, ix + iw, iy + ih * 0.1);   // the top rim band
+    const fill = 0.6, bob = (typeof anim === "number" && isFinite(anim)) ? Math.sin(anim * TAU) * ih * 0.04 : 0;
+    const surfY = clampN(iy + ih * (1 - fill) + bob, iy, iy + ih);
+    ctx.fillStyle = gc.fill; ctx.fillRect(ix + 1, surfY, Math.max(1, iw - 2), Math.max(1, iy + ih - surfY - 1)); // the fluid
+    wave(ctx, ix + 1, surfY, iw - 2, clampN(ih * 0.03, 1, 5), (typeof anim === "number" && isFinite(anim)) ? anim : 0, 5); // surface
+    for (let i = 1; i < 4; i++) seg(ctx, ix, iy + ih * i / 4, ix + iw * 0.12, iy + ih * i / 4); // level ticks
+  }
+
+  // Mixer: a round stirred vessel with a rotating AGITATOR (a hub + 3 impeller
+  // blades at 120 deg) + in/out through ports. Distinct from the process
+  // Station (a machine housing + cog) - here a fluid vessel + a spinning impeller.
+  function d2Mixer(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const cx = x + w / 2, cy = y + d / 2, R = clampN(Math.min(w, d) * 0.34, 5, 4000);
+    ctx.fillStyle = gc.fill; disc(ctx, cx, cy, R * 0.94);  // the fluid body
+    ring(ctx, cx, cy, R);                                  // the vessel wall
+    const m = clampN(Math.min(w, d) * 0.1, 2, 6);
+    arr(ctx, x + m, cy, cx - R, cy, clampN(cell * 0.2, 3, 6));      // in port
+    arr(ctx, cx + R, cy, x + w - m, cy, clampN(cell * 0.2, 3, 6));  // out port
+    const ang = (typeof anim === "number" && isFinite(anim)) ? anim * TAU : 0, bl = R * 0.72;
+    ctx.fillStyle = gc.stroke; disc(ctx, cx, cy, clampN(R * 0.12, 1.2, 4000)); // the hub
+    for (let i = 0; i < 3; i++) {
+      const a = ang + i * (TAU / 3), tx = cx + Math.cos(a) * bl, ty = cy + Math.sin(a) * bl;
+      seg(ctx, cx, cy, tx, ty);                                     // a blade
+      const nx = -Math.sin(a), ny = Math.cos(a), pl = R * 0.2;
+      seg(ctx, tx - nx * pl, ty - ny * pl, tx + nx * pl, ty + ny * pl); // its paddle tip
+    }
+  }
+
+  // Portioner: a fluid inlet through a filling NOZZLE dosing into DISCRETE
+  // portion cups that scroll out below + a droplet from the nozzle. A filler /
+  // doser (continuous fluid -> discrete portions).
+  function d2Portioner(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.14, 2, 6), ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const hx = ix + iw * 0.42;
+    ctx.fillStyle = gc.fill; ctx.fillRect(ix, iy + ih * 0.12, iw * 0.4, ih * 0.16); // fluid inlet
+    seg(ctx, ix, iy + ih * 0.2, hx, iy + ih * 0.2);
+    const nw = clampN(iw * 0.1, 4, 16), ny0 = iy + ih * 0.2, ny1 = iy + ih * 0.5;
+    ctx.strokeRect(hx - nw / 2, ny0, nw, ny1 - ny0);                                // the filling nozzle
+    ctx.fillStyle = gc.stroke;
+    const ph = (typeof anim === "number" && isFinite(anim)) ? anim : 0, cupW = clampN(iw * 0.14, 3, 20);
+    for (let i = 0; i < 3; i++) { const t = ((i / 3) + ph) % 1; ctx.strokeRect(ix + t * (iw - cupW), iy + ih * 0.66, cupW, ih * 0.28); } // portion cups
+    drop(ctx, hx, ny1 + ih * 0.08, clampN(Math.min(iw, ih) * 0.08, 1.5, 5));        // a dosed droplet
+  }
+
+  // DePortioner: DISCRETE portion cups scroll IN along the top, tip down a chute
+  // and are emptied into a CONTINUOUS fluid trough flowing out. The inverse of
+  // the portioner (a dumper / emptier).
+  function d2DePortioner(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.14, 2, 6), ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const ph = (typeof anim === "number" && isFinite(anim)) ? anim : 0, cupW = clampN(iw * 0.14, 3, 20);
+    for (let i = 0; i < 3; i++) { const t = ((i / 3) + ph) % 1; ctx.strokeRect(ix + t * (iw * 0.5 - cupW), iy + ih * 0.08, cupW, ih * 0.26); } // incoming cups
+    const hx = ix + iw * 0.5;
+    seg(ctx, hx, iy + ih * 0.34, hx, iy + ih * 0.6);                                // the emptying chute
+    ctx.fillStyle = gc.fill; ctx.fillRect(hx, iy + ih * 0.62, iw * 0.5, ih * 0.24); // the fluid trough
+    wave(ctx, hx, iy + ih * 0.66, iw * 0.5, clampN(ih * 0.03, 1, 4), ph, 5);
+    arr(ctx, hx + iw * 0.12, iy + ih * 0.74, ix + iw, iy + ih * 0.74, clampN(cell * 0.2, 3, 6)); // fluid out
+    ctx.fillStyle = gc.stroke; drop(ctx, hx, iy + ih * 0.5 + ph * ih * 0.08, clampN(Math.min(iw, ih) * 0.07, 1.2, 4));
+  }
+
+  /* ==================================================================
    * TINY LOD ICONS. Drawn centred at (cx,cy) with radius r when a
    * footprint is too small on-screen for the full glyph. Cheap (a few
    * strokes) and legible at any zoom.
@@ -1126,6 +1293,14 @@
   function icCycle(ctx, cx, cy, r) { ring(ctx, cx, cy, r * 0.8); arr(ctx, cx + r * 0.8, cy - r * 0.15, cx + r * 0.5, cy - r * 0.62, r * 0.3); }
   function icTrack(ctx, cx, cy, r) { seg(ctx, cx - r, cy, cx + r, cy); chev(ctx, cx - r * 0.3, cy, r * 0.4, "right"); chev(ctx, cx + r * 0.45, cy, r * 0.4, "right"); }
   function icTwoLane(ctx, cx, cy, r) { arr(ctx, cx - r, cy - r * 0.5, cx + r, cy - r * 0.5, r * 0.35); arr(ctx, cx + r, cy + r * 0.5, cx - r, cy + r * 0.5, r * 0.35); }
+  // v3.7 FLUIDS process-industry icons.
+  function icPipe(ctx, cx, cy, r) { seg(ctx, cx - r, cy - r * 0.5, cx + r, cy - r * 0.5); seg(ctx, cx - r, cy + r * 0.5, cx + r, cy + r * 0.5); seg(ctx, cx - r, cy - r * 0.75, cx - r, cy + r * 0.75); seg(ctx, cx + r, cy - r * 0.75, cx + r, cy + r * 0.75); }
+  function icFluidSource(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r * 0.65, r, r * 1.3); arr(ctx, cx, cy, cx + r, cy, r * 0.45); }
+  function icFluidDrain(ctx, cx, cy, r) { seg(ctx, cx - r, cy - r * 0.7, cx, cy + r * 0.35); seg(ctx, cx + r, cy - r * 0.7, cx, cy + r * 0.35); ring(ctx, cx, cy + r * 0.55, r * 0.34); }
+  function icTank(ctx, cx, cy, r) { ctx.strokeRect(cx - r * 0.7, cy - r, r * 1.4, r * 2); seg(ctx, cx - r * 0.7, cy + r * 0.25, cx + r * 0.7, cy + r * 0.25); }
+  function icMixer(ctx, cx, cy, r) { ring(ctx, cx, cy, r * 0.85); seg(ctx, cx, cy, cx, cy - r * 0.78); seg(ctx, cx, cy, cx + r * 0.68, cy + r * 0.4); seg(ctx, cx, cy, cx - r * 0.68, cy + r * 0.4); }
+  function icPortioner(ctx, cx, cy, r) { seg(ctx, cx, cy - r, cx, cy - r * 0.25); disc(ctx, cx, cy - r * 0.1, r * 0.16); ctx.strokeRect(cx - r * 0.5, cy + r * 0.3, r, r * 0.6); }
+  function icDePortioner(ctx, cx, cy, r) { ctx.strokeRect(cx - r * 0.5, cy - r, r, r * 0.6); seg(ctx, cx, cy - r * 0.4, cx, cy + r * 0.2); seg(ctx, cx - r * 0.65, cy + r * 0.6, cx + r * 0.65, cy + r * 0.6); }
 
   /* ==================================================================
    * 3D PRIMITIVES (world cells -> px via the caller-supplied P). All
@@ -1795,6 +1970,109 @@
     }
   }
 
+  /* ------------------------------------------------------------------
+   * FLUIDS / PROCESS 3D FORMS (v3.7 FLUIDS). Distinct extruded forms for
+   * the process-industry fluid components, reusing the same primitives
+   * (box3d / box3dZ / colBox / edge); extruded by the domain heightM so a
+   * taller element rises on screen. The Pipe fluid slug, Tank fill level and
+   * Mixer agitator ANIMATE deterministically (seeded from equipmentPhase by
+   * the caller - NO Date / RNG). Illustrative, NOT CAD/BIM, no brand.
+   * ------------------------------------------------------------------ */
+  // Pipe: a low pipe run + flange ticks + a fluid slug scrolling through.
+  function d3Pipe(ctx, P, x, y, w, d, h, color, theme, anim) {
+    const horiz = w >= d, bm = beamColor(color, theme);
+    const pt = clampN(Math.min(w, d) * 0.7, 0.2, 3); // the pipe cross-section
+    if (horiz) box3d(ctx, P, x, y + (d - pt) / 2, w, pt, h, color);
+    else box3d(ctx, P, x + (w - pt) / 2, y, pt, d, h, color);
+    const n = clampN(Math.round((horiz ? w : d) / 1.2), 2, 16);
+    for (let i = 1; i < n; i++) {                     // flange ticks
+      const t = i / n;
+      if (horiz) edge(ctx, P, x + w * t, y + (d - pt) / 2, h, x + w * t, y + (d + pt) / 2, h, bm);
+      else edge(ctx, P, x + (w - pt) / 2, y + d * t, h, x + (w + pt) / 2, y + d * t, h, bm);
+    }
+    if (typeof anim === "number" && isFinite(anim)) {
+      const rw = horiz ? clampN(w * 0.12, 0.3, 1.2) : pt;
+      const rd = horiz ? pt : clampN(d * 0.12, 0.3, 1.2);
+      runner3D(ctx, P, x, y, w, d, ((anim % 1) + 1) % 1, horiz, rw, rd, h + clampN(h * 0.6, 0.2, 0.8), lighten(color, 0.28)); // the fluid slug
+    }
+  }
+
+  // Fluid source: a supply vessel + an outlet spout + a fluid droplet leaving.
+  function d3FluidSource(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w * 0.6, d, h, color);        // the reservoir vessel
+    const bm = beamColor(color, theme);
+    edge(ctx, P, x + w * 0.6, y + d / 2, h * 0.4, x + w, y + d / 2, h * 0.4, bm, 2); // the outlet spout
+    const t = clampN(Math.min(w, d) * 0.18, 0.15, 0.6);
+    const ph = (typeof anim === "number" && isFinite(anim)) ? anim % 1 : 0.5;
+    box3d(ctx, P, x + w * 0.6 + ph * (w * 0.4 - t), y + (d - t) / 2, t, t, h * 0.4 + t, lighten(color, 0.24)); // a fluid droplet
+  }
+
+  // Fluid drain: a low basin + full-height rim posts converging to a central
+  // drain well + a grate bar (a fluid hopper).
+  function d3FluidDrain(ctx, P, x, y, w, d, h, color, theme) {
+    box3d(ctx, P, x, y, w, d, h * 0.3, color);        // the basin pad
+    const bm = beamColor(color, theme), inx = clampN(Math.min(w, d) * 0.3, 0.3, 2);
+    colBox(ctx, P, x + inx, y + inx, inx * 0.45, h, shade(color, 0.8));
+    colBox(ctx, P, x + w - inx, y + inx, inx * 0.45, h, shade(color, 0.8));
+    colBox(ctx, P, x + inx, y + d - inx, inx * 0.45, h, shade(color, 0.8));
+    colBox(ctx, P, x + w - inx, y + d - inx, inx * 0.45, h, shade(color, 0.8));
+    edge(ctx, P, x + inx, y + inx, h, x + w / 2, y + d / 2, h * 0.3, bm, 1.4);
+    edge(ctx, P, x + w - inx, y + inx, h, x + w / 2, y + d / 2, h * 0.3, bm, 1.4);
+    edge(ctx, P, x + inx, y + d - inx, h, x + w / 2, y + d / 2, h * 0.3, bm, 1.4);
+    edge(ctx, P, x + w - inx, y + d - inx, h, x + w / 2, y + d / 2, h * 0.3, bm, 1.4);
+    edge(ctx, P, x + w * 0.4, y + d / 2, h * 0.3, x + w * 0.6, y + d / 2, h * 0.3, bm, 1.6); // the drain grate
+  }
+
+  // Tank: a solid FLUID body filling the lower ~60% (bobbing when animating) +
+  // an outlined empty upper shell + a top rim (a vessel with a fluid level).
+  function d3Tank(ctx, P, x, y, w, d, h, color, theme, anim) {
+    const bm = beamColor(color, theme);
+    const fill = 0.6, bob = (typeof anim === "number" && isFinite(anim)) ? Math.sin(anim * TAU) * h * 0.03 : 0;
+    const fz = Math.max(0.05, Math.min(h, h * fill + bob));
+    box3d(ctx, P, x, y, w, d, fz, lighten(color, theme === "dark" ? 0.14 : 0.06)); // the fluid body
+    // the empty upper shell as outline edges (4 verticals + the top rim)
+    edge(ctx, P, x, y, fz, x, y, h, bm); edge(ctx, P, x + w, y, fz, x + w, y, h, bm);
+    edge(ctx, P, x, y + d, fz, x, y + d, h, bm); edge(ctx, P, x + w, y + d, fz, x + w, y + d, h, bm);
+    edge(ctx, P, x, y, h, x + w, y, h, bm); edge(ctx, P, x + w, y, h, x + w, y + d, h, bm);
+    edge(ctx, P, x + w, y + d, h, x, y + d, h, bm); edge(ctx, P, x, y + d, h, x, y, h, bm);
+    edge(ctx, P, x, y + d, fz, x + w, y + d, fz, shade(color, 0.6), 1.8); // the fluid surface line
+  }
+
+  // Mixer: a vessel body + a full-height agitator shaft + rotating impeller blades.
+  function d3Mixer(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h * 0.82, color);       // the vessel body
+    const bm = beamColor(color, theme), cx = x + w / 2, cy = y + d / 2;
+    colBox(ctx, P, cx, cy, clampN(Math.min(w, d) * 0.18, 0.15, 0.7), h, shade(color, 0.85)); // the drive shaft
+    const ang = (typeof anim === "number" && isFinite(anim)) ? anim * TAU : 0;
+    const R = Math.min(w, d) * 0.34, z = h * 0.7;
+    for (let i = 0; i < 3; i++) { const a = ang + i * (TAU / 3); edge(ctx, P, cx, cy, z, cx + Math.cos(a) * R, cy + Math.sin(a) * R, z, bm, 1.6); } // impeller blades
+  }
+
+  // Portioner: a filling-head housing + a nozzle down-spout + a portion cup
+  // scrolling out (continuous fluid -> discrete portions).
+  function d3Portioner(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d * 0.5, h, color);        // the filling head
+    const bm = beamColor(color, theme), cx = x + w * 0.45;
+    edge(ctx, P, cx, y + d * 0.5, h * 0.4, cx, y + d, h * 0.4, bm, 1.8); // the nozzle spout
+    if (typeof anim === "number" && isFinite(anim)) {
+      const cw = clampN(w * 0.16, 0.2, 1), cd = clampN(d * 0.22, 0.2, 1.2), p = anim % 1;
+      box3dZ(ctx, P, x + p * (w - cw), y + d * 0.72, cw, cd, 0, h * 0.32, lighten(color, 0.24)); // a portion cup
+    }
+  }
+
+  // DePortioner: an emptying-head housing + a dump chute into a low fluid trough
+  // + a portion cup scrolling in on top (discrete portions -> continuous fluid).
+  function d3DePortioner(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d * 0.5, h, color);        // the emptying head
+    const bm = beamColor(color, theme), cx = x + w * 0.5;
+    edge(ctx, P, cx, y + d * 0.5, h * 0.5, cx, y + d * 0.72, h * 0.2, bm, 1.8); // the dump chute
+    box3d(ctx, P, x, y + d * 0.74, w, d * 0.24, h * 0.18, lighten(color, theme === "dark" ? 0.12 : 0.05)); // the fluid trough
+    if (typeof anim === "number" && isFinite(anim)) {
+      const cw = clampN(w * 0.16, 0.2, 1), cd = clampN(d * 0.16, 0.2, 1), p = anim % 1;
+      box3dZ(ctx, P, x + p * (w * 0.5 - cw), y + d * 0.16, cw, cd, h, h + clampN(h * 0.4, 0.2, 0.8), lighten(color, 0.24)); // an incoming cup
+    }
+  }
+
   /* ==================================================================
    * RICH DETAIL TIER (v1.11 "realistic high-detail rendering"). A THIRD
    * LOD tier drawn ONLY when an element reads large on screen (zoomed in):
@@ -2269,6 +2547,14 @@
     "cycle": { d2: d2Cycle, d3: d3Cycle, icon: icCycle, g2: "closed loop track + clockwise arrows + a circulating carrier", f3: "low closed-loop track deck + a circulating carrier" },
     "track": { d2: d2Track, d3: d3Track, icon: icTrack, g2: "single guide line + heading chevrons + a travelling carrier", f3: "single low raised guide rail + heading ticks + carrier" },
     "two-lane-track": { d2: d2TwoLaneTrack, d3: d3TwoLaneTrack, icon: icTwoLane, g2: "two parallel lanes with opposing arrows + a median (bidirectional)", f3: "two low raised guide rails + two carriers travelling opposite" },
+    // v3.7 FLUIDS: process-industry fluid components (Fluids / Process group).
+    "pipe": { d2: d2Pipe, d3: d3Pipe, icon: icPipe, g2: "flanged fluid conduit + fluid column + scrolling bubbles + flow arrow", f3: "low pipe run + flange ticks + a fluid slug scrolling through" },
+    "fluid-source": { d2: d2FluidSource, d3: d3FluidSource, icon: icFluidSource, g2: "supply reservoir + valved outlet + fluid droplets flowing out", f3: "supply vessel + outlet spout + a fluid droplet leaving" },
+    "fluid-drain": { d2: d2FluidDrain, d3: d3FluidDrain, icon: icFluidDrain, g2: "V-funnel basin + wavy fluid pool + central drain grate + droplets in", f3: "low basin + converging rim posts to a central drain well + grate" },
+    "tank": { d2: d2Tank, d3: d3Tank, icon: icTank, g2: "upright vessel + bobbing fluid fill level + side level ticks", f3: "solid fluid body (~60%, bobbing) + outlined upper shell + top rim" },
+    "mixer": { d2: d2Mixer, d3: d3Mixer, icon: icMixer, g2: "round vessel + rotating 3-blade agitator + in/out ports", f3: "vessel body + full-height drive shaft + rotating impeller blades" },
+    "portioner": { d2: d2Portioner, d3: d3Portioner, icon: icPortioner, g2: "fluid inlet + filling nozzle dosing into discrete portion cups + droplet", f3: "filling-head housing + nozzle down-spout + a portion cup scrolling out" },
+    "deportioner": { d2: d2DePortioner, d3: d3DePortioner, icon: icDePortioner, g2: "discrete portion cups tipping down a chute into a continuous fluid trough", f3: "emptying-head housing + dump chute into a low fluid trough + incoming cup" },
   };
 
   /* ==================================================================

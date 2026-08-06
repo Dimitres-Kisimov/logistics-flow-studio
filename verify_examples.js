@@ -249,12 +249,18 @@ if (megaEx) {
   // turntable/turnplate/flow-control/cycle/track/two-lane-track) are likewise
   // ADDITIVE palette types NOT retro-fitted into the byte-identical mega builder
   // (the plant stays byte-identical), so they are exempt from this property too.
+  // The v3.7 FLUIDS process-industry components (pipe/fluid-source/fluid-drain/
+  // tank/mixer/portioner/deportioner) are the Factory mode's Fluids / Process
+  // group; the mega showcase is a synthetic WAREHOUSE plant, so it legitimately
+  // omits them and stays byte-identical - exempt from the palette property too.
   const MEGA_EXEMPT = {
     "conveyor-curve": 1,
     "mfg-source": 1, "mfg-drain": 1, "mfg-station": 1,
     "mfg-parallel-station": 1, "mfg-assembly": 1, "mfg-dismantle": 1,
     "converter": 1, "angular-converter": 1, "turntable": 1, "turnplate": 1,
     "flow-control": 1, "cycle": 1, "track": 1, "two-lane-track": 1,
+    "pipe": 1, "fluid-source": 1, "fluid-drain": 1, "tank": 1,
+    "mixer": 1, "portioner": 1, "deportioner": 1,
   };
   const megaRequired = D.paletteOrder.filter((t) => !MEGA_EXEMPT[t]);
   const missingPalette = megaRequired.filter((t) => !megaTypes[t]);

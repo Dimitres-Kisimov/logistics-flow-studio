@@ -631,8 +631,127 @@ const A2_BASE = {
     "distinct=" + uniq.size + "/" + A2_TYPES.length + (stillStuck.length ? " static: " + stillStuck.join(",") : " animate OK"));
 })();
 
+/* =====================================================================
+ * v3.7 FLUIDS "process-industry components" - focused checks for the seven
+ * NEW Fluids / Process types. The all-types smoke above already exercises
+ * them; these assert the NEW set specifically: registered + palette-listed +
+ * a DECLARED base (conveyor/dock/storage/station) so they ride the flow
+ * machinery, 0 capacity (all category "flow" - INCLUDING the Tank, which
+ * holds FLUID not pallets), a focused non-mutating 2D+3D draw smoke, that the
+ * seven glyphs are all DISTINCT, that the fluid MOTIONS (pipe scroll, tank
+ * fill bob, mixer agitator) move across anim phases, that the Tank carries a
+ * capacityM3/fillPct fluid schema, and that the Ctrl-K command palette + the
+ * IFC export both handle every new type (they iterate the registries).
+ * ===================================================================== */
+const FL_TYPES = ["pipe", "fluid-source", "fluid-drain", "tank", "mixer", "portioner", "deportioner"];
+const FL_BASE = { "pipe": "conveyor", "fluid-source": "dock", "fluid-drain": "dock", "tank": "storage", "mixer": "station", "portioner": "station", "deportioner": "station" };
+
+/* ---- 29. Fluids types: domain + registry + palette + base + 0 capacity - */
+(() => {
+  const inDomain = FL_TYPES.filter((t) => !D.ELEMENTS[t]);
+  const noShape = FL_TYPES.filter((t) => S.has(t) !== true);
+  const notInPalette = FL_TYPES.filter((t) => (D.paletteOrder || []).indexOf(t) < 0);
+  const badBase = FL_TYPES.filter((t) => D.elementBase(t) !== FL_BASE[t]);
+  const badCap = FL_TYPES.filter((t) => { const def = D.ELEMENTS[t] || {}; return D.elementCapacity({ type: t, w: def.w, d: def.d }) !== 0; });
+  check("v3.7 FLUIDS components are in the domain, the shape registry (2D+3D), the palette, declare a base (conveyor/dock/storage/station) and are 0-capacity (category flow)",
+    inDomain.length === 0 && noShape.length === 0 && notInPalette.length === 0 && badBase.length === 0 && badCap.length === 0,
+    (inDomain.length ? "not in domain: " + inDomain.join(",") : "") +
+    (noShape.length ? " no shape: " + noShape.join(",") : "") +
+    (notInPalette.length ? " not in palette: " + notInPalette.join(",") : "") +
+    (badBase.length ? " wrong base: " + badBase.join(",") : "") +
+    (badCap.length ? " nonzero capacity: " + badCap.join(",") : "") ||
+    FL_TYPES.length + " fluid components covered");
+})();
+
+/* ---- 30. focused Fluids draw smoke (2D+3D x themes x scales), no mutation */
+(() => {
+  const P = makeP();
+  const cell = 20;
+  let bad = null, notFinite = null, mutated = null;
+  for (const t of FL_TYPES) {
+    const def = D.ELEMENTS[t];
+    for (const theme of THEMES) {
+      for (const lod of [3, 44]) {
+        const g = { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme, lod, anim: 0.3 };
+        const before = JSON.stringify(g);
+        const c = makeCtx();
+        try { if (S.draw2D(c, t, g) !== true) bad = bad || t + " draw2D returned non-true"; }
+        catch (e) { bad = bad || t + " 2D/" + theme + "/" + lod + ": " + e.message; }
+        if (c._bad.length) notFinite = notFinite || t + " 2D " + c._bad[0];
+        if (JSON.stringify(g) !== before) mutated = mutated || t + " (2D)";
+      }
+      const o = { cx: 4, cy: 3, w: def.w, d: def.d, heightM: def.heightM, color: def.color, theme, anim: 0.3, selected: true, selColor: "#38bdf8" };
+      const beforeO = JSON.stringify(o);
+      const c3 = makeCtx();
+      try { if (S.draw3D(c3, t, P, o) !== true) bad = bad || t + " draw3D returned non-true"; }
+      catch (e) { bad = bad || t + " 3D/" + theme + ": " + e.message; }
+      if (c3._bad.length) notFinite = notFinite || t + " 3D " + c3._bad[0];
+      if (JSON.stringify(o) !== beforeO) mutated = mutated || t + " (3D)";
+    }
+  }
+  check("v3.7 FLUIDS: every fluid component draws 2D+3D x light/dark x small/large - no throw, all finite, no mutation",
+    bad === null && notFinite === null && mutated === null,
+    bad || notFinite || (mutated ? "mutated " + mutated : FL_TYPES.length + " components x themes x scales clean"));
+})();
+
+/* ---- 31. the seven glyphs are DISTINCT + the fluid motions animate ---- */
+(() => {
+  const cell = 20;
+  const glyphOf = (t) => { const def = D.ELEMENTS[t]; const c = recCtx(); S.draw2D(c, t, { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod: 44 }); return c._pts.join("|"); };
+  const uniq = new Set(FL_TYPES.map(glyphOf));
+  const distinct = uniq.size === FL_TYPES.length;
+  // pipe SCROLLS its fluid, the tank fill LEVEL bobs, the mixer AGITATOR spins -
+  // each must move its part across phases (0.05 vs 0.55 read distinct here).
+  const movesOf = (t) => { const def = D.ELEMENTS[t]; const draw = (a) => { const c = recCtx(); S.draw2D(c, t, { x: 100, y: 80, w: def.w * cell, d: def.d * cell, cellPx: cell, color: def.color, theme: "light", lod: 44, anim: a }); return c._pts.join("|"); }; return draw(0.05) !== draw(0.55); };
+  const animated = ["pipe", "tank", "mixer"];
+  const stillStuck = animated.filter((t) => !movesOf(t));
+  check("v3.7 FLUIDS: the seven components render DISTINCT glyphs and the fluid motions (pipe scroll, tank fill bob, mixer agitator) move across anim phases",
+    distinct && stillStuck.length === 0,
+    "distinct=" + uniq.size + "/" + FL_TYPES.length + (stillStuck.length ? " static: " + stillStuck.join(",") : " animate OK"));
+})();
+
+/* ---- 32. Tank fluid schema (base storage yet 0 pallet positions) + the
+ *         Ctrl-K palette command list and IFC export handle every new type -- */
+(() => {
+  const tank = D.ELEMENTS["tank"] || {};
+  // A tank DECLARES base "storage" (reads as a storage vessel) yet contributes
+  // 0 PALLET positions - it holds FLUID (capacityM3), not pallets (honest).
+  const tankFluidSchema = tank.base === "storage" &&
+    D.elementCapacity({ type: "tank", w: tank.w, d: tank.d }) === 0 &&
+    typeof tank.capacityM3 === "number" && tank.capacityM3 > 0 &&
+    typeof tank.fillPct === "number" && tank.fluid === true;
+  // Load library.js (paletteTree) + palette.js (Ctrl-K) + ifc.js (export) with a
+  // minimal localStorage shim, and confirm every new type is reachable through
+  // the SAME registry-iterating paths the app uses.
+  global.localStorage = global.localStorage || (function () {
+    const s = {}; return { getItem: (k) => (k in s ? s[k] : null), setItem: (k, v) => { s[k] = String(v); }, removeItem: (k) => { delete s[k]; } };
+  })();
+  let ctrlkOk = false, ifcOk = false, err = null;
+  try {
+    if (!global.WT.library) (0, eval)(fs.readFileSync(path.join(__dirname, "library.js"), "utf8"));
+    if (!global.WT.palette) (0, eval)(fs.readFileSync(path.join(__dirname, "palette.js"), "utf8"));
+    if (!global.WT.ifc) (0, eval)(fs.readFileSync(path.join(__dirname, "ifc.js"), "utf8"));
+    // Ctrl-K: the command list is built from an UNFILTERED palette tree (every
+    // group), so every fluid type gets an "Add ..." place command.
+    const tree = global.WT.library.paletteTree({});
+    const cmds = global.WT.palette.buildCommands({ tree: tree, elements: D.ELEMENTS, generate: global.WT.generate });
+    const addTypes = {}; cmds.forEach((c) => { if (c && c.type) addTypes[c.type] = 1; });
+    ctrlkOk = FL_TYPES.every((t) => addTypes[t]);
+    // IFC: a layout with all seven fluid types exports without throwing and
+    // labels each one (generic proxy solid per element - no per-type switch).
+    const lay = { version: "wt-1", gridW: 40, gridH: 24, cell: D.METRES_PER_CELL,
+      elements: FL_TYPES.map((t, i) => { const def = D.ELEMENTS[t]; return { id: "f" + i, type: t, x: (i * 5) % 30, y: (i % 3) * 6, w: def.w, d: def.d }; }) };
+    const step = global.WT.ifc.generate(lay);
+    ifcOk = typeof step === "string" && step.length > 0 &&
+      FL_TYPES.every((t) => step.indexOf("'" + global.WT.ifc.stepString(D.ELEMENTS[t].label) + "'") !== -1);
+  } catch (e) { err = e.message; }
+  check("v3.7 FLUIDS: Tank has a fluid capacityM3/fillPct schema (base storage yet 0 pallet positions) + the Ctrl-K palette command list and IFC export handle every new type",
+    tankFluidSchema && ctrlkOk && ifcOk,
+    err ? "threw " + err : "tankSchema=" + tankFluidSchema + " ctrlK=" + ctrlkOk + " ifc=" + ifcOk);
+})();
+
 console.log("");
 console.log(failures === 0
-  ? "ALL SHAPES CHECKS PASSED (28 checks)"
+  ? "ALL SHAPES CHECKS PASSED (32 checks)"
   : failures + " SHAPES CHECK(S) FAILED");
 process.exit(failures === 0 ? 0 : 1);

@@ -12,8 +12,8 @@
  * boot. It writes a MACHINE-READABLE result into a #wt-selftest element
  * (created here) and console.log()s it, in one of two exact formats:
  *
- *     WT-SELFTEST: PASS 60/60
- *     WT-SELFTEST: FAIL 45/60 :: <comma-separated failed check names>
+ *     WT-SELFTEST: PASS 78/78
+ *     WT-SELFTEST: FAIL 45/78 :: <comma-separated failed check names>
  *
  * A maintainer runs it headlessly (e.g. headless Edge) and reads the
  * #wt-selftest text / the console line.
@@ -773,6 +773,68 @@
       return {
         ok: registered && zeroCap && basedOk && drewOk && rotates && placed && typeOk,
         detail: "reg=" + registered + " cap0=" + zeroCap + " base=" + basedOk + " drew=" + drewOk + " rotates=" + rotates + " placed=" + placed + " typeOk=" + typeOk,
+      };
+    });
+
+    // ---- v3.7 FLUIDS: process-industry components place + render + animate -
+    // The seven new Siemens-style Fluids / Process types (Pipe / FluidSource /
+    // FluidDrain / Tank / Mixer / Portioner / DePortioner) are registered with a
+    // declared base (conveyor/dock/storage/station) + 0 capacity (all category
+    // "flow", including the Tank - it holds FLUID, not pallets), RENDER on a
+    // REAL canvas at the zoomed-in tier without throwing, the tank fill level +
+    // mixer agitator MOVE across anim phases, and one places through the SAME
+    // library.placeAt path the palette uses. Continuous-flow physics is
+    // illustrative / deferred (honest) - this gates the placeable + render path.
+    check("fluids-process-components-place-and-render", function () {
+      var S = WT.shapes, DM = WT.domain;
+      if (!S || !DM) return { ok: false, detail: "shapes/domain missing" };
+      var FL = ["pipe", "fluid-source", "fluid-drain", "tank", "mixer", "portioner", "deportioner"];
+      var registered = FL.every(function (t) { return S.has(t) === true && !!DM.ELEMENTS[t]; });
+      var zeroCap = FL.every(function (t) { var def = DM.ELEMENTS[t] || {}; return DM.elementCapacity({ type: t, w: def.w, d: def.d }) === 0; });
+      var basedOk = DM.elementBase("pipe") === "conveyor" && DM.elementBase("fluid-source") === "dock" &&
+        DM.elementBase("tank") === "storage" && DM.elementBase("mixer") === "station";
+      // the Tank declares base "storage" yet holds FLUID (capacityM3), not pallets.
+      var tank = DM.ELEMENTS["tank"] || {};
+      var tankFluid = tank.fluid === true && typeof tank.capacityM3 === "number" && typeof tank.fillPct === "number";
+      var drewOk = true;
+      try {
+        var cv = document.createElement("canvas"); cv.width = 240; cv.height = 240;
+        var g = cv.getContext("2d");
+        FL.forEach(function (t) {
+          var def = DM.ELEMENTS[t];
+          S.draw2D(g, t, { x: 10, y: 10, w: def.w * 30, d: def.d * 30, cellPx: 30, color: def.color, theme: "light", lod: 60, anim: 0.3, seed: 4 });
+        });
+      } catch (e) { drewOk = false; }
+      // the tank fill level bobs + the mixer agitator spins - each moves its part.
+      function frame(t, a) {
+        var def = DM.ELEMENTS[t], c2 = document.createElement("canvas");
+        c2.width = 140; c2.height = 140;
+        S.draw2D(c2.getContext("2d"), t, { x: 8, y: 8, w: def.w * 24, d: def.d * 24, cellPx: 24, color: def.color, theme: "light", lod: 44, anim: a });
+        return c2.toDataURL();
+      }
+      var animates = frame("tank", 0.05) !== frame("tank", 0.55) && frame("mixer", 0.0) !== frame("mixer", 0.25);
+      // place a pipe through the library path (its group is shown in Factory mode).
+      var placed = false, typeOk = false;
+      if (haveApi && API.library && typeof API.library.placeAt === "function") {
+        var wasMode = API.plantMode ? API.plantMode.mode() : null;
+        if (API.plantMode) API.plantMode.set("factory");
+        var before = API.state.elements.length;
+        var lay = API.currentLayout();
+        var spots = [[0, 0], [1, 1], [0, (lay.gridH || 10) - 2], [(lay.gridW || 10) - 6, 0]];
+        for (var i = 0; i < spots.length && !placed; i++) {
+          API.library.placeAt("pipe", spots[i][0], spots[i][1]);
+          if (API.state.elements.length > before) placed = true;
+        }
+        var el = placed ? API.state.elements[API.state.elements.length - 1] : null;
+        typeOk = !!(el && el.type === "pipe");
+        if (el) API.state.elements = API.state.elements.filter(function (e) { return e.id !== el.id; });
+        if (API.plantMode && wasMode) API.plantMode.set(wasMode);
+        if (API.library.buildPalette) API.library.buildPalette();
+        API.render();
+      } else { placed = true; typeOk = true; } // no API -> render + registry checks still gate
+      return {
+        ok: registered && zeroCap && basedOk && tankFluid && drewOk && animates && placed && typeOk,
+        detail: "reg=" + registered + " cap0=" + zeroCap + " base=" + basedOk + " tankFluid=" + tankFluid + " drew=" + drewOk + " animates=" + animates + " placed=" + placed + " typeOk=" + typeOk,
       };
     });
 

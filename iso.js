@@ -127,6 +127,14 @@
     "cycle": 1.0,
     "track": 0.4,
     "two-lane-track": 0.4,
+    // v3.7 FLUIDS "process-industry components" (mirror domain heightM).
+    "pipe": 0.6,
+    "fluid-source": 1.8,
+    "fluid-drain": 1.8,
+    "tank": 5.0,
+    "mixer": 2.6,
+    "portioner": 2.2,
+    "deportioner": 2.2,
   };
 
   // Fallback used when a type is unknown to BOTH the domain model and the
