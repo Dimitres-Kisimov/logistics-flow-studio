@@ -256,6 +256,19 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
 }
 .pal-mini:hover { border-color: var(--accent); color: var(--accent); }
 
+/* v2.3 UI-1: Class Library search + keyboard focus + empty-search note. */
+.pal-search { margin: 0 0 8px; }
+.pal-search-input { width: 100%; }
+.pal-no-match { margin: 6px 4px; font-size: 0.76rem; color: var(--text-dim); }
+/* Visible keyboard focus on the tree controls (the palette buttons are not
+   .btn, so the global :focus-visible rule does not reach them). */
+.pal-item:focus-visible,
+.pal-group-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 8px;
+}
+
 /* Define-Object editor form. */
 .do-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin: 6px 0 10px; }
 .do-field { display: flex; flex-direction: column; gap: 4px; }
@@ -295,6 +308,9 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
 
 /* ---------------- Canvas ---------------- */
 .canvas-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+/* v2.3 UI-1: toolbar sub-clusters are semantic groups only - display:contents
+   keeps the flex layout visually identical while grouping for assistive tech. */
+.tb-group { display: contents; }
 .badge {
   font-size: 0.72rem;
   padding: 3px 9px;

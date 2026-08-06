@@ -95,7 +95,7 @@
            design - a deterministic rule/heuristic engine + offline NL
            parsing, no cloud and no trained model (see the header note and
            generate.js / nlcommands.js). -->
-      <section class="card" id="genCard">
+      <section class="card" id="genCard" data-default-collapsed>
         <h2 class="card-title">Generate Environment (AI)</h2>
         <div id="genHonesty" class="gen-honesty">
           <strong>AI-assisted generative layout.</strong> A deterministic rule/heuristic engine plus offline
@@ -137,7 +137,7 @@
            floor; export it as JSON + CSV. Honest by design — every
            scenario is SYNTHETIC (no real company/brand) and its data is a
            labelled plausible estimate, not measured (see examples.js). -->
-      <section class="card" id="examplesCard">
+      <section class="card" id="examplesCard" data-default-collapsed>
         <h2 class="card-title">Example scenarios</h2>
         <div class="gen-honesty">
           <strong>20+ realistic-but-illustrative scenarios.</strong> Preselected real-world set-ups
@@ -160,8 +160,8 @@
         <p class="hint">Exports are client-side downloads — <strong>fully offline, nothing is uploaded</strong>. The CSV lists every element (type, position, size, storage capacity) plus a KPI/summary block and the labelled synthetic data profile.</p>
       </section>
 
-      <section class="card">
-        <h2 class="card-title">Palette</h2>
+      <section class="card" id="paletteCard">
+        <h2 class="card-title">Class Library</h2>
         <p class="hint">Click an item, then click the floor to place it. Drag to move. Select to edit — arrow keys nudge 1 m, Ctrl+D (or the Duplicate button) copies.</p>
         <div class="pal-actions">
           <button id="defineObjectBtn" class="btn wide primary" type="button" title="Define your OWN object type (like Siemens Plant Simulation UserObjects) — derived from a base MaterialFlow behaviour class, organised into the categorised tree. The built-ins are editable seeds.">＋ Define Object</button>
@@ -171,7 +171,16 @@
           </div>
           <input id="libImportInput" type="file" accept="application/json,.json" hidden />
         </div>
-        <p class="hint">The palette is a categorised, collapsible tree. Built-ins live under their group; your own objects appear under <strong>My Objects</strong> (or the category you give them). Use <strong>✎</strong> to edit a custom object or <strong>⧉</strong> to clone a built-in into an editable custom.</p>
+        <p class="hint">A categorised, collapsible tree — built-ins under their group, your own under <strong>My Objects</strong>. Groups start collapsed (the first stays open); <strong>Search</strong> filters components across every group. <strong>✎</strong> edits a custom object, <strong>⧉</strong> clones a built-in into an editable custom.</p>
+        <!-- v2.3 UI-1: live search across the whole class library. Filters
+             components by name across every group and auto-reveals matches;
+             clearing it restores the collapsed/expanded tree. Keyboard: type
+             to filter, ArrowDown to step into the tree. -->
+        <div class="pal-search">
+          <label for="paletteSearch" class="sr-only">Search the class library by name</label>
+          <input id="paletteSearch" class="pal-search-input" type="search" inputmode="search" autocomplete="off"
+                 placeholder="Search components…" aria-label="Search the class library by name" aria-controls="palette" />
+        </div>
         <div id="palette" class="palette"><!-- filled by app.js buildPalette() as a categorised tree --></div>
       </section>
 
@@ -214,7 +223,7 @@
            synthetic example scenarios above. Stored ON THIS DEVICE only
            (browser localStorage); nothing is uploaded. Loading reuses the
            SAME loader as JSON import (deserialize). Store: scenarios.js. -->
-      <section class="card" id="scenariosCard">
+      <section class="card" id="scenariosCard" data-default-collapsed>
         <h2 class="card-title">My scenarios</h2>
         <p class="hint">Save the plants <strong>you</strong> build under a name, then reload, rename or delete them. Saved <strong>only on this device</strong> (your browser) — <strong>nothing is uploaded</strong>. These are your own work, separate from the read-only example scenarios above. <em>Export bundle</em> makes a JSON backup you can move between devices.</p>
         <div class="field">
@@ -247,7 +256,7 @@
            (compare.js -> WT.compare, derived from WT.report.build), so the
            two sides can never drift from the app. Comparing runs on the
            picked snapshots and never disturbs the current floor. -->
-      <section class="card" id="compareCard">
+      <section class="card" id="compareCard" data-default-collapsed>
         <h2 class="card-title">Scenario A/B compare</h2>
         <p class="hint">Pick <strong>two whole set-ups</strong> — the current layout, a built-in example, or one of your saved scenarios — and see their key metrics <strong>side-by-side with deltas</strong>. Answers "which layout / strategy is better?". Broader than the strategy-only <em>Compare A/B</em> above: this diffs the <strong>full consolidated report</strong> (compliance, WMS KPIs, storage, automation, capacity). Each side's numbers come from the <strong>same WMS Report</strong> the app shows (they can't drift). <strong>SYNTHETIC</strong> unless you imported data — a transparent heuristic informed by ISO/DIN/EN/VDI, <strong>not a certification, not measured</strong>. "Better/worse" is shown only where the direction is unambiguous; capacity/utilisation/automation stay neutral. Comparing runs on the picked snapshots and <strong>doesn't disturb your current floor</strong>.</p>
         <div class="field">
@@ -265,7 +274,7 @@
            demo shows it locked with the padlock + unlock hint (never
            hidden). Parsing runs in the browser via FileReader - the
            app makes zero network requests, so nothing CAN be uploaded. -->
-      <section class="card" id="dataCard">
+      <section class="card" id="dataCard" data-default-collapsed>
         <h2 class="card-title">Import your data <span id="dataLock"></span></h2>
         <p class="hint">Run the sim on <strong>your own SKUs</strong>: an article CSV
           <code>sku,description,weekly_picks[,class]</code> sets real pick velocities
@@ -294,7 +303,7 @@
            synthetic + labelled; imported data is yours and stays on this
            device. Pure model in wmsdata.js (WT.wmsdata); with nothing
            loaded the sim uses the synthetic default, exactly as before. -->
-      <section class="card" id="wmsDataCard">
+      <section class="card" id="wmsDataCard" data-default-collapsed>
         <h2 class="card-title">SKU &amp; order data <span id="wmsDataLock"></span></h2>
         <div class="gen-honesty">
           <strong>A real-data layer: SKU master + order pool.</strong> Generate a
@@ -340,7 +349,7 @@
       <!-- W3: floor-plan image underlay - trace a real hall. Full-tier
            feature, locked-but-visible in the demo. The image becomes a
            local dataURL via FileReader (offline, no canvas taint). -->
-      <section class="card" id="underlayCard">
+      <section class="card" id="underlayCard" data-default-collapsed>
         <h2 class="card-title">Floor plan underlay <span id="underlayLock"></span></h2>
         <p class="hint">From a picture to a working layout: load a photo or plan of your hall, draw it
           <em>under</em> the grid, calibrate the scale, then place racks &amp; docks over the traced plan.
@@ -367,14 +376,22 @@
 
     <!-- CENTER: canvas -->
     <section class="col center" aria-label="Warehouse floor plan and view controls">
-      <div class="canvas-toolbar">
-        <span id="modeBadge" class="badge">Mode: Select</span>
-        <span id="capBadge" class="badge muted">Positions: 0</span>
-        <span id="aisleBadge" class="badge ok">Aisle OK</span>
-        <span id="chainBadge" class="badge muted">Flow: manual</span>
-        <span id="dataBadge" class="badge muted" title="Which dataset the simulation runs on: the seeded synthetic demo catalogue, or your own imported CSVs (Import your data, left panel)">Data: synthetic demo</span>
-        <button id="heatBtn" class="btn small" type="button" aria-pressed="false" title="Shade the floor by metres walked in the last run's pick tours. Goods-to-person picks (AS/RS, shuttle) add no walking, so they leave no trace.">Heatmap</button>
-        <button id="measureBtn" class="btn small" type="button" aria-pressed="true" title="Measurements: a metre scale ruler along the top and left floor edges, the selected element's dimensions (w x d m), and faint floor markings (facility perimeter, aisle centre guides, dock-approach hatching, functional zone tints). Illustrative — the measurements are the model's own metre grid (1 cell = 1 m), not a site survey.">Measure</button>
+      <!-- v2.3 UI-1: the status strip, tidied into two labelled clusters -
+           live status readouts and floor overlays. The wrappers use
+           display:contents so the flex layout is visually unchanged; they
+           only add semantic grouping for assistive tech. Every id is kept. -->
+      <div class="canvas-toolbar" role="group" aria-label="Warehouse status and floor overlays">
+        <div class="tb-group" role="group" aria-label="Live status">
+          <span id="modeBadge" class="badge">Mode: Select</span>
+          <span id="capBadge" class="badge muted">Positions: 0</span>
+          <span id="aisleBadge" class="badge ok">Aisle OK</span>
+          <span id="chainBadge" class="badge muted">Flow: manual</span>
+          <span id="dataBadge" class="badge muted" title="Which dataset the simulation runs on: the seeded synthetic demo catalogue, or your own imported CSVs (Import your data, left panel)">Data: synthetic demo</span>
+        </div>
+        <div class="tb-group" role="group" aria-label="Floor overlays">
+          <button id="heatBtn" class="btn small" type="button" aria-pressed="false" title="Shade the floor by metres walked in the last run's pick tours. Goods-to-person picks (AS/RS, shuttle) add no walking, so they leave no trace.">Heatmap</button>
+          <button id="measureBtn" class="btn small" type="button" aria-pressed="true" title="Measurements: a metre scale ruler along the top and left floor edges, the selected element's dimensions (w x d m), and faint floor markings (facility perimeter, aisle centre guides, dock-approach hatching, functional zone tints). Illustrative — the measurements are the model's own metre grid (1 cell = 1 m), not a site survey.">Measure</button>
+        </div>
       </div>
       <div class="canvas-toolbar view-toolbar">
         <div class="zoom-group" role="group" aria-label="Zoom and pan the warehouse view">
@@ -467,7 +484,7 @@
       </section>
 
       <!-- Round 2: run history (session-only experiment log) -->
-      <section class="card">
+      <section class="card" data-default-collapsed>
         <h2 class="card-title">Run history</h2>
         <p class="hint">Every Run appends a row (newest first) so you can compare experiments without notes on paper. Green marks the best pick travel and throughput so far. <strong>Session-only</strong> — rows describe layouts that may have changed since, so the log is not saved with the layout. EUR/ord uses the wage set at that run. Same seed &amp; setup → identical row.</p>
         <div id="histWrap" class="hist-wrap"><p class="empty">Run the simulation — every run lands here as a comparable row.</p></div>
@@ -477,7 +494,7 @@
       <!-- P2: WMS Operations — the standard warehouse workflow simulated
            as a deterministic seeded flow over the CURRENT layout. Pure
            logic lives in wms.js; the order-picking stage reuses the sim. -->
-      <section class="card" id="wmsCard">
+      <section class="card" id="wmsCard" data-default-collapsed>
         <h2 class="card-title">WMS Operations</h2>
         <div class="wms-disclaimer">
           <strong>SYNTHETIC operations model — a transparent teaching heuristic, NOT a certification and NOT measured from a real site.</strong>
@@ -506,7 +523,7 @@
            automation.js (WT.automation); it reuses the WT.wms per-system
            throughput math (single source of truth). With no automation
            elements the WMS behaviour is byte-identical to before. -->
-      <section class="card" id="autoCard">
+      <section class="card" id="autoCard" data-default-collapsed>
         <h2 class="card-title">Automation systems</h2>
         <div class="wms-disclaimer">
           <strong>SYNTHETIC automation model — a transparent, VDI-informed cycle-time HEURISTIC, NOT measured, NOT a vendor spec and NOT a certification.</strong>
@@ -526,7 +543,7 @@
            occupancy + overflow, and expose a retrieval location the live
            material-flow leg uses. Pure model in storage.js (WT.storage);
            with nothing assigned the flow is byte-identical to before. -->
-      <section class="card" id="storageCard">
+      <section class="card" id="storageCard" data-default-collapsed>
         <h2 class="card-title">Storage &amp; inventory</h2>
         <div class="wms-disclaimer">
           <strong>SYNTHETIC slotting — the transparent ABC / velocity HEURISTIC, NOT a measurement, NOT an optimisation proof and NOT a certification.</strong>
@@ -550,7 +567,7 @@
            units moving through the warehouse over time. Pure model lives
            in flowsim.js; the boxes are drawn on the canvas inside the same
            world transform as every other overlay (zoom/pan/Fit all apply). -->
-      <section class="card" id="flowCard">
+      <section class="card" id="flowCard" data-default-collapsed>
         <h2 class="card-title">Live material flow</h2>
         <div class="wms-disclaimer">
           <strong>SYNTHETIC animation — a transparent teaching model, NOT a real discrete-event-simulation engine, NOT a measurement and NOT a certification.</strong>
@@ -618,7 +635,7 @@
       </section>
 
       <!-- P2: heuristic advisor -->
-      <section class="card">
+      <section class="card" data-default-collapsed>
         <h2 class="card-title">Advisor</h2>
         <p class="hint">A <strong>heuristic advisor</strong> informed by operations-research &amp; warehousing best practice — a transparent rule engine, <em>not</em> a trained/black-box model. Impacts are estimated with the same simulation.</p>
         <button id="adviseBtn" class="btn primary wide" type="button">Analyze layout</button>
@@ -626,7 +643,7 @@
       </section>
 
       <!-- P2: spatial-layout optimizer -->
-      <section class="card">
+      <section class="card" data-default-collapsed>
         <h2 class="card-title">Layout optimizer</h2>
         <p class="hint">Golden-zone heuristic: pulls storage toward the outbound dock, keeping aisles valid. Previews the change and the predicted KPIs before you apply it.</p>
         <button id="optimizeBtn" class="btn primary wide" type="button">Optimize (preview)</button>
@@ -634,7 +651,7 @@
       </section>
 
       <!-- P2: comparative A/B predictor -->
-      <section class="card">
+      <section class="card" data-default-collapsed>
         <h2 class="card-title">Compare A/B</h2>
         <p class="hint">Runs the sim twice (same seed → deterministic) and diffs the KPIs.</p>
         <div class="ab-grid">
@@ -663,7 +680,7 @@
            Informed by German workplace guidelines - a DESIGN AID, not a
            certification or Gefährdungsbeurteilung (see the header banner
            and every report). Pure logic lives in compliance.js. -->
-      <section class="card" id="complCard">
+      <section class="card" id="complCard" data-default-collapsed>
         <h2 class="card-title">Compliance Check</h2>
         <div id="complDisclaimer" class="compl-disclaimer">
           <strong>Design aid, NOT a certification, legal-compliance guarantee, or Gefährdungsbeurteilung.</strong>

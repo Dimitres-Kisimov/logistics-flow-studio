@@ -2441,51 +2441,169 @@
   // PALETTE (tier-aware: locked items stay visible with a padlock —
   // capability flags come from tiers.js, the one gate module)
   // ================================================================
-  // Collapse state per palette group (kept across re-renders so toggling a
-  // group open/closed survives a rebuild). Default: all expanded.
-  const palCollapsed = {};
+  // v2.3 UI-1: the CALM, SEARCHABLE Class Library. The palette is a
+  // CATEGORISED, COLLAPSIBLE TREE (like the Siemens class tree): the seven
+  // canonical groups + any custom category, built-ins under their group and
+  // user-defined types under "My Objects". Collapse state + a first-run
+  // "seeded" marker PERSIST to localStorage (guarded), so a user's open/closed
+  // groups survive a reload. DEFAULT on the first ever run: every group
+  // collapsed EXCEPT the first, so the first screen is calm - the user's later
+  // toggles win from then on. A live SEARCH box filters components by name
+  // across ALL groups. Built-ins are editable SEEDS (clone into a custom).
+  const PAL_LS_KEY = "wt.palette.tree.v1";
+  let palCollapsed = {};   // { groupLabel: true=collapsed | false=expanded }
+  let palSeeded = false;   // has the first-run collapse default been applied?
+  let paletteFilter = "";  // the live search query (lower-cased at match time)
 
-  // The palette is a CATEGORISED, COLLAPSIBLE TREE (like the Siemens class
-  // tree): the seven canonical groups + any custom category, built-ins under
-  // their group and user-defined types under "My Objects" (or their chosen
-  // category). Built-ins are editable SEEDS - clone one into a custom - not a
-  // hardcoded menu. WT.library.paletteTree() is the single source of the
-  // grouping; a fallback flat tree keeps the app usable if the module is absent.
+  function palLoadState() {
+    try {
+      const raw = localStorage.getItem(PAL_LS_KEY);
+      if (!raw) return;
+      const o = JSON.parse(raw);
+      if (o && typeof o === "object") {
+        if (o.collapsed && typeof o.collapsed === "object") palCollapsed = o.collapsed;
+        palSeeded = !!o.seeded;
+      }
+    } catch (_) { /* corrupt / unavailable - fall back to defaults */ }
+  }
+  function palSaveState() {
+    try { localStorage.setItem(PAL_LS_KEY, JSON.stringify({ collapsed: palCollapsed, seeded: palSeeded })); }
+    catch (_) { /* storage may be unavailable - state stays in-memory */ }
+  }
+  palLoadState();
+
+  // WT.library.paletteTree() is the single source of the grouping; a fallback
+  // flat tree keeps the app usable if the module is absent.
   function paletteTreeModel() {
     if (WT.library && typeof WT.library.paletteTree === "function") return WT.library.paletteTree();
     return [{ key: "All", label: "All objects", types: (D.paletteOrder || []).slice() }];
   }
 
+  // Does a type match the live search (by its visible label, case-insensitive)?
+  function palTypeMatches(type, q) {
+    if (!q) return true;
+    const def = ELEMENTS[type];
+    return !!def && String(def.label || "").toLowerCase().indexOf(q) !== -1;
+  }
+
+  // Toggle a group open/closed, persist, rebuild and keep keyboard focus on it.
+  function togglePalGroup(label) {
+    palCollapsed[label] = !palCollapsed[label]; // undefined -> true (collapse)
+    palSaveState();
+    buildPalette();
+    const heads = document.querySelectorAll("#palette .pal-group-head");
+    for (const h of heads) { if (h.dataset.group === label) { h.focus(); break; } }
+  }
+
+  // Reveal (expand) a group - used when a new object lands in it, so the user
+  // sees what they just created even though groups start collapsed.
+  function revealPalGroup(label) { if (label) { palCollapsed[label] = false; palSaveState(); } }
+
   function buildPalette() {
     const caps = WT.tiers.caps();
     const wrap = $("palette");
+    if (!wrap) return;
+    const tree = paletteTreeModel();
+    // First-run seeding: collapse every group but the first, once, then persist.
+    if (!palSeeded) {
+      tree.forEach((group, i) => { palCollapsed[group.label] = i > 0; });
+      palSeeded = true;
+      palSaveState();
+    }
+    const q = paletteFilter.trim().toLowerCase();
     wrap.innerHTML = "";
-    for (const group of paletteTreeModel()) {
-      const collapsed = !!palCollapsed[group.label];
+    let shownItems = 0;
+    for (const group of tree) {
+      const allTypes = group.types;
+      const types = q ? allTypes.filter((t) => palTypeMatches(t, q)) : allTypes;
+      // While searching, drop groups with no match entirely (declutter);
+      // otherwise the empty "My Objects" group still shows its hint.
+      if (q && types.length === 0) continue;
+      // A search force-opens the matching groups; otherwise honour the
+      // persisted collapse state (default seeded above; new groups expand).
+      const collapsed = q ? false : !!palCollapsed[group.label];
       const g = document.createElement("div");
       g.className = "pal-group";
       const head = document.createElement("button");
       head.type = "button";
       head.className = "pal-group-head";
+      head.dataset.group = group.label;
       head.setAttribute("aria-expanded", String(!collapsed));
+      const countLabel = (q && types.length !== allTypes.length) ? types.length + "/" + allTypes.length : String(allTypes.length);
       head.innerHTML =
         `<span class="pal-caret" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>` +
         `<span class="pal-group-label">${esc(group.label)}</span>` +
-        `<span class="pal-count">${group.types.length}</span>`;
-      head.addEventListener("click", () => { palCollapsed[group.label] = !collapsed; buildPalette(); });
+        `<span class="pal-count">${esc(countLabel)}</span>`;
+      head.addEventListener("click", () => { togglePalGroup(group.label); });
       g.appendChild(head);
       const body = document.createElement("div");
       body.className = "pal-group-body";
       body.hidden = collapsed;
-      if (group.types.length === 0) {
+      if (types.length === 0) {
         const empty = document.createElement("p");
         empty.className = "pal-empty";
         empty.textContent = "No objects yet — use “＋ Define Object” to add your own.";
         body.appendChild(empty);
       }
-      for (const type of group.types) renderPaletteItem(body, type, caps);
+      for (const type of types) { renderPaletteItem(body, type, caps); shownItems++; }
       g.appendChild(body);
       wrap.appendChild(g);
+    }
+    if (q && shownItems === 0) {
+      const none = document.createElement("p");
+      none.className = "pal-no-match";
+      none.textContent = "No components match “" + paletteFilter.trim() + "”.";
+      wrap.appendChild(none);
+    }
+  }
+
+  // Wire the search box + roving arrow-key navigation (once). The controls are
+  // fully keyboard-accessible: type to filter, ArrowDown steps into the tree,
+  // Up/Down move between headers + items, Left/Right collapse/expand a group,
+  // Enter/Space pick an item (native button behaviour), Esc clears the search.
+  function wirePaletteControls() {
+    const input = $("paletteSearch");
+    if (input && !input.dataset.wired) {
+      input.dataset.wired = "1";
+      input.addEventListener("input", () => { paletteFilter = input.value || ""; buildPalette(); });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          const first = document.querySelector("#palette .pal-group-head, #palette .pal-item");
+          if (first) first.focus();
+        } else if (e.key === "Escape" && input.value) {
+          e.preventDefault();
+          input.value = ""; paletteFilter = ""; buildPalette();
+        }
+      });
+    }
+    const wrap = $("palette");
+    if (wrap && !wrap.dataset.navWired) {
+      wrap.dataset.navWired = "1";
+      wrap.addEventListener("keydown", onPaletteKeydown);
+    }
+  }
+
+  function onPaletteKeydown(e) {
+    const wrap = $("palette");
+    if (!wrap) return;
+    const items = Array.prototype.slice.call(wrap.querySelectorAll(".pal-group-head, .pal-item"));
+    if (!items.length) return;
+    const active = document.activeElement;
+    const idx = items.indexOf(active);
+    const isHead = !!(active && active.classList && active.classList.contains("pal-group-head"));
+    const focusAt = (i) => { const el = items[Math.max(0, Math.min(items.length - 1, i))]; if (el) el.focus(); };
+    switch (e.key) {
+      case "ArrowDown": e.preventDefault(); e.stopPropagation(); focusAt(idx < 0 ? 0 : idx + 1); break;
+      case "ArrowUp":   e.preventDefault(); e.stopPropagation(); focusAt(idx < 0 ? items.length - 1 : idx - 1); break;
+      case "Home":      e.preventDefault(); e.stopPropagation(); focusAt(0); break;
+      case "End":       e.preventDefault(); e.stopPropagation(); focusAt(items.length - 1); break;
+      case "ArrowRight":
+        if (isHead && palCollapsed[active.dataset.group]) { e.preventDefault(); e.stopPropagation(); togglePalGroup(active.dataset.group); }
+        break;
+      case "ArrowLeft":
+        if (isHead && !palCollapsed[active.dataset.group]) { e.preventDefault(); e.stopPropagation(); togglePalGroup(active.dataset.group); }
+        break;
     }
   }
 
@@ -2663,6 +2781,7 @@
     if (!input.name) { toast("Give the object a name.", "warn"); const n = $("doName"); if (n) n.focus(); return; }
     const def = defineEditId ? WT.library.update(defineEditId, input) : WT.library.define(input);
     if (!def) { toast("Could not save that object.", "warn"); return; }
+    revealPalGroup(def.paletteCategory); // reveal the group the object landed in
     buildPalette();
     closeDefineDialog();
     setTool(def.id);
@@ -2676,6 +2795,7 @@
     delete input.id;
     const def = WT.library.define(input);
     if (!def) { toast("Could not duplicate.", "warn"); return; }
+    revealPalGroup(def.paletteCategory);
     buildPalette();
     openDefineDialog(def.id);
     toast("Duplicated as “" + def.label + "”.");
@@ -2737,6 +2857,7 @@
           const text = await readFileText(file);
           const res = WT.library.importJson(text);
           if (!res.ok && !res.added) { toast("Import failed: " + (res.error || "unrecognised file") + ".", "warn"); return; }
+          if (WT.library.MY_OBJECTS) revealPalGroup(WT.library.MY_OBJECTS);
           buildPalette();
           toast("Imported " + res.added + " object(s)" + (res.errors && res.errors.length ? ", " + res.errors.length + " skipped." : "."));
         } catch (err) { toast("Could not read that file: " + err.message, "warn"); }
@@ -6463,15 +6584,25 @@
   // knowledge base, standards) collapse themselves and are left untouched.
   // Applied GENERICALLY - no card is hand-wired; the header is the only
   // toggle target, so buttons/inputs inside a card are never hijacked.
+  // v2.3 UI-1 declutter: the FIRST ever run seeds the SECONDARY panels (those
+  // marked data-default-collapsed in index.html) as collapsed, so the first
+  // screen is the canvas + a compact Class Library + the essentials, not every
+  // panel at once. Seeded ONCE, guarded by a flag, so the user's later toggles
+  // win from then on. Nothing is removed - every panel is one click away.
+  const UI_SEED_KEY = "wt.ui.seeded.v1";
   function initCollapsibleCards() {
     if (!WT.cards || !document.querySelectorAll) return; // graceful: app still works
     const collapse = WT.cards.create();
+    let seeded = true;
+    try { seeded = localStorage.getItem(UI_SEED_KEY) === "1"; } catch (_) { seeded = true; }
     const cards = document.querySelectorAll("main.layout section.card");
     cards.forEach((card) => {
       const title = card.querySelector(":scope > .card-title");
       if (!title) return; // <details>-based cards handle their own collapsing
       // A stable key: prefer the card's id, else a slug of its title text.
       const key = card.id || "card-" + WT.cards.slug(title.textContent || "");
+      // One-time declutter: collapse the secondary panels on first run.
+      if (!seeded && card.hasAttribute("data-default-collapsed")) collapse.set(key, true);
       title.classList.add("card-toggle");
       title.setAttribute("role", "button");
       title.setAttribute("tabindex", "0");
@@ -6498,6 +6629,9 @@
         }
       });
     });
+    // Mark the first-run declutter as applied so it never re-seeds (the user's
+    // subsequent expand/collapse choices are the ones that persist).
+    if (!seeded) { try { localStorage.setItem(UI_SEED_KEY, "1"); } catch (_) { /* storage may be unavailable */ } }
   }
 
   // In-browser self-test hook. ATTACHED ONLY under ?selftest=1 - a normal
@@ -6551,12 +6685,17 @@
         buildPalette: buildPalette,
         placeAt: (type, cx, cy) => placeAt(type, cx, cy),
         paletteTree: paletteTreeModel,
+        // v2.3 UI-1 Class Library hooks: drive the live search + group toggles.
+        setSearch: (query) => { paletteFilter = query || ""; const inp = $("paletteSearch"); if (inp) inp.value = paletteFilter; buildPalette(); },
+        toggleGroup: (label) => togglePalGroup(label),
+        collapsedState: () => Object.assign({}, palCollapsed),
       },
     };
   }
 
   function boot() {
     buildPalette();
+    wirePaletteControls(); // v2.3 UI-1: Class Library search + arrow-key nav
     buildConfigControls();
     buildAbControls();
     buildStandards();

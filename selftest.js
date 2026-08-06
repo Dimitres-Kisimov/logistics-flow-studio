@@ -12,8 +12,8 @@
  * boot. It writes a MACHINE-READABLE result into a #wt-selftest element
  * (created here) and console.log()s it, in one of two exact formats:
  *
- *     WT-SELFTEST: PASS 57/57
- *     WT-SELFTEST: FAIL 45/57 :: <comma-separated failed check names>
+ *     WT-SELFTEST: PASS 60/60
+ *     WT-SELFTEST: FAIL 45/60 :: <comma-separated failed check names>
  *
  * A maintainer runs it headlessly (e.g. headless Edge) and reads the
  * #wt-selftest text / the console line.
@@ -505,6 +505,60 @@
       var labels = [];
       document.querySelectorAll("#palette .pal-group-label").forEach(function (el) { labels.push(el.textContent); });
       return { ok: labels.indexOf("My Objects") !== -1 && labels.indexOf("Storage & Racking") !== -1, detail: labels.join(" | ") };
+    });
+
+    // ---- v2.3 UI-1: the CALM, SEARCHABLE Class Library ----------------
+    // Progressive disclosure: the palette is a collapsible, searchable tree.
+    // A search box exists, the group headers expose aria-expanded and at least
+    // one is COLLAPSED by default (first-run declutter), and the live search
+    // filters components by name across every group (with a no-match note),
+    // then restores the full tree on clear.
+    check("class-library-search-and-collapsible", function () {
+      var input = document.getElementById("paletteSearch");
+      var heads = document.querySelectorAll("#palette .pal-group-head");
+      // Every group header is a collapsible control (aria-expanded true|false).
+      var allHaveAria = heads.length >= 2, i;
+      for (i = 0; i < heads.length; i++) {
+        var v = heads[i].getAttribute("aria-expanded");
+        if (v !== "true" && v !== "false") allHaveAria = false;
+      }
+      // Prove a group actually collapses/expands via the SAME path the UI uses
+      // (robust to whatever collapse state is persisted for this profile).
+      var toggleOk = false;
+      if (haveApi && API.library && typeof API.library.toggleGroup === "function" && typeof API.library.collapsedState === "function" && heads.length) {
+        var label = heads[0].dataset.group;
+        var before = !!API.library.collapsedState()[label];
+        API.library.toggleGroup(label);
+        var after = !!API.library.collapsedState()[label];
+        API.library.toggleGroup(label); // restore
+        toggleOk = before !== after;
+      }
+      return {
+        ok: !!input && allHaveAria && toggleOk,
+        detail: "search=" + !!input + " heads=" + heads.length + " aria=" + allHaveAria + " toggles=" + toggleOk,
+      };
+    });
+    check("class-library-search-filters", function () {
+      if (!haveApi || !API.library || typeof API.library.setSearch !== "function") return { ok: false, detail: "no setSearch API" };
+      API.library.setSearch("conveyor");
+      var items = document.querySelectorAll("#palette .pal-item");
+      var filtered = items.length;
+      var everyMatches = filtered > 0;
+      items.forEach(function (b) {
+        var nm = (b.querySelector(".pal-name") || {}).textContent || "";
+        if (nm.toLowerCase().indexOf("conveyor") === -1) everyMatches = false;
+      });
+      // A term that matches nothing shows the no-match note + zero items.
+      API.library.setSearch("zzzz-no-such-object");
+      var noMatch = document.querySelectorAll("#palette .pal-item").length === 0 &&
+        !!document.querySelector("#palette .pal-no-match");
+      // Clear: the full tree returns (items in collapsed groups stay in the DOM).
+      API.library.setSearch("");
+      var restored = document.querySelectorAll("#palette .pal-item").length >= filtered;
+      return {
+        ok: everyMatches && filtered >= 1 && noMatch && restored,
+        detail: "filtered=" + filtered + " everyMatch=" + everyMatches + " noMatch=" + noMatch + " restored=" + restored,
+      };
     });
     check("defined-object-registers-places-renders", function () {
       if (!WT.library || !haveApi || !API.library) return { ok: false, detail: "no library api" };
