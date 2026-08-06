@@ -585,6 +585,74 @@
       return { ok: inPalette && placed && typeOk, detail: "inPalette=" + inPalette + " placed=" + placed + " typeOk=" + typeOk };
     });
 
+    // ---- v2.4 UI-2: Simple/Expert DENSITY toggle ----------------------
+    // The global density lever exists, is labelled + aria-pressed, seeds a root
+    // data-density state, and FLIPS it (Simple <-> Expert) through the SAME
+    // path the toolbar button uses. Every state is restored afterwards.
+    check("density-toggle-present-and-labelled", function () {
+      var btn = $("densityBtn");
+      if (!btn) return { ok: false, detail: "no #densityBtn" };
+      var pressed = btn.getAttribute("aria-pressed");
+      var name = (btn.getAttribute("aria-label") || btn.textContent || btn.getAttribute("title") || "").trim();
+      var rootState = document.documentElement.getAttribute("data-density");
+      var ok = (pressed === "true" || pressed === "false") && name.length > 0 &&
+        (rootState === "simple" || rootState === "expert");
+      return { ok: ok, detail: "aria-pressed=" + pressed + " root=" + rootState + " named=" + (name.length > 0) };
+    });
+    check("density-toggle-flips-root-state", function () {
+      if (!haveApi || !API.density || typeof API.density.set !== "function") return { ok: false, detail: "no density API" };
+      var original = API.density.mode();
+      API.density.set("simple");
+      var simpleRoot = document.documentElement.getAttribute("data-density");
+      var pressedSimple = $("densityBtn") && $("densityBtn").getAttribute("aria-pressed");
+      API.density.set("expert");
+      var expertRoot = document.documentElement.getAttribute("data-density");
+      var pressedExpert = $("densityBtn") && $("densityBtn").getAttribute("aria-pressed");
+      API.density.toggle();
+      var toggledRoot = document.documentElement.getAttribute("data-density");
+      API.density.set(original); // restore the profile's density
+      var ok = simpleRoot === "simple" && expertRoot === "expert" && toggledRoot === "simple" &&
+        pressedSimple === "false" && pressedExpert === "true";
+      return { ok: ok, detail: "simple=" + simpleRoot + " expert=" + expertRoot + " toggled=" + toggledRoot + " aria(" + pressedSimple + "/" + pressedExpert + ")" };
+    });
+
+    // ---- v2.4 UI-2: grouped Inspector (Basic always, Advanced gated) --
+    // Select an element, then assert the Properties panel shows a Basic group
+    // (always visible, never gated) and an Advanced group that is DENSITY-
+    // GATED: computed display:none in Simple, visible in Expert.
+    check("inspector-groups-basic-always-advanced-gated", function () {
+      if (!haveApi || typeof API.selectElement !== "function") return { ok: false, detail: "no selectElement API" };
+      if (!API.state.elements.length) {
+        var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+        if (ex) API.loadExample(ex.id);
+      }
+      if (!API.state.elements.length) return { ok: false, detail: "no elements to select" };
+      var origDensity = API.density ? API.density.mode() : "simple";
+      API.selectElement(API.state.elements[0].id);
+      var panel = $("propPanel");
+      var basic = panel.querySelector('.prop-group[data-group="basic"]');
+      var advanced = panel.querySelector('.prop-group[data-group="advanced"]');
+      var basicOk = !!basic;
+      var advancedPresent = !!advanced;
+      var advancedGated = advancedPresent && advanced.getAttribute("data-density") === "expert";
+      var basicUngated = basicOk && basic.getAttribute("data-density") === null;
+      function disp(el) { var cs = el && window.getComputedStyle(el); return cs ? cs.display : "none"; }
+      var hiddenInSimple = true, shownInExpert = true;
+      if (API.density && advancedPresent) {
+        API.density.set("simple");
+        hiddenInSimple = disp(advanced) === "none";
+        API.density.set("expert");
+        shownInExpert = disp(advanced) !== "none";
+        API.density.set(origDensity); // restore
+      }
+      var ok = basicOk && advancedPresent && advancedGated && basicUngated && hiddenInSimple && shownInExpert;
+      return {
+        ok: ok,
+        detail: "basic=" + basicOk + " advGated=" + advancedGated + " ungatedBasic=" + basicUngated +
+          " hiddenSimple=" + hiddenInSimple + " shownExpert=" + shownInExpert,
+      };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

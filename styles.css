@@ -100,6 +100,28 @@ h1, h2, h3 { margin: 0; font-weight: 650; }
   vertical-align: middle;
 }
 .topbar-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ---------------- v2.4 UI-2: Simple/Expert density ----------------
+ * The single global progressive-disclosure lever. Any control or panel
+ * marked [data-density="expert"] is a power-user / advanced affordance:
+ * shown only when the root <html data-density="expert">. In Simple (the
+ * default, seeded at runtime by app.js) they are HIDDEN - never removed,
+ * the toggle reveals them. The toggle itself is never gated (always
+ * reachable). Because the root state is set at runtime, a page with no
+ * data-density yet (pre-boot) shows everything, then app.js seeds Simple. */
+:root[data-density="simple"] [data-density="expert"] { display: none !important; }
+/* The density toggle button: a compact labelled pill that reads its mode. */
+.density-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.density-cap {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-dim);
+}
+.density-mode { font-weight: 650; }
+.density-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.density-toggle[aria-pressed="true"] .density-mode { color: var(--accent); }
 /* Top quick-pick dropdown for the Example scenarios (loads onto the floor). */
 .topbar-examples { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; justify-content: center; }
 .topbar-examples-label { font-size: 0.72rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
@@ -371,11 +393,38 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
 
 /* ---------------- Properties ---------------- */
 .prop-panel .empty { color: var(--text-dim); font-size: 0.82rem; }
+/* v2.4 UI-2: the empty-state hint - a short, guiding line when nothing is
+   selected (not a wall of blank fields). */
+.prop-empty { padding: 4px 0 2px; }
+.prop-empty .empty { display: block; }
+.prop-empty .prop-empty-hint { font-size: 0.74rem; color: var(--text-dim); margin: 6px 0 0; }
 .prop-row { display: flex; justify-content: space-between; gap: 10px; font-size: 0.82rem; padding: 4px 0; border-bottom: 1px dashed var(--border); }
 .prop-row .k { color: var(--text-dim); }
 .prop-row .v { font-weight: 600; text-align: right; }
 .prop-desc { font-size: 0.76rem; color: var(--text-dim); margin: 8px 0; }
 .prop-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+/* v2.4 UI-2: grouped Inspector (detail on demand). The selected element's
+   properties are organised into labelled, collapsible groups - Basic (always
+   visible) - Behaviour - Advanced (collapsed by default + density-gated:
+   [data-density="expert"] on the Advanced group hides it in Simple). Every
+   group header is a real <button>, so Enter/Space toggle it natively and it
+   is keyboard-navigable + focus-visible (covered by the global .btn ring). */
+.prop-group { border-bottom: 1px solid var(--border); }
+.prop-group:last-of-type { border-bottom: none; }
+.prop-group-head {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  background: none; border: none; padding: 9px 0 7px; margin: 0;
+  font: inherit; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--text-dim); cursor: pointer;
+}
+.prop-group-head:hover { color: var(--text); }
+.prop-group-title { flex: 1 1 auto; text-align: left; }
+.prop-group-caret { flex: 0 0 auto; font-size: 0.7rem; line-height: 1; transition: transform 0.15s ease; }
+.prop-group--collapsed .prop-group-caret { transform: rotate(-90deg); }
+.prop-group--collapsed .prop-group-body { display: none; }
+.prop-group-body { padding-bottom: 6px; }
+.prop-group-body .prop-row:last-child { border-bottom: none; }
 
 /* ---------------- Fields ---------------- */
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }

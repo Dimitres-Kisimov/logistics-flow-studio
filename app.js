@@ -2886,54 +2886,92 @@
     const panel = $("propPanel");
     const el = state.elements.find((e) => e.id === state.selectedId);
     if (!el) {
-      panel.innerHTML = '<p class="empty">Select an element to see its properties.</p>';
+      // v2.4 UI-2: a short, guiding empty state - a hint, NOT a wall of blank
+      // fields, so an unselected Inspector stays calm.
+      panel.innerHTML =
+        '<div class="prop-empty">' +
+        '<p class="empty">Nothing selected.</p>' +
+        '<p class="prop-empty-hint">Click an element on the floor to edit it here, or pick one from the Class Library and click to place it. Arrow keys nudge the selection 1 m; Ctrl+D duplicates.</p>' +
+        "</div>";
       return;
     }
     const def = ELEMENTS[el.type];
-    const rows = [];
-    rows.push(row("Type", def.label));
-    rows.push(row("Category", def.category));
-    rows.push(row("Position", `${(el.x * CELL_M).toFixed(0)}, ${(el.y * CELL_M).toFixed(0)} m`));
-    rows.push(row("Footprint", `${(el.w * CELL_M).toFixed(1)} × ${(el.d * CELL_M).toFixed(1)} m`));
+
+    // v2.4 UI-2: grouped Inspector (detail on demand). Every property that was
+    // shown before is KEPT, now organised into three labelled groups:
+    //   Basic     - name/type, position, footprint + the size editor (always).
+    //   Behaviour - capacity, cycle/handling, flow role (shown when relevant).
+    //   Advanced  - the detailed spec params (category, levels, selectivity,
+    //               rotation, cost index) - COLLAPSED by default + density-
+    //               gated (hidden in Simple, revealed/collapsible in Expert).
+    const basic = [];
+    const behaviour = [];
+    const advanced = [];
+
+    basic.push(row("Type", def.label));
+    basic.push(row("Position", `${(el.x * CELL_M).toFixed(0)}, ${(el.y * CELL_M).toFixed(0)} m`));
+    basic.push(row("Footprint", `${(el.w * CELL_M).toFixed(1)} × ${(el.d * CELL_M).toFixed(1)} m`));
+
+    advanced.push(row("Category", def.category));
+
     if (def.category === "storage") {
       const cap = D.elementCapacity(el);
-      rows.push(row(def.pickFace ? "Positions (pallet-eq.)" : "Pallet positions", String(cap)));
+      behaviour.push(row(def.pickFace ? "Positions (pallet-eq.)" : "Pallet positions", String(cap)));
       const cpp = D.cartonsPerPallet(state.config.boxType, state.config.palletType);
-      rows.push(row("Est. cartons", `≈${(cap * cpp.perPallet).toLocaleString("en-US")} (${cpp.perPallet}/${state.config.palletType} pallet)`));
-      rows.push(row("Levels", String(def.levels)));
-      rows.push(row("Selectivity", (def.selectivity * 100).toFixed(0) + "%"));
-      rows.push(row("Rotation", def.rotation));
-      rows.push(row("Cost index", "×" + def.costIndex));
+      behaviour.push(row("Est. cartons", `≈${(cap * cpp.perPallet).toLocaleString("en-US")} (${cpp.perPallet}/${state.config.palletType} pallet)`));
       if (def.goodsToPerson) {
-        rows.push(row("Pick mode", `Goods-to-person · ${def.cycleSec}s cycle/line`));
+        behaviour.push(row("Pick mode", `Goods-to-person · ${def.cycleSec}s cycle/line`));
       } else if (def.handlingDeltaSec) {
         const d2 = def.handlingDeltaSec;
-        rows.push(row("Handling", (d2 > 0 ? "+" : "") + d2 + " s/line vs base"));
+        behaviour.push(row("Handling", (d2 > 0 ? "+" : "") + d2 + " s/line vs base"));
       }
+      advanced.push(row("Levels", String(def.levels)));
+      advanced.push(row("Selectivity", (def.selectivity * 100).toFixed(0) + "%"));
+      advanced.push(row("Rotation", def.rotation));
+      advanced.push(row("Cost index", "×" + def.costIndex));
     }
-    if (def.io) rows.push(row("I/O role", def.io));
-    if (def.flow) rows.push(row("Flow control", def.flow.toUpperCase()));
-    if (def.stage) rows.push(row("Chain stage", def.stage));
+    if (def.io) behaviour.push(row("I/O role", def.io));
+    if (def.flow) behaviour.push(row("Flow control", def.flow.toUpperCase()));
+    if (def.stage) behaviour.push(row("Chain stage", def.stage));
 
-    let sizeEditor = "";
+    // The size editor is a Basic property (size). Same #pW / #pD ids + change
+    // handlers as before - every edit still applies identically via applySize.
     if (def.resizable) {
-      sizeEditor =
+      basic.push(
         '<div class="field-row" style="margin-top:10px">' +
-        `<div class="field"><label>Width (m)</label><input id="pW" type="number" min="1" max="${GRID_W}" step="1" value="${el.w}"></div>` +
-        `<div class="field"><label>Depth (m)</label><input id="pD" type="number" min="1" max="${GRID_H}" step="1" value="${el.d}"></div>` +
-        "</div>";
+        `<div class="field"><label for="pW">Width (m)</label><input id="pW" type="number" min="1" max="${GRID_W}" step="1" value="${el.w}"></div>` +
+        `<div class="field"><label for="pD">Depth (m)</label><input id="pD" type="number" min="1" max="${GRID_H}" step="1" value="${el.d}"></div>` +
+        "</div>"
+      );
     }
+
+    const groups = [];
+    groups.push(propGroup("basic", "Basic", basic.join(""), { collapsed: false }));
+    if (behaviour.length) groups.push(propGroup("behaviour", "Behaviour", behaviour.join(""), { collapsed: false }));
+    // Advanced always renders (so it is discoverable) but starts collapsed and
+    // is gated - CSS hides it in Simple; the density toggle reveals it.
+    groups.push(propGroup("advanced", "Advanced", advanced.join(""), { collapsed: true, gated: true }));
 
     panel.innerHTML =
-      rows.join("") +
+      groups.join("") +
       `<p class="prop-desc">${def.desc}</p>` +
-      sizeEditor +
       '<div class="prop-actions">' +
       '<button id="dupBtn" class="btn" type="button" title="Copy this element next to itself (Ctrl+D). Arrow keys nudge 1 m.">Duplicate</button>' +
       (def.resizable ? '<button id="rotateBtn" class="btn" type="button">Rotate</button>' : "") +
       '<button id="deleteBtn" class="btn danger" type="button">Delete</button>' +
       "</div>" +
       '<p class="hint" style="margin-bottom:0">Arrow keys nudge the selection 1 m; Ctrl+D duplicates.</p>';
+
+    // Group headers toggle their own body. They are real <button>s, so
+    // Enter/Space toggle natively and the focus ring is the global .btn one.
+    panel.querySelectorAll(".prop-group-head").forEach((head) => {
+      head.addEventListener("click", () => {
+        const g = head.closest(".prop-group");
+        if (!g) return;
+        const collapsed = g.classList.toggle("prop-group--collapsed");
+        head.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      });
+    });
 
     if (def.resizable) {
       $("pW").addEventListener("change", () => applySize());
@@ -2942,6 +2980,25 @@
     }
     $("dupBtn").addEventListener("click", duplicateSelected);
     $("deleteBtn").addEventListener("click", deleteSelected);
+  }
+
+  // v2.4 UI-2: build one labelled, collapsible Inspector group. `gated` marks
+  // the group data-density="expert" so the global density toggle hides it in
+  // Simple and reveals it in Expert.
+  function propGroup(gid, title, bodyHtml, opts) {
+    opts = opts || {};
+    const collapsed = !!opts.collapsed;
+    const gatedAttr = opts.gated ? ' data-density="expert"' : "";
+    const bodyId = "pg-" + gid;
+    return (
+      '<div class="prop-group' + (collapsed ? " prop-group--collapsed" : "") + '" data-group="' + gid + '"' + gatedAttr + ">" +
+      '<button class="prop-group-head" type="button" aria-expanded="' + (collapsed ? "false" : "true") + '" aria-controls="' + bodyId + '">' +
+      '<span class="prop-group-title">' + title + "</span>" +
+      '<span class="prop-group-caret" aria-hidden="true">▾</span>' +
+      "</button>" +
+      '<div class="prop-group-body" id="' + bodyId + '">' + bodyHtml + "</div>" +
+      "</div>"
+    );
   }
 
   function row(k, v) {
@@ -6634,6 +6691,50 @@
     if (!seeded) { try { localStorage.setItem(UI_SEED_KEY, "1"); } catch (_) { /* storage may be unavailable */ } }
   }
 
+  // ---- v2.4 UI-2: Simple/Expert DENSITY toggle ----------------------
+  // One global progressive-disclosure lever. Simple (the default on a FRESH
+  // profile) hides advanced/rarely-used controls + the Inspector's Advanced
+  // group; Expert reveals everything (nothing is removed - it is disclosed).
+  // The choice persists to localStorage. The root <html data-density> is
+  // SEEDED AT RUNTIME (never hardcoded in static HTML), mirroring the card-
+  // collapse seeding, so the "no baked-in disclosure state in the HTML"
+  // guarantee holds. CSS ([data-density="simple"] [data-density="expert"])
+  // does the hiding; this only flips the root state + the button chrome.
+  const DENSITY_KEY = "wt.ui.density.v1";
+  function readDensity() {
+    try { return localStorage.getItem(DENSITY_KEY) === "expert" ? "expert" : "simple"; }
+    catch (_) { return "simple"; }
+  }
+  function applyDensity(mode) {
+    const expert = mode === "expert";
+    document.documentElement.setAttribute("data-density", expert ? "expert" : "simple");
+    const btn = $("densityBtn");
+    if (btn) {
+      btn.setAttribute("aria-pressed", expert ? "true" : "false");
+      btn.setAttribute(
+        "aria-label",
+        expert
+          ? "Interface density: Expert. Activate to switch to Simple and hide advanced controls."
+          : "Interface density: Simple. Activate to switch to Expert and reveal all controls."
+      );
+      const lbl = $("densityLabel");
+      if (lbl) lbl.textContent = expert ? "Expert" : "Simple";
+    }
+  }
+  function setDensity(mode) {
+    const m = mode === "expert" ? "expert" : "simple";
+    try { localStorage.setItem(DENSITY_KEY, m); } catch (_) { /* storage may be unavailable */ }
+    applyDensity(m);
+  }
+  function toggleDensity() {
+    setDensity(document.documentElement.getAttribute("data-density") === "expert" ? "simple" : "expert");
+  }
+  function initDensity() {
+    applyDensity(readDensity()); // default = Simple on a fresh profile
+    const btn = $("densityBtn");
+    if (btn) btn.addEventListener("click", toggleDensity);
+  }
+
   // In-browser self-test hook. ATTACHED ONLY under ?selftest=1 - a normal
   // load never exposes these internals. selftest.js drives the LIVE app
   // through the SAME functions the UI uses (no re-implementation), so the
@@ -6648,6 +6749,15 @@
       // the real UI handlers
       loadExample: loadExample,
       runWmsOps: runWmsOps,
+      // v2.4 UI-2 hooks: drive selection + the grouped Inspector, and the
+      // Simple/Expert density lever, through the SAME functions the UI uses.
+      selectElement: selectElement,
+      renderProps: renderProps,
+      density: {
+        mode: () => document.documentElement.getAttribute("data-density"),
+        set: (m) => setDensity(m),
+        toggle: () => toggleDensity(),
+      },
       flowPlay: flowPlay,
       flowPause: flowPause,
       flowStep: flowStep,
@@ -6694,6 +6804,7 @@
   }
 
   function boot() {
+    initDensity(); // v2.4 UI-2: seed the Simple/Expert density state first (runtime-seeded, default Simple)
     buildPalette();
     wirePaletteControls(); // v2.3 UI-1: Class Library search + arrow-key nav
     buildConfigControls();

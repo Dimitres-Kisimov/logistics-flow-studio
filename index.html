@@ -62,6 +62,21 @@
       </select>
     </div>
     <div class="topbar-actions">
+      <!-- v2.4 UI-2: Simple/Expert DENSITY toggle - the global progressive-
+           disclosure lever. Simple (the default on a fresh profile) keeps a
+           calm first view by hiding advanced/rarely-used controls + the
+           Inspector's Advanced group; Expert reveals EVERYTHING (nothing is
+           removed - the toggle just discloses it). The root <html>
+           data-density state + this button's label/aria-pressed are SEEDED AT
+           RUNTIME by app.js (never hardcoded here) and persisted to
+           localStorage. Labelled, aria-pressed, keyboard-usable; always
+           reachable. -->
+      <button id="densityBtn" class="btn ghost density-toggle" type="button" aria-pressed="false"
+              aria-label="Interface density: Simple. Activate to switch to Expert and reveal all controls."
+              title="Density — Simple (default) hides advanced, rarely-used controls and the Inspector's Advanced group for a calm view; Expert reveals every control and parameter. Nothing is removed; your choice is remembered on this device.">
+        <span class="density-cap" aria-hidden="true">Density</span>
+        <span id="densityLabel" class="density-mode">Simple</span>
+      </button>
       <!-- Story Mode: the CINEMATIC guided tour (story.js). One click moves
            the camera to frame each zone in flow order (receiving → storage →
            picking → packing → shipping) with a plain-language caption, then
@@ -256,7 +271,7 @@
            (compare.js -> WT.compare, derived from WT.report.build), so the
            two sides can never drift from the app. Comparing runs on the
            picked snapshots and never disturbs the current floor. -->
-      <section class="card" id="compareCard" data-default-collapsed>
+      <section class="card" id="compareCard" data-default-collapsed data-density="expert">
         <h2 class="card-title">Scenario A/B compare</h2>
         <p class="hint">Pick <strong>two whole set-ups</strong> — the current layout, a built-in example, or one of your saved scenarios — and see their key metrics <strong>side-by-side with deltas</strong>. Answers "which layout / strategy is better?". Broader than the strategy-only <em>Compare A/B</em> above: this diffs the <strong>full consolidated report</strong> (compliance, WMS KPIs, storage, automation, capacity). Each side's numbers come from the <strong>same WMS Report</strong> the app shows (they can't drift). <strong>SYNTHETIC</strong> unless you imported data — a transparent heuristic informed by ISO/DIN/EN/VDI, <strong>not a certification, not measured</strong>. "Better/worse" is shown only where the direction is unambiguous; capacity/utilisation/automation stay neutral. Comparing runs on the picked snapshots and <strong>doesn't disturb your current floor</strong>.</p>
         <div class="field">
@@ -274,7 +289,7 @@
            demo shows it locked with the padlock + unlock hint (never
            hidden). Parsing runs in the browser via FileReader - the
            app makes zero network requests, so nothing CAN be uploaded. -->
-      <section class="card" id="dataCard" data-default-collapsed>
+      <section class="card" id="dataCard" data-default-collapsed data-density="expert">
         <h2 class="card-title">Import your data <span id="dataLock"></span></h2>
         <p class="hint">Run the sim on <strong>your own SKUs</strong>: an article CSV
           <code>sku,description,weekly_picks[,class]</code> sets real pick velocities
@@ -303,7 +318,7 @@
            synthetic + labelled; imported data is yours and stays on this
            device. Pure model in wmsdata.js (WT.wmsdata); with nothing
            loaded the sim uses the synthetic default, exactly as before. -->
-      <section class="card" id="wmsDataCard" data-default-collapsed>
+      <section class="card" id="wmsDataCard" data-default-collapsed data-density="expert">
         <h2 class="card-title">SKU &amp; order data <span id="wmsDataLock"></span></h2>
         <div class="gen-honesty">
           <strong>A real-data layer: SKU master + order pool.</strong> Generate a
@@ -349,7 +364,7 @@
       <!-- W3: floor-plan image underlay - trace a real hall. Full-tier
            feature, locked-but-visible in the demo. The image becomes a
            local dataURL via FileReader (offline, no canvas taint). -->
-      <section class="card" id="underlayCard" data-default-collapsed>
+      <section class="card" id="underlayCard" data-default-collapsed data-density="expert">
         <h2 class="card-title">Floor plan underlay <span id="underlayLock"></span></h2>
         <p class="hint">From a picture to a working layout: load a photo or plan of your hall, draw it
           <em>under</em> the grid, calibrate the scale, then place racks &amp; docks over the traced plan.
@@ -389,7 +404,7 @@
           <span id="dataBadge" class="badge muted" title="Which dataset the simulation runs on: the seeded synthetic demo catalogue, or your own imported CSVs (Import your data, left panel)">Data: synthetic demo</span>
         </div>
         <div class="tb-group" role="group" aria-label="Floor overlays">
-          <button id="heatBtn" class="btn small" type="button" aria-pressed="false" title="Shade the floor by metres walked in the last run's pick tours. Goods-to-person picks (AS/RS, shuttle) add no walking, so they leave no trace.">Heatmap</button>
+          <button id="heatBtn" class="btn small" type="button" aria-pressed="false" data-density="expert" title="Shade the floor by metres walked in the last run's pick tours. Goods-to-person picks (AS/RS, shuttle) add no walking, so they leave no trace.">Heatmap</button>
           <button id="measureBtn" class="btn small" type="button" aria-pressed="true" title="Measurements: a metre scale ruler along the top and left floor edges, the selected element's dimensions (w x d m), and faint floor markings (facility perimeter, aisle centre guides, dock-approach hatching, functional zone tints). Illustrative — the measurements are the model's own metre grid (1 cell = 1 m), not a site survey.">Measure</button>
         </div>
       </div>
