@@ -116,16 +116,39 @@
         <span class="cmdk-btn-label">Search actions</span>
         <kbd class="cmdk-btn-kbd" aria-hidden="true">Ctrl K</kbd>
       </button>
-      <!-- P8: concise, honest "About / why this" panel -->
-      <button id="aboutBtn" class="btn ghost" type="button" title="What WarehouseTwin is, what it does, and how it stays honest (offline, synthetic-unless-imported, not a certification)">About</button>
-      <!-- P5: the network-level companion app (lsp/) -->
-      <a class="btn app-link" href="lsp/index.html" title="Open LSP Planner — the logistics-network planning game (levels, scoring, A/B compare)">LSP Planner &rarr;</a>
-      <!-- P4 tier gate: an honest showcase switch (tiers.js), NOT DRM.
-           A real deployment would verify a license/purchase instead. -->
-      <span id="tierBadge" class="badge tier-badge">Demo version</span>
-      <button id="tierBtn" class="btn" type="button" title="Showcase switch — a real deployment would run a license/purchase check here">Unlock full version</button>
-      <button id="helpBtn" class="btn ghost" type="button" title="Show the quick guide">? Guide</button>
-      <button id="installBtn" class="btn primary" type="button" hidden title="Install as an offline app">Install app</button>
+      <!-- v3.10 REDESIGN-3 (move #5): THIN THE HEADER. The essentials stay
+           visible above (brand, ▶ Story, ▶ Guided demo, Density, Mode, and the
+           prominent Ctrl-K command affordance). The secondary actions move into
+           this overflow "More" menu so the top bar reads calm. RELOCATION ONLY
+           - the moved elements are the SAME nodes, so every control id + handler
+           (aboutBtn, tierBtn, helpBtn, installBtn, the LSP link) is preserved
+           and every action stays fully reachable (here, in a rail drawer, and
+           via Ctrl-K). This is a keyboard-accessible DISCLOSURE: the toggle
+           carries aria-haspopup + aria-expanded + aria-controls; Esc / an
+           outside click closes it; focus-visible + reduced-motion are honoured.
+           The menu ships hidden and its open state is driven at runtime by
+           app.js (initOverflowMenu) - no baked-in open state in static HTML. -->
+      <div class="topbar-overflow" id="topbarOverflow">
+        <button id="overflowBtn" class="btn ghost overflow-toggle" type="button"
+                aria-haspopup="true" aria-expanded="false" aria-controls="overflowMenu"
+                aria-label="More actions — About, LSP Planner, version, guide and install app"
+                title="More — About, LSP Planner, version, quick guide and Install (all also reachable from the left rail and the Ctrl-K command palette)">
+          <span class="overflow-ico" aria-hidden="true">⋯</span>
+          <span class="overflow-label">More</span>
+        </button>
+        <div id="overflowMenu" class="overflow-menu" aria-label="More actions" hidden>
+          <!-- P8: concise, honest "About / why this" panel -->
+          <button id="aboutBtn" class="btn ghost" type="button" title="What WarehouseTwin is, what it does, and how it stays honest (offline, synthetic-unless-imported, not a certification)">About</button>
+          <!-- P5: the network-level companion app (lsp/) -->
+          <a class="btn app-link" href="lsp/index.html" title="Open LSP Planner — the logistics-network planning game (levels, scoring, A/B compare)">LSP Planner &rarr;</a>
+          <!-- P4 tier gate: an honest showcase switch (tiers.js), NOT DRM.
+               A real deployment would verify a license/purchase instead. -->
+          <span id="tierBadge" class="badge tier-badge">Demo version</span>
+          <button id="tierBtn" class="btn" type="button" title="Showcase switch — a real deployment would run a license/purchase check here">Unlock full version</button>
+          <button id="helpBtn" class="btn ghost" type="button" title="Show the quick guide">? Guide</button>
+          <button id="installBtn" class="btn primary" type="button" hidden title="Install as an offline app">Install app</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -570,54 +593,74 @@
         </div>
       </section>
 
+      <!-- v3.10 REDESIGN-3 (move #3): Simulation leads with ONE obvious Run +
+           a one-line result headline; every detailed parameter lives behind a
+           collapsed "Advanced parameters" expander (progressive disclosure -
+           https://en.wikipedia.org/wiki/Progressive_disclosure). Run uses the
+           sensible defaults baked into the inputs below and behaves EXACTLY as
+           before (same #runBtn id + handler). The expander starts collapsed
+           but its state is SEEDED AT RUNTIME by app.js (initSimAdvanced) - NO
+           hardcoded forbidden collapsed class in this static HTML, so
+           verify_ui holds; every param stays fully editable when expanded. -->
       <section class="card" id="simCard" data-default-collapsed>
         <h2 class="card-title">Simulation</h2>
-        <div class="field">
-          <label for="strategySelect">Slotting strategy</label>
-          <select id="strategySelect"></select>
+        <div class="sim-lead">
+          <button id="runBtn" class="btn primary wide sim-run" type="button">▶ Run simulation</button>
+          <p id="simHeadline" class="sim-headline">Press <strong>▶ Run</strong> to simulate with sensible defaults — pick travel, throughput, fill and labour cost land below. Open <em>Advanced parameters</em> to change the strategy, seed, orders, SKUs, aisle, wage or flow.</p>
         </div>
-        <p id="strategyDesc" class="hint"></p>
-        <div class="field-row">
+        <button id="simAdvancedToggle" class="sim-adv-toggle" type="button"
+                aria-expanded="false" aria-controls="simAdvanced"
+                title="Show or hide the detailed simulation parameters (slotting strategy, seed, orders, SKUs, minimum aisle, replenishment flow, wage and weekly orders). Run uses these values; the defaults are sensible.">
+          <span class="sim-adv-caret" aria-hidden="true">▸</span>
+          <span class="sim-adv-text">Advanced parameters</span>
+        </button>
+        <div id="simAdvanced" class="sim-adv" data-default-collapsed>
           <div class="field">
-            <label for="seedInput">Seed</label>
-            <input id="seedInput" type="number" value="42" min="0" step="1" />
+            <label for="strategySelect">Slotting strategy</label>
+            <select id="strategySelect"></select>
+          </div>
+          <p id="strategyDesc" class="hint"></p>
+          <div class="field-row">
+            <div class="field">
+              <label for="seedInput">Seed</label>
+              <input id="seedInput" type="number" value="42" min="0" step="1" />
+            </div>
+            <div class="field">
+              <label for="ordersInput">Orders</label>
+              <input id="ordersInput" type="number" value="200" min="1" step="10" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="skuInput">SKUs</label>
+              <input id="skuInput" type="number" value="80" min="1" step="10" />
+            </div>
+            <div class="field">
+              <label for="aislePreset">Min aisle (truck)</label>
+              <select id="aislePreset"></select>
+            </div>
           </div>
           <div class="field">
-            <label for="ordersInput">Orders</label>
-            <input id="ordersInput" type="number" value="200" min="1" step="10" />
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="skuInput">SKUs</label>
-            <input id="skuInput" type="number" value="80" min="1" step="10" />
+            <label for="aisleInput">Min working aisle (m)</label>
+            <input id="aisleInput" type="number" value="2.9" min="0.5" step="0.1" />
           </div>
           <div class="field">
-            <label for="aislePreset">Min aisle (truck)</label>
-            <select id="aislePreset"></select>
+            <label for="flowModeSelect">Replenishment flow (push vs pull)</label>
+            <select id="flowModeSelect"></select>
           </div>
-        </div>
-        <div class="field">
-          <label for="aisleInput">Min working aisle (m)</label>
-          <input id="aisleInput" type="number" value="2.9" min="0.5" step="0.1" />
-        </div>
-        <div class="field">
-          <label for="flowModeSelect">Replenishment flow (push vs pull)</label>
-          <select id="flowModeSelect"></select>
-        </div>
-        <p class="hint">Push tops pick faces up on a periodic forecast (can overstock and run dry between cycles); pull replenishes on consumption via a reorder point. Both are simulated on the pick-face inventory — see the stockout / overstock KPIs.</p>
-        <div class="field-row">
-          <div class="field">
-            <label for="wageInput">Wage (EUR/h, loaded)</label>
-            <input id="wageInput" type="number" value="22" min="0" step="0.5" />
+          <p class="hint">Push tops pick faces up on a periodic forecast (can overstock and run dry between cycles); pull replenishes on consumption via a reorder point. Both are simulated on the pick-face inventory — see the stockout / overstock KPIs.</p>
+          <div class="field-row">
+            <div class="field">
+              <label for="wageInput">Wage (EUR/h, loaded)</label>
+              <input id="wageInput" type="number" value="22" min="0" step="0.5" />
+            </div>
+            <div class="field">
+              <label for="weeklyOrdersInput">Orders / week</label>
+              <input id="weeklyOrdersInput" type="number" value="1500" min="1" step="50" />
+            </div>
           </div>
-          <div class="field">
-            <label for="weeklyOrdersInput">Orders / week</label>
-            <input id="weeklyOrdersInput" type="number" value="1500" min="1" step="50" />
-          </div>
+          <p class="hint">Feeds the labour-cost KPI: EUR/order = simulated picker time × wage; the weekly figure scales it by your order volume. An estimate for comparing layouts — not a quote.</p>
         </div>
-        <p class="hint">Feeds the labour-cost KPI: EUR/order = simulated picker time × wage; the weekly figure scales it by your order volume. An estimate for comparing layouts — not a quote.</p>
-        <button id="runBtn" class="btn primary wide" type="button">▶ Run simulation</button>
         <div id="kpi" class="kpi"><!-- filled after a run --></div>
       </section>
 

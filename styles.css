@@ -101,6 +101,39 @@ h1, h2, h3 { margin: 0; font-weight: 650; }
 }
 .topbar-actions { display: flex; gap: 8px; align-items: center; }
 
+/* ---------------- v3.10 REDESIGN-3 (move #5): header overflow menu --------
+ * The secondary header actions (About, LSP Planner, tier + Unlock, ? Guide,
+ * Install) live behind a calm "More" disclosure so the top bar stays light.
+ * A dropdown anchored to the toggle; the global [hidden] rule (display:none
+ * !important) keeps it closed until app.js opens it. */
+.topbar-overflow { position: relative; display: inline-flex; }
+.overflow-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.overflow-ico { font-size: 1.05rem; line-height: 1; letter-spacing: 0.02em; }
+.overflow-toggle[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.overflow-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 200px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+/* Inside the menu each action is a full-width row for a tidy stack. */
+.overflow-menu .btn,
+.overflow-menu .app-link { width: 100%; text-align: left; }
+.overflow-menu .tier-badge { align-self: flex-start; }
+
 /* ---------------- v2.4 UI-2: Simple/Expert density ----------------
  * The single global progressive-disclosure lever. Any control or panel
  * marked [data-density="expert"] is a power-user / advanced affordance:
@@ -370,6 +403,40 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
 /* Hide the body when collapsed - everything in the card except its header. */
 .card.card--collapsed > *:not(.card-title) { display: none !important; }
 .hint { font-size: 0.75rem; color: var(--text-dim); margin: 4px 0 10px; }
+
+/* ---------------- v3.10 REDESIGN-3 (move #3): Simulate = one Run + Advanced -
+ * The Simulate drawer leads with a prominent Run + a one-line result headline;
+ * the detailed parameters sit behind an "Advanced parameters" disclosure that
+ * is collapsed by default (state seeded at runtime by app.js; the global
+ * [hidden] rule hides the region - no baked-in collapsed class in the HTML). */
+.sim-lead { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+.sim-run { margin-top: 0; font-size: 0.92rem; padding: 10px 12px; }
+.sim-headline {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+  margin: 0;
+}
+.sim-headline strong { color: var(--text); }
+.sim-adv-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 4px 0 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+}
+.sim-adv-caret {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--text-dim);
+  transition: transform 0.15s ease;
+}
+.sim-adv-toggle.open .sim-adv-caret { transform: rotate(90deg); }
+.sim-adv { display: flex; flex-direction: column; margin-top: 4px; }
 
 /* ---------------- Palette ---------------- */
 .palette { display: flex; flex-direction: column; gap: 6px; }

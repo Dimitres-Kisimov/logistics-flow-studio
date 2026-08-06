@@ -1442,6 +1442,98 @@
         detail: "missing=[" + missing.join(",") + "] notInDrawer=[" + outside.join(",") + "]" };
     });
 
+    // ---- v3.10 REDESIGN-3 (move #3): Simulate = one Run + Advanced expander ----
+    // Opening the Simulate drawer leads with a prominent Run + a one-line result
+    // headline; the detailed parameters are hidden behind a COLLAPSED "Advanced
+    // parameters" expander (progressive disclosure). Expanding reveals editable
+    // params; Run still works from the sensible defaults. The #runBtn id + its
+    // handler are unchanged - this proves the relocation kept the behaviour.
+    check("simulate-run-plus-advanced-expander", function () {
+      var simBtn = document.querySelector('#wtRail [data-drawer="simulate"]');
+      if (!simBtn) return { ok: false, detail: "no simulate rail button" };
+      simBtn.click(); // open the Simulate drawer (expands the lead simCard)
+      var runBtn = document.getElementById("runBtn");
+      var headline = document.getElementById("simHeadline");
+      var toggle = document.getElementById("simAdvancedToggle");
+      var region = document.getElementById("simAdvanced");
+      var strategy = document.getElementById("strategySelect");
+      var seed = document.getElementById("seedInput");
+      // Run LEADS: a prominent Run + a one-line headline in the card's lead
+      // block, inside the flyout drawer, ABOVE the collapsed Advanced params.
+      var runInDrawer = !!(runBtn && runBtn.closest && runBtn.closest(".wt-drawer"));
+      var runIsLead = !!(runBtn && runBtn.closest && runBtn.closest(".sim-lead"));
+      var haveHeadline = !!headline && (headline.textContent || "").length > 0;
+      // Advanced expander starts COLLAPSED: params HIDDEN until expanded.
+      var collapsedDefault = !!toggle && toggle.getAttribute("aria-expanded") === "false" &&
+        !!region && region.hidden === true;
+      var paramInAdv = !!(strategy && strategy.closest && strategy.closest("#simAdvanced"));
+      // Expand -> params become visible + editable.
+      if (toggle) toggle.click();
+      var expands = !!toggle && toggle.getAttribute("aria-expanded") === "true" &&
+        !!region && region.hidden === false;
+      var editable = false;
+      if (seed && !seed.disabled && !seed.readOnly) {
+        var prev = seed.value; seed.value = "43"; editable = seed.value === "43"; seed.value = prev;
+      }
+      // Run STILL WORKS: click it - no uncaught error, KPI container present.
+      var errsBefore = (window.__WT_ERRORS__ || []).length;
+      if (runBtn) runBtn.click();
+      var errsAfter = (window.__WT_ERRORS__ || []).length;
+      var runOk = !!document.getElementById("kpi") && errsAfter === errsBefore;
+      // Restore: re-collapse the expander + close the drawer.
+      if (toggle) toggle.click();
+      simBtn.click();
+      return {
+        ok: runInDrawer && runIsLead && haveHeadline && collapsedDefault && paramInAdv &&
+          expands && editable && runOk,
+        detail: "runLead=" + runIsLead + " headline=" + haveHeadline +
+          " collapsedDefault=" + collapsedDefault + " paramInAdv=" + paramInAdv +
+          " expands=" + expands + " editable=" + editable + " runOk=" + runOk,
+      };
+    });
+
+    // ---- v3.10 REDESIGN-3 (move #5): thinned header + overflow "More" menu ----
+    // The secondary header actions were RELOCATED into a keyboard-accessible
+    // overflow disclosure so the top bar reads calm. The menu ships closed;
+    // opening it reveals the SAME nodes (ids/handlers intact); a menu action
+    // fires its original handler (clicking About opens the About modal). Esc
+    // closes it. Nothing removed, every action still reachable.
+    check("header-overflow-menu-opens-and-actions-fire", function () {
+      var toggle = document.getElementById("overflowBtn");
+      var menu = document.getElementById("overflowMenu");
+      if (!toggle || !menu) return { ok: false, detail: "no overflow toggle/menu" };
+      // Ships CLOSED (runtime-seeded): hidden + aria-expanded=false.
+      var closedFirst = menu.hidden === true && toggle.getAttribute("aria-expanded") === "false";
+      // The secondary actions live here now (ids preserved = handlers preserved).
+      var relocated = ["aboutBtn", "tierBtn", "helpBtn", "installBtn"].every(function (id) {
+        var el = document.getElementById(id);
+        return !!(el && el.closest && el.closest("#overflowMenu"));
+      });
+      // Opens on click: menu visible + aria-expanded true.
+      toggle.click();
+      var opens = menu.hidden === false && toggle.getAttribute("aria-expanded") === "true";
+      // A menu action fires the SAME handler: clicking About opens the About
+      // overlay (and the menu closes behind it).
+      var about = document.getElementById("aboutBtn");
+      if (about) about.click();
+      var aboutEl = document.getElementById("about");
+      var actionFired = !!aboutEl && aboutEl.hidden === false;
+      var closedAfterAction = menu.hidden === true;
+      // Clean up: close the About overlay; ensure the menu is shut via Esc too.
+      try { if (haveApi && API.closeAbout) API.closeAbout(); } catch (_) { /* best-effort */ }
+      toggle.click(); // reopen to prove Esc closes
+      var esc;
+      try { esc = new KeyboardEvent("keydown", { key: "Escape", bubbles: true }); }
+      catch (e) { esc = document.createEvent("Event"); esc.initEvent("keydown", true, true); esc.key = "Escape"; }
+      document.dispatchEvent(esc);
+      var escCloses = menu.hidden === true && toggle.getAttribute("aria-expanded") === "false";
+      return {
+        ok: closedFirst && relocated && opens && actionFired && closedAfterAction && escCloses,
+        detail: "closedFirst=" + closedFirst + " relocated=" + relocated + " opens=" + opens +
+          " actionFired=" + actionFired + " closedAfterAction=" + closedAfterAction + " escCloses=" + escCloses,
+      };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

@@ -3325,6 +3325,32 @@
       `the weekly figure assumes ${weekly.toLocaleString("en-US")} orders/wk — an estimate, not a quote. ` +
       `Same seed → identical KPIs.</p>`;
     kpi.innerHTML = cards.join("") + note;
+    // v3.10 REDESIGN-3: keep the one-line Simulate headline in sync with the
+    // latest run so opening the drawer reads "Run + result", not a wall of
+    // fields. Purely additive chrome - the KPI cards + numbers are unchanged.
+    updateSimHeadline(res, eurPerOrder);
+  }
+
+  // v3.10 REDESIGN-3: the concise result headline shown above the Advanced
+  // expander in the Simulate drawer. Summarises the freshest run in one line;
+  // falls back to the default call-to-action copy before any run (or an honest
+  // "add storage" prompt when a run produced no result).
+  function updateSimHeadline(res, eurPerOrder) {
+    const el = $("simHeadline");
+    if (!el) return;
+    if (!res || !res.ok) {
+      el.innerHTML =
+        "Add at least one storage element (racking or block stack), then press <strong>▶ Run</strong> — pick travel, throughput, fill and labour cost land below.";
+      return;
+    }
+    const eur = Number(eurPerOrder) || 0;
+    el.innerHTML =
+      "Ran <strong>" + res.ordersServed + "</strong> orders · " +
+      res.throughputOrdersPerHour.toFixed(1) + " ord/hr · " +
+      res.avgPickTravelM.toFixed(1) + " m/order · " +
+      res.storageFillPct.toFixed(0) + "% fill · " +
+      eur.toFixed(2) + " EUR/order (" + res.strategy.toUpperCase() + " slotting, seed " + res.seed +
+      "). Open <em>Advanced parameters</em> to change the setup.";
   }
 
   function kcard(label, value, unit) {
@@ -7635,6 +7661,73 @@
     if (!seeded) { try { localStorage.setItem(UI_SEED_KEY, "1"); } catch (_) { /* storage may be unavailable */ } }
   }
 
+  // ---- v3.10 REDESIGN-3 (move #3): Simulate = one Run + an Advanced expander --
+  // The Simulate drawer leads with ONE prominent Run + a one-line result
+  // headline; the detailed parameters (strategy, seed, orders, SKUs, aisle,
+  // wage, weekly orders, replenishment flow) live behind an "Advanced
+  // parameters" expander (progressive disclosure). Default = COLLAPSED, but the
+  // state is SEEDED HERE AT RUNTIME (never a hardcoded collapsed class in the
+  // static HTML, so verify_ui holds) and persisted, mirroring the card-collapse
+  // lever. Run is unaffected - it reads the SAME inputs (with their sensible
+  // defaults) whether the expander is open or shut, so it behaves identically.
+  const SIM_ADV_KEY = "wt.ui.simadv.v1";
+  function initSimAdvanced() {
+    const toggle = $("simAdvancedToggle");
+    const region = $("simAdvanced");
+    if (!toggle || !region) return; // graceful: Run still works without it
+    let open = false; // default collapsed (progressive disclosure)
+    try { open = localStorage.getItem(SIM_ADV_KEY) === "1"; } catch (_) { open = false; }
+    const apply = () => {
+      region.hidden = !open;               // params hidden until asked for
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      toggle.classList.toggle("open", open);
+    };
+    apply(); // runtime-seeded collapse - no baked-in collapsed class in the HTML
+    toggle.addEventListener("click", () => {
+      open = !open;
+      apply();
+      try { localStorage.setItem(SIM_ADV_KEY, open ? "1" : "0"); } catch (_) { /* storage may be unavailable */ }
+    });
+  }
+
+  // ---- v3.10 REDESIGN-3 (move #5): header overflow "More" menu ---------------
+  // A keyboard-accessible DISCLOSURE that holds the secondary header actions
+  // (About, LSP Planner, tier badge + Unlock, ? Guide, Install) so the top bar
+  // stays calm. The moved controls are the SAME DOM nodes - ids + handlers are
+  // untouched - this only shows/hides the menu and tracks aria-expanded. Esc or
+  // an outside click closes it and returns focus to the toggle. The menu ships
+  // hidden; there is no baked-in open state - it opens only on user action.
+  function initOverflowMenu() {
+    const toggle = $("overflowBtn");
+    const menu = $("overflowMenu");
+    const wrap = $("topbarOverflow");
+    if (!toggle || !menu) return; // graceful: the actions still exist in the DOM
+    const setOpen = (open) => {
+      menu.hidden = !open;
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      toggle.classList.toggle("open", open);
+    };
+    const isOpen = () => toggle.getAttribute("aria-expanded") === "true";
+    setOpen(false); // runtime-seeded closed
+    toggle.addEventListener("click", (e) => { e.stopPropagation(); setOpen(!isOpen()); });
+    // A control inside the menu runs its own handler (unchanged), then we close.
+    menu.addEventListener("click", (e) => {
+      if (e.target && e.target.closest && e.target.closest("a,button")) setOpen(false);
+    });
+    // Outside click closes.
+    document.addEventListener("click", (e) => {
+      if (!isOpen()) return;
+      if (wrap && !wrap.contains(e.target)) setOpen(false);
+    });
+    // Esc closes + returns focus to the toggle (does not steal Esc when shut).
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && isOpen()) {
+        setOpen(false);
+        try { toggle.focus(); } catch (_) { /* best-effort */ }
+      }
+    });
+  }
+
   // ---- v2.4 UI-2: Simple/Expert DENSITY toggle ----------------------
   // One global progressive-disclosure lever. Simple (the default on a FRESH
   // profile) hides advanced/rarely-used controls + the Inspector's Advanced
@@ -8137,6 +8230,8 @@
     buildAbout(); // P8: render the About / why-this copy from WT.demo.ABOUT
     initCollapsibleCards(); // v1.0: make the side-panel cards collapsible (default expanded)
     initRail(); // v3.9 REDESIGN-2: slim icon rail + one-at-a-time flyout drawers (re-homes the cards)
+    initSimAdvanced(); // v3.10 REDESIGN-3: Simulate = one Run + a collapsed Advanced-parameters expander (runtime-seeded)
+    initOverflowMenu(); // v3.10 REDESIGN-3: thin header - secondary actions live in the "More" overflow menu
     wireButtons();
     mountCommandPalette(); // v3.6 UI-3: the Ctrl/Cmd-K command palette (additive overlay)
     wireDefineObject(); // user-definable object library (Define Object + import/export)
