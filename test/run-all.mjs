@@ -420,6 +420,26 @@
  *      "open Analyze -> bottleneck + sankey render" path runs in the browser
  *      self-test; every model + SVG PATH is covered here.
  *
+ *  37. verify_howwecompare.js - honest "How we compare" page (v3.3 A4):
+ *      WT.howwecompare is a PURE, DETERMINISTIC, OFFLINE data model + HTML
+ *      serializer for a FAIR, SOURCED comparison vs Siemens Tecnomatix Plant
+ *      Simulation / FlexSim / AnyLogic. Asserts it names the three products
+ *      factually, states what THEY are strong at FIRST (validated DES, deep
+ *      libraries), carries the SOURCED competitor facts (~$10k/yr,
+ *      subscription-only, desktop-only, steep learning curve + paid training,
+ *      limited sharing) each referencing a cited source, carries the
+ *      independent-comparison disclaimer + the honest framing ("for validated,
+ *      certified DES use the suites; for free/offline/shareable modelling use
+ *      this app"), states this app's wedge, has NO banned tokens anywhere (no
+ *      "beats"/"superior"/"no competition"/"best-in-class"/"guaranteed"),
+ *      cites sources as TEXT (opens no external links, no <script>), and is
+ *      byte-identical across calls (no Date/RNG). Folded into the About panel;
+ *      the live presence + honesty run in the browser self-test. The
+ *      consolidated report (verify_report.js) also gains the A3 Analysis-suite
+ *      cross-consistency: its bottleneck / sankey / cost / energy EQUAL the
+ *      WT.analytics models over the SAME sim run (can't drift), with the
+ *      factory line-sim + accepted-optimiser before/after included.
+ *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
  * ===================================================================== */
@@ -468,6 +488,7 @@ const HARNESSES = [
   { name: "Factory process model + deterministic line sim (verify_process.js)", args: ["verify_process.js"] },
   { name: "Factory efficiency optimizer: CRAFT placement + RPW balance + TOC (verify_optimize.js)", args: ["verify_optimize.js"] },
   { name: "Analytics: Bottleneck + Sankey + Cost + Energy analyzers (verify_analytics.js)", args: ["verify_analytics.js"] },
+  { name: "Honest 'How we compare' page (verify_howwecompare.js)", args: ["verify_howwecompare.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

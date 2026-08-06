@@ -1017,6 +1017,83 @@
       return { ok: okAll, detail: detail };
     });
 
+    // ---- v3.3 A3: the consolidated report's ANALYSIS SUITE section is
+    // present AND equals the "Analyze" panels (can't drift). Build the report
+    // via the SAME handler the button uses, render the Analyze panel, and
+    // assert the report's bottleneck + sankey EQUAL the panel model; the
+    // cost/energy figures are present + internally consistent; the printable
+    // HTML carries the section + inline figures. ----------------------------
+    check("report-analytics-section-present-and-equals-panels", function () {
+      if (!haveApi || typeof API.buildCurrentReport !== "function" ||
+        typeof API.analyzeModel !== "function" || typeof API.renderAnalyzePanel !== "function") {
+        return { ok: false, detail: "no analyze/report API" };
+      }
+      if (!WT.report || !WT.analytics) return { ok: false, detail: "no WT.report/analytics" };
+      var okAll = false, detail = "";
+      try {
+        // A warehouse example (no process block) -> the warehouse flow path.
+        var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+        if (ex && typeof API.loadExample === "function") API.loadExample(ex.id);
+        API.renderAnalyzePanel(); // the panel model the report must equal
+        var panel = API.analyzeModel();
+        var rep = API.buildCurrentReport();
+        var a = rep && rep.analytics;
+        var present = !!a && a.available === true && a.mode === "warehouse";
+        // Bottleneck + sankey EQUAL the panel model (rates-independent).
+        var bottleneckMatch = present && !!panel && panel.mode === "warehouse" &&
+          a.bottleneck.constraint.id === panel.bottleneck.constraint.id &&
+          a.bottleneck.headline === panel.bottleneck.headline &&
+          a.bottleneck.resources.length === panel.bottleneck.resources.length;
+        var sankeyMatch = present && a.sankey.maxVolume === panel.sankey.maxVolume &&
+          a.sankey.links.length === panel.sankey.links.length;
+        // Cost + energy present + the per-unit identity holds (total/throughput).
+        var costOk = present && a.cost && a.cost.totalCost > 0 &&
+          Math.abs(a.cost.perUnit * a.cost.throughput - a.cost.totalCost) < 1e-6;
+        var energyOk = present && a.energy && a.energy.totalKWh >= 0 &&
+          Math.abs(a.energy.perUnit * a.energy.throughput - a.energy.totalKWh) < 1e-3;
+        // The printable HTML carries the section + inline SVG figures.
+        var html = WT.report.toHtml(rep);
+        var htmlOk = html.indexOf("Analysis suite (bottleneck, flow, cost, energy)") !== -1 &&
+          (html.match(/<svg/g) || []).length >= 3;
+        okAll = present && bottleneckMatch && sankeyMatch && costOk && energyOk && htmlOk;
+        detail = "present=" + present + " bottleneck=" + bottleneckMatch + " sankey=" + sankeyMatch +
+          " cost=" + costOk + " energy=" + energyOk + " html=" + htmlOk +
+          " (constraint=" + (present ? a.bottleneck.constraint.name : "-") + ")";
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      }
+      return { ok: okAll, detail: detail };
+    });
+
+    // ---- v3.3 A4: the honest "How we compare" page is folded into About,
+    // names the suites factually, carries the disclaimer + framing, and has
+    // NO "beats/superior/no-competition" boast tokens. ----------------------
+    check("about-how-we-compare-present-and-honest", function () {
+      if (!WT.howwecompare || typeof WT.howwecompare.html !== "function") {
+        return { ok: false, detail: "no WT.howwecompare" };
+      }
+      var okAll = false, detail = "";
+      try {
+        if (haveApi && typeof API.openAbout === "function") API.openAbout();
+        var body = $("aboutBody");
+        var bodyHtml = body ? (body.innerHTML || "") : "";
+        var page = WT.howwecompare.html();
+        var inAbout = bodyHtml.indexOf("How we compare") !== -1 && /Plant Simulation/.test(bodyHtml);
+        var names = /Plant Simulation/.test(page) && /FlexSim/.test(page) && /AnyLogic/.test(page);
+        var honest = /independent comparison/i.test(page) && /use this app/i.test(page) &&
+          /commercial suites/i.test(page);
+        var banned = /\bbeats\b/i.test(page) || /\bsuperior\b/i.test(page) || /no[\s-]?competition/i.test(page);
+        var sourced = /10,000/.test(page) && /subscription-only/i.test(page);
+        if (haveApi && typeof API.closeAbout === "function") API.closeAbout();
+        okAll = inAbout && names && honest && sourced && !banned;
+        detail = "inAbout=" + inAbout + " names=" + names + " honest=" + honest +
+          " sourced=" + sourced + " bannedTokens=" + banned;
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      }
+      return { ok: okAll, detail: detail };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

@@ -74,9 +74,15 @@
     { key: "operations", title: "WMS operations KPIs" },
     { key: "storage", title: "Storage & inventory" },
     { key: "automation", title: "Automation systems" },
+    { key: "analytics", title: "Analysis suite (bottleneck, flow, cost, energy)" },
     { key: "dataProfile", title: "Data profile" },
     { key: "standardsBasis", title: "Standards basis" },
   ];
+
+  // Fixed light theme for the printable report (white background). The
+  // analytics SVGs are self-styling inline (no external CSS); passing a
+  // constant theme keeps the report bytes deterministic.
+  const REPORT_THEME = "light";
 
   // ------------------------------------------------------------------
   // Small helpers.
@@ -238,10 +244,10 @@
     };
   }
 
-  function buildOperations(layout, cfg) {
+  function buildOperations(layout, cfg, precomputedRun) {
     const W = mod("wms");
     if (!W || typeof W.runOperations !== "function") return { available: false, note: "wms.js not loaded." };
-    const run = W.runOperations(layout, { orders: cfg.orders, hours: cfg.hours, seed: cfg.seed });
+    const run = precomputedRun || W.runOperations(layout, { orders: cfg.orders, hours: cfg.hours, seed: cfg.seed });
     const kp = W.kpis(run, layout);
     return {
       available: true,
@@ -334,6 +340,106 @@
     };
   }
 
+  // ------------------------------------------------------------------
+  // ANALYSIS SUITE (A3 - consolidated HtmlReport parity). PULLS the same
+  // WT.analytics models the "Analyze" card renders, over the SAME sim the
+  // report already ran, so the report can NEVER drift from the panels:
+  //   warehouse -> reuses THIS report's operations run (WT.wms.runOperations)
+  //                -> bottleneckFromWarehouse + sankeyFromWarehouse + cost +
+  //                   energy models.
+  //   factory   -> when a `process` block is supplied (opts.process, mirroring
+  //                how opts.skuMaster feeds the storage section) and yields a
+  //                bottleneck -> bottleneckFromProcess + sankeyFromProcess +
+  //                cost + energy + the line-sim metrics; plus the optimiser's
+  //                before/after summary when one was accepted (opts.optimize).
+  // Nothing is re-run/re-invented here - it aggregates the analytics module.
+  // ------------------------------------------------------------------
+  function normaliseOptimize(opt) {
+    if (!opt || typeof opt !== "object") return null;
+    const h = opt.headline && typeof opt.headline === "object" ? opt.headline : opt;
+    const val = (v) => (isFinite(Number(v)) ? Number(v) : null);
+    const out = {
+      mhiBefore: val(h.mhiBefore),
+      mhiAfter: val(h.mhiAfter),
+      mhiDeltaPct: val(h.mhiDeltaPct != null ? h.mhiDeltaPct : h.deltaPct),
+      moved: val(h.moved != null ? h.moved : h.movedCount),
+      lineEffBefore: val(h.lineEffBefore),
+      lineEffAfter: val(h.lineEffAfter),
+      throughputPerHr: val(h.throughputPerHr),
+      bottleneckBefore: h.bottleneckBefore != null ? String(h.bottleneckBefore) : null,
+      bottleneckAfter: h.bottleneckAfter != null ? String(h.bottleneckAfter) : null,
+    };
+    // Nothing meaningful -> treat as absent.
+    if (out.mhiBefore == null && out.lineEffBefore == null && out.throughputPerHr == null) return null;
+    return out;
+  }
+
+  function buildAnalytics(layout, cfg, o, opsRun) {
+    const AN = mod("analytics");
+    if (!AN || typeof AN.bottleneckFromWarehouse !== "function") {
+      return { available: false, note: "analytics.js not loaded - the analysis suite (bottleneck, flow, cost, energy) is unavailable." };
+    }
+    const rates = (o && o.rates) || (typeof AN.defaultRates === "function" ? AN.defaultRates() : null);
+    const els = (layout && layout.elements) || [];
+
+    // FACTORY: a process block was supplied and the line has a bottleneck.
+    const PR = mod("process");
+    const procBlock = (o && o.process) || (layout && layout.process) || null;
+    if (procBlock && PR && typeof PR.metrics === "function") {
+      let m = null;
+      try { m = PR.metrics(procBlock); } catch (_) { m = null; }
+      if (m && m.bottleneck) {
+        const input = { mode: "factory", sim: m, elements: els };
+        return {
+          available: true,
+          mode: "factory",
+          throughput: num(m.throughputPerHr),
+          throughputUnit: "parts/hr",
+          bottleneck: AN.bottleneckFromProcess(m),
+          sankey: AN.sankeyFromProcess(procBlock),
+          cost: AN.costModel(input, rates),
+          energy: AN.energyModel(input, rates),
+          lineSim: {
+            throughputPerHr: num(m.throughputPerHr),
+            taktSec: num(m.taktSec),
+            demandMet: !!m.demandMet,
+            lineEfficiency: num(m.lineEfficiency),
+            balanceDelayPct: num(m.balanceDelayPct),
+            stationsUsed: num(m.stationsUsed),
+            wip: num(m.wip),
+            leadTimeSec: num(m.leadTimeSec),
+            bottleneck: m.bottleneck ? { opId: m.bottleneck.opId, name: m.bottleneck.name, effTimeSec: num(m.bottleneck.effTimeSec) } : null,
+          },
+          optimize: normaliseOptimize(o && o.optimize),
+          honesty: AN.HONESTY,
+        };
+      }
+    }
+
+    // WAREHOUSE: reuse THIS report's own operations run so the analysis can
+    // never drift from the WMS operations section above.
+    if (opsRun && opsRun.ok && Array.isArray(opsRun.stages) && opsRun.stages.length) {
+      const input = { mode: "warehouse", sim: opsRun, elements: els };
+      return {
+        available: true,
+        mode: "warehouse",
+        throughput: num(opsRun.shippedUnits) / (num(opsRun.hours, 1) || 1),
+        throughputUnit: "units/hr",
+        bottleneck: AN.bottleneckFromWarehouse(opsRun),
+        sankey: AN.sankeyFromWarehouse(opsRun),
+        cost: AN.costModel(input, rates),
+        energy: AN.energyModel(input, rates),
+        lineSim: null,
+        optimize: null,
+        honesty: AN.HONESTY,
+      };
+    }
+    return {
+      available: false,
+      note: "The analysis suite needs a runnable model - a factory line (Generate in Factory mode) or a warehouse with storage for the 7-stage flow to run.",
+    };
+  }
+
   function buildDataProfile(master, orderPool, imported) {
     const DATA = mod("wmsdata");
     if (!DATA || typeof DATA.stats !== "function") return { available: false, note: "wmsdata.js not loaded." };
@@ -392,7 +498,14 @@
       orderPool = bundle.orderPool;
     }
 
-    const operations = buildOperations(lay, cfg);
+    // Run the 7-stage WMS flow ONCE and reuse it for both the operations
+    // section and the warehouse analytics, so they can never diverge.
+    const W = mod("wms");
+    let opsRun = null;
+    if (W && typeof W.runOperations === "function") {
+      try { opsRun = W.runOperations(lay, { orders: cfg.orders, hours: cfg.hours, seed: cfg.seed }); } catch (_) { opsRun = null; }
+    }
+    const operations = buildOperations(lay, cfg, opsRun);
     const demand = operations && operations.available ? num(operations.throughputUnitsPerHr) : 0;
 
     const report = {
@@ -411,6 +524,7 @@
       operations: operations,
       storage: buildStorage(lay, cfg, master, imported),
       automation: buildAutomation(lay, demand),
+      analytics: buildAnalytics(lay, cfg, o, opsRun),
       dataProfile: buildDataProfile(master, orderPool, imported),
       standardsBasis: buildStandardsBasis(),
     };
@@ -558,6 +672,125 @@
     return out + "</section>";
   }
 
+  function htmlAnalyticsSection(r) {
+    const a = r.analytics;
+    let out = sectionOpen("analytics", "Analysis suite (bottleneck, flow, cost, energy)");
+    if (!a || !a.available) return out + notAvail(a) + "</section>";
+    const AN = mod("analytics");
+    const CUR = (AN && AN.CURRENCY) || "EUR";
+    const modeLabel = a.mode === "factory"
+      ? "Factory line - Theory of Constraints"
+      : "Warehouse flow - per-stage load vs capacity";
+    out += '<p class="rpt-basis"><strong>Mode:</strong> ' + esc(modeLabel) +
+      '. These figures come straight from the same simulation the WMS/line sections above ran - the analysis cannot drift from the app.</p>';
+
+    // --- Bottleneck ranking (table + proportional 0-based SVG) -----------
+    const b = a.bottleneck;
+    if (b && Array.isArray(b.resources) && b.resources.length) {
+      out += "<h3 class=\"rpt-sub-h\">Bottleneck ranking</h3>";
+      out += '<p class="rpt-bottleneck"><strong>Constraint:</strong> ' + esc(b.headline) + "</p>";
+      out += '<table class="rpt-tbl">' + th(["#", "Resource", b.metricLabel, "Value"]);
+      for (const rr of b.resources) {
+        out += '<tr' + (rr.isConstraint ? ' class="rpt-constraint"' : "") + "><td>" + esc(rr.rank) +
+          "</td><td>" + esc(rr.name) + (rr.isConstraint ? " (constraint)" : "") +
+          "</td><td>" + esc(rr.detail || "") + "</td><td>" + esc(rr.pct) + "%</td></tr>";
+      }
+      out += "</table>";
+      if (AN && typeof AN.bottleneckSvg === "function") out += '<div class="rpt-analytics-fig">' + AN.bottleneckSvg(b, REPORT_THEME) + "</div>";
+      out += '<p class="rpt-note">' + esc(b.why) + "</p>";
+    }
+
+    // --- Material-flow Sankey (SVG + flow table) --------------------------
+    const s = a.sankey;
+    if (s && Array.isArray(s.links) && s.links.length) {
+      out += "<h3 class=\"rpt-sub-h\">Material-flow Sankey</h3>";
+      const nameOf = (id) => { const n = (s.nodes || []).find((x) => x.id === id); return n ? n.name : id; };
+      let dom = s.links[0];
+      for (const l of s.links) if (num(l.value) > num(dom.value)) dom = l;
+      if (dom && num(dom.value) > 0) {
+        out += '<p class="rpt-basis"><strong>Dominant flow:</strong> ' + esc(nameOf(dom.from)) + " -> " + esc(nameOf(dom.to)) +
+          " at " + fmtNum(dom.value, 0) + " " + esc(s.unit) + ". Link widths are proportional to the flow volume.</p>";
+      }
+      if (AN && typeof AN.sankeySvg === "function") out += '<div class="rpt-analytics-fig">' + AN.sankeySvg(s, REPORT_THEME) + "</div>";
+      out += '<table class="rpt-tbl">' + th(["From", "To", "Volume (" + s.unit + ")"]);
+      for (const l of s.links) out += tr([nameOf(l.from), nameOf(l.to), fmtNum(l.value, 0)]);
+      out += "</table>";
+    }
+
+    // --- Operating cost (cards + category breakdown) ---------------------
+    const c = a.cost;
+    if (c) {
+      out += "<h3 class=\"rpt-sub-h\">Operating cost (illustrative)</h3>";
+      out += '<div class="cards">';
+      out += card("Total operating cost", CUR + fmtNum(c.totalCost, 0), fmtNum(c.operatingHours, 1) + " h window");
+      out += card("Cost per " + c.throughputUnit, CUR + fmtNum(c.perUnit, 2), fmtNum(c.throughput, 0) + " " + c.throughputUnit + "s");
+      out += "</div>";
+      out += '<table class="rpt-tbl">' + th(["Category", "Cost", "Share"]);
+      const tot = num(c.totalCost);
+      for (const cat of (c.categories || [])) {
+        const pct = tot > 0 ? Math.round((num(cat.amount) / tot) * 100) : 0;
+        out += tr([cat.label, CUR + fmtNum(cat.amount, 0), pct + "%"]);
+      }
+      out += "</table>";
+      if (AN && typeof AN.breakdownSvg === "function") {
+        const catRows = (c.categories || []).map((cat) => ({ label: cat.label, value: num(cat.amount), text: CUR + fmtNum(cat.amount, 0) }));
+        let mx = -1; catRows.forEach((x) => { if (x.value > mx) mx = x.value; });
+        catRows.forEach((x) => { x.emphasis = x.value === mx; });
+        out += '<div class="rpt-analytics-fig">' + AN.breakdownSvg(catRows, REPORT_THEME, { title: "Operating cost by category" }) + "</div>";
+      }
+      if (c.honesty) out += '<p class="rpt-note">' + esc(c.honesty) + "</p>";
+    }
+
+    // --- Energy (cards + per-resource breakdown) -------------------------
+    const e = a.energy;
+    if (e) {
+      out += "<h3 class=\"rpt-sub-h\">Energy (modelled)</h3>";
+      out += '<div class="cards">';
+      out += card("Total energy", fmtNum(e.totalKWh, 0) + " kWh", fmtNum(e.operatingHours, 1) + " h window");
+      out += card("Energy per " + e.throughputUnit, (num(e.perUnit) >= 1 ? fmtNum(e.perUnit, 1) : String(Math.round(num(e.perUnit) * 1000) / 1000)) + " kWh", fmtNum(e.throughput, 0) + " " + e.throughputUnit + "s");
+      out += card("CO2e", fmtNum(e.co2Kg, 0) + " kg", (Math.round(num(e.co2Factor) * 1000) / 1000) + " kg/kWh (illustrative)");
+      out += "</div>";
+      out += '<table class="rpt-tbl">' + th(["Resource", "Count", "Power kW", "Energy kWh"]);
+      for (const g of (e.byClass || [])) out += tr([g.label, fmtInt(g.count), fmtNum(g.powerKW, 2), fmtNum(g.energyKWh, 0)]);
+      out += "</table>";
+      if (AN && typeof AN.breakdownSvg === "function") {
+        const enRows = (e.byClass || []).map((g) => ({ label: g.label, value: num(g.energyKWh), text: fmtNum(g.energyKWh, 0) + " kWh" }));
+        let mx = -1; enRows.forEach((x) => { if (x.value > mx) mx = x.value; });
+        enRows.forEach((x) => { x.emphasis = x.value === mx; });
+        out += '<div class="rpt-analytics-fig">' + AN.breakdownSvg(enRows, REPORT_THEME, { title: "Energy by resource" }) + "</div>";
+      }
+      if (e.honesty) out += '<p class="rpt-note">' + esc(e.honesty) + "</p>";
+    }
+
+    // --- Factory line-sim metrics + optimiser before/after ---------------
+    if (a.mode === "factory" && a.lineSim) {
+      const ls = a.lineSim;
+      out += "<h3 class=\"rpt-sub-h\">Line simulation (Theory of Constraints, Little's Law)</h3>";
+      out += '<div class="cards">';
+      out += card("Throughput", fmtNum(ls.throughputPerHr, 1), "parts / hr");
+      out += card("Takt", fmtNum(ls.taktSec, 1), "s / part");
+      out += card("Line efficiency", fmtNum(num(ls.lineEfficiency) * 100, 1), "%");
+      out += card("WIP", fmtNum(ls.wip, 1), "parts");
+      out += card("Lead time", fmtNum(ls.leadTimeSec, 1), "s");
+      out += card("Stations", fmtInt(ls.stationsUsed), "used");
+      out += "</div>";
+      if (a.optimize) {
+        const op = a.optimize;
+        out += "<h3 class=\"rpt-sub-h\">Efficiency optimiser (accepted) - before / after</h3>";
+        out += '<table class="rpt-tbl">' + th(["Metric", "Before", "After"]);
+        if (op.lineEffBefore != null) out += tr(["Line efficiency", fmtNum(num(op.lineEffBefore) * 100, 1) + " %", fmtNum(num(op.lineEffAfter) * 100, 1) + " %"]);
+        if (op.mhiBefore != null) out += tr(["Material-flow MHI", fmtNum(op.mhiBefore, 0), fmtNum(op.mhiAfter, 0) + (op.mhiDeltaPct != null ? " (-" + fmtNum(op.mhiDeltaPct, 1) + " %)" : "")]);
+        if (op.bottleneckBefore != null) out += tr(["Bottleneck station", op.bottleneckBefore, op.bottleneckAfter || op.bottleneckBefore]);
+        if (op.throughputPerHr != null) out += tr(["Throughput (parts/hr)", fmtNum(op.throughputPerHr, 1), fmtNum(op.throughputPerHr, 1) + " (a re-layout does not change cycle times)"]);
+        if (op.moved != null) out += tr(["Stations moved", "-", fmtInt(op.moved)]);
+        out += "</table>";
+      }
+    }
+
+    if (a.honesty) out += '<p class="rpt-note">' + esc(a.honesty) + "</p>";
+    return out + "</section>";
+  }
+
   function htmlDataProfileSection(r) {
     const d = r.dataProfile;
     let out = sectionOpen("dataProfile", "Data profile");
@@ -621,6 +854,10 @@
     ".card{border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;background:#f8fafc}" +
     ".card-v{font-size:22px;font-weight:700}.card-l{color:#475569;font-size:12px}.card-u{color:#94a3b8;font-size:11px}" +
     ".rpt-bottleneck{background:#f1f5f9;border-left:3px solid #64748b;padding:8px 12px;margin:10px 0;border-radius:0 6px 6px 0}" +
+    "h3.rpt-sub-h{font-size:14px;margin:16px 0 4px;color:#334155}" +
+    ".rpt-analytics-fig{margin:8px 0 12px;max-width:100%;overflow-x:auto}" +
+    ".rpt-analytics-fig svg{max-width:100%;height:auto}" +
+    "tr.rpt-constraint td{background:#fef2f2;font-weight:600}" +
     ".rpt-note{color:#64748b;font-size:11.5px;margin:8px 0}" +
     ".rpt-na{color:#92400e;background:#fffbeb;border:1px dashed #fcd34d;border-radius:6px;padding:8px 12px;font-size:12.5px}" +
     ".rpt-basis{color:#475569;font-size:12px;margin:6px 0}" +
@@ -642,6 +879,7 @@
       htmlOperationsSection(r) +
       htmlStorageSection(r) +
       htmlAutomationSection(r) +
+      htmlAnalyticsSection(r) +
       htmlDataProfileSection(r) +
       htmlStandardsSection(r) +
       '<div class="rpt-foot">' + esc(r.honesty || HONESTY) + " Report format " + esc(r.reportVersion || REPORT_VERSION) + ".</div>" +
@@ -714,6 +952,30 @@
       push("automation", "Modeled throughput", r.automation.totalThroughputUnitsPerHr, "units/hr");
       push("automation", "Flow demand", r.automation.demandUnitsPerHr, "units/hr");
       if (r.automation.constraint && r.automation.constraint.present) push("automation", "Constraint", r.automation.constraint.label, "");
+    }
+    if (r.analytics && r.analytics.available) {
+      const a = r.analytics;
+      push("analytics", "Mode", a.mode, "");
+      if (a.bottleneck && a.bottleneck.constraint) push("analytics", "Constraint", a.bottleneck.constraint.name, "");
+      push("analytics", "Throughput", a.throughput, a.throughputUnit || "");
+      if (a.cost) {
+        push("analytics", "Total operating cost", a.cost.totalCost, a.cost.currency || "");
+        push("analytics", "Cost per " + a.cost.throughputUnit, a.cost.perUnit, a.cost.currency || "");
+      }
+      if (a.energy) {
+        push("analytics", "Total energy", a.energy.totalKWh, "kWh");
+        push("analytics", "Energy per " + a.energy.throughputUnit, a.energy.perUnit, "kWh");
+        push("analytics", "CO2e", a.energy.co2Kg, "kg");
+      }
+      if (a.lineSim) {
+        push("analytics", "Line efficiency", a.lineSim.lineEfficiency, "fraction");
+        push("analytics", "WIP", a.lineSim.wip, "parts");
+      }
+      if (a.optimize) {
+        push("analytics", "Optimiser line-eff before", a.optimize.lineEffBefore, "fraction");
+        push("analytics", "Optimiser line-eff after", a.optimize.lineEffAfter, "fraction");
+        push("analytics", "Optimiser MHI delta", a.optimize.mhiDeltaPct, "%");
+      }
     }
     if (r.dataProfile && r.dataProfile.available) {
       push("dataProfile", "SKUs", r.dataProfile.skuCount, "count");

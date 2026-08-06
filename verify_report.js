@@ -21,6 +21,17 @@
  *       master + strategy + seed.
  *   7.  Automation CROSS-CONSISTENCY: report total throughput + constraint
  *       EQUAL WT.automation.report(layout, demand).
+ *   7b. ANALYTICS SUITE CROSS-CONSISTENCY (A3): the report's Analysis suite
+ *       section EQUALS the WT.analytics models over the SAME sim run - the
+ *       BOTTLENECK ranking == bottleneckFromWarehouse, the SANKEY volumes ==
+ *       sankeyFromWarehouse, the COST breakdown + cost/unit == costModel and
+ *       the ENERGY breakdown + energy/unit == energyModel - so it can never
+ *       drift from the "Analyze" card; toHtml carries the section + >=3 inline
+ *       SVG figures + the modelled-not-measured honesty and stays offline.
+ *   7c. FACTORY analytics: a report built with a process block carries the
+ *       factory bottleneck/flow/cost/energy, the line-sim metrics (== process
+ *       metrics) and the accepted optimiser before/after (runtime-only, never
+ *       required); a no-storage floor marks the analytics section n/a.
  *   8.  Data-profile CROSS-CONSISTENCY: report SKU / order / ABC stats
  *       EQUAL WT.wmsdata.stats(master, orders).
  *   9.  Standards basis: pulls WT.kb.list() entries (each with a source +
@@ -52,7 +63,8 @@ global.window = global; // app modules attach themselves to window.WT
 for (const f of [
   "domain.js", "knowledge.js", "simulation.js", "compliance.js",
   "generate.js", "nlcommands.js", "examples.js", "wms.js", "automation.js",
-  "wmsdata.js", "storage.js", "report.js",
+  "wmsdata.js", "storage.js", "process.js", "optimize_factory.js",
+  "analytics.js", "report.js",
 ]) {
   // eslint-disable-next-line no-eval
   (0, eval)(fs.readFileSync(path.join(__dirname, f), "utf8"));
@@ -122,7 +134,7 @@ check("WT.report exposes build/toHtml/toJson/toCsv + SECTIONS + HONESTY",
 /* --------------------------------------------------------------------
  * 2. build() aggregates the expected sections.
  * ------------------------------------------------------------------ */
-const wantKeys = ["header", "layout", "compliance", "operations", "storage", "automation", "dataProfile", "standardsBasis"];
+const wantKeys = ["header", "layout", "compliance", "operations", "storage", "automation", "analytics", "dataProfile", "standardsBasis"];
 const sectionsOk = wantKeys.every((k) => rep[k] && typeof rep[k] === "object") &&
   deepEq(rep.sections.map((s) => s.key), R.SECTIONS.map((s) => s.key)) &&
   deepEq(rep.sections.map((s) => s.key), wantKeys);
@@ -193,6 +205,102 @@ check("automation total throughput + constraint EQUAL WT.automation.report(layou
   "total " + rep.automation.totalThroughputUnitsPerHr + " constraint " + (rep.automation.constraint.type || "-"));
 
 /* --------------------------------------------------------------------
+ * 7b. ANALYTICS SUITE CROSS-CONSISTENCY (A3 - consolidated HtmlReport
+ *     parity). The report's Analysis suite section must EQUAL the WT.analytics
+ *     models built from the SAME sim run, so it can never drift from the
+ *     "Analyze" card. Warehouse: reuse the report's own operations run.
+ * ------------------------------------------------------------------ */
+const AN = WT.analytics;
+const anRun = W.runOperations(fullLayout, { orders: cfg.orders, hours: cfg.hours, seed: cfg.seed });
+const anRates = AN.defaultRates();
+const anWarehouseInput = { mode: "warehouse", sim: anRun, elements: fullLayout.elements };
+const expBott = AN.bottleneckFromWarehouse(anRun);
+const expSank = AN.sankeyFromWarehouse(anRun);
+const expCost = AN.costModel(anWarehouseInput, anRates);
+const expEnergy = AN.energyModel(anWarehouseInput, anRates);
+const an = rep.analytics;
+const anPresent = an && an.available && an.mode === "warehouse";
+check("analytics section present + is the warehouse-flow mode for a warehouse layout", !!anPresent,
+  an ? "available=" + an.available + " mode=" + an.mode : "no analytics section");
+
+const bottleneckOk = anPresent &&
+  an.bottleneck.constraint.id === expBott.constraint.id &&
+  an.bottleneck.constraint.name === expBott.constraint.name &&
+  an.bottleneck.resources.length === expBott.resources.length &&
+  an.bottleneck.headline === expBott.headline &&
+  an.bottleneck.resources[0].id === expBott.resources[0].id &&
+  an.throughput === expBott.throughput;
+check("report BOTTLENECK EQUALS WT.analytics.bottleneckFromWarehouse(run) (can't drift)", !!bottleneckOk,
+  anPresent ? "constraint=" + an.bottleneck.constraint.name + " thr=" + an.throughput.toFixed(1) : "n/a");
+
+const sankeyOk = anPresent &&
+  an.sankey.maxVolume === expSank.maxVolume &&
+  an.sankey.links.length === expSank.links.length &&
+  deepEq(an.sankey.links.map((l) => l.value), expSank.links.map((l) => l.value)) &&
+  deepEq(an.sankey.nodes.map((n) => n.id), expSank.nodes.map((n) => n.id));
+check("report SANKEY flow volumes EQUAL WT.analytics.sankeyFromWarehouse(run) (can't drift)", !!sankeyOk,
+  anPresent ? "maxVol=" + an.sankey.maxVolume + " links=" + an.sankey.links.length : "n/a");
+
+const costOk = anPresent &&
+  an.cost.totalCost === expCost.totalCost &&
+  an.cost.perUnit === expCost.perUnit &&
+  deepEq(an.cost.categories, expCost.categories);
+check("report COST breakdown + cost/unit EQUAL WT.analytics.costModel(input) (can't drift)", !!costOk,
+  anPresent ? "total=" + an.cost.totalCost.toFixed(0) + " /unit=" + an.cost.perUnit.toFixed(3) : "n/a");
+
+const energyOk = anPresent &&
+  an.energy.totalKWh === expEnergy.totalKWh &&
+  an.energy.perUnit === expEnergy.perUnit &&
+  an.energy.co2Kg === expEnergy.co2Kg &&
+  deepEq(an.energy.byClass, expEnergy.byClass);
+check("report ENERGY breakdown + energy/unit EQUAL WT.analytics.energyModel(input) (can't drift)", !!energyOk,
+  anPresent ? "kWh=" + an.energy.totalKWh.toFixed(0) + " /unit=" + an.energy.perUnit.toFixed(3) : "n/a");
+
+// toHtml carries the analytics section header + the four analysis figures
+// (inline SVG) + the modelled-not-measured honesty; and stays offline.
+const anHtml = R.toHtml(rep);
+const anHtmlOk =
+  anHtml.indexOf("Analysis suite (bottleneck, flow, cost, energy)") !== -1 &&
+  /Bottleneck ranking/.test(anHtml) && /Material-flow Sankey/.test(anHtml) &&
+  /Operating cost/.test(anHtml) && /Energy \(modelled\)/.test(anHtml) &&
+  (anHtml.match(/<svg/g) || []).length >= 3 &&
+  /modelled, not measured/i.test(anHtml);
+check("toHtml renders the analytics section (bottleneck/sankey/cost/energy figures + honesty)", anHtmlOk,
+  "svgs=" + (anHtml.match(/<svg/g) || []).length);
+
+/* --------------------------------------------------------------------
+ * 7c. FACTORY analytics: a report built with a process block carries the
+ *     factory bottleneck/flow/cost/energy, the line-sim metrics and the
+ *     accepted optimiser before/after - all cross-consistent with the sim.
+ * ------------------------------------------------------------------ */
+const facGen = WT.generate.generateFactoryLayout("assembly-line", { seed: 7 });
+const facBlock = WT.process.derive(facGen);
+const facLayout = { elements: facGen.elements, gridW: facGen.gridW, gridH: facGen.gridH, cell: 1, config: facGen.config || {} };
+const facOpt = WT.factoryOpt.optimize(facLayout, facBlock, facGen.config || {});
+const facRep = R.build(facLayout, { timestamp: STAMP, process: facBlock, optimize: facOpt.headline });
+const facMetrics = WT.process.metrics(facBlock);
+const facExpBott = AN.bottleneckFromProcess(facMetrics);
+const fa = facRep.analytics;
+const facOk =
+  fa && fa.available && fa.mode === "factory" &&
+  fa.bottleneck.constraint.id === facExpBott.constraint.id &&
+  fa.bottleneck.constraint.id === facMetrics.bottleneck.opId &&
+  fa.lineSim && fa.lineSim.throughputPerHr === facMetrics.throughputPerHr &&
+  fa.lineSim.lineEfficiency === facMetrics.lineEfficiency &&
+  fa.optimize && fa.optimize.lineEffBefore === facOpt.headline.lineEffBefore &&
+  fa.optimize.lineEffAfter === facOpt.headline.lineEffAfter &&
+  R.toHtml(facRep).indexOf("Line simulation") !== -1 &&
+  R.toHtml(facRep).indexOf("Efficiency optimiser (accepted)") !== -1;
+check("FACTORY report analytics: bottleneck + line-sim + optimiser before/after EQUAL the sim (mode=factory)", !!facOk,
+  fa ? "mode=" + fa.mode + " constraint=" + fa.bottleneck.constraint.name + " thr=" + fa.lineSim.throughputPerHr : "n/a");
+
+// The accepted-optimisation summary is RUNTIME-ONLY: without opts.optimize the
+// section still builds (optimize:null) - proving it never depends on it.
+const facRepNoOpt = R.build(facLayout, { timestamp: STAMP, process: facBlock });
+check("factory analytics builds without an accepted optimisation (optimize:null, never thrown)",
+  facRepNoOpt.analytics.available && facRepNoOpt.analytics.mode === "factory" && facRepNoOpt.analytics.optimize === null);
+
+/* --------------------------------------------------------------------
  * 8. Data-profile CROSS-CONSISTENCY.
  * ------------------------------------------------------------------ */
 const dstats = DATA.stats(bundle.skuMaster, bundle.orderPool);
@@ -221,8 +329,12 @@ check("standards basis pulls WT.kb.list() entries (each with a source) + the not
  * ------------------------------------------------------------------ */
 const html = R.toHtml(rep);
 const escHtml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// The analytics figures are inline <svg> - the ONLY allowed "http" is the
+// standard SVG XML namespace (an identifier, not a fetched asset). Strip it,
+// then assert there is no real external reference anywhere in the report.
+const htmlNoXmlns = html.replace(/xmlns="http:\/\/www\.w3\.org\/2000\/svg"/g, "");
 const noExternal =
-  !/https?:\/\//i.test(html) &&
+  !/https?:\/\//i.test(htmlNoXmlns) &&
   !/<script/i.test(html) &&
   !/<link/i.test(html) &&
   !/url\(\s*["']?https?:/i.test(html) &&
@@ -310,6 +422,8 @@ const repNoStore = R.build(noStoreLayout, { timestamp: STAMP });
 const markOk =
   repNoAuto.automation.available === false && /manual/i.test(repNoAuto.automation.note) &&
   repNoStore.operations.ran === false && repNoStore.storage.available === false &&
+  // a no-storage floor has no runnable flow -> analytics section marked n/a
+  repNoStore.analytics.available === false && /runnable model/i.test(repNoStore.analytics.note) &&
   // and the printable HTML still renders (never throws) for both:
   R.toHtml(repNoAuto).length > 500 && R.toHtml(repNoStore).length > 500;
 check("not-yet-run sections are MARKED (no-automation -> manual note; no-storage -> ops not run + storage n/a), never thrown", markOk,

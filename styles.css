@@ -1335,6 +1335,31 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .about-for { font-size: 0.82rem; color: var(--text-dim); line-height: 1.5; margin: 4px 0 0; }
 
 /* ================================================================
+ * v3.3 A4: honest "How we compare" page (WT.howwecompare), folded into
+ * About. Plain, theme-aware, static (no motion). Sources cited as text.
+ * ================================================================ */
+.about-compare { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+.hwc-title { margin: 6px 0 2px; }
+.hwc-lede { font-size: 0.86rem; color: var(--text); margin: 2px 0 8px; line-height: 1.5; }
+.hwc-disclaimer { font-size: 0.8rem; color: var(--text-dim); background: var(--surface-2, rgba(148,163,184,0.12));
+  border-left: 3px solid var(--border); border-radius: 0 6px 6px 0; padding: 8px 10px; margin: 8px 0; line-height: 1.5; }
+.hwc-h { font-size: 0.9rem; margin: 14px 0 4px; }
+.hwc-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 0.82rem; line-height: 1.45; }
+.hwc-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 0.78rem; }
+.hwc-table th, .hwc-table td { border: 1px solid var(--border); padding: 5px 7px; text-align: left; vertical-align: top; }
+.hwc-table thead th { background: var(--surface-2, rgba(148,163,184,0.12)); }
+.hwc-table th[scope="row"] { font-weight: 600; white-space: nowrap; }
+.hwc-comp { margin: 8px 0; }
+.hwc-comp-name { font-size: 0.85rem; margin: 6px 0 2px; }
+.hwc-strong { font-size: 0.8rem; color: var(--text-dim); margin: 2px 0 4px; line-height: 1.45; }
+.hwc-cite { color: var(--text-dim); font-size: 0.72rem; }
+.hwc-framing { font-size: 0.84rem; color: var(--text); background: var(--surface-2, rgba(148,163,184,0.12));
+  border-radius: 6px; padding: 8px 10px; margin: 10px 0; line-height: 1.5; }
+.hwc-sources { margin: 0; padding-left: 18px; font-size: 0.78rem; color: var(--text-dim); display: flex; flex-direction: column; gap: 4px; }
+.hwc-url { color: var(--text-dim); font-size: 0.74rem; }
+.hwc-note { font-size: 0.74rem; color: var(--text-dim); margin: 8px 0 0; line-height: 1.45; }
+
+/* ================================================================
  * v2.7 FACTORY-C: Factory line efficiency read-out (WT.process)
  * Headline KPIs + a drill-in of per-station utilisation bars and
  * editable cycle times. Calm, colourblind-safe, theme-aware.

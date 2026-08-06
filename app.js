@@ -132,6 +132,11 @@
     // shift/demand. null for a warehouse layout (so serialize stays byte-
     // identical). Auto-derived on a factory generate; editable cycle times.
     process: null,
+    // v3.3 A3: the LAST ACCEPTED factory-optimiser before/after summary
+    // (WT.factoryOpt result headline). RUNTIME-ONLY - never serialized (so
+    // scenarios stay byte-identical); surfaced in the consolidated report's
+    // Analysis suite section when present. Cleared when the line is (re)built.
+    lastOptimize: null,
     // P3: Live material-flow animation (flowsim.js). `sim` is the current
     // flowsim state; `on` gates whether MUs are drawn; `playing` gates the
     // requestAnimationFrame loop; `sig` is the layout signature the sim was
@@ -4261,6 +4266,7 @@
     state.process = (WT.process && typeof WT.process.rebuild === "function")
       ? WT.process.rebuild(obj) : null;
     state.procPreview = null; // v2.8 FACTORY-D: drop any stale optimiser preview
+    state.lastOptimize = null; // v3.3 A3: a new layout has no accepted optimisation
     pushConfigToUI();
     syncFloorInputs();
     renderProps();
@@ -4400,6 +4406,15 @@
       opts.skuMaster = WT.wmsdata.skuMaster;
       opts.orderPool = WT.wmsdata.orderPool;
     }
+    // A3: feed the report's Analysis suite section the SAME inputs the
+    // "Analyze" card uses, so the report equals the panels. In FACTORY mode
+    // pass the process block (the report builds the factory bottleneck/flow/
+    // cost/energy + line-sim from it) and, if an optimisation was accepted,
+    // its before/after summary. Pass the editable illustrative rate copy so
+    // the report's Cost + Energy equal what the panels show. All read-only.
+    if (state.process) opts.process = state.process;
+    if (state.lastOptimize) opts.optimize = state.lastOptimize;
+    if (WT.analytics && typeof ensureRates === "function") opts.rates = ensureRates();
     return opts;
   }
 
@@ -5147,6 +5162,7 @@
     // station), so state.process stays null there and serialize is unchanged.
     state.process = (WT.process && typeof WT.process.derive === "function")
       ? WT.process.derive({ elements: state.elements, gridW: GRID_W, gridH: GRID_H, config: state.config }) : null;
+    state.lastOptimize = null; // v3.3 A3: a freshly (re)built line has no accepted optimisation yet
     pushConfigToUI();
     syncFloorInputs();
     renderProps();
@@ -5353,6 +5369,9 @@
       const e = state.elements.find((x) => x.id === g.id);
       if (e) { e.x = g.x; e.y = g.y; }
     }
+    // Record a compact, JSON-safe before/after summary for the consolidated
+    // report's Analysis suite (runtime-only; never serialized).
+    state.lastOptimize = opt && opt.headline ? Object.assign({ basis: opt.basis }, opt.headline) : null;
     state.procPreview = null;
     procOptResult = null;
     scheduleSave();
@@ -6377,7 +6396,12 @@
       (chips ? '<div class="about-pipeline">' + chips + "</div>" : "") +
       "<h3>What it does</h3><ul class=\"about-list\">" + li(A.what) + "</ul>" +
       "<h3>How it stays honest</h3><ul class=\"about-list about-honesty\">" + li(A.honesty) + "</ul>" +
-      "<h3>Who it is for</h3><p class=\"about-for\">" + esc(A.forWho) + "</p>";
+      "<h3>Who it is for</h3><p class=\"about-for\">" + esc(A.forWho) + "</p>" +
+      // v3.3 A4: the honest, sourced "How we compare" page (WT.howwecompare)
+      // folded into About - a fair comparison vs the commercial suites.
+      (WT.howwecompare && typeof WT.howwecompare.html === "function"
+        ? '<div class="about-compare">' + WT.howwecompare.html({ headingLevel: 3 }) + "</div>"
+        : "");
   }
 
   function openAbout() { buildAbout(); if ($("about")) $("about").hidden = false; }
