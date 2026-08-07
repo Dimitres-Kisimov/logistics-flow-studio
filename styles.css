@@ -2096,6 +2096,48 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .tb-menu-item:focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
 .tb-menu-item > svg { flex: 0 0 auto; color: var(--text-dim); }
 .tb-menu-item.danger { color: var(--danger); }
+
+/* ---- v3.16 ICON-EXTEND: the "Add component" flyout ----
+ * The Add icon opens the Class Library CATEGORIES; each is a keyboard-
+ * accessible disclosure whose items arm placement (by firing the real
+ * palette item). Built at runtime from paletteTree() so it stays in sync.
+ * Many categories/components, so the flyout scrolls within a capped height. */
+.tb-menu-add { min-width: 240px; max-height: min(62vh, 440px); overflow-y: auto; }
+.tb-submenu-group { display: flex; flex-direction: column; }
+.tb-submenu-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 9px;
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tb-submenu-head:hover { background: var(--surface-2); border-color: var(--border); }
+.tb-submenu-head:focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
+.tb-submenu-caret { flex: 0 0 auto; width: 12px; color: var(--text-dim); font-size: 0.72rem; }
+.tb-submenu-label { flex: 1 1 auto; min-width: 0; }
+.tb-submenu-count {
+  flex: 0 0 auto; color: var(--text-dim); font-size: 0.72rem;
+  font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.tb-submenu {
+  display: flex; flex-direction: column; gap: 2px;
+  margin: 2px 0 4px 8px; padding-left: 7px;
+  border-left: 1px solid var(--border);
+}
+.tb-add-glyph { width: 18px; height: 18px; border-radius: 4px; overflow: hidden; flex: 0 0 auto; }
+.tb-add-glyph.pal-glyph canvas { width: 18px; height: 18px; display: block; }
+.tb-add-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* The Layout action row renders as a wrapped compact icon row. */
 .btn-grid.icon-actions { display: flex; flex-wrap: wrap; gap: 5px; }
 .btn-grid.icon-actions .btn { flex: 0 0 auto; }

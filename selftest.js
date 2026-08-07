@@ -1823,8 +1823,8 @@
     // compact-density stylesheet is live by default.
     check("pro-toolbar-icons-render-with-accessible-names", function () {
       var ids = ["heatBtn", "measureBtn", "flowLinksBtn", "zoomFitBtn", "panBtn", "isoBtn",
-        "exportMenuBtn", "viewMenuBtn", "saveBtn", "loadBtn", "exportBtn", "importBtn",
-        "clearBtn", "demoBtn", "storyBtn", "guidedDemoBtn"];
+        "exportMenuBtn", "viewMenuBtn", "simMenuBtn", "addMenuBtn", "saveBtn", "loadBtn",
+        "exportBtn", "importBtn", "clearBtn", "demoBtn", "storyBtn", "guidedDemoBtn"];
       var bad = [];
       ids.forEach(function (id) {
         var b = $(id);
@@ -1892,6 +1892,85 @@
       return { ok: closedFirst && proxiesResolve && opens && closes,
         detail: "closed=" + closedFirst + " items=" + items.length + " proxiesResolve=" + proxiesResolve +
           " opens=" + opens + " closes=" + closes };
+    });
+
+    // v3.16 ICON-EXTEND: the SIMULATE icon EXPANDS into a detailed menu of the
+    // run + material-flow playback controls, each item proxying an EXISTING
+    // control (its handler is reused, not duplicated). Ships closed, opens on
+    // click, Esc closes - and FIRING the Run item triggers the REAL Run (on a
+    // populated, simulatable layout the headline shows "Ran N orders").
+    check("simulate-icon-expands-into-detailed-menu", function () {
+      var toggle = $("simMenuBtn"), menu = $("simMenu");
+      if (!toggle || !menu) return { ok: false, detail: "no simulate flyout" };
+      var closedFirst = menu.hidden === true && toggle.getAttribute("aria-expanded") === "false";
+      var items = menu.querySelectorAll(".tb-menu-item[data-proxy]");
+      var proxiesResolve = items.length >= 5 && Array.prototype.every.call(items, function (it) {
+        return !!document.getElementById(it.getAttribute("data-proxy"));
+      });
+      toggle.click();
+      var opens = menu.hidden === false && toggle.getAttribute("aria-expanded") === "true";
+      document.dispatchEvent(escKey());
+      var escCloses = menu.hidden === true && toggle.getAttribute("aria-expanded") === "false";
+      // Fire the Run item -> the SAME #runBtn Run handler runs on a populated layout.
+      var ran = true;
+      if (haveApi && typeof API.loadExample === "function") {
+        var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+        if (ex) API.loadExample(ex.id);
+        API.render();
+        var runItem = menu.querySelector('.tb-menu-item[data-proxy="runBtn"]');
+        if (runItem) runItem.click(); // proxies #runBtn
+        var head = ($("simHeadline").textContent || "");
+        var res = API.state.lastResult;
+        ran = !!(res && res.ok) && /Ran\s+\d+\s+orders/i.test(head) && !/nothing to simulate/i.test(head);
+      }
+      return { ok: closedFirst && proxiesResolve && opens && escCloses && ran,
+        detail: "closed=" + closedFirst + " items=" + items.length + " proxiesResolve=" + proxiesResolve +
+          " opens=" + opens + " escCloses=" + escCloses + " runFires=" + ran };
+    });
+
+    // v3.16 ICON-EXTEND: the ADD-COMPONENT icon EXPANDS into the Class Library
+    // CATEGORIES (built at runtime from paletteTree()). Every component item's
+    // data-proxy-type resolves to a REAL palette item (no dangling); a category
+    // is a keyboard disclosure; and FIRING an item ARMS placement via the SAME
+    // setTool path (proving one-click add of any of the 51 components).
+    check("add-icon-expands-into-category-flyout-arming-setTool", function () {
+      var toggle = $("addMenuBtn"), menu = $("addMenu");
+      if (!toggle || !menu) return { ok: false, detail: "no add flyout" };
+      // Clear any leftover palette search so the full Class Library renders
+      // (the add menu mirrors paletteTree(); #palette items must be present).
+      if (haveApi && API.library && typeof API.library.setSearch === "function") API.library.setSearch("");
+      var closedFirst = menu.hidden === true && toggle.getAttribute("aria-expanded") === "false";
+      var heads = menu.querySelectorAll(".tb-submenu-head");
+      var items = menu.querySelectorAll(".tb-menu-item[data-proxy-type]");
+      var itemsResolve = items.length > 0 && Array.prototype.every.call(items, function (it) {
+        return !!document.querySelector('#palette .pal-item[data-type="' + it.getAttribute("data-proxy-type") + '"]');
+      });
+      toggle.click();
+      var opens = menu.hidden === false && toggle.getAttribute("aria-expanded") === "true";
+      // A category disclosure: expanding the first head reveals its sub-list.
+      var firstHead = heads[0], catExpands = false;
+      if (firstHead) {
+        firstHead.click();
+        var body = document.getElementById(firstHead.getAttribute("aria-controls"));
+        catExpands = firstHead.getAttribute("aria-expanded") === "true" && !!body && body.hidden === false;
+      }
+      // Fire a component item unlocked in every tier -> arms setTool(type).
+      var TYPE = "selective-racking";
+      var addItem = menu.querySelector('.tb-menu-item[data-proxy-type="' + TYPE + '"]');
+      var palItem = document.querySelector('#palette .pal-item[data-type="' + TYPE + '"]');
+      var armed = false;
+      if (haveApi && addItem && palItem) {
+        if (API.state.activeTool === TYPE) addItem.click(); // start disarmed (deterministic)
+        addItem.click(); // proxies the real palette item -> setTool(TYPE)
+        armed = API.state.activeTool === TYPE;
+        if (API.state.activeTool && palItem) palItem.click(); // restore: disarm placement
+      }
+      document.dispatchEvent(escKey());
+      var escCloses = menu.hidden === true && toggle.getAttribute("aria-expanded") === "false";
+      return { ok: closedFirst && itemsResolve && opens && catExpands && armed && escCloses,
+        detail: "closed=" + closedFirst + " cats=" + heads.length + " items=" + items.length +
+          " itemsResolve=" + itemsResolve + " opens=" + opens + " catExpands=" + catExpands +
+          " armed=" + armed + " escCloses=" + escCloses };
     });
 
     // A rail icon EXPANDS into its drawer of detailed controls (the "icon opens

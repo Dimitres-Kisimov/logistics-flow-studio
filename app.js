@@ -2743,6 +2743,87 @@
       none.textContent = "No components match “" + paletteFilter.trim() + "”.";
       wrap.appendChild(none);
     }
+    buildAddMenu(); // v3.16: keep the "Add" icon flyout in sync with the registry
+  }
+
+  // ---- v3.16 ICON-EXTEND: the "Add component" flyout ------------------
+  // Build the compact Add-component icon menu (#addMenu) from the SAME
+  // paletteTreeModel() the Class Library uses, so it stays in lock-step with
+  // the real registry (built-ins + custom "My Objects") and honours the
+  // Warehouse/Factory mode filter. Each category is a keyboard-accessible
+  // disclosure; each component item carries data-proxy-type and, when clicked,
+  // fires the REAL palette item (the SAME setTool placement path) via
+  // initTbMenus - no placement logic is duplicated here. Rebuilt on every
+  // buildPalette() call (mode change, custom add/remove, theme reglyph), so
+  // new / custom components appear automatically. NO Date / RNG - deterministic.
+  function buildAddMenu() {
+    const menu = $("addMenu");
+    if (!menu) return;
+    const tree = paletteTreeModel();
+    menu.innerHTML = "";
+    let idx = 0;
+    for (const group of tree) {
+      const types = (group.types || []).filter((t) => !!ELEMENTS[t]);
+      if (!types.length) continue; // stay compact: skip empty groups (e.g. no custom objects yet)
+      const grp = document.createElement("div");
+      grp.className = "tb-submenu-group";
+      const head = document.createElement("button");
+      head.type = "button";
+      head.className = "tb-submenu-head";
+      const bodyId = "addCat-" + idx;
+      head.setAttribute("aria-expanded", "false");
+      head.setAttribute("aria-controls", bodyId);
+      head.innerHTML =
+        '<span class="tb-submenu-caret" aria-hidden="true">▸</span>' +
+        '<span class="tb-submenu-label">' + esc(group.label) + "</span>" +
+        '<span class="tb-submenu-count">' + types.length + "</span>";
+      const body = document.createElement("div");
+      body.className = "tb-submenu";
+      body.id = bodyId;
+      body.setAttribute("role", "group");
+      body.setAttribute("aria-label", group.label);
+      body.hidden = true;
+      for (const type of types) {
+        const def = ELEMENTS[type];
+        if (!def) continue;
+        const it = document.createElement("button");
+        it.type = "button";
+        it.className = "tb-menu-item";
+        it.setAttribute("role", "menuitem");
+        it.setAttribute("data-proxy-type", type); // resolves to #palette .pal-item[data-type]
+        const sw = document.createElement("span");
+        sw.className = "pal-swatch pal-glyph tb-add-glyph";
+        const name = document.createElement("span");
+        name.className = "tb-add-name";
+        name.textContent = def.label;
+        it.appendChild(sw);
+        it.appendChild(name);
+        paintPaletteGlyph(sw, type, def); // the SAME glyph the palette + floor use
+        body.appendChild(it);
+      }
+      head.addEventListener("click", (e) => {
+        e.stopPropagation(); // this is a disclosure header, not a proxy item
+        const wasOpen = head.getAttribute("aria-expanded") === "true";
+        // one category open at a time keeps the flyout compact
+        const heads = menu.querySelectorAll(".tb-submenu-head");
+        Array.prototype.forEach.call(heads, (h) => {
+          if (h === head) return;
+          h.setAttribute("aria-expanded", "false");
+          const b = document.getElementById(h.getAttribute("aria-controls"));
+          if (b) b.hidden = true;
+          const c = h.querySelector(".tb-submenu-caret");
+          if (c) c.textContent = "▸";
+        });
+        head.setAttribute("aria-expanded", wasOpen ? "false" : "true");
+        body.hidden = wasOpen;
+        const caret = head.querySelector(".tb-submenu-caret");
+        if (caret) caret.textContent = wasOpen ? "▸" : "▾";
+      });
+      grp.appendChild(head);
+      grp.appendChild(body);
+      menu.appendChild(grp);
+      idx++;
+    }
   }
 
   // Wire the search box + roving arrow-key navigation (once). The controls are
@@ -7925,6 +8006,18 @@
         const pid = item.getAttribute("data-proxy");
         const target = pid ? document.getElementById(pid) : null;
         if (target && target !== item) { try { target.click(); } catch (_) { /* best-effort */ } }
+        else if (!pid) {
+          // v3.16 ICON-EXTEND: an Add-component item proxies the REAL Class
+          // Library palette item (the SAME setTool path a palette click uses),
+          // keyed by data-proxy-type because palette items carry data-type, not
+          // an id. No new placement logic - it clicks the real palette button
+          // (which arms setTool, or shows the tier padlock hint if locked).
+          const ptype = item.getAttribute("data-proxy-type");
+          if (ptype) {
+            const palItem = document.querySelector('#palette .pal-item[data-type="' + ptype + '"]');
+            if (palItem && palItem !== item) { try { palItem.click(); } catch (_) { /* best-effort */ } }
+          }
+        }
       });
       menus.push({ wrap: wrap, toggle: toggle, menu: menu, setOpen: setOpen, isOpen: isOpen });
     });

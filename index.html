@@ -576,6 +576,40 @@
             <button class="tb-menu-item" type="button" role="menuitem" data-proxy="shareBtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/></svg>Share layout link</button>
           </div>
         </div>
+        <!-- v3.16 ICON-EXTEND: a SIMULATE icon that EXPANDS into a detailed
+             flyout of the run + material-flow-playback controls. Every item
+             just fires the SAME existing handler (Run = #runBtn, Play/Pause/
+             Step/Reset = the #flow*Btn playback controls, Clear run history =
+             #histClearBtn) via app.js initTbMenus (data-proxy) - no new sim
+             logic, nothing duplicated; this only ADDS a one-click grouped
+             access point. Keyboard-accessible disclosure (aria-haspopup/
+             -expanded/-controls; Esc + outside-click close); ships hidden,
+             opened at runtime. -->
+        <div class="tb-menu-wrap" id="simMenuWrap">
+          <button id="simMenuBtn" class="btn small tb-btn icon-only tb-menu-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="simMenu" aria-label="Simulate" title="Simulate — a menu of the run + material-flow playback controls: Run simulation, Play / Pause / Step / Reset the live flow, and Clear run history. Each item fires the SAME control on the panels (this just adds a one-click grouped access point)."><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h3l2 6 4-14 2 8h4"/></svg><span class="tb-btn-label">Simulate</span></button>
+          <div id="simMenu" class="tb-menu" role="menu" aria-label="Simulate and playback" hidden>
+            <button class="tb-menu-item" type="button" role="menuitem" data-proxy="runBtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>Run simulation</button>
+            <button class="tb-menu-item" type="button" role="menuitem" data-proxy="flowPlayBtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z"/></svg>Play material flow</button>
+            <button class="tb-menu-item" type="button" role="menuitem" data-proxy="flowPauseBtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="5" width="3" height="14" rx="1"/><rect x="14" y="5" width="3" height="14" rx="1"/></svg>Pause flow</button>
+            <button class="tb-menu-item" type="button" role="menuitem" data-proxy="flowStepBtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5l8 7-8 7z"/><path d="M18 5v14"/></svg>Step flow</button>
+            <button class="tb-menu-item" type="button" role="menuitem" data-proxy="flowResetBtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 1 2.3 5.6"/><path d="M4 20v-5h5"/></svg>Reset flow</button>
+            <button class="tb-menu-item danger" type="button" role="menuitem" data-proxy="histClearBtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>Clear run history</button>
+          </div>
+        </div>
+        <!-- v3.16 ICON-EXTEND: an ADD-COMPONENT icon that EXPANDS into the
+             Class Library CATEGORIES (Storage & Racking, Conveying & Sortation,
+             Stations, ... My Objects). Each category discloses a sub-list of
+             its components; picking one ARMS placement by firing the SAME real
+             palette item (setTool path) - no new placement logic. The menu is
+             BUILT AT RUNTIME by app.js buildAddMenu() from WT.library.
+             paletteTree(), so it stays in sync with the registry (new / custom
+             components appear automatically) and honours the Warehouse/Factory
+             mode filter, exactly like the Class Library. Keyboard-accessible
+             disclosure; ships hidden + empty, filled + seeded closed at runtime. -->
+        <div class="tb-menu-wrap" id="addMenuWrap">
+          <button id="addMenuBtn" class="btn small tb-btn icon-only tb-menu-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="addMenu" aria-label="Add component" title="Add component — open the Class Library categories and pick any component to arm placement (click the floor to drop it). One-click access to every component; built live from the Class Library so custom objects appear automatically."><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg><span class="tb-btn-label">Add</span></button>
+          <div id="addMenu" class="tb-menu tb-menu-add" role="menu" aria-label="Add a component" hidden><!-- filled by app.js buildAddMenu() from WT.library.paletteTree() --></div>
+        </div>
       </div>
       <div class="canvas-wrap" id="canvasWrap">
         <!-- v1.6 a11y: a <canvas> is opaque to assistive tech, so it carries an
