@@ -27,7 +27,7 @@
  *   7.  app.js exposes window.__WT_TEST_API__ ONLY under the ?selftest=1
  *       guard (never on a normal load).
  *   8.  sw.js precaches errors.js + selftest.js and the cache is bumped to
- *       wt-v67 (v3.14 professional compact density + icon toolbar; previously wt-v66,
+ *       wt-v68 (v3.15 floating/draggable/pinnable drawers; previously wt-v67,
  *       v3.13 multi-open flyout drawers + full-access density default).
  *   9.  Offline guard on the two new files: no external hosts referenced.
  *
@@ -231,9 +231,9 @@ check(
   "both in APP_SHELL"
 );
 check(
-  "sw.js cache bumped to wt-v67 (and no longer wt-v66)",
-  /CACHE_VERSION\s*=\s*"wt-v67"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v66"/.test(swJs),
-  "CACHE_VERSION = wt-v67"
+  "sw.js cache bumped to wt-v68 (and no longer wt-v67)",
+  /CACHE_VERSION\s*=\s*"wt-v68"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v67"/.test(swJs),
+  "CACHE_VERSION = wt-v68"
 );
 
 // ---- 9. the two new files reference no external hosts -------------------

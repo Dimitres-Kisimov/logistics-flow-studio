@@ -7860,6 +7860,14 @@
     };
     const isOpen = () => toggle.getAttribute("aria-expanded") === "true";
     setOpen(false); // runtime-seeded closed
+    // v3.15: "Reset panel layout" re-docks every floating panel (keyboard-
+    // accessible recovery of the default layout). The menu closes itself on
+    // click via the delegated handler below.
+    const resetBtn = $("resetLayoutBtn");
+    if (resetBtn) resetBtn.addEventListener("click", () => {
+      resetDrawerLayout();
+      try { toast("Panel layout reset — all panels re-docked."); } catch (_) { /* toast optional */ }
+    });
     toggle.addEventListener("click", (e) => { e.stopPropagation(); setOpen(!isOpen()); });
     // A control inside the menu runs its own handler (unchanged), then we close.
     menu.addEventListener("click", (e) => {
@@ -8276,6 +8284,15 @@
         isOpen: (name) => isDrawerOpen(name),            // v3.13
         drawerFor: (cardId) => drawerNameForCard(document.getElementById(cardId)),
         names: () => RAIL_DRAWERS.map((d) => d.name),
+        // v3.15: floating / draggable / pinnable panels. Drive dock<->float
+        // through the SAME functions the pin button + drag use, and read the
+        // per-drawer floating position/state for the self-test.
+        setFloating: (name, on) => setDrawerFloating(name, on !== false),
+        toggleFloat: (name) => toggleDrawerFloat(name),
+        isFloating: (name) => isDrawerFloating(name),
+        position: (name) => { const r = railState.layout[name]; return (r && typeof r.x === "number") ? { x: r.x, y: r.y } : null; },
+        moveTo: (name, x, y) => { if (isDrawerFloating(name)) { applyFloatPosition(name, x, y); persistOpenDrawers(); } },
+        resetLayout: () => resetDrawerLayout(),
       },
     };
   }
@@ -8310,23 +8327,61 @@
   ];
   // v3.13: `open` is the SET of currently-open drawer names (multi-open);
   // `lastOpened` tracks the most-recently opened for focus/back-compat.
-  const railState = { open: {}, lastOpened: null, panels: null, btns: null, host: null, rail: null };
-  const DRAWERS_KEY = "wt.ui.drawers.v1"; // persisted list of open drawers
+  // v3.15: `layout` maps a drawer name -> { float, x, y } so panels can be
+  // dragged into free-floating positions and pinned back to the dock; `pins`
+  // and `grips` cache the per-drawer chrome buttons; `floatOrder` tracks the
+  // focus recency of floating panels for a bounded bring-to-front z-order.
+  const railState = { open: {}, lastOpened: null, panels: null, btns: null, host: null, rail: null,
+    layout: {}, pins: {}, grips: {}, floatOrder: [] };
+  const DRAWERS_KEY = "wt.ui.drawers.v1"; // persisted open set + floating layout
 
   function isDrawerOpen(name) { return !!railState.open[name]; }
   function anyDrawerOpen() { return Object.keys(railState.open).length > 0; }
+  function isDrawerFloating(name) { const r = railState.layout[name]; return !!(r && r.float); }
 
-  function readOpenDrawers() {
+  // v3.15: read BOTH the historical array shape (open names only => all docked)
+  // AND the current object shape ({ open:[...], layout:{ name:{float,x,y} } }),
+  // so an existing profile upgrades cleanly and a fresh profile stays all-docked.
+  function readDrawerState() {
     try {
       const raw = localStorage.getItem(DRAWERS_KEY);
-      if (!raw) return [];
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr.filter((n) => typeof n === "string") : [];
-    } catch (_) { return []; }
+      if (!raw) return { open: [], layout: {} };
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return { open: parsed.filter((n) => typeof n === "string"), layout: {} };
+      }
+      if (parsed && typeof parsed === "object") {
+        const open = Array.isArray(parsed.open) ? parsed.open.filter((n) => typeof n === "string") : [];
+        const layout = {};
+        const L = (parsed.layout && typeof parsed.layout === "object") ? parsed.layout : {};
+        Object.keys(L).forEach((k) => {
+          const r = L[k];
+          if (!r || typeof r !== "object") return;
+          const rec = { float: !!r.float };
+          if (typeof r.x === "number" && isFinite(r.x)) rec.x = r.x;
+          if (typeof r.y === "number" && isFinite(r.y)) rec.y = r.y;
+          layout[k] = rec;
+        });
+        return { open: open, layout: layout };
+      }
+      return { open: [], layout: {} };
+    } catch (_) { return { open: [], layout: {} }; }
   }
+  // back-compat helper kept for any caller expecting just the open-name list.
+  function readOpenDrawers() { return readDrawerState().open; }
   function persistOpenDrawers() {
-    try { localStorage.setItem(DRAWERS_KEY, JSON.stringify(Object.keys(railState.open))); }
-    catch (_) { /* storage may be unavailable */ }
+    try {
+      const layout = {};
+      Object.keys(railState.layout).forEach((k) => {
+        const r = railState.layout[k];
+        if (!r || !r.float) return; // docked is the default - only persist floats
+        const rec = { float: true };
+        if (typeof r.x === "number" && isFinite(r.x)) rec.x = Math.round(r.x);
+        if (typeof r.y === "number" && isFinite(r.y)) rec.y = Math.round(r.y);
+        layout[k] = rec;
+      });
+      localStorage.setItem(DRAWERS_KEY, JSON.stringify({ open: Object.keys(railState.open), layout: layout }));
+    } catch (_) { /* storage may be unavailable */ }
   }
 
   function drawerNameForCard(card) {
@@ -8360,8 +8415,199 @@
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
     if (railState.host) {
-      railState.host.setAttribute("data-open", String(Object.keys(railState.open).length));
+      const openNames = Object.keys(railState.open);
+      let docked = 0;
+      openNames.forEach((n) => { if (!isDrawerFloating(n)) docked++; });
+      railState.host.setAttribute("data-open", String(openNames.length));
+      // v3.15: docked count drives the docked-stack flex sizing (floating panels
+      // are position:fixed and out of flow, so they don't affect the stack).
+      railState.host.setAttribute("data-docked", String(docked));
     }
+  }
+
+  // ================= v3.15 FLOATING / DRAGGABLE / PINNABLE DRAWERS =========
+  // A drawer can be DOCKED (the default left-stack behaviour, unchanged) or
+  // FLOATING (position:fixed, freely placed over the canvas). Dragging the
+  // title bar of a docked drawer auto-floats it; the pin toggles docked<->float;
+  // "Reset panel layout" re-docks everything. Positions + the docked/floating
+  // state persist (extending wt.ui.drawers.v1). Deterministic: positions are
+  // user-driven + clamped, never generated (no Date/RNG).
+  function railRightEdge() {
+    const rail = railState.rail;
+    if (!rail || !rail.getBoundingClientRect) return 84;
+    try { return rail.getBoundingClientRect().right; } catch (_) { return 84; }
+  }
+  // Keep a floating panel fully on-screen and clear of the icon rail.
+  function clampFloat(panel, x, y) {
+    const vw = window.innerWidth || document.documentElement.clientWidth || 1024;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 768;
+    let w = 320, h = 160;
+    try { const r = panel.getBoundingClientRect(); if (r.width) w = r.width; if (r.height) h = r.height; } catch (_) { /* jsdom */ }
+    const minX = railRightEdge() + 8;         // never overlap the rail
+    const maxX = Math.max(minX, vw - w - 8);
+    const minY = 8;
+    const maxY = Math.max(minY, vh - h - 8);
+    const cx = Math.min(Math.max(x, minX), maxX);
+    const cy = Math.min(Math.max(y, minY), maxY);
+    return { x: Math.round(cx), y: Math.round(cy) };
+  }
+  function applyFloatPosition(name, x, y) {
+    const panel = railState.panels && railState.panels[name];
+    if (!panel) return;
+    const c = clampFloat(panel, x, y);
+    panel.style.left = c.x + "px";
+    panel.style.top = c.y + "px";
+    const rec = railState.layout[name] || (railState.layout[name] = {});
+    rec.float = true; rec.x = c.x; rec.y = c.y;
+  }
+  // Bounded bring-to-front: re-stamp z among the currently-floating panels by
+  // focus recency, keeping z in a small 41..(41+n) band (below toasts/modals).
+  function bringToFront(name) {
+    const order = railState.floatOrder;
+    const i = order.indexOf(name);
+    if (i !== -1) order.splice(i, 1);
+    order.push(name);
+    let z = 41;
+    order.forEach((nm) => {
+      const p = railState.panels[nm];
+      if (p && isDrawerFloating(nm)) p.style.zIndex = String(z++);
+    });
+    Object.keys(railState.panels || {}).forEach((k) => {
+      railState.panels[k].classList.remove("wt-drawer--front");
+    });
+    const front = railState.panels[name];
+    if (front) front.classList.add("wt-drawer--front");
+  }
+  function syncPinButton(name) {
+    const pin = railState.pins && railState.pins[name];
+    if (!pin) return;
+    const floating = isDrawerFloating(name);
+    pin.setAttribute("aria-pressed", floating ? "true" : "false");
+    pin.setAttribute("aria-label", floating
+      ? "Dock panel (currently floating) — pin back into the left stack"
+      : "Float panel (currently docked) — free-position it over the canvas");
+  }
+  // Switch a drawer between docked and floating. Floating uses a stored or
+  // sensibly-defaulted position; docking clears the inline float styles so the
+  // drawer rejoins the left stack exactly as before.
+  function setDrawerFloating(name, floating, pos) {
+    const panel = railState.panels && railState.panels[name];
+    if (!panel) return;
+    const rec = railState.layout[name] || (railState.layout[name] = {});
+    if (floating) {
+      panel.classList.add("wt-drawer--floating");
+      panel.setAttribute("data-float", "1");
+      let x = (pos && typeof pos.x === "number") ? pos.x
+        : (typeof rec.x === "number" ? rec.x : null);
+      let y = (pos && typeof pos.y === "number") ? pos.y
+        : (typeof rec.y === "number" ? rec.y : null);
+      if (x === null || y === null) {
+        // default: near the drawer's current on-screen spot, else a tidy offset
+        let r = null; try { r = panel.getBoundingClientRect(); } catch (_) { r = null; }
+        x = (r && r.left > 0) ? r.left : railRightEdge() + 16;
+        y = (r && r.top > 0) ? r.top : 84;
+      }
+      rec.float = true;
+      applyFloatPosition(name, x, y);
+      bringToFront(name);
+    } else {
+      rec.float = false;
+      panel.classList.remove("wt-drawer--floating", "wt-drawer--front");
+      panel.removeAttribute("data-float");
+      panel.style.left = ""; panel.style.top = ""; panel.style.zIndex = "";
+      const oi = railState.floatOrder.indexOf(name);
+      if (oi !== -1) railState.floatOrder.splice(oi, 1);
+    }
+    syncPinButton(name);
+    syncRailButtons();
+    persistOpenDrawers();
+  }
+  function toggleDrawerFloat(name) { setDrawerFloating(name, !isDrawerFloating(name)); }
+
+  // Re-apply a persisted float when a drawer (re)opens, or refresh the pin.
+  function applyStoredFloat(name) {
+    if (isDrawerFloating(name)) {
+      const rec = railState.layout[name];
+      setDrawerFloating(name, true, { x: rec.x, y: rec.y });
+    } else {
+      syncPinButton(name);
+    }
+  }
+
+  // Pointer-driven drag from the title bar. A docked drawer floats on the FIRST
+  // real move (a plain click never floats it); the panel then follows the
+  // pointer, clamped on-screen. Works with mouse/pen/touch (pointer events).
+  function startDrawerDrag(name, ev) {
+    const panel = railState.panels && railState.panels[name];
+    if (!panel) return;
+    if (ev.button != null && ev.button !== 0) return; // primary button / touch only
+    const startX = ev.clientX, startY = ev.clientY;
+    let rect0 = null; try { rect0 = panel.getBoundingClientRect(); } catch (_) { rect0 = { left: 0, top: 0 }; }
+    const grabDX = startX - rect0.left;
+    const grabDY = startY - rect0.top;
+    const pid = ev.pointerId;
+    let started = false;
+    panel.__wtDragMoved = false;
+    const onMove = (e) => {
+      if (pid != null && e.pointerId !== pid) return;
+      if (!started) {
+        if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) < 3) return;
+        started = true;
+        panel.__wtDragMoved = true;
+        if (!isDrawerFloating(name)) setDrawerFloating(name, true, { x: rect0.left, y: rect0.top });
+        bringToFront(name);
+        panel.classList.add("wt-drawer--dragging");
+      }
+      applyFloatPosition(name, e.clientX - grabDX, e.clientY - grabDY);
+    };
+    const onUp = (e) => {
+      if (pid != null && e.pointerId != null && e.pointerId !== pid) return;
+      window.removeEventListener("pointermove", onMove, true);
+      window.removeEventListener("pointerup", onUp, true);
+      window.removeEventListener("pointercancel", onUp, true);
+      if (started) { panel.classList.remove("wt-drawer--dragging"); persistOpenDrawers(); }
+    };
+    window.addEventListener("pointermove", onMove, true);
+    window.addEventListener("pointerup", onUp, true);
+    window.addEventListener("pointercancel", onUp, true);
+  }
+
+  // Keyboard nudge from a focused grip when the panel is floating (arrow keys;
+  // Shift = larger step). Enter/Space fall through to the grip's click (toggle).
+  function onGripKeydown(name, e) {
+    if (!isDrawerFloating(name)) return;
+    const step = e.shiftKey ? 24 : 8;
+    let dx = 0, dy = 0;
+    switch (e.key) {
+      case "ArrowLeft": dx = -step; break;
+      case "ArrowRight": dx = step; break;
+      case "ArrowUp": dy = -step; break;
+      case "ArrowDown": dy = step; break;
+      default: return;
+    }
+    e.preventDefault();
+    const rec = railState.layout[name] || {};
+    applyFloatPosition(name, (rec.x || 0) + dx, (rec.y || 0) + dy);
+    persistOpenDrawers();
+  }
+
+  // Re-dock EVERY panel and clear stored positions (keyboard-accessible via the
+  // "Reset panel layout" action + WT.rail.resetLayout()).
+  function resetDrawerLayout() {
+    Object.keys(railState.panels || {}).forEach((name) => {
+      const rec = railState.layout[name];
+      if (rec) { rec.float = false; rec.x = null; rec.y = null; }
+      const panel = railState.panels[name];
+      if (panel) {
+        panel.classList.remove("wt-drawer--floating", "wt-drawer--front", "wt-drawer--dragging");
+        panel.removeAttribute("data-float");
+        panel.style.left = ""; panel.style.top = ""; panel.style.zIndex = "";
+      }
+      syncPinButton(name);
+    });
+    railState.floatOrder = [];
+    syncRailButtons();
+    persistOpenDrawers();
   }
 
   // v3.13: open a drawer WITHOUT closing the others (multi-open). Idempotent.
@@ -8374,6 +8620,7 @@
     panel.classList.add("open");
     railState.open[name] = true;
     railState.lastOpened = name;
+    applyStoredFloat(name); // v3.15: re-apply a persisted floating position, if any
     syncRailButtons();
     persistOpenDrawers();
     expandFirstCard(panel);
@@ -8460,16 +8707,57 @@
       panel.hidden = true;
       const head = document.createElement("div");
       head.className = "wt-drawer-head";
+      // v3.15: a drag GRIP on the title bar. Dragging the head (grip or title)
+      // repositions the drawer as a floating panel; the grip is also a real,
+      // keyboard-operable control (Enter/Space toggle float/dock; when floating,
+      // arrow keys nudge it).
+      const grip = document.createElement("button");
+      grip.type = "button";
+      grip.className = "wt-drawer-grip";
+      grip.setAttribute("aria-label", "Move " + d.title + " panel — drag to reposition; when floating, arrow keys nudge, Enter toggles dock");
+      grip.title = "Drag to move this panel; Enter floats/docks it, arrow keys nudge it when floating";
+      grip.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>';
       const title = document.createElement("span");
       title.className = "wt-drawer-title";
       title.textContent = d.title;
+      // v3.15: the pin/dock toggle. aria-pressed=true means FLOATING (pinned out
+      // of the dock); default docked = aria-pressed=false. A real button, so it
+      // is fully keyboard-operable.
+      const pin = document.createElement("button");
+      pin.type = "button";
+      pin.className = "wt-drawer-pin";
+      pin.setAttribute("aria-pressed", "false");
+      pin.setAttribute("aria-label", "Float panel (currently docked) — free-position it over the canvas");
+      pin.title = "Float / dock this panel";
+      pin.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z"/><path d="M12 17v3"/></svg>';
+      pin.addEventListener("click", () => toggleDrawerFloat(d.name));
       const close = document.createElement("button");
       close.type = "button";
       close.className = "wt-drawer-close";
       close.setAttribute("aria-label", "Close " + d.title + " panel");
       close.innerHTML = "&#10005;"; // multiplication X
       close.addEventListener("click", () => closeDrawer(d.name, true)); // v3.13: closes THIS drawer only
+      // v3.15: start a drag from the head (grip or title), but NOT from the
+      // pin/close buttons (their clicks must work). A docked drawer floats on the
+      // first real move; a plain click never floats it.
+      head.addEventListener("pointerdown", (e) => {
+        const btn = e.target && e.target.closest ? e.target.closest("button") : null;
+        if (btn && !btn.classList.contains("wt-drawer-grip")) return; // pin/close: not a drag
+        startDrawerDrag(d.name, e);
+      });
+      // A genuine grip click/tap (no drag) toggles float/dock; a click that
+      // trails a real drag is swallowed (the drag already moved the panel).
+      grip.addEventListener("click", () => {
+        const panel2 = railState.panels[d.name];
+        if (panel2 && panel2.__wtDragMoved) { panel2.__wtDragMoved = false; return; }
+        toggleDrawerFloat(d.name);
+      });
+      grip.addEventListener("keydown", (e) => onGripKeydown(d.name, e));
+      railState.grips[d.name] = grip;
+      railState.pins[d.name] = pin;
+      head.appendChild(grip);
       head.appendChild(title);
+      head.appendChild(pin);
       head.appendChild(close);
       const body = document.createElement("div");
       body.className = "wt-drawer-body";
@@ -8526,9 +8814,24 @@
     host.addEventListener("keydown", escClose);
     rail.addEventListener("keydown", escClose);
 
-    // v3.13: restore the drawers the user left open (PERSISTED). A FRESH profile
-    // has none stored, so the canvas-hero empty-state is untouched on first run.
-    readOpenDrawers().forEach((name) => { if (railState.panels[name]) openDrawer(name); });
+    // v3.13/v3.15: restore the drawers the user left open AND their floating
+    // layout (PERSISTED). A FRESH profile has none stored, so every drawer is
+    // docked and the canvas-hero empty-state is untouched on first run.
+    const saved = readDrawerState();
+    Object.keys(saved.layout).forEach((name) => {
+      if (railState.panels[name]) railState.layout[name] = saved.layout[name];
+    });
+    saved.open.forEach((name) => { if (railState.panels[name]) openDrawer(name); });
+
+    // v3.15: keep floating panels on-screen when the viewport is resized (they
+    // are position:fixed, so re-clamp their stored position to the new bounds).
+    window.addEventListener("resize", () => {
+      Object.keys(railState.open).forEach((name) => {
+        if (!isDrawerFloating(name)) return;
+        const rec = railState.layout[name];
+        if (rec) applyFloatPosition(name, rec.x, rec.y);
+      });
+    });
   }
 
   function boot() {

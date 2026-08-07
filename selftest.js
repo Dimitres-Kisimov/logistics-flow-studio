@@ -1557,6 +1557,108 @@
         detail: "missing=[" + missing.join(",") + "] notInDrawer=[" + outside.join(",") + "]" };
     });
 
+    // ---- v3.15 FLOATING / DRAGGABLE / PINNABLE DRAWERS -------------------
+    // Each open drawer's title bar carries a DRAG HANDLE (grip) + a PIN/DOCK
+    // toggle. Toggling the pin flips the drawer between docked (the left stack)
+    // and floating (position:fixed, free-placed); a class + data-float flip and
+    // a position style is applied. The floating layout PERSISTS (write -> read
+    // via wt.ui.drawers.v1), and a "reset layout" path re-docks EVERY panel.
+    var DRAWERS_KEY = "wt.ui.drawers.v1";
+
+    check("drawer-has-drag-handle-and-pin-toggle", function () {
+      var libBtn = document.querySelector('#wtRail [data-drawer="library"]');
+      if (!libBtn) return { ok: false, detail: "no library rail button" };
+      var lib = document.querySelector('.wt-drawer[data-drawer="library"]');
+      if (!lib.classList.contains("open")) libBtn.click(); // ensure open
+      var head = lib.querySelector(".wt-drawer-head");
+      var grip = head && head.querySelector(".wt-drawer-grip");
+      var pin = head && head.querySelector(".wt-drawer-pin");
+      var gripNamed = !!(grip && grip.getAttribute("aria-label"));
+      var pinIsButton = !!(pin && pin.tagName === "BUTTON" && pin.hasAttribute("aria-pressed"));
+      var close = head && head.querySelector(".wt-drawer-close"); // chrome preserved
+      return { ok: !!grip && !!pin && gripNamed && pinIsButton && !!close,
+        detail: "grip=" + !!grip + " pin=" + !!pin + " gripAria=" + gripNamed +
+          " pinButton=" + pinIsButton + " closePreserved=" + !!close };
+    });
+
+    check("drawer-pin-toggles-docked-and-floating", function () {
+      if (!haveApi || !API.rail || typeof API.rail.toggleFloat !== "function")
+        return { ok: false, detail: "no rail float API" };
+      var libBtn = document.querySelector('#wtRail [data-drawer="library"]');
+      var lib = document.querySelector('.wt-drawer[data-drawer="library"]');
+      if (!lib.classList.contains("open")) libBtn.click();
+      // ensure we start docked
+      if (API.rail.isFloating("library")) API.rail.toggleFloat("library");
+      var pin = lib.querySelector(".wt-drawer-pin");
+      // -> FLOAT
+      API.rail.toggleFloat("library");
+      var floatOn = API.rail.isFloating("library") &&
+        lib.classList.contains("wt-drawer--floating") &&
+        lib.getAttribute("data-float") === "1" &&
+        /px/.test(lib.style.left || "") && /px/.test(lib.style.top || "") &&
+        pin.getAttribute("aria-pressed") === "true";
+      // -> DOCK
+      API.rail.toggleFloat("library");
+      var dockOn = !API.rail.isFloating("library") &&
+        !lib.classList.contains("wt-drawer--floating") &&
+        !lib.hasAttribute("data-float") &&
+        (lib.style.left === "" || lib.style.left == null) &&
+        pin.getAttribute("aria-pressed") === "false";
+      return { ok: floatOn && dockOn,
+        detail: "floatApplied=" + floatOn + " dockRestored=" + dockOn };
+    });
+
+    check("drawer-float-layout-persists", function () {
+      if (!haveApi || !API.rail || typeof API.rail.setFloating !== "function")
+        return { ok: false, detail: "no rail float API" };
+      var libBtn = document.querySelector('#wtRail [data-drawer="library"]');
+      var lib = document.querySelector('.wt-drawer[data-drawer="library"]');
+      if (!lib.classList.contains("open")) libBtn.click();
+      API.rail.setFloating("library", true);
+      if (typeof API.rail.moveTo === "function") API.rail.moveTo("library", 260, 140);
+      var pos = API.rail.position("library");
+      // read back the PERSISTED payload (proves write -> read round-trip)
+      var raw = null; try { raw = window.localStorage.getItem(DRAWERS_KEY); } catch (e) { raw = null; }
+      var parsed = null; try { parsed = JSON.parse(raw); } catch (e) { parsed = null; }
+      var rec = parsed && parsed.layout ? parsed.layout.library : null;
+      var stored = !!(rec && rec.float === true && typeof rec.x === "number" && typeof rec.y === "number");
+      var matches = !!(pos && rec && rec.x === pos.x && rec.y === pos.y);
+      // tidy: dock it again (leaves storage without the float)
+      API.rail.setFloating("library", false);
+      return { ok: stored && matches,
+        detail: "storedFloat=" + stored + " matchesLive=" + matches +
+          " pos=" + (pos ? pos.x + "," + pos.y : "null") };
+    });
+
+    check("drawer-reset-layout-redocks-all", function () {
+      if (!haveApi || !API.rail || typeof API.rail.resetLayout !== "function")
+        return { ok: false, detail: "no rail resetLayout API" };
+      var libBtn = document.querySelector('#wtRail [data-drawer="library"]');
+      var genBtn = document.querySelector('#wtRail [data-drawer="generate"]');
+      var lib = document.querySelector('.wt-drawer[data-drawer="library"]');
+      var gen = document.querySelector('.wt-drawer[data-drawer="generate"]');
+      if (!lib.classList.contains("open")) libBtn.click();
+      if (!gen.classList.contains("open")) genBtn.click();
+      API.rail.setFloating("library", true);
+      API.rail.setFloating("generate", true);
+      var bothFloat = API.rail.isFloating("library") && API.rail.isFloating("generate");
+      API.rail.resetLayout();
+      var noneFloat = !API.rail.isFloating("library") && !API.rail.isFloating("generate") &&
+        !lib.classList.contains("wt-drawer--floating") && !gen.classList.contains("wt-drawer--floating") &&
+        !lib.hasAttribute("data-float") && !gen.hasAttribute("data-float");
+      // reset re-docks but does NOT close: both drawers stay open
+      var stillOpen = lib.classList.contains("open") && gen.classList.contains("open");
+      // persisted payload no longer carries any float record
+      var raw = null; try { raw = window.localStorage.getItem(DRAWERS_KEY); } catch (e) { raw = null; }
+      var parsed = null; try { parsed = JSON.parse(raw); } catch (e) { parsed = null; }
+      var noFloatStored = !!(parsed && parsed.layout && Object.keys(parsed.layout).length === 0);
+      // tidy up: close all drawers so later checks start from the resting state
+      if (API.rail.close) API.rail.close();
+      return { ok: bothFloat && noneFloat && stillOpen && noFloatStored,
+        detail: "bothFloat=" + bothFloat + " noneFloatAfterReset=" + noneFloat +
+          " stillOpen=" + stillOpen + " noFloatStored=" + noFloatStored };
+    });
+
     // ---- v3.10 REDESIGN-3 (move #3): Simulate = one Run + Advanced expander ----
     // Opening the Simulate drawer leads with a prominent Run + a one-line result
     // headline; the detailed parameters are hidden behind a COLLAPSED "Advanced
