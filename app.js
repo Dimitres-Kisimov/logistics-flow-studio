@@ -2386,7 +2386,13 @@
     if (b) {
       b.classList.toggle("active", iso);
       b.setAttribute("aria-pressed", String(iso));
-      b.textContent = iso ? "2.5D on" : "2.5D view";
+      // v3.14: #isoBtn is now an ICON button - update only its (visually-hidden)
+      // text label so the inline SVG glyph survives the state change; the "on"
+      // state stays visible via aria-pressed + the .active accent fill. Falls
+      // back to textContent if the label span is absent.
+      const isoLbl = b.querySelector(".tb-btn-label");
+      if (isoLbl) isoLbl.textContent = iso ? "2.5D on" : "2.5D view";
+      else b.textContent = iso ? "2.5D on" : "2.5D view";
     }
     if (iso) {
       // Editing is disabled in the presentation view: drop any in-flight
@@ -7873,6 +7879,61 @@
     });
   }
 
+  // ---- v3.14 ICON TOOLBAR: expand-into-detail flyout menus ----------
+  // Compact toolbar icons (Export, View) that EXPAND into a detailed flyout of
+  // related actions - progressive disclosure that ADDS reach WITHOUT hiding the
+  // always-visible controls. Each `.tb-menu-wrap` pairs a `.tb-menu-toggle`
+  // button with its `.tb-menu`; a menu item carries data-proxy="<id>" and, on
+  // activation, simply FIRES the SAME existing control's handler (the target
+  // button's .click()) - no export/view logic is duplicated, so every export
+  // path stays byte-identical. Keyboard-accessible disclosure: aria-expanded on
+  // the toggle, Esc + outside click close, focus returns to the toggle. Seeded
+  // CLOSED at runtime (no baked-in open state in the static HTML).
+  function initTbMenus() {
+    const wraps = document.querySelectorAll(".tb-menu-wrap");
+    if (!wraps || !wraps.length) return;
+    const menus = [];
+    Array.prototype.forEach.call(wraps, (wrap) => {
+      const toggle = wrap.querySelector(".tb-menu-toggle");
+      const menu = wrap.querySelector(".tb-menu");
+      if (!toggle || !menu) return;
+      const setOpen = (open) => {
+        menu.hidden = !open;
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      };
+      const isOpen = () => toggle.getAttribute("aria-expanded") === "true";
+      setOpen(false); // runtime-seeded closed
+      toggle.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const wasOpen = isOpen();
+        menus.forEach((m) => { if (m.toggle !== toggle) m.setOpen(false); }); // one flyout at a time
+        setOpen(!wasOpen);
+      });
+      // A menu item fires its proxied control's handler, then the menu closes.
+      menu.addEventListener("click", (e) => {
+        const item = e.target && e.target.closest ? e.target.closest(".tb-menu-item") : null;
+        if (!item) return;
+        setOpen(false);
+        const pid = item.getAttribute("data-proxy");
+        const target = pid ? document.getElementById(pid) : null;
+        if (target && target !== item) { try { target.click(); } catch (_) { /* best-effort */ } }
+      });
+      menus.push({ wrap: wrap, toggle: toggle, menu: menu, setOpen: setOpen, isOpen: isOpen });
+    });
+    if (!menus.length) return;
+    // Outside click closes any open flyout.
+    document.addEventListener("click", (e) => {
+      menus.forEach((m) => { if (m.isOpen() && m.wrap && !m.wrap.contains(e.target)) m.setOpen(false); });
+    });
+    // Esc closes any open flyout + returns focus to its toggle.
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      menus.forEach((m) => {
+        if (m.isOpen()) { m.setOpen(false); try { m.toggle.focus(); } catch (_) { /* best-effort */ } }
+      });
+    });
+  }
+
   // ---- v2.4 UI-2 / v3.13 FULL-ACCESS: Simple/Expert DENSITY toggle ----
   // One global progressive-disclosure lever. v3.13 makes EXPERT (full access)
   // the default on a FRESH profile so NOTHING is hidden - the compact icon rail
@@ -8488,6 +8549,7 @@
     initRail(); // v3.9 REDESIGN-2: slim icon rail + one-at-a-time flyout drawers (re-homes the cards)
     initSimAdvanced(); // v3.10 REDESIGN-3: Simulate = one Run + a collapsed Advanced-parameters expander (runtime-seeded)
     initOverflowMenu(); // v3.10 REDESIGN-3: thin header - secondary actions live in the "More" overflow menu
+    initTbMenus(); // v3.14: Export / View icon flyouts that EXPAND into detailed menus (proxy the existing handlers)
     wireButtons();
     mountCommandPalette(); // v3.6 UI-3: the Ctrl/Cmd-K command palette (additive overlay)
     wireDefineObject(); // user-definable object library (Define Object + import/export)

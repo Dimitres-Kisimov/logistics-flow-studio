@@ -1709,6 +1709,117 @@
       });
     })();
 
+    // ---- v3.14 PROFESSIONAL COMPACT DENSITY + ICON TOOLBAR -------------
+    // The header/toolbar/in-panel action clusters now read as compact ICON
+    // buttons: each carries an inline SVG glyph AND keeps an accessible name
+    // (aria-label / title / text), so a screen-reader user never loses the
+    // control's name. The SAME ids + handlers are preserved (e.g. #runBtn still
+    // runs - proven above by simulate-run-plus-advanced-expander). Some icons
+    // EXPAND into a detailed flyout (Export -> IFC/report/JSON/CSV/share; View
+    // -> fit/zoom/overlays) or into their rail drawer (Analyze) - progressive
+    // disclosure that ADDS reach without hiding anything. And the professional
+    // compact-density stylesheet is live by default.
+    check("pro-toolbar-icons-render-with-accessible-names", function () {
+      var ids = ["heatBtn", "measureBtn", "flowLinksBtn", "zoomFitBtn", "panBtn", "isoBtn",
+        "exportMenuBtn", "viewMenuBtn", "saveBtn", "loadBtn", "exportBtn", "importBtn",
+        "clearBtn", "demoBtn", "storyBtn", "guidedDemoBtn"];
+      var bad = [];
+      ids.forEach(function (id) {
+        var b = $(id);
+        if (!b) { bad.push(id + ":missing"); return; }
+        if (!b.querySelector("svg")) bad.push(id + ":no-svg");
+        var name = (b.getAttribute("aria-label") || b.textContent || b.getAttribute("title") || "").trim();
+        if (!name.length) bad.push(id + ":no-name");
+      });
+      return { ok: bad.length === 0,
+        detail: bad.length ? bad.join(",") : ids.length + " icon buttons OK (svg glyph + accessible name)" };
+    });
+
+    // #runBtn stays the SAME id + keeps an accessible name after the icon pass
+    // (its handler firing is proven by the simulate test above).
+    check("pro-run-keeps-id-and-accessible-name", function () {
+      var b = $("runBtn");
+      if (!b) return { ok: false, detail: "no #runBtn" };
+      var name = (b.getAttribute("aria-label") || b.textContent || b.getAttribute("title") || "").trim();
+      var isButton = b.tagName === "BUTTON";
+      return { ok: isButton && name.length > 0, detail: "tag=" + b.tagName + " name='" + name + "'" };
+    });
+
+    function escKey() {
+      var e;
+      try { e = new KeyboardEvent("keydown", { key: "Escape", bubbles: true }); }
+      catch (_) { e = document.createEvent("Event"); e.initEvent("keydown", true, true); e.key = "Escape"; }
+      return e;
+    }
+
+    // The Export icon EXPANDS into a detailed menu of every export/share path;
+    // every item proxies an EXISTING control (its handler is reused, not
+    // duplicated). Ships closed, opens on click, Esc closes.
+    check("export-icon-expands-into-detailed-menu", function () {
+      var toggle = $("exportMenuBtn"), menu = $("exportMenu");
+      if (!toggle || !menu) return { ok: false, detail: "no export flyout" };
+      var closedFirst = menu.hidden === true && toggle.getAttribute("aria-expanded") === "false";
+      var items = menu.querySelectorAll(".tb-menu-item[data-proxy]");
+      var proxiesResolve = items.length >= 4 && Array.prototype.every.call(items, function (it) {
+        return !!document.getElementById(it.getAttribute("data-proxy"));
+      });
+      toggle.click();
+      var opens = menu.hidden === false && toggle.getAttribute("aria-expanded") === "true";
+      document.dispatchEvent(escKey());
+      var escCloses = menu.hidden === true && toggle.getAttribute("aria-expanded") === "false";
+      return { ok: closedFirst && proxiesResolve && opens && escCloses,
+        detail: "closed=" + closedFirst + " items=" + items.length + " proxiesResolve=" + proxiesResolve +
+          " opens=" + opens + " escCloses=" + escCloses };
+    });
+
+    // The View icon EXPANDS into a detailed menu of the view + overlay controls
+    // (fit/zoom/pan/2.5D/heatmap/measure/flow-links), each proxying its existing
+    // control. Ships closed, opens, toggles closed again.
+    check("view-icon-expands-into-detailed-menu", function () {
+      var toggle = $("viewMenuBtn"), menu = $("viewMenu");
+      if (!toggle || !menu) return { ok: false, detail: "no view flyout" };
+      var closedFirst = menu.hidden === true && toggle.getAttribute("aria-expanded") === "false";
+      var items = menu.querySelectorAll(".tb-menu-item[data-proxy]");
+      var proxiesResolve = items.length >= 5 && Array.prototype.every.call(items, function (it) {
+        return !!document.getElementById(it.getAttribute("data-proxy"));
+      });
+      toggle.click();
+      var opens = menu.hidden === false && toggle.getAttribute("aria-expanded") === "true";
+      toggle.click(); // toggle closes
+      var closes = menu.hidden === true && toggle.getAttribute("aria-expanded") === "false";
+      return { ok: closedFirst && proxiesResolve && opens && closes,
+        detail: "closed=" + closedFirst + " items=" + items.length + " proxiesResolve=" + proxiesResolve +
+          " opens=" + opens + " closes=" + closes };
+    });
+
+    // A rail icon EXPANDS into its drawer of detailed controls (the "icon opens
+    // its drawer" form of progressive disclosure). Restores the prior state.
+    check("rail-analyze-icon-expands-into-drawer", function () {
+      var btn = document.querySelector('#wtRail [data-drawer="analyze"]');
+      if (!btn) return { ok: false, detail: "no analyze rail button" };
+      var wasOpen = btn.getAttribute("aria-expanded") === "true";
+      if (!wasOpen) btn.click();
+      var openState = btn.getAttribute("aria-expanded") === "true" && btn.classList.contains("active");
+      var hasOpenDrawer = !!document.querySelector(".wt-drawer.open");
+      if (!wasOpen) btn.click(); // restore closed
+      return { ok: openState && hasOpenDrawer,
+        detail: "opened=" + openState + " drawerOpen=" + hasOpenDrawer + " wasOpen=" + wasOpen };
+    });
+
+    // The professional COMPACT DENSITY stylesheet is active by default (a live
+    // CSS sentinel proves the section loaded) and the density default stays a
+    // valid full-access state (the fresh-profile Expert default is proven by
+    // density-default-full-access-on-fresh-profile above).
+    check("pro-compact-density-stylesheet-active", function () {
+      var sentinel = "";
+      try { sentinel = (getComputedStyle(document.documentElement).getPropertyValue("--wt-density") || "").trim(); }
+      catch (_) { sentinel = ""; }
+      var densityAttr = document.documentElement.getAttribute("data-density");
+      var validDensity = densityAttr === "expert" || densityAttr === "simple";
+      return { ok: sentinel === "compact" && validDensity,
+        detail: "sentinel='" + sentinel + "' data-density=" + densityAttr };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

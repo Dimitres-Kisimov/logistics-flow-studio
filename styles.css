@@ -1899,3 +1899,135 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   .cmdk-dialog { animation: none; }
   .cmdk-backdrop { backdrop-filter: none; }
 }
+
+/* =====================================================================
+ * v3.14 PROFESSIONAL COMPACT DENSITY + ICON TOOLBAR
+ * ---------------------------------------------------------------------
+ * A global VISUAL-DENSITY + POLISH pass so the app reads like a
+ * professional engineering / plant-sim / CAD tool (FlexSim / AnyLogic /
+ * Siemens Plant Simulation feel): tighter spacing + padding, a tightened
+ * type scale, thinner dividers and denser chrome. This ONLY restyles what
+ * is already on screen - NOTHING is hidden or removed; every control stays
+ * visible + reachable. Theme-aware (uses the existing light/dark tokens)
+ * and accessible: a min tap target of ~24-28px is kept on every
+ * interactive control, the global :focus-visible ring is untouched, and
+ * reduced-motion is honoured. Appended LAST so it wins by source order
+ * over the airier defaults above WITHOUT editing them (easy to reason
+ * about + revert). A live sentinel custom property lets the self-test
+ * confirm this stylesheet section is active.
+ * ===================================================================== */
+:root { --wt-density: compact; }
+
+/* ---- global rhythm: tighter frame + columns ---- */
+.layout { gap: 10px; padding: 10px; }
+.col { gap: 10px; }
+
+/* ---- header: slimmer, denser, still legible ---- */
+.topbar { padding: 6px 12px; gap: 10px; }
+.brand-mark { width: 30px; height: 30px; }
+.brand-text h1 { font-size: 0.98rem; }
+.brand-text p { font-size: 0.72rem; }
+.topbar-actions { gap: 6px; }
+.topbar-examples-label { font-size: 0.72rem; }
+
+/* ---- buttons: compact but tap-safe (min-height keeps the target >=24px) ---- */
+.btn { padding: 5px 10px; font-size: 0.8rem; border-radius: 7px; min-height: 26px; }
+.btn.small { padding: 3px 9px; min-height: 24px; }
+.btn.wide { margin-top: 8px; }
+.btn-grid { gap: 5px; }
+
+/* ---- cards: denser padding, tighter titles, thinner rules ---- */
+.card { padding: 10px; }
+.card-title { font-size: 0.86rem; margin-bottom: 6px; }
+.hint { line-height: 1.4; }
+
+/* ---- drawers: denser head + body, cards sit flush ---- */
+.wt-drawer-head { padding: 7px 10px; }
+.wt-drawer-title { font-size: 0.88rem; }
+.wt-drawer-close { width: 28px; height: 28px; }
+.wt-drawer-body { padding: 10px; gap: 9px; }
+.wt-drawer-body .card { padding: 2px 0; border: none; }
+
+/* ---- slim icon rail ---- */
+.wt-rail { width: 54px; gap: 3px; padding: 5px 4px; }
+.wt-rail-btn { padding: 6px 2px 4px; }
+.wt-rail-label { font-size: 0.58rem; }
+
+/* ---- status strip + badges ---- */
+.badge { padding: 2px 8px; font-size: 0.7rem; }
+.canvas-toolbar { gap: 6px; margin-bottom: 6px; }
+
+/* ---- inspector rows: denser, thinner dashed rules ---- */
+.prop-row { padding: 3px 0; font-size: 0.8rem; }
+.prop-actions { margin-top: 8px; }
+.prop-desc { margin: 6px 0; }
+
+/* =====================================================================
+ * v3.14 ICON TOOLBAR - compact, grouped icon buttons + expand flyouts
+ * ---------------------------------------------------------------------
+ * Text-button clusters become compact icon buttons: an inline SVG glyph
+ * (currentColor, offline, theme-aware) reads at a glance while the FULL
+ * name stays the accessible name (an explicit aria-label) plus a
+ * hover/focus tooltip (title). A visually-hidden text label rides along so
+ * textContent + any assistive fallback never loses the name. Some icons
+ * EXPAND into a detailed flyout menu (progressive disclosure that ADDS
+ * reach - Export -> IFC/report/JSON/CSV/share; View -> fit/zoom/overlays)
+ * whose items just fire the SAME existing handlers; nothing is hidden.
+ * ===================================================================== */
+.tb-btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.tb-btn > svg { display: block; flex: 0 0 auto; }
+.tb-btn.icon-only { min-width: 28px; padding-left: 7px; padding-right: 7px; }
+/* Icon-only: the label stays in the DOM (accessible-name backup + textContent)
+ * but is visually clipped so the control reads as a pure icon. */
+.tb-btn.icon-only .tb-btn-label {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap; border: 0;
+}
+
+/* ---- expand-into-detail flyout menu (Export / View) ---- */
+.tb-menu-wrap { position: relative; display: inline-flex; }
+.tb-menu-toggle[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.tb-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: auto;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  min-width: 216px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28), var(--shadow);
+}
+.tb-menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 9px;
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.tb-menu-item:hover { background: var(--surface-2); border-color: var(--border); }
+.tb-menu-item:focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
+.tb-menu-item > svg { flex: 0 0 auto; color: var(--text-dim); }
+.tb-menu-item.danger { color: var(--danger); }
+/* The Layout action row renders as a wrapped compact icon row. */
+.btn-grid.icon-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.btn-grid.icon-actions .btn { flex: 0 0 auto; }
