@@ -154,9 +154,12 @@
 
   <!-- ================= MAIN LAYOUT ================= -->
   <main class="layout" aria-label="Warehouse planner">
-    <!-- v3.9 REDESIGN-2: a slim, always-visible ICON RAIL. Each button opens
-         its panel as a single FLYOUT DRAWER (one open at a time); clicking the
-         active icon again, or Esc, closes it, so the canvas keeps the space.
+    <!-- v3.9 REDESIGN-2 / v3.13 MULTI-OPEN: a slim, always-visible ICON RAIL.
+         Each button TOGGLES its panel as a FLYOUT DRAWER; the user can keep AS
+         MANY drawers open at once as they like (they dock + stack down the left
+         without trapping the canvas). Clicking an active icon, its X, or Esc
+         closes just that drawer; per-icon aria-expanded/aria-pressed + .active
+         show which are open. The set of open drawers is persisted.
          The existing side-panel cards are RE-HOMED into these drawers at
          runtime by app.js (initRail) - the markup is moved, never rebuilt or
          deleted, so every control id + handler is preserved and every panel is
@@ -207,10 +210,11 @@
         <span class="wt-rail-label">Help</span>
       </button>
     </nav>
-    <!-- The single flyout-drawer host. app.js builds one drawer panel per rail
-         target inside it and MOVES the existing cards in; only one is shown at
-         a time. Starts closed (hidden) - no forbidden collapsed class, so
-         verify_ui holds. -->
+    <!-- The flyout-drawer host. app.js builds one drawer panel per rail target
+         inside it and MOVES the existing cards in; v3.13 lets ANY number be
+         open at once (they dock + stack down this strip). Starts closed
+         (hidden) - no forbidden collapsed class, so verify_ui holds; which
+         drawers are open is seeded at runtime from persistence, never baked in. -->
     <div class="wt-drawer-host" id="wtDrawerHost" hidden aria-hidden="true"></div>
     <!-- LEFT: palette + layout actions -->
     <aside class="col left" aria-label="Building tools: palette, generator, examples, scenarios and data">

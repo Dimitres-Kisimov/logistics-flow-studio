@@ -5300,7 +5300,7 @@
     if (!card) return null;
     // v3.9 REDESIGN-2: open the drawer this card was re-homed into first.
     const dn = drawerNameForCard(card);
-    if (dn && railState.openName !== dn) openDrawer(dn);
+    if (dn && !isDrawerOpen(dn)) openDrawer(dn); // v3.13: leaves other open drawers untouched
     const title = card.querySelector(":scope > .card-title");
     if (title && card.classList.contains("card--collapsed")) title.click();
     try { card.scrollIntoView({ block: "nearest" }); } catch (_) { /* best-effort */ }
@@ -7873,19 +7873,27 @@
     });
   }
 
-  // ---- v2.4 UI-2: Simple/Expert DENSITY toggle ----------------------
-  // One global progressive-disclosure lever. Simple (the default on a FRESH
-  // profile) hides advanced/rarely-used controls + the Inspector's Advanced
-  // group; Expert reveals everything (nothing is removed - it is disclosed).
-  // The choice persists to localStorage. The root <html data-density> is
-  // SEEDED AT RUNTIME (never hardcoded in static HTML), mirroring the card-
-  // collapse seeding, so the "no baked-in disclosure state in the HTML"
-  // guarantee holds. CSS ([data-density="simple"] [data-density="expert"])
-  // does the hiding; this only flips the root state + the button chrome.
+  // ---- v2.4 UI-2 / v3.13 FULL-ACCESS: Simple/Expert DENSITY toggle ----
+  // One global progressive-disclosure lever. v3.13 makes EXPERT (full access)
+  // the default on a FRESH profile so NOTHING is hidden - the compact icon rail
+  // exposes everything on demand. Simple stays available as an OPT-IN lighter
+  // view (hides advanced/rarely-used controls + the Inspector's Advanced group);
+  // nothing is ever removed - it is disclosed. The choice persists to
+  // localStorage. The root <html data-density> is SEEDED AT RUNTIME (never
+  // hardcoded in static HTML), mirroring the card-collapse seeding, so the "no
+  // baked-in disclosure state in the HTML" guarantee holds. CSS
+  // ([data-density="simple"] [data-density="expert"]) does the hiding; this
+  // only flips the root state + the button chrome.
   const DENSITY_KEY = "wt.ui.density.v1";
   function readDensity() {
-    try { return localStorage.getItem(DENSITY_KEY) === "expert" ? "expert" : "simple"; }
-    catch (_) { return "simple"; }
+    // v3.13: an EXPLICIT "simple" choice is honoured; anything else (including
+    // an unset key on a fresh profile) resolves to EXPERT / full-access.
+    try {
+      const v = localStorage.getItem(DENSITY_KEY);
+      if (v === "simple") return "simple";
+      if (v === "expert") return "expert";
+      return "expert"; // fresh profile => full-access default
+    } catch (_) { return "expert"; }
   }
   function applyDensity(mode) {
     const expert = mode === "expert";
@@ -7912,7 +7920,7 @@
     setDensity(document.documentElement.getAttribute("data-density") === "expert" ? "simple" : "expert");
   }
   function initDensity() {
-    applyDensity(readDensity()); // default = Simple on a fresh profile
+    applyDensity(readDensity()); // v3.13: default = Expert / full-access on a fresh profile
     const btn = $("densityBtn");
     if (btn) btn.addEventListener("click", toggleDensity);
   }
@@ -8000,7 +8008,7 @@
     // v3.9 REDESIGN-2: the card now lives in a flyout drawer - open it first so
     // a Ctrl-K action or a deep-link actually SHOWS the control it targets.
     const dn = drawerNameForCard(card);
-    if (dn && railState.openName !== dn) openDrawer(dn);
+    if (dn && !isDrawerOpen(dn)) openDrawer(dn); // v3.13: additive - other open drawers stay put
     if (card.classList.contains("card--collapsed")) {
       const title = card.querySelector(":scope > .card-title");
       if (title) title.click(); // toggles the collapsed card open (same handler)
@@ -8087,6 +8095,9 @@
         mode: () => document.documentElement.getAttribute("data-density"),
         set: (m) => setDensity(m),
         toggle: () => toggleDensity(),
+        // v3.13: re-seed from storage the way boot does - proves the FRESH-
+        // profile default (no stored key => Expert / full-access).
+        reseed: () => { applyDensity(readDensity()); return document.documentElement.getAttribute("data-density"); },
       },
       // v2.5 FACTORY-A: drive the Warehouse/Factory mode through the SAME
       // path the toolbar toggle uses (seeds root data-mode + re-filters palette).
@@ -8191,14 +8202,17 @@
         run: runPaletteCommand,
         controller: () => cmdPaletteCtl,
       },
-      // v3.9 REDESIGN-2: the slim icon rail + one-at-a-time flyout drawers.
-      // Drive open/close through the SAME functions the rail buttons call, and
-      // read which drawer is open + which drawer a card was re-homed into.
+      // v3.9 REDESIGN-2 / v3.13 MULTI-OPEN: the slim icon rail + flyout drawers.
+      // Drive open/close/toggle through the SAME functions the rail buttons call,
+      // and read the FULL open SET (several drawers can be open at once).
       rail: {
         open: (name) => openDrawer(name),
-        close: () => closeDrawer(false),
+        close: () => closeAllDrawers(false),            // close every open drawer
+        closeDrawer: (name) => closeDrawer(name, false), // v3.13: close ONE
         toggle: (name) => toggleDrawer(name, null),
-        openName: () => railState.openName,
+        openName: () => railState.lastOpened,            // most-recently opened (back-compat)
+        openNames: () => Object.keys(railState.open),    // v3.13: ALL open drawers
+        isOpen: (name) => isDrawerOpen(name),            // v3.13
         drawerFor: (cardId) => drawerNameForCard(document.getElementById(cardId)),
         names: () => RAIL_DRAWERS.map((d) => d.name),
       },
@@ -8206,12 +8220,21 @@
   }
 
   // ====================================================================
-  // v3.9 REDESIGN-2: slim ICON RAIL + one-at-a-time FLYOUT DRAWERS.
+  // v3.9 REDESIGN-2: slim ICON RAIL + FLYOUT DRAWERS.
   // The de-clutter: the canvas gets the space; the existing side-panel cards
-  // are RE-HOMED (moved, never rebuilt or deleted) into a single flyout drawer
-  // host, one drawer per rail icon, only ONE open at a time. Every control id
-  // + event handler is preserved (moving a DOM node keeps both); the Ctrl-K
-  // palette + the canvas empty-state stay as complementary fast paths.
+  // are RE-HOMED (moved, never rebuilt or deleted) into a flyout drawer host,
+  // one drawer per rail icon. Every control id + event handler is preserved
+  // (moving a DOM node keeps both); the Ctrl-K palette + the canvas empty-state
+  // stay as complementary fast paths.
+  //
+  // v3.13 MULTI-OPEN: the drawers are COMPACT but fully open-on-demand - the
+  // user can keep AS MANY drawers open at once as they like (Library +
+  // Properties + Simulate + Analyze together, etc.). A rail icon TOGGLES its
+  // own drawer independently (open/close) and reflects state per-icon
+  // (aria-expanded + aria-pressed + .active). Open drawers DOCK + STACK down
+  // the left (a narrow strip, sharing the height when several are open) so the
+  // canvas is never trapped - the rest of the floor stays fully interactive.
+  // Esc closes only the FOCUSED drawer; the set of open drawers is PERSISTED.
   // ====================================================================
   const RAIL_DRAWERS = [
     { name: "inspect",   title: "Select & inspect",    cards: ["propCard"] },
@@ -8224,7 +8247,26 @@
     { name: "saveshare", title: "Save & share",        cards: ["scenariosCard", "compareCard"] },
     { name: "settings",  title: "Settings & data",     cards: ["dataCard", "wmsDataCard", "underlayCard", "kbCard", "stdCard"] },
   ];
-  const railState = { openName: null, panels: null, btns: null, host: null, rail: null };
+  // v3.13: `open` is the SET of currently-open drawer names (multi-open);
+  // `lastOpened` tracks the most-recently opened for focus/back-compat.
+  const railState = { open: {}, lastOpened: null, panels: null, btns: null, host: null, rail: null };
+  const DRAWERS_KEY = "wt.ui.drawers.v1"; // persisted list of open drawers
+
+  function isDrawerOpen(name) { return !!railState.open[name]; }
+  function anyDrawerOpen() { return Object.keys(railState.open).length > 0; }
+
+  function readOpenDrawers() {
+    try {
+      const raw = localStorage.getItem(DRAWERS_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.filter((n) => typeof n === "string") : [];
+    } catch (_) { return []; }
+  }
+  function persistOpenDrawers() {
+    try { localStorage.setItem(DRAWERS_KEY, JSON.stringify(Object.keys(railState.open))); }
+    catch (_) { /* storage may be unavailable */ }
+  }
 
   function drawerNameForCard(card) {
     if (!card || !card.id) return null;
@@ -8245,50 +8287,86 @@
     if (title && card.classList.contains("card--collapsed")) title.click();
   }
 
+  // v3.13: reflect the open SET on every rail button (per-icon state) + tell
+  // the host how many drawers are open (CSS sizes 1 vs many differently).
+  function syncRailButtons() {
+    (railState.btns || []).forEach((b) => {
+      const dn = b.getAttribute("data-drawer");
+      if (!dn) return; // e.g. the Help action button - no drawer to reflect
+      const on = isDrawerOpen(dn);
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-expanded", on ? "true" : "false");
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    if (railState.host) {
+      railState.host.setAttribute("data-open", String(Object.keys(railState.open).length));
+    }
+  }
+
+  // v3.13: open a drawer WITHOUT closing the others (multi-open). Idempotent.
   function openDrawer(name) {
     if (!railState.panels || !railState.panels[name]) return false;
-    if (railState.openName && railState.openName !== name) closeDrawer(false); // one-at-a-time
     railState.host.hidden = false;
     railState.host.setAttribute("aria-hidden", "false");
-    Object.keys(railState.panels).forEach((k) => {
-      const p = railState.panels[k];
-      const on = k === name;
-      p.hidden = !on;
-      p.classList.toggle("open", on);
-    });
-    railState.openName = name;
-    (railState.btns || []).forEach((b) => {
-      const on = b.getAttribute("data-drawer") === name;
-      b.classList.toggle("active", on);
-      if (b.hasAttribute("aria-expanded")) b.setAttribute("aria-expanded", on ? "true" : "false");
-    });
-    expandFirstCard(railState.panels[name]);
+    const panel = railState.panels[name];
+    panel.hidden = false;
+    panel.classList.add("open");
+    railState.open[name] = true;
+    railState.lastOpened = name;
+    syncRailButtons();
+    persistOpenDrawers();
+    expandFirstCard(panel);
     return true;
   }
 
-  function closeDrawer(returnFocus) {
+  // v3.13: close ONE drawer (leaving any others open); the host hides only when
+  // the last drawer closes. Optionally return focus to that drawer's rail icon.
+  function closeDrawer(name, returnFocus) {
+    if (!railState.host || !railState.panels || !railState.panels[name]) return;
+    const panel = railState.panels[name];
+    panel.hidden = true;
+    panel.classList.remove("open");
+    delete railState.open[name];
+    if (railState.lastOpened === name) {
+      const remaining = Object.keys(railState.open);
+      railState.lastOpened = remaining.length ? remaining[remaining.length - 1] : null;
+    }
+    if (!anyDrawerOpen()) {
+      railState.host.hidden = true;
+      railState.host.setAttribute("aria-hidden", "true");
+    }
+    syncRailButtons();
+    persistOpenDrawers();
+    if (returnFocus) {
+      const btn = (railState.btns || []).filter((b) => b.getAttribute("data-drawer") === name)[0];
+      if (btn) { try { btn.focus(); } catch (_) { /* best-effort */ } }
+    }
+  }
+
+  // v3.13: close EVERY open drawer at once (WT.rail.close()). Returns focus to
+  // the most-recently opened drawer's rail icon when asked.
+  function closeAllDrawers(returnFocus) {
     if (!railState.host) return;
-    const wasName = railState.openName;
+    const last = railState.lastOpened;
     Object.keys(railState.panels || {}).forEach((k) => {
       const p = railState.panels[k];
       p.hidden = true;
       p.classList.remove("open");
     });
+    railState.open = {};
+    railState.lastOpened = null;
     railState.host.hidden = true;
     railState.host.setAttribute("aria-hidden", "true");
-    railState.openName = null;
-    (railState.btns || []).forEach((b) => {
-      b.classList.remove("active");
-      if (b.hasAttribute("aria-expanded")) b.setAttribute("aria-expanded", "false");
-    });
-    if (returnFocus && wasName) {
-      const btn = (railState.btns || []).filter((b) => b.getAttribute("data-drawer") === wasName)[0];
+    syncRailButtons();
+    persistOpenDrawers();
+    if (returnFocus && last) {
+      const btn = (railState.btns || []).filter((b) => b.getAttribute("data-drawer") === last)[0];
       if (btn) { try { btn.focus(); } catch (_) { /* best-effort */ } }
     }
   }
 
   function toggleDrawer(name, btn) {
-    if (railState.openName === name) { closeDrawer(true); return; }
+    if (isDrawerOpen(name)) { closeDrawer(name, true); return; }
     openDrawer(name);
   }
 
@@ -8329,7 +8407,7 @@
       close.className = "wt-drawer-close";
       close.setAttribute("aria-label", "Close " + d.title + " panel");
       close.innerHTML = "&#10005;"; // multiplication X
-      close.addEventListener("click", () => closeDrawer(true));
+      close.addEventListener("click", () => closeDrawer(d.name, true)); // v3.13: closes THIS drawer only
       head.appendChild(title);
       head.appendChild(close);
       const body = document.createElement("div");
@@ -8354,6 +8432,9 @@
     railState.btns = btns;
     btns.forEach((btn, i) => {
       btn.tabIndex = i === 0 ? 0 : -1; // roving tabindex
+      // v3.13: seed aria-pressed on each drawer toggle at RUNTIME (never baked
+      // into the static HTML), mirroring the density/collapse seeding.
+      if (btn.getAttribute("data-drawer")) btn.setAttribute("aria-pressed", "false");
       btn.addEventListener("click", () => {
         const action = btn.getAttribute("data-rail-action");
         if (action === "help") { const a = document.getElementById("aboutBtn"); if (a) a.click(); return; }
@@ -8364,14 +8445,29 @@
       btn.addEventListener("keydown", (e) => onRailKeydown(e, btns, i));
     });
 
-    // Esc closes the open drawer when focus is inside the drawer or the rail,
-    // returning focus to the triggering rail button. Scoped so it never steals
-    // Esc from the canvas (placement cancel), a modal or the command palette.
+    // v3.13: Esc closes ONLY the FOCUSED drawer (others stay open), returning
+    // focus to that drawer's rail button. Scoped to the rail/host so it never
+    // steals Esc from the canvas (placement cancel), a modal or the palette.
     const escClose = (e) => {
-      if (e.key === "Escape" && railState.openName) { e.stopPropagation(); closeDrawer(true); }
+      if (e.key !== "Escape" || !anyDrawerOpen()) return;
+      const active = document.activeElement;
+      let name = null;
+      const inDrawer = active && active.closest ? active.closest(".wt-drawer[data-drawer]") : null;
+      if (inDrawer) {
+        name = inDrawer.getAttribute("data-drawer");
+      } else if (active && active.closest) {
+        const railBtn = active.closest(".wt-rail-btn[data-drawer]");
+        if (railBtn && isDrawerOpen(railBtn.getAttribute("data-drawer"))) name = railBtn.getAttribute("data-drawer");
+      }
+      if (!name) name = railState.lastOpened; // fallback: the most-recently opened
+      if (name && isDrawerOpen(name)) { e.stopPropagation(); closeDrawer(name, true); }
     };
     host.addEventListener("keydown", escClose);
     rail.addEventListener("keydown", escClose);
+
+    // v3.13: restore the drawers the user left open (PERSISTED). A FRESH profile
+    // has none stored, so the canvas-hero empty-state is untouched on first run.
+    readOpenDrawers().forEach((name) => { if (railState.panels[name]) openDrawer(name); });
   }
 
   function boot() {

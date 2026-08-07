@@ -137,11 +137,12 @@ h1, h2, h3 { margin: 0; font-weight: 650; }
 /* ---------------- v2.4 UI-2: Simple/Expert density ----------------
  * The single global progressive-disclosure lever. Any control or panel
  * marked [data-density="expert"] is a power-user / advanced affordance:
- * shown only when the root <html data-density="expert">. In Simple (the
- * default, seeded at runtime by app.js) they are HIDDEN - never removed,
- * the toggle reveals them. The toggle itself is never gated (always
- * reachable). Because the root state is set at runtime, a page with no
- * data-density yet (pre-boot) shows everything, then app.js seeds Simple. */
+ * shown when the root <html data-density="expert">. v3.13 makes EXPERT the
+ * default (seeded at runtime by app.js), so everything is visible on a fresh
+ * profile - nothing hidden. Simple is an OPT-IN lighter view that HIDES these
+ * (never removes them - the toggle reveals them again); the toggle itself is
+ * never gated (always reachable). Because the root state is set at runtime, a
+ * page with no data-density yet (pre-boot) shows everything, matching Expert. */
 :root[data-density="simple"] [data-density="expert"] { display: none !important; }
 /* The density toggle button: a compact labelled pill that reads its mode. */
 .density-toggle { display: inline-flex; align-items: center; gap: 6px; }
@@ -306,7 +307,14 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   .wt-rail-btn.is-ready::after { animation: none; opacity: 0.9; }
 }
 
-/* ---------------- v3.9 flyout drawer (one open at a time) ---------------- */
+/* -------- v3.9 flyout drawer / v3.13 MULTI-OPEN docked stack -------------- */
+/* The host is a narrow left strip that DOCKS + STACKS every open drawer down
+   the column (top -> bottom), so the user can keep as many open at once as
+   they like without trapping the canvas: it stays pointer-transparent (only
+   the drawers themselves capture events, and the gaps between them let canvas
+   clicks through), and it occupies only this left strip - the rest of the
+   floor stays fully interactive. When two+ drawers are open they SHARE the
+   column height (each body scrolls internally) so none ever overflows. */
 .wt-drawer-host {
   position: absolute;
   top: 0;
@@ -315,11 +323,15 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   width: min(380px, 82vw);
   z-index: 40;
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .wt-drawer-host[hidden] { display: none; }
 .wt-drawer {
   display: none;
   flex-direction: column;
+  min-height: 0; /* v3.13: allow a shared drawer to shrink instead of overflow */
   max-height: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -332,6 +344,11 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   transition: transform 0.16s ease, opacity 0.16s ease;
 }
 .wt-drawer.open { display: flex; transform: none; opacity: 1; }
+/* v3.13: a LONE open drawer sizes to its content (like v3.9) so the canvas
+   below it stays visible + clickable; TWO+ open drawers grow to share the
+   column equally so every head stays on screen and nothing overflows. */
+.wt-drawer-host[data-open="1"] .wt-drawer.open { flex: 0 1 auto; }
+.wt-drawer-host:not([data-open="1"]) .wt-drawer.open { flex: 1 1 0; }
 .wt-drawer-head {
   display: flex;
   align-items: center;

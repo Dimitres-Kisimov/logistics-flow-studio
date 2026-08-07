@@ -647,6 +647,46 @@
       return { ok: ok, detail: "simple=" + simpleRoot + " expert=" + expertRoot + " toggled=" + toggledRoot + " aria(" + pressedSimple + "/" + pressedExpert + ")" };
     });
 
+    // ---- v3.13 FULL-ACCESS DEFAULT ------------------------------------
+    // On a FRESH profile (no stored density choice) the app defaults to EXPERT /
+    // full-access so NOTHING is hidden - a control previously gated by Simple is
+    // visible by default. Re-seed from an emptied store the way boot does, then
+    // restore the profile's stored choice so we leave no trace.
+    check("density-default-full-access-on-fresh-profile", function () {
+      if (!haveApi || !API.density || typeof API.density.reseed !== "function")
+        return { ok: false, detail: "no density.reseed API" };
+      var KEY = "wt.ui.density.v1";
+      var saved = null;
+      try { saved = localStorage.getItem(KEY); } catch (e) { /* storage may be unavailable */ }
+      try { localStorage.removeItem(KEY); } catch (e) { /* best-effort */ }
+      var freshMode = API.density.reseed(); // fresh profile => full-access
+      var fullAccess = freshMode === "expert" &&
+        document.documentElement.getAttribute("data-density") === "expert";
+      // A previously Simple-hidden control must now be VISIBLE by default: use
+      // the Inspector's Advanced group (data-density="expert").
+      var advVisible = true;
+      if (typeof API.selectElement === "function") {
+        if (!API.state.elements.length) {
+          var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+          if (ex) API.loadExample(ex.id);
+        }
+        if (API.state.elements.length) {
+          API.selectElement(API.state.elements[0].id);
+          var panel = $("propPanel");
+          var advanced = panel && panel.querySelector('.prop-group[data-group="advanced"]');
+          if (advanced) { var cs = window.getComputedStyle(advanced); advVisible = !!cs && cs.display !== "none"; }
+        }
+      }
+      // Restore the profile's stored choice + re-seed (leave no trace).
+      try {
+        if (saved === "simple" || saved === "expert") localStorage.setItem(KEY, saved);
+        else localStorage.removeItem(KEY);
+      } catch (e) { /* best-effort */ }
+      API.density.reseed();
+      return { ok: fullAccess && advVisible,
+        detail: "freshMode=" + freshMode + " advancedVisibleByDefault=" + advVisible };
+    });
+
     // ---- v2.4 UI-2: grouped Inspector (Basic always, Advanced gated) --
     // Select an element, then assert the Properties panel shows a Basic group
     // (always visible, never gated) and an Advanced group that is DENSITY-
@@ -1402,11 +1442,13 @@
       };
     });
 
-    // ---- v3.9 REDESIGN-2: slim ICON RAIL + one-at-a-time FLYOUT DRAWERS ----
-    // The de-clutter: a slim rail of labelled icon buttons; clicking one opens
-    // its panel as a single flyout drawer (only one open at a time); Esc / the
-    // active icon closes it. The existing cards were RE-HOMED into the drawers,
-    // so every previously-verified control still exists inside its drawer.
+    // ---- v3.9 REDESIGN-2 / v3.13 MULTI-OPEN: slim ICON RAIL + FLYOUT DRAWERS -
+    // The de-clutter: a slim rail of labelled icon buttons; clicking one TOGGLES
+    // its flyout drawer. v3.13: the user can keep AS MANY drawers open at once
+    // as they like - opening a 2nd leaves the 1st OPEN; toggling / X / focused-
+    // Esc closes only that ONE drawer, the rest stay open. The existing cards
+    // were RE-HOMED into the drawers, so every previously-verified control
+    // still exists inside its drawer.
     check("rail-renders-labelled-icon-buttons", function () {
       var rail = document.getElementById("wtRail");
       var btns = rail ? rail.querySelectorAll(".wt-rail-btn") : [];
@@ -1435,30 +1477,72 @@
         detail: "open=" + open + " hostShown=" + hostShown + " aria-expanded=" + expanded + " containsPalette=" + hasPalette };
     });
 
-    check("rail-one-drawer-open-at-a-time", function () {
+    // v3.13: opening a SECOND drawer must leave the FIRST open (multi-open),
+    // and each rail icon reflects its OWN drawer's state (aria-expanded +
+    // aria-pressed + .active) independently.
+    check("rail-multiple-drawers-open-at-once", function () {
+      var libBtn = document.querySelector('#wtRail [data-drawer="library"]');
       var genBtn = document.querySelector('#wtRail [data-drawer="generate"]');
-      if (!genBtn) return { ok: false, detail: "no generate rail button" };
-      genBtn.click(); // opening Generate must CLOSE Library (one-at-a-time)
-      var gen = document.querySelector('.wt-drawer[data-drawer="generate"]');
+      if (!libBtn || !genBtn) return { ok: false, detail: "missing library/generate rail button" };
       var lib = document.querySelector('.wt-drawer[data-drawer="library"]');
-      var genOpen = !!gen && gen.classList.contains("open") && !gen.hidden;
-      var libClosed = !!lib && !lib.classList.contains("open") && lib.hidden;
+      var gen = document.querySelector('.wt-drawer[data-drawer="generate"]');
+      if (!lib.classList.contains("open")) libBtn.click(); // ensure Library open (first)
+      if (!gen.classList.contains("open")) genBtn.click(); // open Generate (second)
+      var libOpen = lib.classList.contains("open") && !lib.hidden;
+      var genOpen = gen.classList.contains("open") && !gen.hidden;
+      var libState = libBtn.getAttribute("aria-expanded") === "true" && libBtn.getAttribute("aria-pressed") === "true";
+      var genState = genBtn.getAttribute("aria-expanded") === "true" && genBtn.getAttribute("aria-pressed") === "true";
       var genHasBtn = !!(gen && gen.querySelector("#genBtn"));
-      return { ok: genOpen && libClosed && genHasBtn,
-        detail: "generateOpen=" + genOpen + " libraryClosed=" + libClosed + " containsGenBtn=" + genHasBtn };
+      return { ok: libOpen && genOpen && libState && genState && genHasBtn,
+        detail: "libraryStillOpen=" + libOpen + " generateOpen=" + genOpen +
+          " libIconOn=" + libState + " genIconOn=" + genState + " containsGenBtn=" + genHasBtn };
     });
 
-    check("rail-esc-closes-open-drawer", function () {
-      var panel = document.querySelector(".wt-drawer.open");
-      if (!panel) return { ok: false, detail: "no open drawer to close" };
+    // v3.13: toggling a rail icon closes ONLY its own drawer - the others stay
+    // open (this is the key multi-open behaviour).
+    check("rail-toggle-closes-only-its-own-drawer", function () {
+      var libBtn = document.querySelector('#wtRail [data-drawer="library"]');
+      var genBtn = document.querySelector('#wtRail [data-drawer="generate"]');
+      if (!libBtn || !genBtn) return { ok: false, detail: "missing library/generate rail button" };
+      var lib = document.querySelector('.wt-drawer[data-drawer="library"]');
+      var gen = document.querySelector('.wt-drawer[data-drawer="generate"]');
+      if (!lib.classList.contains("open")) libBtn.click();
+      if (!gen.classList.contains("open")) genBtn.click();
+      genBtn.click(); // toggle Generate CLOSED - Library must remain open
+      var genClosed = !gen.classList.contains("open") && gen.hidden &&
+        genBtn.getAttribute("aria-expanded") === "false" && genBtn.getAttribute("aria-pressed") === "false";
+      var libStillOpen = lib.classList.contains("open") && !lib.hidden &&
+        libBtn.getAttribute("aria-expanded") === "true";
+      return { ok: genClosed && libStillOpen,
+        detail: "generateClosed=" + genClosed + " libraryStillOpen=" + libStillOpen };
+    });
+
+    // v3.13: Esc closes only the FOCUSED drawer; other open drawers stay put and
+    // the host stays visible while any drawer remains open.
+    check("rail-esc-closes-focused-drawer-only", function () {
+      var libBtn = document.querySelector('#wtRail [data-drawer="library"]');
+      var genBtn = document.querySelector('#wtRail [data-drawer="generate"]');
+      if (!libBtn || !genBtn) return { ok: false, detail: "missing library/generate rail button" };
+      var lib = document.querySelector('.wt-drawer[data-drawer="library"]');
+      var gen = document.querySelector('.wt-drawer[data-drawer="generate"]');
+      if (!lib.classList.contains("open")) libBtn.click();
+      if (!gen.classList.contains("open")) genBtn.click();
+      // focus INSIDE the Generate drawer, then Esc -> only Generate closes
+      var focusTarget = gen.querySelector("button, input, select, textarea, [tabindex]") || gen;
+      try { focusTarget.focus(); } catch (e) { /* headless focus best-effort */ }
       var ev;
       try { ev = new KeyboardEvent("keydown", { key: "Escape", bubbles: true }); }
       catch (e) { ev = document.createEvent("Event"); ev.initEvent("keydown", true, true); ev.key = "Escape"; }
-      panel.dispatchEvent(ev);
+      gen.dispatchEvent(ev);
       var host = document.getElementById("wtDrawerHost");
-      var anyOpen = !!document.querySelector(".wt-drawer.open");
-      var hostHidden = !!host && host.hidden;
-      return { ok: !anyOpen && hostHidden, detail: "anyOpen=" + anyOpen + " hostHidden=" + hostHidden };
+      var genClosed = !gen.classList.contains("open") && gen.hidden;
+      var libStillOpen = lib.classList.contains("open") && !lib.hidden;
+      var hostStillShown = !!host && !host.hidden; // Library still open => host visible
+      // tidy up: close remaining drawers so later checks start from the rail's
+      // resting (all-closed) state.
+      if (haveApi && API.rail && API.rail.close) API.rail.close();
+      return { ok: genClosed && libStillOpen && hostStillShown,
+        detail: "generateClosed=" + genClosed + " libraryStillOpen=" + libStillOpen + " hostShown=" + hostStillShown };
     });
 
     check("rail-relocated-controls-preserved-in-drawers", function () {
