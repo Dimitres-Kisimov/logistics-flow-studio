@@ -383,6 +383,26 @@
  *      and the modelled / deterministic / teaching-scale / TOC / Little's Law
  *      / NOT-a-DES / NOT-CAD-BIM / NOT-a-certification honesty labels present.
  *
+ *  34b. verify_flownet.js  - MULTI-WAY PROPORTIONAL-FLOW ROUTING (v3.17):
+ *      routing arcs are no longer only structural - a process block that
+ *      DECLARES a split (>= 2 outgoing arcs with `ratio`s summing to ~1) or
+ *      a merge (>= 2 incoming arcs) is RESOLVED into a proportional flow
+ *      network and simulated on it. Hand-computed split/merge expectations
+ *      on the demoNetwork line (60/40 QA split: cyclesPerFinished 1/0.6/
+ *      0.4/1, bottleneck QA deep test 32 s -> 112.5/hr, utilisation
+ *      0.9375/0.75/1/0.78125, line eff 111/128, arc flows 100/60/40/60/
+ *      40/100), CONSERVATION independently recomputed at every node (flow
+ *      out == transformed flow in, residual ~0), merge accumulation, the
+ *      gozinto through a dismantle-then-split case, COLLAPSE TO BASE CASE
+ *      (every generated factory profile: isMultiway false, simulateFlow ==
+ *      legacy simulate BYTE-IDENTICALLY, no `flow`/`ratio` keys anywhere -
+ *      existing scenarios byte-identical), determinism everywhere (incl.
+ *      the largest-deficit split dispatcher: identical 50/50 branches
+ *      measure identical utilisation - NO RNG), friendly VALIDATION
+ *      (ratio sums != 1, missing ratios, cycles, duplicate arcs rejected
+ *      with plain-language messages; metrics -> null, never a guess), and
+ *      the modelled / NOT-a-DES honesty naming the proportional-flow basis.
+ *
  *  35. verify_optimize.js  - Factory EFFICIENCY OPTIMIZER (v2.8 FACTORY-D):
  *      the CRAFT material-flow placement + RPW line-balancing + TOC read-out
  *      (WT.factoryOpt) on top of the process model. buildFD() builds F (from
@@ -503,6 +523,7 @@ const HARNESSES = [
   { name: "Story Mode: cinematic guided tour plan + camera math (verify_story.js)", args: ["verify_story.js"] },
   { name: "User-definable object library (verify_library.js)", args: ["verify_library.js"] },
   { name: "Factory process model + deterministic line sim (verify_process.js)", args: ["verify_process.js"] },
+  { name: "Multi-way proportional-flow routing (verify_flownet.js)", args: ["verify_flownet.js"] },
   { name: "Factory efficiency optimizer: CRAFT placement + RPW balance + TOC (verify_optimize.js)", args: ["verify_optimize.js"] },
   { name: "Analytics: Bottleneck + Sankey + Cost + Energy analyzers (verify_analytics.js)", args: ["verify_analytics.js"] },
   { name: "Honest 'How we compare' page (verify_howwecompare.js)", args: ["verify_howwecompare.js"] },

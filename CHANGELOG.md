@@ -6,6 +6,57 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [3.17.0] — 2026-08-08
+
+### Added
+- **Multi-way proportional-flow routing in the factory line simulation
+  (`process.js`).** Until now the from-to routing arcs of a `process` block
+  were *structural* — a branched network could be declared and serialized, but
+  the deterministic line sim flattened everything onto one linear chain. Now a
+  block that **declares** a split (≥ 2 outgoing arcs, each carrying a `ratio`,
+  ratios summing to ~1) or a merge (≥ 2 incoming arcs) is **resolved into a
+  proportional flow network** (`WT.process.resolveFlow`): split arcs carry
+  their declared share, merges accumulate, assembly divides (inputs → 1) and
+  dismantle multiplies (1 → outputs), and **conservation is verified at every
+  node** (flow out = transformed flow in, residual ~0). The token line sim runs
+  **on that network** (`WT.process.simulateFlow`) with the same 4-phase
+  blocking-buffer mechanics plus a **deterministic largest-deficit quota
+  dispatcher** at each split — no `Date`, no RNG, exact long-run proportions —
+  and `metrics()` reports the Theory-of-Constraints bottleneck, takt,
+  utilisation, line efficiency and Little's Law WIP/lead-time on the resolved
+  per-finished-unit loads, plus an additive `flow` summary
+  (splits/merges/arcs/conservation).
+- **Friendly validation, never a guess** (`WT.process.validateFlow`): ratio
+  sets that don't sum to ~1, a split arc without a ratio, routing cycles and
+  duplicated arcs are rejected with a plain-language message (shown in the
+  existing Factory line read-out; `metrics()` returns null rather than
+  computing nonsense).
+- **Hand-computable demo network** (`WT.process.demoNetwork()`): an importable
+  wt-1 layout — source → Machining → **60 % QA fast / 40 % QA deep** → merge →
+  Pack → drain at 100 parts/hr offered. Exact expectations: effective times
+  30/24/32/25 s per finished unit, bottleneck *QA deep test* at 32 s →
+  **112.5 parts/hr**, utilisation 0.9375/0.75/1/0.78125, line efficiency
+  111/128 ≈ 86.7 %, arc flows 100/60/40/60/40/100 parts/hr, conserved at every
+  node.
+- **Verification**: new `verify_flownet.js` harness (the 43rd) — hand-computed
+  split/merge flows, independent node-by-node conservation recompute, a
+  dismantle-then-split gozinto case, determinism (identical 50/50 branches
+  measure identical utilisation), friendly-rejection messages, and **collapse
+  to the base case**: on every generated factory profile the network sim
+  reproduces the legacy chain sim **byte-identically** and neither `flow` nor
+  `ratio` keys appear anywhere. Three new in-browser self-test checks (now
+  **107/107**). Service-worker cache bumped to `wt-v70`.
+
+### Unchanged / honesty
+- **Every existing scenario is byte-identical.** Plain-chain process blocks
+  take the exact legacy code path; `derive()` still builds linear chains; a
+  warehouse layout still has no process block. The UI direction is untouched —
+  the only surface change is extra rows inside the existing Factory line
+  read-out, and only for blocks that actually declare multi-way routing.
+- The line metrics remain a **deterministic proportional-flow model —
+  modelled, not measured**; teaching-scale; **not a validated discrete-event
+  simulation**, not CAD/BIM, not a certification.
+
 ## [2.0.0] — 2026-08-05
 
 ### Added

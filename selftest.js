@@ -1064,6 +1064,111 @@
       return { ok: okAll, detail: detail };
     });
 
+    // ---- v3.17 FLOW-NET: multi-way proportional-flow routing -----------
+    // The demo split/merge network resolves to the hand-computed flows AND
+    // the existing factory read-out renders the flow-network rows (splits/
+    // merges/arcs/conservation). Temporarily swaps state.process, restores.
+    check("flownet-split-merge-demo-resolves-and-renders", function () {
+      if (!WT.process || typeof WT.process.demoNetwork !== "function" ||
+        typeof WT.process.resolveFlow !== "function" || typeof WT.process.metrics !== "function") {
+        return { ok: false, detail: "no WT.process flow API" };
+      }
+      var okAll = false, detail = "";
+      var prev = haveApi && API.state ? API.state.process : null;
+      try {
+        var block = WT.process.rebuild(WT.process.demoNetwork());
+        var rf = WT.process.resolveFlow(block);
+        var m = WT.process.metrics(block);
+        var resolved = !!rf && rf.ok && rf.splits === 1 && rf.merges === 1 &&
+          rf.conservation.ok === true && Math.abs(rf.nodes["op-pack"].inPerHr - 100) < 1e-9 &&
+          Math.abs(rf.nodes["op-qaf"].inPerHr - 60) < 1e-9 && Math.abs(rf.nodes["op-qad"].inPerHr - 40) < 1e-9;
+        var metricsOk = !!m && m.bottleneck.opId === "op-qad" &&
+          Math.abs(m.throughputPerHr - 112.5) < 1e-6 && !!m.flow && m.flow.multiway === true;
+        var rendered = true;
+        if (haveApi && API.state && typeof API.renderProcessPanel === "function") {
+          API.state.process = block;
+          API.renderProcessPanel();
+          var d = document.getElementById("procDetail");
+          var txt = d ? (d.textContent || "") : "";
+          rendered = txt.indexOf("Flow network") !== -1 && txt.indexOf("QA deep test") !== -1 &&
+            txt.indexOf("conservation holds") !== -1;
+        }
+        okAll = resolved && metricsOk && rendered;
+        detail = "resolved=" + resolved + " metrics=" + metricsOk + " rendered=" + rendered +
+          " (tp=" + (m && m.throughputPerHr) + "/hr bottleneck=" + (m && m.bottleneck && m.bottleneck.name) + ")";
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      } finally {
+        try {
+          if (haveApi && API.state) { API.state.process = prev; API.renderProcessPanel(); }
+        } catch (_) { /* best-effort restore */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
+    // Ratios that don't sum to ~1 are REJECTED with the friendly message
+    // (module -> null metrics; panel -> the plain-language explanation).
+    check("flownet-invalid-ratios-friendly-message", function () {
+      if (!WT.process || typeof WT.process.validateFlow !== "function") {
+        return { ok: false, detail: "no validateFlow" };
+      }
+      var okAll = false, detail = "";
+      var prev = haveApi && API.state ? API.state.process : null;
+      try {
+        var bad = WT.process.rebuild(WT.process.demoNetwork());
+        bad.routing[1].ratio = 0.5;
+        bad.routing[2].ratio = 0.6; // sums to 1.1
+        var v = WT.process.validateFlow(bad);
+        var rejected = !v.ok && v.errors.length > 0 && v.errors[0].indexOf("sum") !== -1 &&
+          WT.process.metrics(bad) === null;
+        var rendered = true;
+        if (haveApi && API.state && typeof API.renderProcessPanel === "function") {
+          API.state.process = bad;
+          API.renderProcessPanel();
+          var h = document.getElementById("procHeadline");
+          var txt = h ? (h.textContent || "") : "";
+          rendered = txt.indexOf("does not resolve") !== -1 && txt.indexOf("sum") !== -1;
+        }
+        okAll = rejected && rendered;
+        detail = "rejected=" + rejected + " rendered=" + rendered +
+          (v && v.errors && v.errors[0] ? " msg=" + v.errors[0] : "");
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      } finally {
+        try {
+          if (haveApi && API.state) { API.state.process = prev; API.renderProcessPanel(); }
+        } catch (_) { /* best-effort restore */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
+    // Collapse to base case: a plain-chain line takes the legacy path and
+    // the network sim reproduces it BYTE-IDENTICALLY (existing scenarios
+    // cannot change - no `flow` metric key, no `ratio` in the serialize).
+    check("flownet-chain-collapse-byte-identical", function () {
+      if (!WT.process || typeof WT.process.simulateFlow !== "function" ||
+        typeof WT.process.derive !== "function") {
+        return { ok: false, detail: "no simulateFlow/derive" };
+      }
+      try {
+        var lay = { elements: [
+          { id: "s", type: "mfg-source", x: 0, y: 0, w: 2, d: 2, zone: "receiving" },
+          { id: "a", type: "mfg-station", x: 4, y: 0, w: 3, d: 2, zone: "storage" },
+          { id: "j", type: "mfg-assembly", x: 9, y: 0, w: 4, d: 3, zone: "picking" },
+          { id: "d", type: "mfg-drain", x: 15, y: 0, w: 2, d: 2, zone: "shipping" },
+        ] };
+        var lb = WT.process.derive(lay);
+        var same = JSON.stringify(WT.process.simulate(lb)) === JSON.stringify(WT.process.simulateFlow(lb));
+        var noFlowKey = WT.process.metrics(lb).flow === undefined;
+        var noRatio = JSON.stringify(WT.process.sanitize(lb)).indexOf('"ratio"') === -1;
+        var notMw = WT.process.isMultiway(lb) === false;
+        return { ok: same && noFlowKey && noRatio && notMw,
+          detail: "simEqual=" + same + " noFlowKey=" + noFlowKey + " noRatio=" + noRatio + " linear=" + notMw };
+      } catch (e) {
+        return { ok: false, detail: "threw: " + (e && e.message) };
+      }
+    });
+
     // ---- v2.8 FACTORY-D: efficiency optimiser preview -> accept --------
     // Generate a factory line, run the REAL optimise handler (which renders
     // a before/after headline + dashed preview ghosts), then Accept and

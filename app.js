@@ -5724,6 +5724,19 @@
       if (detail) detail.innerHTML = "";
       return;
     }
+    // v3.17: a process that DECLARES multi-way routing but whose split
+    // ratios don't resolve gets the friendly validation message (never a
+    // silent guess) instead of nonsense metrics.
+    if (typeof WT.process.isMultiway === "function" && WT.process.isMultiway(block) &&
+        typeof WT.process.validateFlow === "function") {
+      const flowVal = WT.process.validateFlow(block);
+      if (!flowVal.ok) {
+        head.innerHTML = '<p class="empty">This process declares multi-way routing, but the flow does not resolve yet: ' +
+          esc(flowVal.errors.join(" ")) + "</p>";
+        if (detail) detail.innerHTML = "";
+        return;
+      }
+    }
     let m = null;
     try { m = WT.process.metrics(block); } catch (_) { m = null; }
     if (!m || !m.bottleneck) {
@@ -5755,10 +5768,31 @@
             'aria-label="Cycle time in seconds for ' + esc(s.name) + '" /> s ×' + s.servers + '</label>' +
           '</div>';
       }).join("");
+      // v3.17: when the process declares multi-way routing, show the RESOLVED
+      // proportional flow network (splits/merges, per-arc share + units/hr,
+      // conservation) as extra rows in this same read-out. Absent for every
+      // plain-chain line (the panel is byte-identical to before there).
+      let flowRows = "";
+      if (m.flow && m.flow.multiway) {
+        const opName = {};
+        (block.operations || []).forEach((o) => { opName[o.id] = o.name; });
+        const arcRows = m.flow.arcs.map((a) =>
+          '<div class="proc-bar-row">' +
+            '<span class="proc-bar-name">' + esc(opName[a.from] || a.from) + ' → ' + esc(opName[a.to] || a.to) + '</span>' +
+            '<span class="proc-bar-pct">' + Math.round(a.ratio * 100) + '%</span>' +
+            '<span class="proc-bar-pct">' + procFmt(a.unitsPerHr) + '/hr</span>' +
+          '</div>').join("");
+        flowRows =
+          '<p class="proc-little">Flow network: ' + m.flow.splits + ' split · ' + m.flow.merges + ' merge · offered ' +
+            procFmt(m.flow.sourceRatePerHr) + '/hr → ' + procFmt(m.flow.finishedPerHr) + '/hr finished · conservation ' +
+            (m.flow.conservation.ok ? 'holds (flow in = flow out at every node)' : 'residual ' + m.flow.conservation.maxAbsResidualPerHr + '/hr') + '.</p>' +
+          '<div class="proc-bars" role="group" aria-label="Resolved routing arcs: declared share and units per hour">' + arcRows + '</div>';
+      }
       detail.innerHTML =
         '<div class="proc-bars" role="group" aria-label="Per-station utilisation and editable cycle times">' + bars + '</div>' +
         '<p class="proc-little">WIP ≈ ' + procFmt(m.wip) + ' parts · lead time ≈ ' + procFmt(m.leadTimeSec) + ' s · part-flow ' + procFmt(m.partFlowPerHr) + '/hr. ' +
           'Little’s Law (L = λW): modelled avg parts-in-line = flow rate × time in line (residual ' + procPct(m.little.residualRel) + ').</p>' +
+        flowRows +
         '<p class="proc-basis">Utilisation = busy/available at the line’s own pace (the bottleneck runs at 100%). Every figure is modelled, not measured; deterministic; teaching-scale — NOT a validated DES, NOT CAD/BIM, NOT a certification.</p>';
       const inputs = detail.querySelectorAll(".proc-cycle-inp");
       for (let i = 0; i < inputs.length; i++) inputs[i].addEventListener("change", onProcCycleEdit);
