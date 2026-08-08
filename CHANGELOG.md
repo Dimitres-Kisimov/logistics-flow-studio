@@ -6,6 +6,95 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [3.18.0] — 2026-08-08
+
+Closes the two follow-up gaps the v3.17 release notes acknowledged: (a) the
+factory layout **generator** could not emit a multi-way network (`derive()`
+builds linear chains only — multi-way entered only via JSON import or the
+demo), and (b) the optimizer consumed multi-way **metrics** but its **RPW
+line-balancing** heuristics remained chain-oriented.
+
+### Added
+- **A fourth factory baseline that emits a genuine multi-way process network
+  from the generator** (`generate.js`): **“Machining shop with QA split
+  (multi-way flow)”** (`machining-qa-split`), selectable in the existing
+  Generate flow (Factory mode), matched by generator keywords (“qa split”,
+  “inspection split”, …), reachable from the command palette and from the
+  plain-language *“use the machining-qa-split baseline”*. It lays out a
+  machining feed lane (2 stations), **two QA branch stations** (the arms of a
+  declared **60/40 split**) and a **pack-and-finish merge** step, and — new —
+  **emits the matching `process` block from the generator itself**
+  (`gen.process`, adopted by the app instead of the derived linear chain):
+  operations bound to the placed elements (`op-<elementId>`, the `derive()`
+  convention), split ratios declared on the arcs, accepted by
+  `WT.process.validateFlow`, canonical under `sanitize`, ratio-preserving
+  through the serialize round-trip. Hand-computed and harness-pinned at the
+  offered 120 parts/hr: arc flows **120/120/72/48/72/48/120**, effective times
+  **30/30/24/32/25 s** per finished unit, bottleneck **QA deep test** at 32 s
+  → **112.5 parts/hr**, line efficiency 141/160 ≈ **88.1 %**, conservation
+  residual ~0. Deterministic and seeded (the seed is recorded; the line
+  composition is a fixed function of the profile — the same convention as
+  every factory baseline). Reserving the branch lane emits **no** block (the
+  app falls back to the honest derived chain — never a broken network).
+- **RPW line balancing on resolved per-finished-unit effective loads**
+  (`optimize_factory.js`): the balancer’s task times are now the **same
+  numbers `WT.process.metrics` reports** — on a chain, the gozinto- and
+  servers-weighted `cycle × cyclesPerFinished / servers`; on a declared
+  multi-way network, `resolveFlow`’s proportional-flow effective times (a
+  60 %-share QA branch weighs 0.6 × its cycle) — instead of raw chain cycle
+  times. On the generated QA-split line this packs **[Machining 1+2] = 60 s /
+  [QA deep + QA fast] = 56 s / [Pack] = 25 s** — the **theoretical minimum**
+  of 3 stations (a raw-cycle balancer cannot see that the two branches
+  together load only 56 s per finished unit). The RPW precedence walk is a
+  DAG walk, so both branches of a split rank and pack correctly, and the
+  packing respects precedence across the split and merge.
+- **Verification**: new `verify_flowbalance.js` harness (the 44th, wired into
+  `test/run-all.mjs`, 39 checks) — the generated block’s hand-computed
+  resolved flows/metrics, byte-identical legacy builds, the reserved-lane
+  fallback, a **full hand-written pin proving the pure-chain RPW output is
+  byte-identical to the legacy balancer**, the multi-way packing hand case,
+  bounded over-takt efficiency, and an optimizer that is **never illegal or
+  worse** on multi-way inputs (independent legality oracle; TOC read-back
+  equals `WT.process.metrics`). `verify_factory.js` now pins **4** factory
+  profiles and runs the new baseline through the full geometry / compliance /
+  determinism / part-flow battery. Two new in-browser self-test checks (now
+  **109/109**). Service-worker cache bumped to `wt-v71` (every pinned
+  harness synced).
+
+### Changed (documented, deliberate)
+- **Over-takt line efficiency is now bounded to [0, 1]**: when a task’s
+  effective load exceeds takt (possible once loads are gozinto-weighted), the
+  efficiency denominator switches from takt to the **realized bottleneck
+  station time** (the classical Helgeson–Birnie basis). Previously an
+  over-takt chain could report a “line efficiency” above 100 %. Lines with
+  every load ≤ takt — which includes every pre-v3.18 balancer output — are
+  computed exactly as before, and on a **pure chain** (servers 1, no
+  assembly/dismantle) the entire balancer output is **byte-identical** to
+  v3.17 (harness-pinned).
+- Balancer outputs for chains **with** assembly/dismantle or multi-server
+  stations (e.g. the generated assembly-line) now reflect the honest
+  effective loads, so their groupings/efficiencies differ from v3.17’s
+  raw-cycle numbers — the scenario **data** is untouched and byte-identical;
+  only the advisory balance read-out changed.
+
+### Unchanged / honesty — what remains chain-oriented
+- The balance is a **capacity grouping only**: it never re-routes flow, never
+  changes declared split ratios, and never adds/removes servers. An
+  **invalid** declared network falls back to raw cycle times after
+  `validateFlow`’s friendly rejection (never a guessed resolution). The CRAFT
+  placement objective continues to use the stored from-to arc rates (which,
+  for the generated baseline, equal the resolved flows). Structural
+  plain-language edits on the new baseline **re-derive a linear chain**
+  (`derive()` remains chain-only by design — the network comes from the
+  generator recipe or an import).
+- Every existing scenario, all three legacy factory baselines and all four
+  warehouse baselines are **byte-identical**. UI direction unchanged — the
+  new archetype appears inside the existing Generate flow; the optimizer
+  panel only re-words its Balance labels (“Σ effective load ÷ n × takt”).
+- Everything stays **modelled, not measured**; a **heuristic local
+  optimum** (not guaranteed optimal); deterministic, teaching-scale; **NOT a
+  validated discrete-event simulation**, not CAD/BIM, not a certification.
+
 ## [3.17.0] — 2026-08-08
 
 ### Added

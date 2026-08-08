@@ -37,8 +37,9 @@
  *      picking sector" -> +2 rgv, reserve/regenerate/widen/remove, and
  *      an honest not-understood on unknown input).
  *   8b. verify_factory.js    - Factory layout GENERATOR (v2.6 FACTORY-B): the
- *      3 factory line profiles (assembly-line / machining-shop / general-
- *      factory) as a SEPARATE path from the 4 warehouse profiles; each build
+ *      4 factory line profiles (assembly-line / machining-shop / general-
+ *      factory + the v3.18 machining-qa-split multi-way baseline) as a
+ *      SEPARATE path from the 4 warehouse profiles; each build
  *      has a Source + Drain + >=1 Station + straight AND curved conveyors +
  *      real dock doors, is overlap-free + in-bounds on its own floor, byte-
  *      identical on re-run, passes/warns (never fails) compliance, and a Part
@@ -403,6 +404,30 @@
  *      with plain-language messages; metrics -> null, never a guess), and
  *      the modelled / NOT-a-DES honesty naming the proportional-flow basis.
  *
+ *  34c. verify_flowbalance.js - GENERATED MULTI-WAY NETWORK + BALANCE ON
+ *      EFFECTIVE LOADS (v3.18 FLOW-GEN + FLOW-BALANCE). Gap (a): the new
+ *      machining-qa-split factory baseline EMITS a genuine multi-way
+ *      `process` block from the generator (a declared 60/40 QA split that
+ *      merges again before pack-out, operations bound to the placed
+ *      elements, validateFlow-accepted, canonical, ratio-preserving
+ *      through serialize), with hand-computed resolved flows (offered
+ *      120/hr -> arcs 120/120/72/48/72/48/120, effective times
+ *      30/30/24/32/25 s, bottleneck QA deep test 32 s -> 112.5/hr, line
+ *      eff 141/160), deterministic + seeded, the 3 legacy profiles
+ *      byte-identical (no process/ratio keys), and a reserved branch lane
+ *      falling back to NO emitted block. Gap (b): WT.factoryOpt.rpw packs
+ *      on the RESOLVED PER-FINISHED-UNIT EFFECTIVE LOADS (the metrics
+ *      numbers - gozinto- and servers-weighted, proportional-flow shares
+ *      on a declared network): a full hand-written pin proves the PURE-
+ *      CHAIN output is BYTE-IDENTICAL to the legacy balancer; the multi-
+ *      way hand case packs [M1+M2]/[QAdeep+QAfast]/[Pack] = the
+ *      theoretical minimum; over-takt loads are measured against the
+ *      realized bottleneck so efficiency stays in [0,1]; and the
+ *      optimizer never returns an illegal or worse layout on multi-way
+ *      inputs (independent legality oracle + TOC == metrics). Honest
+ *      remainder documented: the balance is a capacity grouping only -
+ *      it never re-routes flow, changes ratios or adds servers.
+ *
  *  35. verify_optimize.js  - Factory EFFICIENCY OPTIMIZER (v2.8 FACTORY-D):
  *      the CRAFT material-flow placement + RPW line-balancing + TOC read-out
  *      (WT.factoryOpt) on top of the process model. buildFD() builds F (from
@@ -524,6 +549,7 @@ const HARNESSES = [
   { name: "User-definable object library (verify_library.js)", args: ["verify_library.js"] },
   { name: "Factory process model + deterministic line sim (verify_process.js)", args: ["verify_process.js"] },
   { name: "Multi-way proportional-flow routing (verify_flownet.js)", args: ["verify_flownet.js"] },
+  { name: "Generated multi-way network + RPW balance on effective loads (verify_flowbalance.js)", args: ["verify_flowbalance.js"] },
   { name: "Factory efficiency optimizer: CRAFT placement + RPW balance + TOC (verify_optimize.js)", args: ["verify_optimize.js"] },
   { name: "Analytics: Bottleneck + Sankey + Cost + Energy analyzers (verify_analytics.js)", args: ["verify_analytics.js"] },
   { name: "Honest 'How we compare' page (verify_howwecompare.js)", args: ["verify_howwecompare.js"] },

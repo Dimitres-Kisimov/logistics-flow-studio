@@ -11,9 +11,10 @@
  * asserts EXACT outcomes:
  *
  *   Factory generator (additive; warehouse generateLayout UNTOUCHED)
- *     - factoryProfiles has the 3 pinned keys (assembly-line /
- *       machining-shop / general-factory) and is SEPARATE from the 4
- *       warehouse plantProfiles (which stay exactly 4)
+ *     - factoryProfiles has the 4 pinned keys (assembly-line /
+ *       machining-shop / general-factory + the v3.18 machining-qa-split
+ *       multi-way baseline) and is SEPARATE from the 4 warehouse
+ *       plantProfiles (which stay exactly 4)
  *     - each factory build has a Source + a Drain + >=1 Station + straight
  *       AND curved conveyors + real dock doors
  *     - every build is overlap-free AND in-bounds on its own floor
@@ -62,7 +63,11 @@ function check(name, ok, detail) {
   if (!ok) failures++;
 }
 
-const FACTORY_KEYS = ["assembly-line", "machining-shop", "general-factory"];
+// v3.18 FLOW-GEN: machining-qa-split (the multi-way baseline) joins the
+// pinned set and runs the SAME battery below (components/geometry/compliance/
+// determinism/part-flow); its emitted process block is covered in depth by
+// verify_flowbalance.js.
+const FACTORY_KEYS = ["assembly-line", "machining-shop", "general-factory", "machining-qa-split"];
 const ZONES = ["receiving", "storage", "picking", "packing", "shipping"];
 
 function overlapFree(els) {
@@ -95,10 +100,10 @@ function runToCompletion(gen, units, seed) {
 console.log("Factory layout generator verification (deterministic)");
 console.log("");
 
-/* ---- 1. factoryProfiles has the 3 keys, SEPARATE from the 4 warehouse ---- */
+/* ---- 1. factoryProfiles has the 4 keys, SEPARATE from the 4 warehouse ---- */
 const fkeys = Object.keys(G.factoryProfiles || {});
-check("factoryProfiles has exactly the 3 pinned factory keys",
-  FACTORY_KEYS.every((k) => fkeys.indexOf(k) !== -1) && fkeys.length === 3, fkeys.join(", "));
+check("factoryProfiles has exactly the 4 pinned factory keys",
+  FACTORY_KEYS.every((k) => fkeys.indexOf(k) !== -1) && fkeys.length === 4, fkeys.join(", "));
 check("warehouse plantProfiles stays exactly the 4 keys (factory is a SEPARATE path)",
   Object.keys(G.plantProfiles).length === 4);
 check("generateFactoryLayout is exposed", typeof G.generateFactoryLayout === "function");

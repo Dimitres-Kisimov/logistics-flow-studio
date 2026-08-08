@@ -1169,6 +1169,91 @@
       }
     });
 
+    // ---- v3.18 FLOW-GEN: the GENERATOR emits a multi-way network -------
+    // Generate the machining-qa-split baseline through the REAL Generate
+    // handler and assert the adopted state.process IS the declared 60/40
+    // split network (validateFlow ok, bottleneck QA deep test -> 112.5/hr)
+    // and the existing factory read-out renders its flow-network rows.
+    check("flowgen-qa-split-baseline-emits-multiway-network", function () {
+      if (!haveApi || !API.plantMode || typeof API.runGenerate !== "function") {
+        return { ok: false, detail: "no generate API" };
+      }
+      if (!WT.process || !WT.generate || !WT.generate.factoryProfiles ||
+        !WT.generate.factoryProfiles["machining-qa-split"]) {
+        return { ok: false, detail: "no machining-qa-split profile" };
+      }
+      var original = API.plantMode.mode();
+      var okAll = false, detail = "";
+      try {
+        API.plantMode.set("factory");
+        API.runGenerate("machining-qa-split"); // the REAL Generate handler
+        var block = API.state.process;
+        var v = block ? WT.process.validateFlow(block) : { ok: false, multiway: false };
+        var mw = !!block && WT.process.isMultiway(block) === true && v.ok && v.multiway;
+        var m = block ? WT.process.metrics(block) : null;
+        var metricsOk = !!m && m.bottleneck && m.bottleneck.name === "QA deep test" &&
+          Math.abs(m.throughputPerHr - 112.5) < 1e-6 && !!m.flow && m.flow.multiway === true &&
+          m.flow.splits === 1 && m.flow.merges === 1 && m.flow.conservation.ok === true;
+        var d = document.getElementById("procDetail");
+        var txt = d ? (d.textContent || "") : "";
+        var rendered = txt.indexOf("Flow network") !== -1 && txt.indexOf("QA deep test") !== -1 &&
+          txt.indexOf("conservation holds") !== -1;
+        okAll = mw && metricsOk && rendered;
+        detail = "multiway=" + mw + " metrics=" + metricsOk + " rendered=" + rendered +
+          " (tp=" + (m && m.throughputPerHr) + "/hr bottleneck=" + (m && m.bottleneck && m.bottleneck.name) + ")";
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      } finally {
+        try {
+          API.plantMode.set(original);
+          var ex = WT.examples && WT.examples.library && WT.examples.library[0];
+          if (ex) API.loadExample(ex.id);
+        } catch (_) { /* best-effort restore */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
+    // ---- v3.18 FLOW-BALANCE: RPW balances on resolved effective loads --
+    // On the generated multi-way network, the balancer's loads are the
+    // resolveFlow per-finished-unit times (total 141 s, packs to the
+    // 3-station theoretical minimum, efficiency 0.47 -> 0.7833), and on a
+    // pure chain it collapses to the legacy grouping ([T1] + [T2,T3]).
+    check("flowbalance-rpw-on-effective-loads", function () {
+      if (!WT.factoryOpt || typeof WT.factoryOpt.rpw !== "function" ||
+        !WT.generate || typeof WT.generate.generateFactoryLayout !== "function" || !WT.process) {
+        return { ok: false, detail: "no factoryOpt/generate API" };
+      }
+      try {
+        var gen = WT.generate.generateFactoryLayout("machining-qa-split", { seed: 7 });
+        if (!gen.process) return { ok: false, detail: "generator emitted no process block" };
+        var r = WT.factoryOpt.rpw(WT.process.sanitize(gen.process));
+        var mwOk = r.nStationsAfter === 3 && r.theoreticalMinStations === 3 &&
+          Math.abs(r.totalCycleSec - 141) < 1e-3 &&
+          Math.abs(r.lineEffAfter - 0.7833) < 1e-4 && r.lineEffAfter <= 1;
+        var chain = WT.process.sanitize({
+          version: "wt-proc-1", shiftSec: 40, demandPerShift: 1,
+          operations: [
+            { id: "t0", name: "src", elementId: "e0", kind: "source" },
+            { id: "t1", name: "T1", elementId: "e1", kind: "station", cycleSec: 30, servers: 1 },
+            { id: "t2", name: "T2", elementId: "e2", kind: "station", cycleSec: 20, servers: 1 },
+            { id: "t3", name: "T3", elementId: "e3", kind: "station", cycleSec: 10, servers: 1 },
+            { id: "t4", name: "snk", elementId: "e4", kind: "sink" },
+          ],
+          precedence: [["t0", "t1"], ["t1", "t2"], ["t2", "t3"], ["t3", "t4"]],
+          routing: [{ from: "t0", to: "t1", unitsPerHr: 90 }, { from: "t1", to: "t2", unitsPerHr: 90 },
+            { from: "t2", to: "t3", unitsPerHr: 90 }, { from: "t3", to: "t4", unitsPerHr: 90 }],
+        });
+        var rc = WT.factoryOpt.rpw(chain);
+        var chainOk = rc.nStationsAfter === 2 && rc.stations[0].opIds.join(",") === "t1" &&
+          rc.stations[1].opIds.join(",") === "t2,t3" && rc.lineEffAfter === 0.75;
+        return { ok: mwOk && chainOk,
+          detail: "multiway=" + mwOk + " (total=" + r.totalCycleSec + " stations=" + r.nStationsAfter +
+            " eff=" + r.lineEffAfter + ") chainCollapse=" + chainOk };
+      } catch (e) {
+        return { ok: false, detail: "threw: " + (e && e.message) };
+      }
+    });
+
     // ---- v2.8 FACTORY-D: efficiency optimiser preview -> accept --------
     // Generate a factory line, run the REAL optimise handler (which renders
     // a before/after headline + dashed preview ghosts), then Accept and

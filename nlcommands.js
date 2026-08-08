@@ -104,6 +104,9 @@
       "assembly-line": ["assembly-line factory", "assembly line factory", "assembly-line", "assembly line", "final assembly", "product build"],
       "machining-shop": ["machining shop", "machining-shop", "machine shop", "cnc cell", "cnc shop", "job shop", "metal cutting"],
       "general-factory": ["general factory", "general-factory", "manufacturing plant", "production line", "general production", "factory"],
+      // v3.18 FLOW-GEN: the multi-way QA-split baseline (longest-match wins,
+      // so "machining shop with a qa split" resolves here, not machining-shop).
+      "machining-qa-split": ["machining shop with a qa split", "machining qa split", "machining-qa-split", "qa split", "qa-split", "inspection split", "multi-way", "multiway"],
     };
   }
 

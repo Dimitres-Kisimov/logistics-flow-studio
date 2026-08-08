@@ -5464,9 +5464,10 @@
   const NL = WT.nl;
 
   // v2.6 FACTORY-B: the Generate panel is MODE-AWARE - Warehouse mode offers
-  // the 4 warehouse plant profiles; Factory mode offers the 3 factory line
-  // profiles (assembly-line / machining-shop / general-factory). The select
-  // is repopulated whenever the Warehouse/Factory toggle flips.
+  // the 4 warehouse plant profiles; Factory mode offers the 4 factory line
+  // profiles (assembly-line / machining-shop / general-factory + the v3.18
+  // machining-qa-split multi-way baseline). The select is repopulated
+  // whenever the Warehouse/Factory toggle flips.
   function genProfilesForMode() {
     return (currentPlantMode() === "factory" && GEN && GEN.factoryProfiles)
       ? GEN.factoryProfiles : (GEN ? GEN.plantProfiles : {});
@@ -5525,6 +5526,9 @@
       "assembly-line": ["assembly", "final assembly", "make-to-order", "build line"],
       "machining-shop": ["machin", "cnc", "job shop", "cutting", "mill", "lathe"],
       "general-factory": ["factory", "manufactur", "production", "plant", "general"],
+      // v3.18 FLOW-GEN: the multi-way QA-split baseline ("qa split" outranks
+      // "machin" on length, so "machining shop with a qa split" lands here).
+      "machining-qa-split": ["qa split", "qa-split", "inspection split", "deep test", "multi-way", "multiway", "branched"],
     } : {
       "ecommerce-fulfilment": ["ecommerce", "e-commerce", "fulfil", "online", "b2c", "parcel"],
       "spare-parts-distribution": ["spare", "aftermarket", "parts", "mro"],
@@ -5625,8 +5629,16 @@
     // the line sim + metrics "just work" on a generated/steered/example line.
     // WT.process.derive returns null for a warehouse layout (no source+sink+
     // station), so state.process stays null there and serialize is unchanged.
-    state.process = (WT.process && typeof WT.process.derive === "function")
-      ? WT.process.derive({ elements: state.elements, gridW: GRID_W, gridH: GRID_H, config: state.config }) : null;
+    // v3.18 FLOW-GEN: a generator build that EMITS its own process block (the
+    // multi-way machining-qa-split baseline declares a 60/40 QA split + merge)
+    // is adopted as-is (sanitized) - derive() would flatten the declared split
+    // back to a linear chain. Every other layout takes the exact derive() path
+    // (byte-identical), and a later structural NL edit re-derives the chain
+    // honestly (documented: edits do not preserve a generated network).
+    state.process = (gen.process && WT.process && typeof WT.process.sanitize === "function")
+      ? WT.process.sanitize(gen.process)
+      : (WT.process && typeof WT.process.derive === "function")
+        ? WT.process.derive({ elements: state.elements, gridW: GRID_W, gridH: GRID_H, config: state.config }) : null;
     state.lastOptimize = null; // v3.3 A3: a freshly (re)built line has no accepted optimisation yet
     pushConfigToUI();
     syncFloorInputs();
@@ -6287,12 +6299,12 @@
       optRows([
         ["Takt (shift ÷ demand)", procFmt(b.taktSec) + " s/unit"],
         ["Workstations", b.nStationsBefore + " → " + b.nStationsAfter + " (theoretical min " + b.theoreticalMinStations + ")"],
-        ["Line efficiency (Σ cycle ÷ n × takt)", procPct(b.lineEffBefore) + " → " + procPct(b.lineEffAfter)],
+        ["Line efficiency (Σ effective load ÷ n × takt)", procPct(b.lineEffBefore) + " → " + procPct(b.lineEffAfter)],
         ["Balance delay (idle %)", procFmt(b.balanceDelayBefore) + "% → " + procFmt(b.balanceDelayAfter) + "%"],
         ["Smoothness index (0 = even)", procFmt(b.smoothnessAfter)],
       ]) +
       '<div class="proc-bars" role="group" aria-label="Proposed balanced workstation loads vs takt">' + bars + "</div>" +
-      '<p class="proc-basis">Ranked Positional Weight (Helgeson–Birnie): tasks packed by descending RPW into workstations ≤ takt, honouring precedence. A balance recommendation — it does not move machines.</p>');
+      '<p class="proc-basis">Ranked Positional Weight (Helgeson–Birnie) on the resolved per-finished-unit effective loads — the same gozinto- and servers-weighted numbers the line metrics use; on a declared multi-way network, a branch weighs its proportional-flow share (e.g. a 60% QA lane counts 0.6 × its cycle). Tasks packed by descending RPW into workstations ≤ takt, honouring precedence (over-takt loads are measured against the realized bottleneck time instead, so efficiency stays a true 0–100%). A capacity grouping only — it never re-routes flow, changes declared ratios or moves machines.</p>');
 
     // ---- Flow group (TOC) ----
     if (toc) {
@@ -6348,7 +6360,7 @@
       "<h4>Rectilinear DISTANCE matrix D (m, centroid → centroid)</h4>" + matrix(p.D, (v) => (v ? procFmt(v) : "·")) +
       legend +
       "<h4>Ranked Positional Weight (RPW) table</h4>" +
-      '<table class="opt-rpw"><thead><tr><th>Task</th><th>Cycle s</th><th>Servers</th><th>RPW</th></tr></thead><tbody>' + rpwRows + "</tbody></table>" +
+      '<table class="opt-rpw"><thead><tr><th>Task</th><th>Cycle s (raw)</th><th>Servers</th><th>RPW (effective-load s)</th></tr></thead><tbody>' + rpwRows + "</tbody></table>" +
       '<p class="proc-basis"><strong>Basis.</strong> ' + esc(opt.basis) + "</p>" +
       '<p class="proc-basis"><strong>Honesty.</strong> ' + esc(opt.honesty) + "</p>" +
       "</div></details>";

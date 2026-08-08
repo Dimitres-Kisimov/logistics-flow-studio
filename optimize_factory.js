@@ -21,10 +21,25 @@
  *      illegal swap is rejected. Reports MHI before/after + the delta%.
  *
  *   2) LINE BALANCING (Ranked Positional Weight, Helgeson-Birnie). takt =
- *      shiftSec/demandPerShift. RPW(op) = cycleSec + SUM cycleSec of all
- *      precedence-successors; pack tasks by descending RPW into workstations
- *      <= takt honouring precedence. Reports the stations, line efficiency
- *      = SUM cycle / (n * cycle_max), balance delay and smoothness index.
+ *      shiftSec/demandPerShift. v3.18 FLOW-BALANCE: the per-task time is the
+ *      RESOLVED PER-FINISHED-UNIT EFFECTIVE LOAD - the SAME numbers
+ *      WT.process.metrics computes (chain: annotate()'s gozinto- and
+ *      servers-weighted cycle/servers x cyclesPerFinished; declared multi-way
+ *      network: resolveFlow()'s effTimeSec, so a 60%-share QA branch weighs
+ *      0.6 x its cycle). RPW(op) = load + SUM load of all precedence-
+ *      successors; pack tasks by descending RPW into workstations <= takt
+ *      honouring precedence (the precedence walk is a DAG walk, so both
+ *      branches of a split rank + pack correctly). On a PURE chain (servers
+ *      1, no assembly/dismantle) every load equals the raw cycleSec, so the
+ *      result is BYTE-IDENTICAL to the pre-v3.18 balancer (harness-pinned).
+ *      WHAT REMAINS CHAIN-ORIENTED (honest): the packing model treats a
+ *      workstation as one sequential resource at takt - it groups tasks by
+ *      capacity (per-finished-unit load) but does NOT re-route flow, move
+ *      arcs, change declared ratios or add/remove servers; and an invalid
+ *      multi-way network falls back to raw cycle times (chain-style) after
+ *      validateFlow's rejection, never a guessed resolution. Reports the
+ *      stations, line efficiency = SUM load / (n * takt), balance delay and
+ *      smoothness index.
  *
  *   3) BOTTLENECK + THROUGHPUT (Theory of Constraints). Reuses the EXISTING
  *      WT.process.metrics read-back so the headline numbers can never
@@ -68,7 +83,10 @@
   const BASIS =
     "Material flow: min SUM(flow x distance) via CRAFT pairwise exchange " +
     "(Koopmans-Beckmann QAP). Line balancing: Ranked Positional Weight to " +
-    "takt. Throughput: Theory of Constraints (bottleneck = max effective " +
+    "takt on the resolved per-finished-unit effective loads (gozinto- and " +
+    "servers-weighted; on a declared multi-way network, the proportional-" +
+    "flow shares from resolveFlow - the same numbers metrics() reports). " +
+    "Throughput: Theory of Constraints (bottleneck = max effective " +
     "cycle). Rectilinear (aisle-following) distance between element centroids.";
 
   function domain() { return WT.domain || null; }
@@ -310,22 +328,66 @@
   }
 
   /* ==================================================================
+   * EFFECTIVE PER-FINISHED-UNIT LOADS - v3.18 FLOW-BALANCE. The balancer's
+   * task times, read from the SAME machinery metrics() uses so the two can
+   * never disagree: a declared multi-way network -> resolveFlow()'s
+   * effTimeSec (proportional-flow shares; a 60% branch weighs 0.6 x cycle);
+   * a chain -> annotate()'s _effTimePerFinished (gozinto x cycle / servers)
+   * on a FRESH sanitize copy (never mutates the caller's block). Returns
+   * null when WT.process is absent or the declared network is INVALID
+   * (validateFlow already rejected it with the friendly message) - the
+   * caller then falls back to raw cycleSec, the honest chain-style basis,
+   * never a guessed resolution. On a PURE chain (servers 1, no assembly/
+   * dismantle) every load equals the raw cycleSec exactly.
+   * ================================================================== */
+  function effectiveLoads(block) {
+    const P = WT.process;
+    if (!P) return null;
+    try {
+      if (typeof P.isMultiway === "function" && P.isMultiway(block)) {
+        if (typeof P.resolveFlow !== "function") return null;
+        const rf = P.resolveFlow(block);
+        if (!rf || !rf.ok) return null; // invalid network -> raw-cycle fallback
+        const loads = {};
+        for (const id in rf.nodes) loads[id] = rf.nodes[id].effTimeSec;
+        return { loads: loads, basis: "network" };
+      }
+      if (typeof P.annotate === "function" && typeof P.sanitize === "function") {
+        const a = P.annotate(P.sanitize(block)); // fresh copy: no caller mutation
+        const loads = {};
+        for (const s of a.stations) loads[s.id] = s._effTimePerFinished;
+        return { loads: loads, basis: "chain" };
+      }
+    } catch (_) { /* fall through to the raw-cycle fallback */ }
+    return null;
+  }
+
+  /* ==================================================================
    * RPW - Ranked Positional Weight (Helgeson-Birnie) line balancing.
-   * Tasks = the timed process operations; task time = cycleSec (the work
-   * content per part, per the from-to line). takt = shiftSec/demandPerShift.
-   * RPW(op) = cycleSec + SUM cycleSec of ALL precedence-successors. Pack
-   * tasks by descending RPW into workstations <= takt honouring precedence
-   * (a task is assignable only once every predecessor is placed). A task
-   * longer than takt gets its own station (over-takt, flagged).
+   * Tasks = the timed process operations; task time = the EFFECTIVE
+   * PER-FINISHED-UNIT LOAD (v3.18 FLOW-BALANCE - see effectiveLoads above;
+   * raw cycleSec only as the no-WT.process / invalid-network fallback).
+   * takt = shiftSec/demandPerShift. RPW(op) = load + SUM load of ALL
+   * precedence-successors (a DAG walk - both branches of a split count).
+   * Pack tasks by descending RPW into workstations <= takt honouring
+   * precedence (a task is assignable only once every predecessor is
+   * placed). A task whose load exceeds takt gets its own station
+   * (over-takt, flagged).
    *
-   * LINE EFFICIENCY = SUM cycle / (n * C) with C = the takt (the line's
+   * LINE EFFICIENCY = SUM load / (n * C) with C = the takt (the line's
    * demanded/design cycle time), so it reads as WORKSTATION-TIME UTILISED
    * at the takt pace: consolidating idle stations RAISES it, and balance
    * delay = idle/available = 1 - efficiency stays exactly consistent. The
    * fullest station's actual load (cycleMax) is reported separately. Before
    * = the current one-op-per-station line (n0 stations); after = the RPW-
    * balanced line (n1 <= n0). Smoothness = sqrt(SUM (takt - load)^2).
-   * Deterministic: descending-RPW order, flow-order tie-break.
+   * Deterministic: descending-RPW order, flow-order tie-break. The output
+   * SCHEMA is unchanged from the pre-v3.18 balancer (task rows still carry
+   * the raw cycleSec for reference; station `load`/`rpw`/efficiencies are
+   * in effective per-finished-unit seconds) and on a PURE chain the whole
+   * result is BYTE-IDENTICAL to the legacy balancer (harness-pinned).
+   * CHAIN-ORIENTED REMAINDER (honest): grouping is capacity-only - it
+   * never re-routes flow, changes ratios or adds/removes servers.
    * ================================================================== */
   function rpw(block) {
     const ops = (block && block.operations) || [];
@@ -334,21 +396,31 @@
     const byId = {};
     ops.forEach((o) => { byId[o.id] = o; });
 
-    // Successor adjacency over ALL ops (source/sink cycleSec 0 -> harmless),
-    // then transitive-successor cycle-time sum restricted to task ops.
+    // v3.18 FLOW-BALANCE: per-task load = resolved effective time per
+    // finished unit; raw cycleSec only when WT.process is absent or the
+    // declared network is invalid (already rejected with a friendly message).
+    const eff = effectiveLoads(block);
+    const loadById = {};
+    for (const t of tasks) {
+      loadById[t.id] = eff && Number.isFinite(eff.loads[t.id]) && eff.loads[t.id] > 0
+        ? eff.loads[t.id] : Math.max(0, num(t.cycleSec, 0));
+    }
+    const taskIdSet = {}; tasks.forEach((t) => { taskIdSet[t.id] = 1; });
+
+    // Successor adjacency over ALL ops (source/sink load 0 -> harmless),
+    // then transitive-successor LOAD sum restricted to task ops.
     const succ = {};
     ops.forEach((o) => { succ[o.id] = []; });
     for (const [a, b] of (block.precedence || [])) {
       if (succ[a] && byId[b]) succ[a].push(b);
     }
     function reachTaskTime(startId) {
-      // Sum cycleSec of all ops reachable from startId (excluding itself).
+      // Sum the loads of all task ops reachable from startId (excl. itself).
       const seen = {}; const stack = succ[startId].slice(); let sum = 0;
       while (stack.length) {
         const id = stack.pop();
         if (seen[id]) continue; seen[id] = 1;
-        const o = byId[id];
-        if (o) sum += Math.max(0, num(o.cycleSec, 0));
+        if (taskIdSet[id]) sum += loadById[id];
         for (const s of succ[id] || []) if (!seen[s]) stack.push(s);
       }
       return sum;
@@ -374,17 +446,17 @@
     const rows = tasks.map((t) => ({
       opId: t.id,
       name: t.name,
-      cycleSec: t.cycleSec,
+      cycleSec: t.cycleSec, // raw cycle, kept for reference (schema-stable)
       servers: t.servers,
-      rpw: round4(t.cycleSec + reachTaskTime(t.id)),
+      rpw: round4(loadById[t.id] + reachTaskTime(t.id)),
     }));
     // Descending RPW; tie-break by flow order then id (deterministic).
     rows.sort((p, q) =>
       q.rpw - p.rpw || flowIdx[p.opId] - flowIdx[q.opId] ||
       (p.opId < q.opId ? -1 : 1));
 
-    const totalCycle = tasks.reduce((s, t) => s + t.cycleSec, 0);
-    const maxCycle = tasks.reduce((m, t) => Math.max(m, t.cycleSec), 0);
+    const totalCycle = tasks.reduce((s, t) => s + loadById[t.id], 0);
+    const maxCycle = tasks.reduce((m, t) => Math.max(m, loadById[t.id]), 0);
 
     // --- The RPW packing pass (precedence-feasible, <= takt) ------------
     const assigned = {};
@@ -400,38 +472,46 @@
     while (remaining.length && guard++ < guardMax) {
       // Highest-RPW remaining task whose predecessors are all assigned and
       // which fits the current station (already RPW-sorted -> first match).
+      // Fit is judged on the task's effective per-finished-unit LOAD.
       let pickIdx = -1;
       for (let i = 0; i < remaining.length; i++) {
         const t = remaining[i];
         if (!predsMet(t.opId)) continue;
-        if (t.cycleSec <= takt - cur.load + 1e-9) { pickIdx = i; break; }
+        if (loadById[t.opId] <= takt - cur.load + 1e-9) { pickIdx = i; break; }
       }
       if (pickIdx === -1) {
         if (cur.tasks.length) { stations.push(cur); cur = { load: 0, tasks: [] }; continue; }
-        // Empty station can't fit any assignable task -> a task > takt.
+        // Empty station can't fit any assignable task -> a task load > takt.
         let soloIdx = -1;
         for (let i = 0; i < remaining.length; i++) if (predsMet(remaining[i].opId)) { soloIdx = i; break; }
         if (soloIdx === -1) break; // precedence deadlock (robustness) -> stop
         const t = remaining.splice(soloIdx, 1)[0];
         assigned[t.opId] = 1;
-        stations.push({ load: t.cycleSec, tasks: [t], overTakt: true });
+        stations.push({ load: loadById[t.opId], tasks: [t], overTakt: true });
         continue;
       }
       const t = remaining.splice(pickIdx, 1)[0];
       assigned[t.opId] = 1;
-      cur.tasks.push(t); cur.load += t.cycleSec;
+      cur.tasks.push(t); cur.load += loadById[t.opId];
     }
     if (cur.tasks.length) stations.push(cur);
 
     const nAfter = stations.length || 1;
     const maxLoadAfter = stations.reduce((m, s) => Math.max(m, s.load), 0) || 1;
-    // Any single task longer than takt cannot meet the demanded pace with one
-    // machine - flagged so the efficiency (capped at takt) stays honest.
+    // Any single task whose LOAD exceeds takt cannot meet the demanded pace
+    // as-is - flagged (over-takt) and reported honestly.
     const overTakt = maxCycle > takt + 1e-9;
-    const C = takt > 0 ? takt : (maxCycle || 1); // design cycle time = takt
-    // Line efficiency at takt = value-added time / available station-time.
+    // Design cycle time C: the takt, exactly as before - EXCEPT when a task
+    // load exceeds takt (over-takt, only possible on gozinto-/share-weighted
+    // loads, v3.18): the line then cannot run at takt at all, and dividing by
+    // takt would report a "utilisation" above 100%. In that case C is the
+    // REALIZED bottleneck station time (maxCycle - the classical Helgeson-
+    // Birnie basis), so line efficiency stays a true utilisation in [0,1].
+    // Lines with every load <= takt (all pre-v3.18 outputs) are unchanged.
+    const C = takt > 0 && !overTakt ? takt : (maxCycle || 1);
+    // Line efficiency at C = value-added time / available station-time.
     const lineEffAfter = C > 0 ? totalCycle / (nAfter * C) : 0;
-    // Smoothness index = sqrt(SUM (takt - load)^2) over stations (0 = perfect).
+    // Smoothness index = sqrt(SUM (C - load)^2) over stations (0 = perfect).
     let smoo = 0; for (const s of stations) smoo += Math.pow(C - s.load, 2);
     const smoothness = Math.sqrt(smoo);
 
@@ -439,8 +519,9 @@
     const nBefore = tasks.length || 1;
     const lineEffBefore = C > 0 ? totalCycle / (nBefore * C) : 0;
 
-    // Named bottleneck = the fullest workstation (after) / slowest op (before).
-    let slowest = null; for (const t of tasks) if (!slowest || t.cycleSec > slowest.cycleSec) slowest = t;
+    // Named bottleneck = the fullest workstation (after) / the op with the
+    // greatest effective load (before) - the same op metrics() would name.
+    let slowest = null; for (const t of tasks) if (!slowest || loadById[t.id] > loadById[slowest.id]) slowest = t;
     let fullest = null; for (const s of stations) if (!fullest || s.load > fullest.load) fullest = s;
     const stationOut = stations.map((s, i) => ({
       index: i + 1,

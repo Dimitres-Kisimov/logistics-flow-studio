@@ -222,6 +222,36 @@
       summary:
         "a general factory: a balanced production line - a process/machining feed, an assembly join, then a QA/inspection step and a wider pack-out - from a parts Source to a finished-goods Drain, conveyor-linked with curved turns",
     },
+    // v3.18 FLOW-GEN: the FIRST factory baseline whose process block declares
+    // GENUINE MULTI-WAY ROUTING (a split with ratios + a merge). ADDITIVE - a
+    // new key; the 3 profiles above are untouched and stay byte-identical.
+    // Lane 2 carries the two QA BRANCH stations of a declared 60/40 split
+    // (qaBranch, instead of assembly/dismantle) and the generator emits the
+    // matching `process` block from the flowNetwork recipe below, so the
+    // multi-way line sim/metrics run on it out of the box (validated by
+    // WT.process.validateFlow; conservation checked by resolveFlow).
+    "machining-qa-split": {
+      key: "machining-qa-split",
+      label: "Machining shop with QA split (multi-way flow)",
+      keywords: ["qa split", "inspection split", "branched flow", "60/40 routing", "multi-way line"],
+      machining: 2, parallel: 0, assembly: 0, dismantle: 0, qa: 1, packing: 1,
+      qaBranch: 2, // lane-2 QA branch stations (the split's two arms)
+      flowNetwork: {
+        // Declared split shares + modelled branch cycle times (REFA/MTM-style
+        // teaching estimates; editable in the panel like every cycle time).
+        ratios: [0.6, 0.4],
+        branchNames: ["QA fast lane", "QA deep test"],
+        branchCycles: [40, 80],
+        finishName: "Pack & finish",
+        finishCycle: 25,
+      },
+      docksIn: 1, docksOut: 1,
+      gridW: 46, gridH: 26,
+      strategy: "batch", orders: 160, skuCount: 60, flowMode: "push", demandSkew: 1.1,
+      automation: "machining feed -> a declared 60/40 QA split (fast lane / deep test) -> merge -> pack-out",
+      summary:
+        "a machining shop with a QA split: a machining/process feed lane, then the flow DIVIDES 60/40 into a QA fast lane and a QA deep-test lane and MERGES again into a pack-and-finish step to the Drain - the one factory baseline whose process block declares genuine multi-way routing (split ratios + merge), resolved and validated by the proportional-flow model",
+    },
   };
 
   /* ------------------------------------------------------------------
@@ -576,24 +606,30 @@
     for (const x of spread(profile.docksIn, 2, pad, gridW - pad)) {
       add("dock-in", x, dockInY, 2, 1, "receiving");
     }
-    add("mfg-source", pad, sourceY, 2, 2, "receiving");
+    const srcEl = add("mfg-source", pad, sourceY, 2, 2, "receiving");
 
     // ---- helper: lay a lane of stations left->right, top-aligned at
     // bandY, spread across [x0, x1), plus a straight conveyor spine on
     // spineY spanning the lane. maxW slots keep mixed-width stations apart.
+    // Returns the placed STATION elements in lane order (v3.18 FLOW-GEN:
+    // the flowNetwork process builder binds its operations to them; the
+    // return value was previously unused, so nothing else changes).
     const layLane = (types, x0, x1, bandY, spineY, zone) => {
       const n = types.length;
+      const placed = [];
       if (n > 0) {
         const xs = spread(n, 4, x0, x1);
         for (let i = 0; i < n; i++) {
           const def = ELEMENTS[types[i]] || { w: 3, d: 2 };
-          add(types[i], xs[i], bandY, def.w, def.d, zone);
+          const e = add(types[i], xs[i], bandY, def.w, def.d, zone);
+          if (e) placed.push(e);
         }
       }
       // Straight conveyor spine for the lane (a connector, never blocks an
       // aisle). Full lane width so it reads as a continuous belt.
       const sw = Math.max(2, (x1 - 1) - x0);
       if (!isReserved(zone)) add("conveyor", x0, spineY, sw, 1, zone);
+      return placed;
     };
 
     // Lane 1: machining / process feed (+ a parallel station for the slow
@@ -601,16 +637,20 @@
     // waypoint). Leave the right 3 cols for the right turn.
     const machiningTypes = repeatTypes("mfg-station", profile.machining)
       .concat(repeatTypes("mfg-parallel-station", profile.parallel));
-    layLane(machiningTypes, pad, gridW - pad - 3, lane0Band, lane0Spine, "storage");
+    const lane1Els = layLane(machiningTypes, pad, gridW - pad - 3, lane0Band, lane0Spine, "storage");
     // Right turn: a curved conveyor (belt from the left turns down).
     add("conveyor-curve", gridW - pad - 3, lane0Spine, 3, 3, "storage")
       && (els[els.length - 1].arc = "bl");
 
     // Lane 2: assembly / dismantle (join / split). Zone "picking" (mid-line;
     // the flow spine's picking waypoint). Leave the left 3 cols for the turn.
+    // v3.18 FLOW-GEN: a profile with `qaBranch` lays that many plain QA
+    // branch stations here instead (the two arms of the declared split);
+    // absent on the 3 legacy profiles -> their lane is byte-identical.
     const assemblyTypes = repeatTypes("mfg-assembly", profile.assembly)
-      .concat(repeatTypes("mfg-dismantle", profile.dismantle));
-    layLane(assemblyTypes, pad + 3, gridW - pad, lane1Band, lane1Spine, "picking");
+      .concat(repeatTypes("mfg-dismantle", profile.dismantle))
+      .concat(repeatTypes("mfg-station", profile.qaBranch || 0));
+    const lane2Els = layLane(assemblyTypes, pad + 3, gridW - pad, lane1Band, lane1Spine, "picking");
     // Left turn: a curved conveyor (belt from the right turns down).
     add("conveyor-curve", pad, lane1Spine, 3, 3, "picking")
       && (els[els.length - 1].arc = "br");
@@ -620,12 +660,31 @@
     // clear for the Drain + shipping dock.
     const finishTypes = repeatTypes("mfg-station", profile.qa)
       .concat(repeatTypes("pack-station", profile.packing));
-    layLane(finishTypes, pad, gridW - pad - 4, lane2Band, lane2Spine, "packing");
+    const lane3Els = layLane(finishTypes, pad, gridW - pad - 4, lane2Band, lane2Spine, "packing");
 
     // ---- SHIPPING: the finished-goods Drain + shipping dock door(s) ----
-    add("mfg-drain", gridW - pad - 2, drainY, 2, 2, "shipping");
+    const drainEl = add("mfg-drain", gridW - pad - 2, drainY, 2, 2, "shipping");
     for (const x of spread(profile.docksOut, 2, pad, gridW - pad)) {
       add("dock-out", x, dockOutY, 2, 1, "shipping");
+    }
+
+    // ---- v3.18 FLOW-GEN: emit the MULTI-WAY process block ----
+    // A profile that declares a flowNetwork recipe emits the matching
+    // `process` block (operations bound to the placed elements, a declared
+    // split with ratios + a merge) so the user gets a genuine multi-way
+    // network straight from the generator - not only via JSON import or the
+    // demo. Attached ONLY when every referenced element was actually placed
+    // (a reserved lane falls back to the app's derived linear chain), so the
+    // 3 legacy profiles never gain a `process` key (byte-identical builds).
+    let procBlock = null;
+    if (profile.flowNetwork) {
+      procBlock = buildFlowNetworkProcess(profile, {
+        source: srcEl,
+        machining: lane1Els.filter((e) => e.type === "mfg-station"),
+        branches: lane2Els.filter((e) => e.type === "mfg-station"),
+        finish: (lane3Els || []).find((e) => e.type === "mfg-station") || null,
+        drain: drainEl,
+      });
     }
 
     // Zones (bounding boxes; reuse the shared builder) + safety asserts.
@@ -665,10 +724,113 @@
       reserved: reserve.slice(),
       counts: counts,
       stationCount: stations,
-      summary: plainFactorySummary(profile, seed, gridW, gridH, reserve, counts, stations),
+      summary: plainFactorySummary(profile, seed, gridW, gridH, reserve, counts, stations, !!procBlock),
     };
+    // v3.18 FLOW-GEN: `process` + `meta.multiway` appear ONLY when the
+    // profile emitted a flow-network block - a legacy build's JSON carries
+    // neither key, so it stays byte-identical to pre-v3.18 output.
+    if (procBlock) meta.multiway = true;
 
-    return { elements: els, config: config, meta: meta, gridW: gridW, gridH: gridH };
+    const out = { elements: els, config: config, meta: meta, gridW: gridW, gridH: gridH };
+    if (procBlock) out.process = procBlock;
+    return out;
+  }
+
+  /* ==================================================================
+   * buildFlowNetworkProcess(profile, refs) - v3.18 FLOW-GEN. Build the
+   * MULTI-WAY `process` block (wt-proc-1 canonical shape, mirroring
+   * WT.process.sanitize key order) for a factory profile that declares a
+   * flowNetwork recipe:
+   *
+   *   Source -> Machining 1 -> ... -> Machining n -> SPLIT (declared
+   *   ratios, e.g. 60/40 into the QA branch stations) -> MERGE at the
+   *   finish station -> Drain
+   *
+   * Operations are BOUND to the placed elements (id "op-<elementId>", the
+   * same convention WT.process.derive uses); machining cycle times come
+   * from the domain mfg-station estimate, branch/finish cycle times from
+   * the recipe - all REFA/MTM-style modelled teaching values, editable in
+   * the panel. Routing units/hr carry the INTENDED flow (source emit rate
+   * through the chain, rate x ratio per branch); the resolved flows +
+   * conservation come from WT.process.resolveFlow. Deterministic - a pure
+   * function of profile + placed elements (no Date/RNG). Returns null when
+   * a referenced element is missing (e.g. its lane was reserved) or when
+   * WT.process.validateFlow rejects the network - never a guessed block.
+   * ================================================================== */
+  function buildFlowNetworkProcess(profile, refs) {
+    const fnw = profile.flowNetwork;
+    if (!fnw || !refs || !refs.source || !refs.drain || !refs.finish) return null;
+    const machining = refs.machining || [];
+    const branches = refs.branches || [];
+    if (!machining.length || branches.length !== fnw.ratios.length || branches.length < 2) return null;
+
+    const stDef = ELEMENTS["mfg-station"] || {};
+    const srcDef = ELEMENTS["mfg-source"] || {};
+    const machCycle = Math.max(1, Math.round(Number(stDef.cycleSec) > 0 ? Number(stDef.cycleSec) : 30));
+    const rate = Math.max(1, Math.round(Number(srcDef.emitRatePerHr) > 0 ? Number(srcDef.emitRatePerHr) : 120));
+    const MODELLED = "modelled (REFA/MTM-style estimate; editable)";
+    const mkOp = (el, name, kind, cycle) => ({
+      id: "op-" + el.id,
+      name: name,
+      elementId: el.id,
+      kind: kind,
+      cycleSec: kind === "station" ? Math.max(1, Math.round(cycle)) : 0,
+      servers: 1,
+      source: kind === "station" ? MODELLED : "endpoint (not timed)",
+    });
+
+    const operations = [mkOp(refs.source, "Parts source", "source", 0)];
+    machining.forEach((el, i) => operations.push(mkOp(el, "Machining " + (i + 1), "station", machCycle)));
+    branches.forEach((el, i) => operations.push(
+      mkOp(el, fnw.branchNames[i] || ("QA branch " + (i + 1)), "station", Number(fnw.branchCycles[i]) > 0 ? fnw.branchCycles[i] : 30)));
+    operations.push(mkOp(refs.finish, fnw.finishName || "Pack & finish", "station", Number(fnw.finishCycle) > 0 ? fnw.finishCycle : 30));
+    operations.push(mkOp(refs.drain, "Finished drain", "sink", 0));
+
+    const idOf = (el) => "op-" + el.id;
+    const lastMach = machining[machining.length - 1];
+
+    // Precedence: chain through machining, branch out at the SPLIT, merge
+    // back at the finish station, then the drain.
+    const precedence = [[idOf(refs.source), idOf(machining[0])]];
+    for (let i = 0; i < machining.length - 1; i++) {
+      precedence.push([idOf(machining[i]), idOf(machining[i + 1])]);
+    }
+    for (const b of branches) precedence.push([idOf(lastMach), idOf(b)]);
+    for (const b of branches) precedence.push([idOf(b), idOf(refs.finish)]);
+    precedence.push([idOf(refs.finish), idOf(refs.drain)]);
+
+    // Routing: the from-to flow arcs. The split arcs DECLARE their ratio
+    // (WT.process validates the shares sum to ~1); units/hr is the intended
+    // offered flow at the source emit rate.
+    const routing = [{ from: idOf(refs.source), to: idOf(machining[0]), unitsPerHr: rate }];
+    for (let i = 0; i < machining.length - 1; i++) {
+      routing.push({ from: idOf(machining[i]), to: idOf(machining[i + 1]), unitsPerHr: rate });
+    }
+    branches.forEach((b, i) => routing.push({
+      from: idOf(lastMach), to: idOf(b),
+      unitsPerHr: Math.round(rate * fnw.ratios[i]), ratio: fnw.ratios[i],
+    }));
+    branches.forEach((b, i) => routing.push({
+      from: idOf(b), to: idOf(refs.finish), unitsPerHr: Math.round(rate * fnw.ratios[i]),
+    }));
+    routing.push({ from: idOf(refs.finish), to: idOf(refs.drain), unitsPerHr: rate });
+
+    const block = {
+      version: "wt-proc-1", // mirrors WT.process.VERSION (process.js)
+      shiftSec: 28800,      // the process-model defaults (8 h shift,
+      demandPerShift: 480,  // 480/shift -> takt 60 s) - both editable
+      operations: operations,
+      precedence: precedence,
+      routing: routing,
+    };
+    // Defensive: never emit a network the flow model would reject. The
+    // recipe is static + harness-pinned, so this cannot fire in practice;
+    // if it ever did, the app falls back to the derived linear chain.
+    if (WT.process && typeof WT.process.validateFlow === "function") {
+      const v = WT.process.validateFlow(block);
+      if (!v || !v.ok) return null;
+    }
+    return block;
   }
 
   function assertInBounds(els, gridW, gridH) {
@@ -679,7 +841,7 @@
     }
   }
 
-  function plainFactorySummary(profile, seed, gridW, gridH, reserve, counts, stations) {
+  function plainFactorySummary(profile, seed, gridW, gridH, reserve, counts, stations, multiway) {
     let s =
       "Generated " + profile.summary + " on a " + gridW + "x" + gridH + " m floor " +
       "(seed " + seed + "). Automation: " + profile.automation + ". " +
@@ -687,6 +849,13 @@
       "a parts Source and a finished-goods Drain, conveyor-linked.";
     if (reserve.length) {
       s += " Reserved for manual expansion: " + reserve.join(", ") + " (left empty).";
+    }
+    // v3.18 FLOW-GEN: only a flowNetwork profile ever passes multiway=true,
+    // so the 3 legacy profiles' summaries stay byte-identical.
+    if (multiway) {
+      s += " The process block declares MULTI-WAY routing (a 60/40 QA split that merges " +
+        "again before pack-out) - resolved and conservation-checked by the proportional-" +
+        "flow model, still modelled, NOT a validated DES.";
     }
     s += " Illustrative synthetic production layout - a deterministic procedural build, " +
       "NOT a validated process plan and NOT CAD/BIM. Checked against the same ASR/DIN " +
