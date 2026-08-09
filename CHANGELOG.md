@@ -6,6 +6,91 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [3.19.0] — 2026-08-10
+
+Gives the Fluids / process-industry component family (placeable since v3.7,
+but static) its **deterministic continuous-flow behaviour** — the last big
+functional parity item on the roadmap. Everything is a **steady-state
+analytical model**: computed as closed-form arithmetic over the connected
+component network — **no time stepping, no RNG, no clock**.
+
+### Added
+- **Fluids steady-state continuous-flow solver** (`fluids.js` → `WT.fluids`):
+  fluid components that **touch** (a shared footprint edge ≥ 1 m; corner
+  contact does not connect) form a network; multi-source BFS hop distances
+  orient every junction from the drain-farther to the drain-nearer element
+  (ties broken by source distance, then element id — a total order, so the
+  directed network is **provably acyclic** and nothing ever flows into a
+  source or out of a drain). Two analytical passes solve it: a **backward
+  acceptance** pass (how much each element can accept and eventually deliver
+  to a drain or buffer in a tank — a dead end accepts 0) and a **forward
+  flow** pass (sources push their declared rate up to acceptance; at a
+  branch, flow **splits equally capped by each branch's acceptance**, the
+  excess re-filling unsaturated branches — deterministic water-filling, a
+  documented model rule).
+  - **Sources** produce at their declared `rateM3h`; supply the network
+    cannot carry is reported as **curtailed** (back-pressure — an overflow
+    risk at the source, with a plain-language warning).
+  - **Pipes** carry up to `flowRateM3h`; a saturated pipe is named the
+    **bottleneck** (utilisation 100 %).
+  - **Tanks** buffer: `capacityM3` + `fillPct` give the free volume, and the
+    net fill rate yields the **overflow horizon analytically** — *"fills at
+    +50 m³/h, FULL in 96 min at current rates"* is free volume ÷ net inflow,
+    pure arithmetic.
+  - **Mixers** blend their input streams with **exact ratio conservation**
+    (out = sum of ins; blend shares reported) and are flagged **starved**
+    when fewer live input streams arrive than their declared `inputs`.
+  - **Drains** consume; **Portioner/DePortioner** pass flow through
+    conserved (their continuous↔discrete dosing is *not* modelled).
+  - **Volume conservation is VERIFIED at every node** (in + produced = out +
+    consumed + buffered + curtailed; residual reported — the same checked-
+    not-assumed discipline as `resolveFlow`), and the network totals close:
+    supply = delivered + buffered + curtailed.
+- **Read-out in the existing Factory line efficiency card** (`#fluidsReadout`
+  filled by `renderFluidsReadout()` — the v3.17 flow-rows pattern: **no new
+  panel, no UI redesign**): network totals (supply → delivered / buffered /
+  curtailed), the named bottleneck, per-element steady flows, tank fill
+  horizons, and every warning (overflow risk / starved / dead end / no
+  supply) in plain language. It refreshes with the panel and on every layout
+  mutation, and renders **empty** for any layout without a connected fluid
+  network.
+- **A hand-computable demo** (`WT.fluids.demoLayout()`): 40 + 40 m³/h
+  supplies → mixer blends 80 → 200 m³ tank at 60 % → pipe capped 30 m³/h
+  (the bottleneck) → drain receives 30; the tank fills at +50 m³/h → FULL in
+  **96 min**; conservation residual 0.
+- **Verification**: new `verify_fluids.js` harness (the 45th, wired into
+  `test/run-all.mjs`, 31 checks, all expectations hand-computed): the demo
+  steady state, asymmetric mixer blending (60/20 → shares 0.75/0.25),
+  capacity curtailment (40 offered → 30 carried, 10 backing up), terminal-
+  tank fill time (120 min), branch water-filling (80 → 30/50), the starved-
+  mixer / no-supply friendly messages, **collapse to the base case**
+  (untouching fluid components = zero metrics; **every example scenario
+  stays fluids-inactive and byte-identical** — `analyze()` is read-only and
+  adds nothing to the serialize), determinism (byte-identical re-runs; no
+  `Date`/`Math.random` in the source), the honesty labels, and the shipped
+  wiring. Three new in-browser self-test checks (now **112/112**): the
+  `WT.fluids` module shape, the demo computing + rendering in the live card,
+  and the read-out staying inert/empty on a non-fluids layout.
+
+### Changed
+- `sw.js` cache `wt-v71` → **`wt-v72`** (new `fluids.js` in the app shell);
+  `index.html` loads `fluids.js` before `app.js` and ships the
+  `#fluidsReadout` container inside the existing Factory line card.
+- Existing behaviour is otherwise untouched: **every existing scenario,
+  example, generated layout and panel is byte-identical** — the solver only
+  activates for layouts that actually connect fluid components into a
+  network, and unconnected fluid components stay exactly as static as
+  before.
+
+### Honesty
+- A **steady-state analytical model — modelled, not measured**. **NOT a
+  validated process simulation, NOT CFD, NOT hydraulics** (no pressure,
+  viscosity, head loss or pump curves), **not transient dynamics** (tank
+  levels are a linear horizon at the current rates, drain-down / pull demand
+  is not modelled), and **not a certification**. Rates are the components'
+  synthetic order-of-magnitude teaching values; the equal-split branch rule
+  is a documented model convention, not a hydraulic computation.
+
 ## [3.18.0] — 2026-08-08
 
 Closes the two follow-up gaps the v3.17 release notes acknowledged: (a) the

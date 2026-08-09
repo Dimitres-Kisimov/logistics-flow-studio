@@ -27,9 +27,9 @@
  *   7.  app.js exposes window.__WT_TEST_API__ ONLY under the ?selftest=1
  *       guard (never on a normal load).
  *   8.  sw.js precaches errors.js + selftest.js and the cache is bumped to
- *       wt-v71 (v3.18 flow-gen + flow-balance: the generator emits a
- *       multi-way process network + RPW balances on effective loads;
- *       previously wt-v70, v3.17 flow-net multi-way routing).
+ *       wt-v72 (v3.19 fluids-flow: the Fluids components gain the
+ *       deterministic steady-state continuous-flow model in fluids.js;
+ *       previously wt-v71, v3.18 flow-gen + flow-balance).
  *   9.  Offline guard on the two new files: no external hosts referenced.
  *
  * Everything is deterministic. Usage:  node verify_hardening.js
@@ -232,9 +232,9 @@ check(
   "both in APP_SHELL"
 );
 check(
-  "sw.js cache bumped to wt-v71 (and no longer wt-v70)",
-  /CACHE_VERSION\s*=\s*"wt-v71"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v70"/.test(swJs),
-  "CACHE_VERSION = wt-v71"
+  "sw.js cache bumped to wt-v72 (and no longer wt-v71)",
+  /CACHE_VERSION\s*=\s*"wt-v72"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v71"/.test(swJs),
+  "CACHE_VERSION = wt-v72"
 );
 
 // ---- 9. the two new files reference no external hosts -------------------

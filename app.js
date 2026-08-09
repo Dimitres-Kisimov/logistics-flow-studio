@@ -4612,6 +4612,11 @@
     // stale synchronously (config-only changes that skip scheduleSave
     // call markKPIsStale directly in their listeners).
     markKPIsStale();
+    // v3.19 FLUIDS-FLOW: every scheduleSave call site is a layout/config
+    // mutation, so the fluids steady-state read-out (a pure function of the
+    // elements) refreshes here too. Cheap: it early-exits for layouts with
+    // no fluid components and only writes the DOM when the markup changed.
+    try { renderFluidsReadout(); } catch (_) {}
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       try { localStorage.setItem(LS_KEY, JSON.stringify(serialize())); } catch (_) {}
@@ -5727,6 +5732,10 @@
   function procPct(v) { return Math.round((Number(v) || 0) * 100) + "%"; }
 
   function renderProcessPanel() {
+    // v3.19 FLUIDS-FLOW: the fluids steady-state read-out lives in the SAME
+    // card and refreshes with it (empty markup for a layout with no
+    // connected fluid network - the panel stays byte-identical there).
+    renderFluidsReadout();
     const head = $("procHeadline");
     if (!head) return;
     const detail = $("procDetail");
@@ -5808,6 +5817,79 @@
         '<p class="proc-basis">Utilisation = busy/available at the line’s own pace (the bottleneck runs at 100%). Every figure is modelled, not measured; deterministic; teaching-scale — NOT a validated DES, NOT CAD/BIM, NOT a certification.</p>';
       const inputs = detail.querySelectorAll(".proc-cycle-inp");
       for (let i = 0; i < inputs.length; i++) inputs[i].addEventListener("change", onProcCycleEdit);
+    }
+  }
+
+  // ================================================================
+  // v3.19 FLUIDS-FLOW: the fluids steady-state continuous-flow read-out
+  // (WT.fluids.analyze). Rendered INTO the existing Factory line card
+  // (#fluidsReadout) - no new panel, no redesign. Active ONLY when the
+  // layout connects fluid components into a network (touching footprints
+  // with >= 1 supply); otherwise the container renders EMPTY, so every
+  // non-fluids layout keeps a byte-identical panel. Deterministic, pure,
+  // read-only (WT.fluids never mutates the layout or the serialize).
+  // ================================================================
+  function fluidsFmt(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "0";
+    return (Math.abs(n - Math.round(n)) < 0.05) ? String(Math.round(n)) : n.toFixed(1);
+  }
+
+  function renderFluidsReadout() {
+    const box = $("fluidsReadout");
+    if (!box || !WT.fluids || typeof WT.fluids.analyze !== "function") return;
+    let model = null;
+    try { model = WT.fluids.analyze({ elements: state.elements }); } catch (_) { model = null; }
+    let html = "";
+    if (model && model.networks.length) {
+      const parts = [];
+      for (const net of model.networks) {
+        if (!net.active) {
+          parts.push('<p class="proc-little">' + esc(net.id) + ": " + esc(net.warnings.join(" ")) + "</p>");
+          continue;
+        }
+        const cons = net.conservation.ok
+          ? "conservation holds (in = out + buffered + curtailed at every node)"
+          : "conservation residual " + fluidsFmt(net.conservation.maxAbsResidualM3h) + " m3/h";
+        parts.push(
+          '<p class="proc-little"><strong>Fluid network</strong> (' + net.elementIds.length + " elements): supply " +
+            fluidsFmt(net.supplyM3h) + " m3/h &rarr; delivered " + fluidsFmt(net.deliveredM3h) +
+            " m3/h &middot; buffered " + fluidsFmt(net.bufferedM3h) + " m3/h &middot; curtailed " +
+            fluidsFmt(net.curtailedM3h) + " m3/h &middot; " + esc(cons) + ".</p>"
+        );
+        if (net.bottleneck) {
+          parts.push('<p class="proc-little">Bottleneck: <strong>' + esc(net.bottleneck.label) +
+            "</strong> saturated at its " + fluidsFmt(net.bottleneck.capM3h) + " m3/h capacity (100% utilised).</p>");
+        }
+        const rows = [];
+        for (const id of net.elementIds) {
+          const n = net.nodes[id];
+          if (!n) continue;
+          let fig = "";
+          if (n.role === "source") fig = fluidsFmt(n.producedM3h) + " m3/h supplied" + (n.curtailedM3h ? " (" + fluidsFmt(n.curtailedM3h) + " backs up)" : "");
+          else if (n.role === "drain") fig = fluidsFmt(n.consumedM3h) + " m3/h consumed";
+          else if (n.role === "tank") fig = (n.netFillM3h > 0 ? "+" : "") + fluidsFmt(n.netFillM3h) + " m3/h net fill" +
+            (n.timeToFullMin != null ? " &middot; full in " + fluidsFmt(n.timeToFullMin) + " min" : "");
+          else if (n.role === "mixer") fig = fluidsFmt(n.inM3h) + " m3/h blended (" + n.liveInputs + "/" + n.expectedInputs + " inputs)";
+          else fig = fluidsFmt(n.outM3h) + (n.capM3h != null ? " / " + fluidsFmt(n.capM3h) : "") + " m3/h" +
+            (n.utilisation != null ? " (" + Math.round(n.utilisation * 100) + "%)" : "");
+          rows.push('<div class="proc-bar-row' + (net.bottleneck && net.bottleneck.id === id ? " is-bottleneck" : "") + '">' +
+            '<span class="proc-bar-name">' + esc(n.label) + (n.starved ? " &mdash; starved" : "") + "</span>" +
+            '<span class="proc-bar-pct">' + fig + "</span></div>");
+        }
+        if (rows.length) parts.push('<div class="proc-bars" role="group" aria-label="Fluid network steady-state flows per element">' + rows.join("") + "</div>");
+        for (const w of net.warnings) parts.push('<p class="proc-little">&#9888; ' + esc(w) + "</p>");
+      }
+      html =
+        '<p class="proc-sub"><strong>Fluids continuous flow</strong> &mdash; steady-state analytical model.</p>' +
+        parts.join("") +
+        '<p class="proc-basis">Steady-state ANALYTICAL model over the touching-component network: declared rates, equal-split branching capped by downstream acceptance, tank fill horizons computed analytically. Modelled, not measured; deterministic. NOT a validated process simulation, NOT CFD, NOT hydraulics, NOT a certification.</p>';
+    }
+    // Only touch the DOM when the content actually changed (this runs from
+    // scheduleSave on every layout mutation, including drags).
+    if (box.__wtFluidsHtml !== html) {
+      box.__wtFluidsHtml = html;
+      box.innerHTML = html;
     }
   }
 
@@ -8337,6 +8419,10 @@
       // v2.7 FACTORY-C: the factory line read-out (process model + line sim)
       renderProcessPanel: renderProcessPanel,
       processMetrics: () => (state.process && WT.process ? WT.process.metrics(state.process) : null),
+      // v3.19 FLUIDS-FLOW: the fluids steady-state read-out + its pure model
+      // (the SAME renderer the panel uses), for the live self-test.
+      renderFluidsReadout: renderFluidsReadout,
+      fluidsModel: () => (WT.fluids ? WT.fluids.analyze({ elements: state.elements }) : null),
       // v3.1 ANALYTICS A1: drive the Analyze panel (Bottleneck + Sankey)
       // through the SAME handler the button uses, for the live self-test.
       renderAnalyzePanel: renderAnalyzePanel,

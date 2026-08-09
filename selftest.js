@@ -111,6 +111,7 @@
       ["story", function (m) { return m && Array.isArray(m.STEPS) && m.STEPS.length > 0 && typeof m.run === "function" && typeof m.frameZone === "function" && typeof m.lerpCamera === "function"; }],
       ["tiers", function (m) { return m && typeof m.caps === "function" && typeof m.current === "function"; }],
       ["library", function (m) { return m && typeof m.define === "function" && typeof m.paletteTree === "function" && typeof m.embedInto === "function" && Array.isArray(m.BASES); }],
+      ["fluids", function (m) { return m && typeof m.analyze === "function" && typeof m.demoLayout === "function" && typeof m.NOTE === "string"; }],
     ];
     MODULES.forEach(function (pair) {
       var name = pair[0];
@@ -1102,6 +1103,83 @@
         try {
           if (haveApi && API.state) { API.state.process = prev; API.renderProcessPanel(); }
         } catch (_) { /* best-effort restore */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
+    // ---- v3.19 FLUIDS-FLOW: steady-state continuous-flow model ---------
+    // The hand-computable demo network (two 40 m3/h supplies -> mixer ->
+    // 200 m3 tank at 60% -> pipe capped 30 -> drain) resolves to the exact
+    // analytical numbers AND the existing Factory line card renders the
+    // fluids rows. Temporarily swaps state.elements, restores after.
+    check("fluids-steady-state-demo-computes-and-renders", function () {
+      if (!WT.fluids || typeof WT.fluids.analyze !== "function" ||
+        typeof WT.fluids.demoLayout !== "function") {
+        return { ok: false, detail: "no WT.fluids API" };
+      }
+      var okAll = false, detail = "";
+      var prevEls = haveApi && API.state ? API.state.elements : null;
+      try {
+        var lay = WT.fluids.demoLayout();
+        var r = WT.fluids.analyze(lay);
+        var net = r.networks && r.networks[0];
+        var tank = net && net.nodes["fl-tank"];
+        var mix = net && net.nodes["fl-mix"];
+        var solved = !!net && r.active === true && net.conservation.ok === true &&
+          Math.abs(net.supplyM3h - 80) < 1e-9 && Math.abs(net.deliveredM3h - 30) < 1e-9 &&
+          Math.abs(net.bufferedM3h - 50) < 1e-9 && Math.abs(net.curtailedM3h) < 1e-9 &&
+          !!net.bottleneck && net.bottleneck.id === "fl-pipe" &&
+          !!tank && Math.abs(tank.netFillM3h - 50) < 1e-9 && Math.abs(tank.timeToFullMin - 96) < 1e-9 &&
+          !!mix && Math.abs(mix.inM3h - 80) < 1e-9 && Math.abs(mix.outM3h - 80) < 1e-9;
+        var deterministic = JSON.stringify(r) === JSON.stringify(WT.fluids.analyze(WT.fluids.demoLayout()));
+        var rendered = true;
+        if (haveApi && API.state && typeof API.renderFluidsReadout === "function") {
+          API.state.elements = lay.elements;
+          API.renderFluidsReadout();
+          var box = document.getElementById("fluidsReadout");
+          var txt = box ? (box.textContent || "") : "";
+          rendered = txt.indexOf("Fluid network") !== -1 && txt.indexOf("Bottleneck") !== -1 &&
+            txt.indexOf("96 min") !== -1 && txt.indexOf("conservation holds") !== -1 &&
+            txt.indexOf("NOT a validated process simulation") !== -1;
+        }
+        okAll = solved && deterministic && rendered;
+        detail = "solved=" + solved + " deterministic=" + deterministic + " rendered=" + rendered +
+          (net ? " (supply=" + net.supplyM3h + " delivered=" + net.deliveredM3h +
+            " buffered=" + net.bufferedM3h + " fullIn=" + (tank && tank.timeToFullMin) + "min)" : "");
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      } finally {
+        try {
+          if (haveApi && API.state && prevEls) { API.state.elements = prevEls; API.renderFluidsReadout(); }
+        } catch (_) { /* best-effort restore */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
+    // Collapse to base case: the CURRENT (non-fluids) layout yields NO
+    // fluids network and an EMPTY read-out container - the existing panel
+    // stays byte-identical for every layout without connected fluids.
+    check("fluids-inert-on-non-fluid-layout", function () {
+      if (!WT.fluids || typeof WT.fluids.analyze !== "function") {
+        return { ok: false, detail: "no WT.fluids API" };
+      }
+      var okAll = false, detail = "";
+      try {
+        var model = haveApi && typeof API.fluidsModel === "function"
+          ? API.fluidsModel()
+          : WT.fluids.analyze({ elements: [] });
+        var inert = !!model && model.active === false;
+        var boxEmpty = true;
+        if (haveApi && typeof API.renderFluidsReadout === "function") {
+          API.renderFluidsReadout();
+          var box = document.getElementById("fluidsReadout");
+          boxEmpty = !!box && (box.innerHTML === "" || model.active === true);
+        }
+        okAll = inert && boxEmpty;
+        detail = "inert=" + inert + " boxEmpty=" + boxEmpty +
+          " (fluidCount=" + (model && model.fluidCount) + ")";
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
       }
       return { ok: okAll, detail: detail };
     });

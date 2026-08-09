@@ -890,6 +890,15 @@
           <div id="procDetail" class="proc-detail"><!-- filled by app.js renderProcessPanel() --></div>
         </details>
 
+        <!-- v3.19 FLUIDS-FLOW: the fluids steady-state continuous-flow
+             read-out (WT.fluids). Filled by app.js renderFluidsReadout()
+             ONLY when the layout connects fluid components (Source / Pipe /
+             Tank / Mixer / Drain) into a touching network; empty (and
+             invisible) otherwise, so a non-fluids layout keeps this card
+             byte-identical. Steady-state ANALYTICAL model — modelled, not
+             measured; NOT a validated process simulation, NOT CFD. -->
+        <div id="fluidsReadout" class="proc-detail"><!-- filled by app.js renderFluidsReadout() --></div>
+
         <!-- v2.8 FACTORY-D: the FACTORY EFFICIENCY OPTIMISER. One calm action:
              arrange + balance the line for maximum efficiency. It PREVIEWS the
              proposed placement (dashed ghosts on the floor) with a headline
@@ -1254,6 +1263,7 @@
   <script src="compare.js"></script>
   <script src="orderpool.js"></script>
   <script src="process.js"></script>
+  <script src="fluids.js"></script>
   <script src="optimize_factory.js"></script>
   <script src="analytics.js"></script>
   <script src="howwecompare.js"></script>

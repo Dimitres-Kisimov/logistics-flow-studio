@@ -485,6 +485,28 @@
  *      WT.analytics models over the SAME sim run (can't drift), with the
  *      factory line-sim + accepted-optimiser before/after included.
  *
+ *  37b. verify_fluids.js  - FLUIDS STEADY-STATE CONTINUOUS-FLOW model
+ *      (v3.19 FLUIDS-FLOW): the Fluids component family (Pipe / FluidSource
+ *      / FluidDrain / Tank / Mixer / Portioner / DePortioner) gains a PURE,
+ *      DETERMINISTIC steady-state analytical flow solver (WT.fluids) -
+ *      touching footprints form the network, multi-source BFS orients it
+ *      toward the drains (provably acyclic), a backward acceptance pass +
+ *      a forward equal-split water-filling pass give every element its
+ *      steady m3/h, and VOLUME CONSERVATION IS VERIFIED at every node.
+ *      Hand-computed expectations: the demo (40+40 supplies -> mixer 80 ->
+ *      tank -> pipe capped 30 -> drain 30; tank +50 m3/h, FULL in 96 min;
+ *      shares 0.5/0.5; residual 0), asymmetric blend 60/20 -> 0.75/0.25,
+ *      capacity curtailment (40 offered, 30 carried, 10 backing up at the
+ *      source), terminal-tank fill 120 min, branch water-filling 30/50,
+ *      the starved-mixer + no-supply friendly messages, COLLAPSE TO BASE
+ *      CASE (untouching fluids = zero metrics; every example scenario
+ *      stays fluids-inactive AND byte-identical - analyze() is read-only),
+ *      determinism (byte-identical re-runs, no Date/RNG in the source),
+ *      the modelled-not-measured / NOT-a-validated-process-simulation /
+ *      NOT-CFD honesty, and the shipped wiring (fluids.js loaded +
+ *      precached at wt-v72, the #fluidsReadout rows in the EXISTING
+ *      Factory line card, the self-test checks, this runner entry).
+ *
  *  38. verify_palette.js  - Ctrl/Cmd-K COMMAND PALETTE (v3.6 UI-3): the PURE,
  *      DOM-free command MODEL + filter behind the modal overlay. Asserts the
  *      list is NON-EMPTY and built from the REAL registries (every Class
@@ -552,6 +574,7 @@ const HARNESSES = [
   { name: "Generated multi-way network + RPW balance on effective loads (verify_flowbalance.js)", args: ["verify_flowbalance.js"] },
   { name: "Factory efficiency optimizer: CRAFT placement + RPW balance + TOC (verify_optimize.js)", args: ["verify_optimize.js"] },
   { name: "Analytics: Bottleneck + Sankey + Cost + Energy analyzers (verify_analytics.js)", args: ["verify_analytics.js"] },
+  { name: "Fluids steady-state continuous-flow model (verify_fluids.js)", args: ["verify_fluids.js"] },
   { name: "Honest 'How we compare' page (verify_howwecompare.js)", args: ["verify_howwecompare.js"] },
   { name: "Ctrl/Cmd-K command palette: model + wiring (verify_palette.js)", args: ["verify_palette.js"] },
   { name: "Material-flow connection overlay / Flow links (verify_flowlinks.js)", args: ["verify_flowlinks.js"] },
