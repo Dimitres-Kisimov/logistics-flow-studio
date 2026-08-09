@@ -10,8 +10,18 @@
  * WT.process - same input => byte-identical output:
  *
  *   1) MATERIAL-FLOW PLACEMENT (CRAFT pairwise-exchange). Build the from-to
- *      FLOW matrix F from process.routing and the rectilinear DISTANCE
+ *      FLOW matrix F and the rectilinear DISTANCE
  *      matrix D from the mfg elements' integer-metre centroids, then
+ *      v3.20 CRAFT-FLOW: F comes from the RESOLVED flow network
+ *      (WT.process.resolveFlow arc flows - the same numbers metrics()
+ *      reports) whenever the block DECLARES a VALID multi-way network, so
+ *      the placement objective weighs each arc by the material-handling
+ *      intensity that actually flows on it (a 60% QA branch weighs 0.6 x
+ *      the offered rate, stale stored from-to rates cannot skew the
+ *      layout). A plain chain - every existing scenario - and an INVALID
+ *      declared network (validateFlow already rejected it) keep the
+ *      STORED process.routing rates: the exact pre-v3.20 code path,
+ *      byte-identical output (harness-pinned). Then
  *      minimise MHI = SUM F*D (the Koopmans-Beckmann / QAP objective) by
  *      repeatedly evaluating candidate EQUAL-FOOTPRINT two-way position
  *      swaps of the process stations and committing the single best
@@ -82,7 +92,10 @@
 
   const BASIS =
     "Material flow: min SUM(flow x distance) via CRAFT pairwise exchange " +
-    "(Koopmans-Beckmann QAP). Line balancing: Ranked Positional Weight to " +
+    "(Koopmans-Beckmann QAP); on a declared multi-way network the flow " +
+    "matrix F is the RESOLVED arc flows (resolveFlow - the same numbers " +
+    "metrics() reports), stored from-to rates otherwise. " +
+    "Line balancing: Ranked Positional Weight to " +
     "takt on the resolved per-finished-unit effective loads (gozinto- and " +
     "servers-weighted; on a declared multi-way network, the proportional-" +
     "flow shares from resolveFlow - the same numbers metrics() reports). " +
@@ -96,11 +109,39 @@
   function isProcessStation(kind) { return !!PROCESS_KINDS[kind]; }
 
   /* ==================================================================
+   * RESOLVED ARC FLOWS - v3.20 CRAFT-FLOW. When the block DECLARES a
+   * VALID multi-way network (split/merge), the truer material-handling
+   * intensity per arc is the RESOLVED flow (WT.process.resolveFlow - the
+   * same numbers metrics() reports: split shares, merge accumulation,
+   * gozinto through assembly/dismantle), not the stored from-to rates,
+   * which can go stale when ratios or the offered rate are edited.
+   * Returns the resolved arc list ({from, to, unitsPerHr}) or null when
+   * WT.process is absent, the block is a plain chain (every existing
+   * scenario - the stored rates ARE authoritative there) or the declared
+   * network is INVALID (validateFlow already rejected it with the
+   * friendly message) - the caller then keeps the stored rates, the
+   * exact pre-v3.20 path, never a guessed resolution.
+   * ================================================================== */
+  function resolvedArcFlows(block) {
+    const P = WT.process;
+    if (!P || typeof P.isMultiway !== "function" || typeof P.resolveFlow !== "function") return null;
+    try {
+      if (!P.isMultiway(block)) return null;
+      const rf = P.resolveFlow(block);
+      if (!rf || !rf.ok || !Array.isArray(rf.arcs)) return null;
+      return rf.arcs;
+    } catch (_) { return null; }
+  }
+
+  /* ==================================================================
    * BUILD F + D - the from-to FLOW matrix and the rectilinear DISTANCE
    * matrix, both indexed over the operations that carry a placed element,
    * in the block's deterministic operation order. Distances are DERIVED
    * from the integer-metre element centroids (never stored). Returns the
    * ordered id list so callers can read the matrices unambiguously.
+   * v3.20 CRAFT-FLOW: F reads the RESOLVED arc flows on a valid declared
+   * multi-way network (flowBasis "resolved"); the stored process.routing
+   * rates otherwise (flowBasis "stored" - byte-identical to before).
    * ================================================================== */
   function buildFD(layout, block) {
     const els = (layout && layout.elements) || [];
@@ -132,11 +173,16 @@
       }
     }
 
-    // Flow matrix F[i][j] = units/hr from routing (the from-to chart).
+    // Flow matrix F[i][j] = units/hr per arc. v3.20 CRAFT-FLOW: on a valid
+    // declared multi-way network the arcs are the RESOLVED flows
+    // (resolveFlow - split shares, merge accumulation); a plain chain or
+    // an invalid network keeps the STORED routing rates (the from-to
+    // chart), the exact pre-v3.20 path.
     const F = [];
     for (let i = 0; i < n; i++) F.push(new Array(n).fill(0));
-    const routing = (block && block.routing) || [];
-    for (const r of routing) {
+    const resolved = resolvedArcFlows(block);
+    const arcs = resolved || ((block && block.routing) || []);
+    for (const r of arcs) {
       const a = idx[r.from], b = idx[r.to];
       if (a === undefined || b === undefined) continue;
       F[a][b] += Math.max(0, num(r.unitsPerHr, 0));
@@ -150,6 +196,9 @@
       cell: cell,
       F: F,
       D: D,
+      // "resolved" = F from the resolved multi-way network; "stored" = F
+      // from the stored process.routing rates (chains + invalid networks).
+      flowBasis: resolved ? "resolved" : "stored",
     };
   }
 
@@ -306,7 +355,7 @@
     const mhiAfter = curMhi;
     const deltaPct = mhiBefore > 1e-9 ? ((mhiBefore - mhiAfter) / mhiBefore) * 100 : 0;
 
-    return {
+    const out = {
       ids: fd.ids,
       elementIds: fd.elementIds,
       names: fd.names,
@@ -325,6 +374,12 @@
       aisleAfter: aisleCount(els, minAisle),
       improved: mhiAfter < mhiBefore - 1e-6,
     };
+    // v3.20 CRAFT-FLOW: name the flow basis ONLY when F came from the
+    // resolved network - the stored-rate fallback (every plain chain and
+    // every invalid network) keeps the exact pre-v3.20 report shape, so
+    // existing outputs stay BYTE-IDENTICAL (harness-pinned).
+    if (fd.flowBasis === "resolved") out.flowBasis = "resolved";
+    return out;
   }
 
   /* ==================================================================

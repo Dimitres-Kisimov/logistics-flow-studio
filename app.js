@@ -3241,6 +3241,31 @@
     if (def.flow) behaviour.push(row("Flow control", def.flow.toUpperCase()));
     if (def.stage) behaviour.push(row("Chain stage", def.stage));
 
+    // v3.20 FLUIDS-PERSIST: editable per-element fluid rate overrides in the
+    // EXISTING Behaviour group (the grouped-Inspector pattern - no new
+    // panel). Setting a value stores an OVERRIDE on this element (the v3.19
+    // steady-state solver already honours it; serialize() now persists it);
+    // clearing the field (or re-entering the declared default) removes the
+    // override so the element serializes exactly as before.
+    const fluidFields = fluidOverrideFields(el);
+    if (fluidFields.length) {
+      behaviour.push(
+        fluidFields.map((f) => {
+          const cur = (typeof el[f.key] === "number" && isFinite(el[f.key])) ? el[f.key] : "";
+          const dflt = (typeof def[f.key] === "number" && isFinite(def[f.key])) ? String(def[f.key]) : "";
+          return (
+            '<div class="field" style="margin-top:8px">' +
+            `<label for="pFl_${f.key}">${f.label}</label>` +
+            `<input id="pFl_${f.key}" data-flkey="${f.key}" type="number" min="${f.min}"` +
+            (f.max != null ? ` max="${f.max}"` : "") +
+            ` step="${f.step}" value="${cur}" placeholder="${dflt ? "default " + dflt : "no cap"}">` +
+            "</div>"
+          );
+        }).join("") +
+        '<p class="hint" style="margin:6px 0 0">Modelled fluid rate for THIS element (steady-state model; not a measurement). Clear the field to return to the declared default.</p>'
+      );
+    }
+
     // The size editor is a Basic property (size). Same #pW / #pD ids + change
     // handlers as before - every edit still applies identically via applySize.
     if (def.resizable) {
@@ -3285,6 +3310,11 @@
       $("pD").addEventListener("change", () => applySize());
       $("rotateBtn").addEventListener("click", () => rotateSelected());
     }
+    // v3.20 FLUIDS-PERSIST: apply a fluid rate override on change (same
+    // change-handler pattern as the #pW/#pD size editor).
+    panel.querySelectorAll("input[data-flkey]").forEach((inp) => {
+      inp.addEventListener("change", () => applyFluidOverride(inp.getAttribute("data-flkey"), inp.value));
+    });
     $("dupBtn").addEventListener("click", duplicateSelected);
     $("deleteBtn").addEventListener("click", deleteSelected);
   }
@@ -3324,6 +3354,51 @@
     scheduleSave();
     render();
     renderProps();
+  }
+
+  // v3.20 FLUIDS-PERSIST: which override fields the Inspector offers for a
+  // fluid element, by its flow-model role (WT.fluids.roleOf) - the same
+  // keys the steady-state solver reads (WT.fluids.OVERRIDE_KEYS family).
+  function fluidOverrideFields(el) {
+    if (!WT.fluids || typeof WT.fluids.roleOf !== "function" ||
+        typeof WT.fluids.isFluidEl !== "function" || !WT.fluids.isFluidEl(el)) return [];
+    const role = WT.fluids.roleOf(el);
+    if (role === "source") return [{ key: "rateM3h", label: "Supply rate (m3/h)", min: 0, step: 1 }];
+    if (role === "conduit") return [{ key: "flowRateM3h", label: "Flow capacity (m3/h)", min: 0, step: 1 }];
+    if (role === "tank") {
+      return [
+        { key: "capacityM3", label: "Capacity (m3)", min: 0, step: 1 },
+        { key: "fillPct", label: "Fill level (%)", min: 0, max: 100, step: 1 },
+      ];
+    }
+    if (role === "mixer") return [{ key: "inputs", label: "Input streams", min: 1, step: 1 }];
+    return []; // drain: consumes whatever arrives - nothing to override
+  }
+
+  // Set / clear a per-element fluid rate override from the Inspector.
+  // Clearing (or re-entering the declared default) DELETES the key so the
+  // element serializes exactly as before; values are clamped the same way
+  // WT.fluids.applyOverrides clamps them on load (single discipline).
+  function applyFluidOverride(key, rawValue) {
+    const el = state.elements.find((e) => e.id === state.selectedId);
+    if (!el || !key) return;
+    const def = ELEMENTS[el.type] || {};
+    const n = Number(rawValue);
+    if (rawValue === "" || !isFinite(n) || (typeof def[key] === "number" && n === def[key])) {
+      delete el[key]; // back to the declared default - no override persisted
+    } else {
+      let v = n;
+      if (key === "fillPct") v = Math.max(0, Math.min(100, v));
+      else if (key === "inputs") v = Math.max(1, Math.round(v));
+      else v = Math.max(0, v);
+      el[key] = v;
+    }
+    scheduleSave(); // persists the layout + refreshes the fluids read-out
+    render();
+    renderProps();
+    status(typeof el[key] === "number"
+      ? "Set " + key + " to " + el[key] + " for " + def.label + " (modelled override; persists with the layout)."
+      : "Cleared the " + key + " override for " + def.label + " (back to the declared default).");
   }
 
   function rotateSelected() {
@@ -4511,7 +4586,20 @@
       // `arc` (curved-conveyor corner orientation) is included only when set;
       // JSON.stringify omits an undefined value, so a layout with no curved
       // conveyor serializes BYTE-IDENTICALLY to before.
-      elements: state.elements.map((e) => ({ id: e.id, type: e.type, x: e.x, y: e.y, w: e.w, d: e.d, arc: e.arc })),
+      // v3.20 FLUIDS-PERSIST: per-element FLUID rate overrides (rateM3h /
+      // flowRateM3h / capacityM3 / fillPct / inputs - the keys the v3.19
+      // steady-state solver already honours in-memory) now PERSIST too:
+      // WT.fluids.overridesOf returns them ONLY when actually set on a
+      // fluid element, so every layout without an override serializes
+      // BYTE-IDENTICALLY to before.
+      elements: state.elements.map((e) => {
+        const rec = { id: e.id, type: e.type, x: e.x, y: e.y, w: e.w, d: e.d, arc: e.arc };
+        if (WT.fluids && typeof WT.fluids.overridesOf === "function") {
+          const ov = WT.fluids.overridesOf(e);
+          if (ov) Object.assign(rec, ov);
+        }
+        return rec;
+      }),
       config: Object.assign({}, state.config),
       savedAt: new Date().toISOString(),
     };
@@ -4558,6 +4646,12 @@
       };
       // Restore the curved-conveyor corner orientation when present.
       if (typeof raw.arc === "string") el.arc = raw.arc;
+      // v3.20 FLUIDS-PERSIST: restore the per-element fluid rate overrides
+      // (sanitized/clamped by WT.fluids.applyOverrides; a no-op for every
+      // non-fluid element and every record without an override).
+      if (WT.fluids && typeof WT.fluids.applyOverrides === "function") {
+        WT.fluids.applyOverrides(el, raw);
+      }
       // keep in-bounds
       el.x = Math.min(el.x, GRID_W - el.w);
       el.y = Math.min(el.y, GRID_H - el.d);
@@ -8423,6 +8517,12 @@
       // (the SAME renderer the panel uses), for the live self-test.
       renderFluidsReadout: renderFluidsReadout,
       fluidsModel: () => (WT.fluids ? WT.fluids.analyze({ elements: state.elements }) : null),
+      // v3.20 FLUIDS-PERSIST: the REAL serialize()/deserialize() pair (the
+      // SAME functions the Save/Load/localStorage/JSON-export flows use),
+      // so the live self-test can prove a fluid rate override survives the
+      // save -> load round-trip through the shipped path, not a re-model.
+      serializeLayout: serialize,
+      deserializeLayout: deserialize,
       // v3.1 ANALYTICS A1: drive the Analyze panel (Bottleneck + Sankey)
       // through the SAME handler the button uses, for the live self-test.
       renderAnalyzePanel: renderAnalyzePanel,

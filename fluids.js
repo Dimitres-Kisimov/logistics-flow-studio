@@ -126,6 +126,60 @@
     const d = defOf(el) || {};
     return num(el[key], num(d[key], dflt));
   }
+
+  /* ------------------------------------------------------------------
+   * v3.20 FLUIDS-PERSIST - per-element override round-trip helpers.
+   * The solver has honoured per-element overrides of the declared rate
+   * keys since v3.19 (prop() above), but the app serializer dropped them
+   * (a documented v3.19 limitation): a saved / shared layout silently
+   * reverted every element to its registry default. These two PURE
+   * helpers are the single source of truth for WHICH keys persist and
+   * HOW they are sanitized, so the serializer, the Inspector and the
+   * solver can never drift from each other.
+   *   overridesOf(el)        -> { key: value } of the finite overrides
+   *                             actually SET on a FLUID element, in
+   *                             OVERRIDE_KEYS order (deterministic), or
+   *                             null when none / not a fluid element -
+   *                             so a layout with no overrides serializes
+   *                             BYTE-IDENTICALLY to before.
+   *   applyOverrides(el,raw) -> copy the sanitized overrides from a raw
+   *                             (deserialized) record onto the rebuilt
+   *                             element: rates/capacity clamped >= 0,
+   *                             fillPct clamped 0..100, mixer inputs a
+   *                             whole number >= 1; junk ignored. A
+   *                             non-fluid element is never touched.
+   * ------------------------------------------------------------------ */
+  const OVERRIDE_KEYS = ["rateM3h", "flowRateM3h", "capacityM3", "fillPct", "inputs"];
+
+  function sanitizeOverride(key, value) {
+    // Overrides are NUMBERS set on the element (the Inspector writes
+    // numbers; JSON carries numbers) - anything else is junk, ignored.
+    if (typeof value !== "number" || !Number.isFinite(value)) return null;
+    if (key === "fillPct") return Math.max(0, Math.min(100, value));
+    if (key === "inputs") return Math.max(1, Math.round(value));
+    return Math.max(0, value); // rateM3h / flowRateM3h / capacityM3
+  }
+
+  function overridesOf(el) {
+    if (!isFluidEl(el)) return null;
+    let out = null;
+    for (const key of OVERRIDE_KEYS) {
+      const v = sanitizeOverride(key, el ? el[key] : null);
+      if (v === null) continue;
+      if (!out) out = {};
+      out[key] = v;
+    }
+    return out;
+  }
+
+  function applyOverrides(el, raw) {
+    if (!el || !raw || !isFluidEl(el)) return el;
+    for (const key of OVERRIDE_KEYS) {
+      const v = sanitizeOverride(key, raw[key]);
+      if (v !== null) el[key] = v;
+    }
+    return el;
+  }
   function labelOf(el) {
     const d = defOf(el) || {};
     return (d.label || el.type) + " (" + el.id + ")";
@@ -541,5 +595,10 @@
     touches: touches,
     analyze: analyze,
     demoLayout: demoLayout,
+    // v3.20 FLUIDS-PERSIST: per-element override round-trip helpers (the
+    // serializer + Inspector read these - single source of truth).
+    OVERRIDE_KEYS: OVERRIDE_KEYS.slice(),
+    overridesOf: overridesOf,
+    applyOverrides: applyOverrides,
   };
 })();

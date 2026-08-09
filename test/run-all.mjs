@@ -507,6 +507,36 @@
  *      precached at wt-v72, the #fluidsReadout rows in the EXISTING
  *      Factory line card, the self-test checks, this runner entry).
  *
+ *  37c. verify_craftflow.js - CRAFT-ON-RESOLVED-FLOWS + FLUID-OVERRIDE
+ *      PERSISTENCE (v3.20 CRAFT-FLOW + FLUIDS-PERSIST). Closes the two
+ *      documented v3.17-v3.19 follow-up gaps. (a) The CRAFT placement
+ *      optimizer's flow matrix F reads the RESOLVED network flows
+ *      (WT.process.resolveFlow - the same numbers metrics() reports)
+ *      whenever the block declares a VALID multi-way network: on the
+ *      machining-qa-split archetype F carries the hand-computed 60/40
+ *      split flows (72/48 parts/hr at the offered 120/hr), stale stored
+ *      from-to rates cannot skew the placement (tampering them to 1/hr
+ *      leaves the whole craft report byte-identical), every F entry
+ *      equals its resolveFlow arc (can't diverge), mhiBefore matches an
+ *      independent SUM(F x D) recomputation, and never-illegal / never-
+ *      worse still holds (independent legality oracle, MHI monotone,
+ *      optimize deterministic, balance never worse). COLLAPSE TO BASE
+ *      CASE: a plain chain (every existing scenario) keeps the STORED
+ *      rates and reproduces the pre-v3.20 craft report BYTE-IDENTICALLY
+ *      (a full hand-written pin - MHI 3400 -> 2200, one B<->C swap, no
+ *      flowBasis key); an INVALID network falls back to stored, never a
+ *      guess. (b) Per-element FLUID rate overrides (rateM3h/flowRateM3h/
+ *      capacityM3/fillPct/inputs - honoured in-memory since v3.19 but
+ *      DROPPED by the serializer) now persist: WT.fluids.overridesOf/
+ *      applyOverrides are the sanitizing source of truth (clamps, junk
+ *      ignored, non-fluid elements untouched), the hand-computed round-
+ *      trip proves the demo pipe's 30 m3/h override survives serialize ->
+ *      JSON -> rebuild (delivered 30, tank FULL in 96 min) while the
+ *      v3.19 drop reverted it to 40/120, every example scenario still
+ *      serializes byte-identically (no override -> no key), and the
+ *      shipped wiring (serialize/deserialize + the role-aware Inspector
+ *      rate fields + wt-v73 + the 2 live self-test checks) is asserted.
+ *
  *  38. verify_palette.js  - Ctrl/Cmd-K COMMAND PALETTE (v3.6 UI-3): the PURE,
  *      DOM-free command MODEL + filter behind the modal overlay. Asserts the
  *      list is NON-EMPTY and built from the REAL registries (every Class
@@ -575,6 +605,7 @@ const HARNESSES = [
   { name: "Factory efficiency optimizer: CRAFT placement + RPW balance + TOC (verify_optimize.js)", args: ["verify_optimize.js"] },
   { name: "Analytics: Bottleneck + Sankey + Cost + Energy analyzers (verify_analytics.js)", args: ["verify_analytics.js"] },
   { name: "Fluids steady-state continuous-flow model (verify_fluids.js)", args: ["verify_fluids.js"] },
+  { name: "CRAFT on resolved flows + fluid-override persistence (verify_craftflow.js)", args: ["verify_craftflow.js"] },
   { name: "Honest 'How we compare' page (verify_howwecompare.js)", args: ["verify_howwecompare.js"] },
   { name: "Ctrl/Cmd-K command palette: model + wiring (verify_palette.js)", args: ["verify_palette.js"] },
   { name: "Material-flow connection overlay / Flow links (verify_flowlinks.js)", args: ["verify_flowlinks.js"] },

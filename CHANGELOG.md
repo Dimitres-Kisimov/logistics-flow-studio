@@ -6,6 +6,86 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [3.20.0] — 2026-08-10
+
+Closes the two minor gaps the v3.17–v3.19 releases documented: (a) the CRAFT
+placement optimizer still consumed the **stored** from-to arc rates even on a
+declared multi-way process network, and (b) the per-element **fluid rate
+overrides** were honoured in-memory by the v3.19 steady-state solver but
+**dropped by the serializer**.
+
+### Changed
+- **CRAFT placement derives F from the resolved flow network**
+  (`optimize_factory.js`): when the process block declares a **valid
+  multi-way network**, `buildFD()` now builds the from-to flow matrix F from
+  the **resolved arc flows** (`WT.process.resolveFlow` — the same numbers
+  `metrics()` reports: split shares, merge accumulation, gozinto through
+  assembly/dismantle) instead of the stored `process.routing` rates, so the
+  placement objective **MHI = Σ F·D** weighs each arc by the
+  material-handling intensity that actually flows on it. On the
+  `machining-qa-split` archetype the 60/40 QA branch arcs weigh
+  **72 / 48 parts/hr** at the offered 120/hr — even when the stored rates
+  have gone stale (harness-proven: tampering every non-source arc's stored
+  rate to 1/hr leaves the whole craft report **byte-identical**). A **plain
+  chain** (every existing scenario) and an **invalid** declared network
+  (already rejected by `validateFlow` with the friendly message) keep the
+  stored rates on the **exact pre-v3.20 code path** — a full hand-written
+  pin proves the chain craft report is **byte-identical** (MHI 3400 → 2200,
+  one B↔C swap, no new keys). The never-illegal / never-worse guarantees
+  are re-asserted on the resolved basis (independent legality oracle:
+  in-bounds, overlap-free, DIN 15185 aisle count never increased; MHI
+  monotone non-increasing; deterministic). `buildFD` reports the basis
+  (`flowBasis: "resolved" | "stored"`); the craft report carries the key
+  **only** on the resolved path so every existing output stays
+  byte-identical.
+
+### Added
+- **Per-element fluid rate overrides persist** (`fluids.js` + `app.js`): the
+  override keys the steady-state solver reads (`rateM3h`, `flowRateM3h`,
+  `capacityM3`, `fillPct`, `inputs`) now survive save / load / share.
+  `WT.fluids.overridesOf` / `WT.fluids.applyOverrides` are the single
+  sanitizing source of truth (rates/capacity clamped ≥ 0, `fillPct` clamped
+  0–100, mixer `inputs` a whole number ≥ 1; junk ignored; **non-fluid
+  elements are never touched**). `serialize()` writes an override **only
+  when actually set** on a fluid element — a layout with no overrides
+  serializes **byte-identically** to before (asserted across all 24 example
+  scenarios) — and `deserialize()` restores them. Hand-computed round-trip:
+  the demo pipe's **30 m³/h** cap survives save → load (delivered 30 m³/h,
+  tank full in **96 min**), where the v3.19 serializer silently reverted it
+  to the 40 m³/h registry default (delivered 40, full in 120 min).
+- **Role-aware rate fields in the existing Inspector** (Behaviour group —
+  the established grouped-Inspector pattern, **no new panel, no redesign**):
+  a Fluid source gets *Supply rate (m³/h)*, a conduit (Pipe / Portioner /
+  DePortioner) *Flow capacity (m³/h)*, a Tank *Capacity (m³)* + *Fill level
+  (%)*, a Mixer *Input streams*. Setting a value stores the override on
+  that element; clearing the field (or re-entering the declared default)
+  removes it, so the element serializes exactly as before.
+- **Verification**: new `verify_craftflow.js` harness (the **46th**, wired
+  into `test/run-all.mjs`, 38 checks, all expectations hand-computed): the
+  full byte-identical chain-craft pin, the resolved 72/48 F matrix, the
+  stale-stored-rates invariance proof, F ≡ resolveFlow arcs (can't
+  diverge), an independent MHI recomputation, the never-illegal /
+  never-worse oracle on the resolved basis, the invalid-network stored
+  fallback, the override sanitization table, the 30-vs-40 m³/h round-trip
+  proof and the example-scenario byte-identity sweep. Two new in-browser
+  self-test checks (now **114/114**): the live serialize → deserialize
+  override round-trip through the real app path, and the resolved-flows F
+  matrix on the live `machining-qa-split` build.
+
+### Honesty
+- The optimizer remains a transparent **heuristic finding a local optimum**
+  — modelled, not measured; NOT guaranteed optimal, NOT a validated
+  discrete-event simulation, NOT CAD/BIM, NOT a certification. The fluids
+  model remains a **steady-state analytical model** — NOT CFD, NOT
+  hydraulics, NOT transient dynamics. Rates (including overrides) are
+  synthetic teaching values the user edits.
+
+### Infrastructure
+- `sw.js` cache `wt-v72` → **`wt-v73`** (changed `optimize_factory.js`,
+  `fluids.js`, `app.js`, `selftest.js`; no asset added or removed); the
+  `verify_hardening` / `verify_palette` / `verify_analytics` /
+  `verify_animation` / `verify_fluids` cache pins bumped to match.
+
 ## [3.19.0] — 2026-08-10
 
 Gives the Fluids / process-industry component family (placeable since v3.7,

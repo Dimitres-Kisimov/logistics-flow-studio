@@ -1184,6 +1184,100 @@
       return { ok: okAll, detail: detail };
     });
 
+    // ---- v3.20 FLUIDS-PERSIST: a per-element fluid rate override survives
+    // the REAL serialize() -> deserialize() round-trip (the same pair the
+    // Save/Load/localStorage/JSON-export flows use), while an element with
+    // NO override serializes byte-identically to before. Restores state.
+    check("fluids-override-persists-through-serialize", function () {
+      if (!haveApi || typeof API.serializeLayout !== "function" ||
+        typeof API.deserializeLayout !== "function" ||
+        !WT.fluids || typeof WT.fluids.overridesOf !== "function") {
+        return { ok: false, detail: "no serialize/deserialize API" };
+      }
+      var okAll = false, detail = "";
+      var snapshot = null;
+      try {
+        snapshot = API.serializeLayout();
+        // Pure helper shape: an override is picked up, a plain element is null.
+        var pureOk = (function () {
+          var ov = WT.fluids.overridesOf({ id: "p1", type: "pipe", x: 0, y: 0, w: 6, d: 1, flowRateM3h: 25 });
+          var none = WT.fluids.overridesOf({ id: "p2", type: "pipe", x: 0, y: 0, w: 6, d: 1 });
+          return !!ov && ov.flowRateM3h === 25 && none === null;
+        })();
+        // Real round-trip: push a pipe carrying an override, serialize,
+        // pop it, and confirm the remaining serialize is byte-identical.
+        API.state.elements.push({ id: "st-fluid-pipe", type: "pipe", x: 0, y: 0, w: 6, d: 1, flowRateM3h: 25 });
+        var withOv = API.serializeLayout();
+        var saved = null;
+        for (var i = 0; i < withOv.elements.length; i++) {
+          if (withOv.elements[i].id === "st-fluid-pipe") saved = withOv.elements[i];
+        }
+        var persisted = !!saved && saved.flowRateM3h === 25;
+        API.state.elements.pop();
+        var identical = JSON.stringify(API.serializeLayout().elements) ===
+          JSON.stringify(snapshot.elements);
+        // Load the override layout through the REAL deserialize().
+        API.deserializeLayout(withOv);
+        var live = null;
+        for (var j = 0; j < API.state.elements.length; j++) {
+          if (API.state.elements[j].id === "st-fluid-pipe") live = API.state.elements[j];
+        }
+        var restored = !!live && live.flowRateM3h === 25;
+        okAll = pureOk && persisted && identical && restored;
+        detail = "pure=" + pureOk + " persisted=" + persisted +
+          " byteIdenticalWithoutOverride=" + identical + " restored=" + restored;
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      } finally {
+        try { if (snapshot) API.deserializeLayout(snapshot); } catch (_) { /* best effort */ }
+      }
+      return { ok: okAll, detail: detail };
+    });
+
+    // ---- v3.20 CRAFT-FLOW: the CRAFT placement's flow matrix F reads the
+    // RESOLVED network flows (resolveFlow arc flows - 72/48 on the 60/40 QA
+    // split) even when the STORED from-to rates are stale, and a plain
+    // chain keeps the stored basis (byte-identical fallback, no flowBasis
+    // key in its report).
+    check("optimize-craft-F-from-resolved-flows", function () {
+      if (!WT.generate || !WT.process || !WT.factoryOpt ||
+        typeof WT.factoryOpt.buildFD !== "function" || typeof WT.factoryOpt.craft !== "function") {
+        return { ok: false, detail: "no generate/process/factoryOpt API" };
+      }
+      var okAll = false, detail = "";
+      try {
+        var gen = WT.generate.generateFactoryLayout("machining-qa-split", { seed: 7 });
+        var block = WT.process.sanitize(gen.process);
+        // Stale stored rates on every non-source arc: the resolved flows must win.
+        for (var i = 1; i < block.routing.length; i++) block.routing[i].unitsPerHr = 1;
+        var layout = { elements: gen.elements, gridW: gen.gridW, gridH: gen.gridH, cell: 1 };
+        var fd = WT.factoryOpt.buildFD(layout, block);
+        var ix = {};
+        fd.ids.forEach(function (id, k) { ix[id] = k; });
+        var a06 = null, a04 = null;
+        for (var r = 0; r < block.routing.length; r++) {
+          if (block.routing[r].ratio === 0.6) a06 = block.routing[r];
+          if (block.routing[r].ratio === 0.4) a04 = block.routing[r];
+        }
+        var resolvedOk = fd.flowBasis === "resolved" && !!a06 && !!a04 &&
+          Math.abs(fd.F[ix[a06.from]][ix[a06.to]] - 72) < 1e-6 &&
+          Math.abs(fd.F[ix[a04.from]][ix[a04.to]] - 48) < 1e-6;
+        var c = WT.factoryOpt.craft(layout, block, { minAisleMetres: 0 });
+        var craftOk = c.flowBasis === "resolved" && c.mhiAfter <= c.mhiBefore + 1e-9;
+        // Plain-chain fallback: stored basis, no flowBasis key in the report.
+        var chain = WT.process.derive(gen);
+        var fd2 = WT.factoryOpt.buildFD(layout, chain);
+        var c2 = WT.factoryOpt.craft(layout, chain, { minAisleMetres: 0 });
+        var chainOk = fd2.flowBasis === "stored" && !("flowBasis" in c2);
+        okAll = resolvedOk && craftOk && chainOk;
+        detail = "resolvedF=" + resolvedOk + " craft=" + craftOk + " chainFallback=" + chainOk +
+          (a06 ? " (F06=" + fd.F[ix[a06.from]][ix[a06.to]] + " F04=" + fd.F[ix[a04.from]][ix[a04.to]] + ")" : "");
+      } catch (e) {
+        detail = "threw: " + (e && e.message);
+      }
+      return { ok: okAll, detail: detail };
+    });
+
     // Ratios that don't sum to ~1 are REJECTED with the friendly message
     // (module -> null metrics; panel -> the plain-language explanation).
     check("flownet-invalid-ratios-friendly-message", function () {
