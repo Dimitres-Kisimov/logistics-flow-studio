@@ -28,7 +28,7 @@
  *   - shipped wiring: index.html loads palette.js before app.js + ships the
  *     accessible overlay (role=dialog/combobox/listbox) + the affordance;
  *     app.js mounts it and dispatches to setTool / runGenerate / el.click /
- *     the actionKey switch; sw.js precaches ./palette.js at wt-v73
+ *     the actionKey switch; sw.js precaches ./palette.js at wt-v74
  *   - offline (no external asset ref) + NO Date / NO RNG in palette.js
  *   - honesty: palette.js states it invokes the existing handlers (additive)
  *
@@ -243,9 +243,9 @@ check("app.js dispatches each command kind to the SAME existing handler",
 
 // ---- service worker precache + cache bump --------------------------------
 check("sw.js precaches ./palette.js", swJs.indexOf('"./palette.js"') !== -1, "in APP_SHELL");
-check("sw.js cache bumped to wt-v73 (and no longer wt-v72)",
-  /CACHE_VERSION\s*=\s*"wt-v73"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v72"/.test(swJs),
-  "CACHE_VERSION = wt-v73");
+check("sw.js cache bumped to wt-v74 (and no longer wt-v73)",
+  /CACHE_VERSION\s*=\s*"wt-v74"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v73"/.test(swJs),
+  "CACHE_VERSION = wt-v74");
 
 // ---- offline + deterministic (NO Date / NO RNG) --------------------------
 const externalRe = /https?:\/\/(?!schemas?\.|www\.w3\.org)/i;

@@ -2363,6 +2363,93 @@
         detail: "sentinel='" + sentinel + "' data-density=" + densityAttr };
     });
 
+    // ---- v3.20.1 CRAFT PASS: design tokens + typography + motion guards ----
+    // The visual craft pass is gate-verified, not eyeballed: the token layer
+    // exists, KPI numerals are tabular, the ink-role text tokens really pass
+    // WCAG AA against their surface (contrast is COMPUTED here, live, from
+    // the resolved custom properties), and the new micro-interactions sit
+    // behind a prefers-reduced-motion guard in the shipped stylesheet.
+    function cssVar(name) {
+      try { return (getComputedStyle(document.documentElement).getPropertyValue(name) || "").trim(); }
+      catch (_) { return ""; }
+    }
+    function hexLum(hex) {
+      var h = String(hex).replace("#", "");
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      if (!/^[0-9a-fA-F]{6}$/.test(h)) return -1;
+      var c = [0, 2, 4].map(function (i) {
+        var v = parseInt(h.substr(i, 2), 16) / 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    }
+    function contrast(a, b) {
+      var la = hexLum(a), lb = hexLum(b);
+      if (la < 0 || lb < 0) return 0;
+      var hi = Math.max(la, lb), lo = Math.min(la, lb);
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    check("craft-design-tokens-present", function () {
+      var need = ["--accent-ink", "--ok-ink", "--warn-ink", "--danger-ink",
+        "--track-label", "--shadow-2", "--shadow-3", "--ease-out", "--dur-1", "--dur-2"];
+      var missing = need.filter(function (n) { return cssVar(n) === ""; });
+      return { ok: missing.length === 0,
+        detail: missing.length ? "missing: " + missing.join(",") : "all " + need.length + " tokens resolve" };
+    });
+
+    check("craft-kpi-numerals-tabular", function () {
+      var probe = document.createElement("span");
+      probe.className = "kpi-value";
+      probe.textContent = "1234";
+      document.body.appendChild(probe);
+      var fvn = "";
+      try { fvn = getComputedStyle(probe).fontVariantNumeric || ""; }
+      finally { probe.remove(); }
+      return { ok: fvn.indexOf("tabular-nums") !== -1, detail: "font-variant-numeric='" + fvn + "'" };
+    });
+
+    check("craft-ink-tokens-pass-aa-contrast", function () {
+      var surface = cssVar("--surface");
+      var pairs = [["--accent-ink", 4.5], ["--ok-ink", 4.5], ["--warn-ink", 4.5],
+        ["--danger-ink", 4.5], ["--text-dim", 4.5]];
+      var bad = [];
+      var seen = [];
+      for (var i = 0; i < pairs.length; i++) {
+        var v = cssVar(pairs[i][0]);
+        var cr = contrast(v, surface);
+        seen.push(pairs[i][0] + "=" + cr.toFixed(2));
+        if (cr < pairs[i][1]) bad.push(pairs[i][0] + " " + cr.toFixed(2) + "<" + pairs[i][1]);
+      }
+      return { ok: bad.length === 0,
+        detail: bad.length ? bad.join("; ") : "on " + surface + ": " + seen.join(" ") };
+    });
+
+    check("craft-motion-behind-reduced-motion-guard", function () {
+      // The shipped stylesheet must carry BOTH guards: a reduce block that
+      // stills the drawer/rail chrome, and the rail-icon micro-lift authored
+      // INSIDE a no-preference block (so reduce never sees it at all).
+      var foundReduce = false, foundNoPref = false;
+      try {
+        for (var s = 0; s < document.styleSheets.length; s++) {
+          var rules;
+          try { rules = document.styleSheets[s].cssRules; } catch (_) { continue; }
+          if (!rules) continue;
+          for (var r = 0; r < rules.length; r++) {
+            var rule = rules[r];
+            if (!rule.conditionText || String(rule.conditionText).indexOf("prefers-reduced-motion") === -1) continue;
+            var body = rule.cssText || "";
+            if (String(rule.conditionText).indexOf("reduce") !== -1 &&
+                body.indexOf(".wt-drawer") !== -1 && body.indexOf(".wt-rail") !== -1) foundReduce = true;
+            if (String(rule.conditionText).indexOf("no-preference") !== -1 &&
+                body.indexOf(".wt-rail-ico") !== -1 && body.indexOf("transform") !== -1) foundNoPref = true;
+          }
+        }
+      } catch (_) { /* fall through with whatever was found */ }
+      return { ok: foundReduce && foundNoPref,
+        detail: "reduceGuard=" + foundReduce + " noPrefLift=" + foundNoPref };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

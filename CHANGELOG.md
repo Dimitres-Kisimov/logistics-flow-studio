@@ -6,6 +6,56 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [3.20.1] — 2026-08-12
+
+An **award-level visual craft pass** — "industrial control room": the dark
+canvas is the hero, chrome recedes, colour stays reserved for state. Entirely
+**within** the established rail / multi-open-drawer structure (nothing
+restructured), with **no behaviour, copy, or serialization change** — every
+scenario stays byte-identical.
+
+### Changed
+- **Design-token layer** (`styles.css`): ink-role text tokens
+  (`--accent-ink` / `--ok-ink` / `--warn-ink` / `--danger-ink`) so every
+  status-coloured **text** pair passes **WCAG AA** in the light theme
+  (accent-as-text was 2.77:1 on white → 5.93:1; ok 3.30 → 5.02;
+  warn 3.19 → 5.02; ratios **computed**, and asserted **live** by the
+  self-test) while the vivid base tokens keep painting borders and tints, so
+  signal stays saturated where it isn't text. Dark inks equal the base
+  colours (8.3–10.7:1 — already passing), so dark is visually unchanged.
+  Plus: a disciplined **three-step elevation ladder** (`--shadow` resting
+  card, `--shadow-2` docked drawer, `--shadow-3` floating panel —
+  slate-tinted in light instead of dead black), **one** shared
+  uppercase-label tracking token (`--track-label`, replacing 25 ad-hoc
+  0.03–0.06 em values), and motion tokens (`--ease-out`, `--dur-1/2`).
+- **Instrument typography**: KPI numerals are now tabular
+  (`font-variant-numeric: tabular-nums` on `.kpi-value` / `.proc-kpi-val`)
+  so a live readout never wobbles column-to-column; display-size KPI values
+  get a touch of negative tracking.
+- **Canvas craft** (`app.js`): a refined **selection affordance** — the one
+  selected element earns a soft accent halo plus four corner ticks (glow is
+  reserved for state that demands attention; nothing else on the floor
+  glows); **stage-glow discipline** — only a *congested* flow station gets a
+  halo, calm stations stay flat; **per-theme grid contrast** — dark 5 m
+  major lines step up (`#2b3d5c → #34486b`) so the dark floor reads
+  structured, light 1 m minors recede (`#e8edf3 → #eaeff5`) so placed
+  elements pop. All deterministic — no time input, no RNG.
+- **Micro-interactions**: a 1 px hover lift on rail icons authored *inside*
+  `prefers-reduced-motion: no-preference` (reduce never sees it), an accent
+  keel on the active rail tool, and drawer open/close riding the shared
+  ease/duration tokens.
+- **Empty-state composition**: a radial vignette focuses the welcome card
+  while the floor grid stays legible at the edges; confident display-title
+  tracking; the three action glyphs sit in quiet tinted chips. Same copy.
+
+### Verification
+- Self-test extended **114 → 118**: design tokens present, tabular KPI
+  numerals, **live-computed** WCAG AA contrast on the ink tokens, and both
+  reduced-motion guards in the shipped stylesheet.
+- `sw.js` cache bumped `wt-v73 → wt-v74` (version-history trail preserved);
+  all six harness cache pins synced. All 46 harnesses green; offline guard
+  clean; no external assets (system font stacks only).
+
 ## [3.20.0] — 2026-08-10
 
 Closes the two minor gaps the v3.17–v3.19 releases documented: (a) the CRAFT

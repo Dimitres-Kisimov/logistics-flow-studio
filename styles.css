@@ -18,11 +18,33 @@
   --danger: #dc2626;
   --ok: #16a34a;
   --warn: #d97706;
+  /* v3.20.1 CRAFT: ink-role status tokens. The vivid base tokens above keep
+   * painting borders/tints/fills (signal stays saturated); any place a status
+   * colour is TEXT wears its -ink twin so every text pair passes WCAG AA
+   * (light accent #0ea5e9 on white was 2.77:1; #0369a1 is 5.93:1 - computed,
+   * not eyeballed; the self-test asserts these ratios live). In dark the inks
+   * equal the base colours (they already pass), so dark is unchanged. */
+  --accent-ink: #0369a1;
+  --ok-ink: #15803d;
+  --warn-ink: #b45309;
+  --danger-ink: #b91c1c;
   --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
+  /* v3.20.1 CRAFT: a disciplined three-step elevation ladder. --shadow is the
+   * resting card; --shadow-2 the docked drawer; --shadow-3 a floating panel.
+   * Light-theme depth is slate-tinted (not dead black) so chrome stays quiet. */
+  --shadow-2: 0 10px 32px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.08);
+  --shadow-3: 0 18px 50px rgba(15, 23, 42, 0.20), 0 3px 10px rgba(15, 23, 42, 0.12);
   --radius: 12px;
   --canvas-bg: #ffffff;
   --canvas-grid: #e2e8f0;
   --canvas-grid-strong: #cbd5e1;
+  /* v3.20.1 CRAFT: shared type + motion tokens. One tracking value for every
+   * uppercase micro-label (the letter-spacing was 0.03-0.06em ad hoc); one
+   * confident ease + two durations for every chrome transition. */
+  --track-label: 0.05em;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-1: 0.14s;
+  --dur-2: 0.18s;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     "Noto Sans", sans-serif;
   --mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
@@ -43,7 +65,14 @@
     --danger: #f87171;
     --ok: #4ade80;
     --warn: #fbbf24;
+    /* Dark inks == base colours (8.3:1 / 10.3:1 / 10.7:1 / 6.5:1 on --surface). */
+    --accent-ink: #38bdf8;
+    --ok-ink: #4ade80;
+    --warn-ink: #fbbf24;
+    --danger-ink: #f87171;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 12px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.30);
+    --shadow-3: 0 22px 60px rgba(0, 0, 0, 0.50), 0 4px 12px rgba(0, 0, 0, 0.35);
     --canvas-bg: #0e1626;
     --canvas-grid: #1c2942;
     --canvas-grid-strong: #2b3d5c;
@@ -94,7 +123,7 @@ h1, h2, h3 { margin: 0; font-weight: 650; }
   display: inline-block;
   font-size: 0.66rem;
   background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
+  color: var(--accent-ink);
   padding: 1px 7px;
   border-radius: 999px;
   vertical-align: middle;
@@ -147,7 +176,7 @@ h1, h2, h3 { margin: 0; font-weight: 650; }
 /* The density toggle button: a compact labelled pill that reads its mode. */
 .density-toggle { display: inline-flex; align-items: center; gap: 6px; }
 .density-cap {
-  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em;
+  font-size: 0.6rem; font-weight: 700; letter-spacing: var(--track-label);
   text-transform: uppercase; color: var(--text-dim);
 }
 .density-mode { font-weight: 650; }
@@ -155,10 +184,10 @@ h1, h2, h3 { margin: 0; font-weight: 650; }
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
-.density-toggle[aria-pressed="true"] .density-mode { color: var(--accent); }
+.density-toggle[aria-pressed="true"] .density-mode { color: var(--accent-ink); }
 /* Top quick-pick dropdown for the Example scenarios (loads onto the floor). */
 .topbar-examples { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; justify-content: center; }
-.topbar-examples-label { font-size: 0.72rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+.topbar-examples-label { font-size: 0.72rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: var(--track-label); white-space: nowrap; }
 .topbar-select { width: auto; min-width: 220px; max-width: 380px; font-size: 0.8rem; padding: 7px 10px; }
 
 /* ---------------- Buttons ---------------- */
@@ -185,17 +214,17 @@ h1, h2, h3 { margin: 0; font-weight: 650; }
 a.btn:focus-visible,
 [role="button"]:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--accent) !important;
+  outline: 2px solid var(--accent-ink) !important;
   outline-offset: 2px !important;
   border-radius: 8px;
 }
 .btn.primary { background: var(--primary); color: var(--primary-ink); border-color: transparent; font-weight: 600; }
 .btn.primary:hover { filter: brightness(1.06); }
 .btn.ghost { background: transparent; }
-.btn.danger { color: var(--danger); }
+.btn.danger { color: var(--danger-ink); }
 .btn.danger:hover { border-color: var(--danger); }
 .btn.wide { width: 100%; margin-top: 10px; }
-.btn.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn.active { outline: 2px solid var(--accent-ink); outline-offset: 1px; }
 /* P8: accent call-to-action (the Guided demo button) - a filled gradient
    pill that reads as the primary "try me" action without shouting. */
 .btn.accent {
@@ -206,7 +235,7 @@ a.btn:focus-visible,
 /* P5: cross-app links (anchors styled as buttons, e.g. the LSP Planner
    link in the header and the back-link in lsp/). */
 a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
-a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); font-weight: 600; white-space: nowrap; }
+a.btn.app-link { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 45%, transparent); font-weight: 600; white-space: nowrap; }
 
 /* ---------------- Layout ---------------- */
 /* v3.9 REDESIGN-2: canvas-hero shell. A slim icon rail on the left + the
@@ -259,11 +288,18 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   cursor: pointer;
   font: inherit;
   line-height: 1;
-  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+  transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
 }
 .wt-rail-btn:hover { background: var(--surface-2, rgba(127, 127, 127, 0.12)); }
-.wt-rail-ico { display: inline-flex; color: var(--text-dim); transition: color 0.14s ease; }
+.wt-rail-ico { display: inline-flex; color: var(--text-dim); transition: color var(--dur-1) var(--ease-out); }
 .wt-rail-ico svg { display: block; }
+/* v3.20.1 CRAFT: a whisper of lift on the hovered rail icon - motion-pref
+ * gated at the source (inside no-preference), so reduce never sees it. */
+@media (prefers-reduced-motion: no-preference) {
+  .wt-rail-ico { transition: color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out); }
+  .wt-rail-btn:hover .wt-rail-ico { transform: translateY(-1px); }
+  .wt-rail-btn:active .wt-rail-ico { transform: translateY(0); }
+}
 .wt-rail-label {
   font-size: 0.6rem;
   letter-spacing: 0.01em;
@@ -276,10 +312,23 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   background: color-mix(in srgb, var(--accent, #2563eb) 16%, transparent);
   border-color: color-mix(in srgb, var(--accent, #2563eb) 40%, transparent);
 }
+/* v3.20.1 CRAFT: an open tool carries a quiet accent keel on its left edge -
+ * the active state reads in the periphery without the icon shouting. */
+.wt-rail-btn { position: relative; }
+.wt-rail-btn.active::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--accent-ink, #2563eb);
+}
 .wt-rail-btn.active .wt-rail-ico,
-.wt-rail-btn.active .wt-rail-label { color: var(--accent, #2563eb); }
+.wt-rail-btn.active .wt-rail-label { color: var(--accent-ink, #2563eb); }
 .wt-rail-btn:focus-visible {
-  outline: 2px solid var(--accent, #2563eb);
+  outline: 2px solid var(--accent-ink, #2563eb);
   outline-offset: 2px;
 }
 /* v3.11 RUN DISCOVERABILITY: a calm "ready to run" affordance on the Simulate
@@ -336,12 +385,12 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28), var(--shadow);
+  box-shadow: var(--shadow-2); /* v3.20.1 CRAFT: elevation ladder step 2 (slate-tinted in light) */
   pointer-events: auto;
   overflow: hidden;
-  transform: translateX(-8px);
+  transform: translateX(-10px);
   opacity: 0;
-  transition: transform 0.16s ease, opacity 0.16s ease;
+  transition: transform var(--dur-2) var(--ease-out), opacity var(--dur-2) var(--ease-out);
 }
 .wt-drawer.open { display: flex; transform: none; opacity: 1; }
 /* v3.13: a LONE open drawer sizes to its content (like v3.9) so the canvas
@@ -366,10 +415,10 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   max-height: min(72vh, 640px);
   margin: 0;
   z-index: 41;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.34), 0 3px 10px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--shadow-3); /* v3.20.1 CRAFT: elevation ladder step 3 */
 }
 .wt-drawer.wt-drawer--floating.wt-drawer--front {
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42),
+  box-shadow: var(--shadow-3),
     0 0 0 1px color-mix(in srgb, var(--accent, #2563eb) 42%, transparent);
 }
 /* During a pointer drag: no transition (never fights reduced-motion easing),
@@ -405,7 +454,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   cursor: grab;
 }
 .wt-drawer-grip:hover { color: var(--text); }
-.wt-drawer-grip:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: 2px; border-radius: 6px; }
+.wt-drawer-grip:focus-visible { outline: 2px solid var(--accent-ink, #2563eb); outline-offset: 2px; border-radius: 6px; }
 .wt-drawer-pin {
   flex: 0 0 auto;
   border: 1px solid var(--border);
@@ -420,9 +469,9 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   justify-content: center;
 }
 .wt-drawer-pin:hover { background: var(--surface-2, rgba(127, 127, 127, 0.12)); }
-.wt-drawer-pin:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: 2px; }
+.wt-drawer-pin:focus-visible { outline: 2px solid var(--accent-ink, #2563eb); outline-offset: 2px; }
 .wt-drawer-pin[aria-pressed="true"] {
-  color: var(--accent, #2563eb);
+  color: var(--accent-ink, #2563eb);
   border-color: color-mix(in srgb, var(--accent, #2563eb) 45%, transparent);
   background: color-mix(in srgb, var(--accent, #2563eb) 14%, transparent);
 }
@@ -439,7 +488,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   line-height: 1;
 }
 .wt-drawer-close:hover { background: var(--surface-2, rgba(127, 127, 127, 0.12)); }
-.wt-drawer-close:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: 2px; }
+.wt-drawer-close:focus-visible { outline: 2px solid var(--accent-ink, #2563eb); outline-offset: 2px; }
 .wt-drawer-body {
   overflow-y: auto;
   overflow-x: hidden;
@@ -469,6 +518,9 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
 @media (prefers-reduced-motion: reduce) {
   .wt-drawer { transition: none; }
   .wt-rail-btn { transition: none; }
+  /* v3.20.1 CRAFT: the icon micro-lift is authored inside no-preference, so
+   * it never runs here; this belt-and-braces line also kills its transition. */
+  .wt-rail-ico { transition: none; transform: none; }
 }
 
 /* Narrow screens: the rail stays; the drawer becomes a wider overlay. */
@@ -495,7 +547,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   user-select: none;
 }
 .card-title.card-toggle:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-ink);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -565,15 +617,15 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   width: 100%;
 }
 .pal-item:hover { border-color: var(--accent); }
-.pal-item.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pal-item.active { outline: 2px solid var(--accent-ink); outline-offset: 1px; }
 .pal-swatch { width: 16px; height: 16px; border-radius: 4px; flex: none; }
-.pal-cat { margin-left: auto; font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+.pal-cat { margin-left: auto; font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: var(--track-label); }
 .pal-head {
   font-size: 0.66rem;
   font-weight: 700;
   color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--track-label);
   margin: 6px 0 0;
 }
 .pal-head:first-child { margin-top: 0; }
@@ -584,10 +636,10 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
 .pal-group-head {
   display: flex; align-items: center; gap: 8px; width: 100%;
   padding: 7px 10px; border: 0; background: var(--surface-2);
-  font: inherit; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
+  font: inherit; font-size: 0.72rem; font-weight: 700; letter-spacing: var(--track-label);
   color: var(--text); text-transform: uppercase; cursor: pointer; text-align: left;
 }
-.pal-group-head:hover { color: var(--accent); }
+.pal-group-head:hover { color: var(--accent-ink); }
 .pal-caret { flex: none; font-size: 0.7rem; width: 0.9em; color: var(--text-dim); }
 .pal-group-label { flex: 1 1 auto; }
 .pal-count { flex: none; font-size: 0.66rem; color: var(--text-dim); font-weight: 600; }
@@ -601,7 +653,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   background: var(--surface-2); color: var(--text-dim); cursor: pointer;
   font-size: 0.95rem; line-height: 1;
 }
-.pal-mini:hover { border-color: var(--accent); color: var(--accent); }
+.pal-mini:hover { border-color: var(--accent); color: var(--accent-ink); }
 
 /* v2.3 UI-1: Class Library search + keyboard focus + empty-search note. */
 .pal-search { margin: 0 0 8px; }
@@ -611,7 +663,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
    .btn, so the global :focus-visible rule does not reach them). */
 .pal-item:focus-visible,
 .pal-group-head:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-ink);
   outline-offset: 1px;
   border-radius: 8px;
 }
@@ -646,7 +698,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   font-size: 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-ink);
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 5px;
   padding: 0 4px;
@@ -666,8 +718,8 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   border: 1px solid var(--border);
   color: var(--text-dim);
 }
-.badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
-.badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.badge.ok { color: var(--ok-ink); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.badge.warn { color: var(--warn-ink); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
 .badge.muted { color: var(--text-dim); }
 
 /* ---------------- View toolbar (zoom / pan / floor size) ---------------- */
@@ -683,7 +735,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
 }
 .zoom-group #zoomBadge { min-width: 3.1em; text-align: center; }
 .btn.small.icon { min-width: 26px; padding: 3px 8px; font-weight: 700; line-height: 1; }
-.btn.small.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn.small.active { outline: 2px solid var(--accent-ink); outline-offset: 1px; }
 /* 2.5D presentation-mode toggle: reads as a clearly "on" filled state so
    it is obvious the floor is in the illustrative iso view (not editable). */
 #isoBtn.active {
@@ -715,7 +767,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
 }
 #floor { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
 .status-line { font-size: 0.78rem; color: var(--text-dim); margin: 8px 2px 0; min-height: 1.2em; }
-.status-line.warn { color: var(--warn); }
+.status-line.warn { color: var(--warn-ink); }
 
 /* ---------------- v3.8 REDESIGN-1: canvas-hero empty-state -------------
    Shown by app.js ONLY when the floor has no elements, hidden the moment it
@@ -731,7 +783,12 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   justify-content: center;
   padding: 20px;
   pointer-events: none;
-  background: color-mix(in srgb, var(--canvas-bg) 34%, transparent);
+  /* v3.20.1 CRAFT: a soft radial vignette focuses the card while the floor
+   * grid stays legible at the edges - the canvas remains the hero. */
+  background: radial-gradient(ellipse at center,
+    color-mix(in srgb, var(--canvas-bg) 55%, transparent) 0%,
+    color-mix(in srgb, var(--canvas-bg) 30%, transparent) 55%,
+    color-mix(in srgb, var(--canvas-bg) 10%, transparent) 100%);
   z-index: 5;
 }
 .empty-state[hidden] { display: none; }
@@ -740,26 +797,41 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   width: min(100%, 560px);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 22px 22px 18px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-2); /* v3.20.1 CRAFT: the welcome moment earns step-2 depth */
+  padding: 26px 24px 20px;
   text-align: center;
 }
-.empty-title { margin: 0 0 4px; font-size: 1.15rem; }
-.empty-sub { margin: 0 0 16px; font-size: 0.85rem; color: var(--text-dim); }
+/* v3.20.1 CRAFT: composed welcome typography - a confident display title with
+ * tight tracking over a calmer, airier standfirst. Same copy, better voice. */
+.empty-title { margin: 0 0 6px; font-size: 1.3rem; font-weight: 700; letter-spacing: -0.015em; }
+.empty-sub { margin: 0 auto 18px; font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; max-width: 40ch; }
 .empty-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 @media (max-width: 560px) { .empty-actions { grid-template-columns: 1fr; } }
 .empty-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   height: auto;
   padding: 14px 10px;
   text-align: center;
   white-space: normal;
 }
-.empty-ico { font-size: 1.5rem; line-height: 1; }
+/* v3.20.1 CRAFT: the action glyph sits in a quiet tinted chip so the three
+ * starting points read as equal, scannable tiles. The primary tile's chip
+ * inverts onto the primary surface. */
+.empty-ico {
+  font-size: 1.25rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 11px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-ink);
+}
+.empty-btn.primary .empty-ico {
+  background: color-mix(in srgb, var(--primary-ink) 16%, transparent);
+  color: inherit;
+}
 .empty-btn-label { font-weight: 700; font-size: 0.9rem; }
 .empty-btn-note { font-size: 0.7rem; color: var(--text-dim); font-weight: 400; line-height: 1.25; }
 .empty-btn.primary .empty-btn-note { color: inherit; opacity: 0.85; }
@@ -771,7 +843,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
   gap: 8px;
   margin-top: 16px;
 }
-.empty-sizes-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); }
+.empty-sizes-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: var(--track-label); color: var(--text-dim); }
 .empty-size { display: inline-flex; gap: 6px; align-items: baseline; }
 .empty-size small { color: var(--text-dim); font-size: 0.68rem; }
 .empty-foot { margin: 14px 0 0; font-size: 0.74rem; color: var(--text-dim); }
@@ -800,7 +872,7 @@ a.btn.app-link { color: var(--accent); border-color: color-mix(in srgb, var(--ac
 .prop-group-head {
   display: flex; align-items: center; gap: 6px; width: 100%;
   background: none; border: none; padding: 9px 0 7px; margin: 0;
-  font: inherit; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em;
+  font: inherit; font-size: 0.68rem; font-weight: 700; letter-spacing: var(--track-label);
   text-transform: uppercase; color: var(--text-dim); cursor: pointer;
 }
 .prop-group-head:hover { color: var(--text); }
@@ -825,7 +897,7 @@ input, select {
   color: var(--text);
   width: 100%;
 }
-input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+input:focus, select:focus { outline: 2px solid var(--accent-ink); outline-offset: 0; border-color: transparent; }
 
 /* ---------------- KPIs ---------------- */
 .kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
@@ -836,8 +908,14 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   padding: 10px;
 }
 .kpi-card.full { grid-column: 1 / -1; }
-.kpi-label { font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
-.kpi-value { font-size: 1.25rem; font-weight: 700; font-family: var(--mono); margin-top: 2px; }
+.kpi-label { font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: var(--track-label); }
+/* v3.20.1 CRAFT: confident instrument numerals - tabular figures keep live
+ * digits column-stable frame to frame (a readout never wobbles), with a touch
+ * of negative tracking at display size. */
+.kpi-value {
+  font-size: 1.25rem; font-weight: 700; font-family: var(--mono); margin-top: 2px;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+}
 .kpi-unit { font-size: 0.7rem; color: var(--text-dim); font-weight: 500; }
 .kpi-note { font-size: 0.7rem; color: var(--text-dim); margin-top: 6px; grid-column: 1 / -1; }
 
@@ -849,7 +927,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   grid-column: 1 / -1;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--warn);
+  color: var(--warn-ink);
   background: color-mix(in srgb, var(--warn) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
   border-radius: 9px;
@@ -908,10 +986,10 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
 .cmp-table td.cmp-metric { color: var(--text); }
 .cmp-table td.cmp-metric .cmp-unit { color: var(--text-dim); font-size: 0.72rem; }
 .cmp-dir { display: inline-block; margin-left: 6px; font-size: 0.68rem; color: var(--text-dim); }
-.cmp-sec td { background: var(--surface-2); font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.7rem; text-align: left; }
+.cmp-sec td { background: var(--surface-2); font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: var(--track-label); font-size: 0.7rem; text-align: left; }
 .cmp-delta { font-variant-numeric: tabular-nums; }
-.cmp-good { color: var(--ok); }
-.cmp-bad { color: var(--danger); }
+.cmp-good { color: var(--ok-ink); }
+.cmp-bad { color: var(--danger-ink); }
 .cmp-neu { color: var(--text-dim); }
 .cmp-na { color: var(--text-dim); opacity: 0.7; }
 .cmp-pill { display: inline-block; font-size: 0.64rem; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border); margin-left: 6px; color: var(--text-dim); }
@@ -1024,7 +1102,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
 .adv-finding { font-weight: 650; font-size: 0.82rem; }
 .adv-line { font-size: 0.76rem; color: var(--text-dim); margin-top: 5px; }
 .adv-k {
-  display: inline-block; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.04em;
+  display: inline-block; font-size: 0.62rem; text-transform: uppercase; letter-spacing: var(--track-label);
   font-weight: 700; color: var(--text); background: color-mix(in srgb, var(--accent) 16%, transparent);
   padding: 0 6px; border-radius: 5px; margin-right: 5px;
 }
@@ -1038,14 +1116,14 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
 .dl-v { font-family: var(--mono); font-size: 0.78rem; }
 .dl-u { color: var(--text-dim); font-size: 0.68rem; }
 .dl-pct { font-family: var(--mono); font-weight: 700; font-size: 0.78rem; text-align: right; min-width: 56px; }
-.dl-pct.up { color: var(--ok); }
-.dl-pct.down { color: var(--danger); }
+.dl-pct.up { color: var(--ok-ink); }
+.dl-pct.down { color: var(--danger-ink); }
 .dl-pct.neutral { color: var(--text-dim); }
 
 /* ---- A/B compare ---- */
 .ab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 .ab-side { display: flex; flex-direction: column; gap: 6px; }
-.ab-title { font-size: 0.72rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+.ab-title { font-size: 0.72rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: var(--track-label); }
 .ab-out { margin-top: 10px; }
 .ab-out .empty { color: var(--text-dim); font-size: 0.8rem; }
 .ab-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
@@ -1054,7 +1132,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
 .ab-table thead th { color: var(--text-dim); font-size: 0.72rem; font-weight: 600; }
 .ab-table .ab-names td { font-size: 0.68rem; color: var(--text-dim); font-weight: 600; }
 .ab-table .ab-k { color: var(--text-dim); }
-.ab-table td.win { color: var(--ok); font-weight: 700; }
+.ab-table td.win { color: var(--ok-ink); font-weight: 700; }
 .ab-table td { font-family: var(--mono); }
 .ab-table td.ab-k, .ab-table .ab-names td { font-family: var(--font); }
 .ab-rec { font-size: 0.8rem; margin-top: 10px; padding: 9px 11px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--border); }
@@ -1064,13 +1142,13 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
  * hidden. This is an honest showcase gate, not DRM (see tiers.js).
  * ===================================================================== */
 .tier-badge {
-  color: var(--warn);
+  color: var(--warn-ink);
   border-color: color-mix(in srgb, var(--warn) 45%, transparent);
   font-weight: 700;
   white-space: nowrap;
 }
 .tier-badge.full {
-  color: var(--ok);
+  color: var(--ok-ink);
   border-color: color-mix(in srgb, var(--ok) 45%, transparent);
 }
 .lock-glyph { color: var(--text-dim); flex: none; }
@@ -1119,12 +1197,12 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   white-space: normal;
   min-width: 110px;
 }
-.hist-table td.win { color: var(--ok); font-weight: 700; }
+.hist-table td.win { color: var(--ok-ink); font-weight: 700; }
 .hist-tag {
   font-size: 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-ink);
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 5px;
   padding: 0 4px;
@@ -1135,14 +1213,14 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
 .std-summary { font-size: 0.9rem; font-weight: 650; cursor: pointer; padding: 2px 0; }
 .std-summary em { font-style: italic; color: var(--text-dim); font-weight: 500; }
 .std-live { font-size: 0.76rem; margin: 10px 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); }
-.std-live.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
-.std-live.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.std-live.ok { color: var(--ok-ink); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.std-live.warn { color: var(--warn-ink); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
 .std-list { display: flex; flex-direction: column; gap: 8px; }
 .std-item { border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; background: var(--surface-2); }
 .std-code { font-weight: 700; font-size: 0.8rem; }
 .std-gov { font-size: 0.76rem; color: var(--text-dim); margin-top: 3px; }
 .std-app { font-size: 0.74rem; margin-top: 5px; }
-.std-applabel { font-weight: 700; color: var(--accent); }
+.std-applabel { font-weight: 700; color: var(--accent-ink); }
 .std-disclaimer { font-size: 0.75rem; margin-top: 12px; padding: 10px 12px; border-radius: 9px; background: color-mix(in srgb, var(--warn) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); }
 
 /* =====================================================================
@@ -1162,14 +1240,14 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
 .kb-item.edited { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
 .kb-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .kb-label { font-weight: 700; font-size: 0.8rem; }
-.kb-cat { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; }
-.kb-badge { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 999px; padding: 1px 6px; }
-.kb-badge.custom { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.kb-cat { font-size: 0.66rem; text-transform: uppercase; letter-spacing: var(--track-label); color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; }
+.kb-badge { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: var(--track-label); color: var(--accent-ink); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 999px; padding: 1px 6px; }
+.kb-badge.custom { color: var(--ok-ink); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 .kb-edit { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
 .kb-input { flex: 1 1 90px; min-width: 60px; padding: 4px 8px; font-size: 0.8rem; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
 .kb-unit { font-size: 0.74rem; color: var(--text-dim); min-width: 34px; }
 .kb-source { font-size: 0.72rem; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
-.kb-src-label { font-weight: 700; color: var(--accent); }
+.kb-src-label { font-weight: 700; color: var(--accent-ink); }
 .kb-note { font-size: 0.71rem; color: var(--text-dim); margin-top: 4px; font-style: italic; line-height: 1.4; }
 
 /* =====================================================================
@@ -1186,7 +1264,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
   line-height: 1.45;
 }
-.compl-disclaimer strong { color: var(--warn); }
+.compl-disclaimer strong { color: var(--warn-ink); }
 .compl-disclaimer .compl-en { display: block; margin-top: 4px; }
 .compl-disclaimer .compl-de { display: block; margin-top: 6px; color: var(--text-dim); font-style: italic; }
 .compl-summary { display: flex; gap: 8px; margin: 10px 0 4px; }
@@ -1197,15 +1275,15 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   font-size: 0.66rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--track-label);
   padding: 1px 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
   color: var(--text-dim);
 }
-.cbadge.pass { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }
-.cbadge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
-.cbadge.fail { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.cbadge.pass { color: var(--ok-ink); border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.cbadge.warn { color: var(--warn-ink); border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.cbadge.fail { color: var(--danger-ink); border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .compl-item {
   border: 1px solid var(--border);
   border-left: 4px solid var(--text-dim);
@@ -1218,17 +1296,17 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
 .compl-item.pass { border-left-color: var(--ok); }
 .compl-item[role="button"] { cursor: pointer; }
 .compl-item[role="button"]:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
-.compl-item[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.compl-item[role="button"]:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 1px; }
 .compl-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .compl-rule { font-weight: 650; font-size: 0.8rem; }
 .compl-line { font-size: 0.76rem; color: var(--text-dim); margin-top: 5px; line-height: 1.4; }
 .compl-line.de { font-style: italic; opacity: 0.85; }
 .compl-k {
-  display: inline-block; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.04em;
+  display: inline-block; font-size: 0.6rem; text-transform: uppercase; letter-spacing: var(--track-label);
   font-weight: 700; color: var(--text); background: color-mix(in srgb, var(--accent) 16%, transparent);
   padding: 0 6px; border-radius: 5px; margin-right: 4px;
 }
-.compl-loc { font-size: 0.68rem; color: var(--accent); margin-top: 6px; font-weight: 600; }
+.compl-loc { font-size: 0.68rem; color: var(--accent-ink); margin-top: 6px; font-weight: 600; }
 
 /* =====================================================================
  * WMS Operations panel (wms.js). The 7-stage flow, per-stage load bars,
@@ -1245,7 +1323,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
   line-height: 1.45;
 }
-.wms-disclaimer strong { color: var(--warn); }
+.wms-disclaimer strong { color: var(--warn-ink); }
 .wms-disclaimer code { font-family: var(--mono); font-size: 0.72rem; }
 .wms-out { margin-top: 10px; }
 .wms-out .empty { color: var(--text-dim); font-size: 0.8rem; }
@@ -1289,13 +1367,13 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
 .wms-stage-note { font-size: 0.68rem; color: var(--text-dim); margin-top: 4px; line-height: 1.4; opacity: 0.9; }
 .wms-badge {
   display: inline-block; font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.04em; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim);
+  letter-spacing: var(--track-label); padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim);
 }
-.wms-badge.crit { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
-.wms-badge.back { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
-.wms-badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.wms-badge.crit { color: var(--danger-ink); border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.wms-badge.back { color: var(--warn-ink); border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.wms-badge.ok { color: var(--ok-ink); border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }
 .wms-h3 { font-size: 0.82rem; margin: 14px 0 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.wms-synth { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--warn); }
+.wms-synth { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: var(--track-label); color: var(--warn-ink); }
 .wms-sources { margin-top: 8px; font-size: 0.72rem; color: var(--text-dim); }
 .wms-sources summary { cursor: pointer; font-weight: 600; color: var(--text); }
 .wms-sources ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.45; }
@@ -1328,12 +1406,12 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   line-height: 1.45;
 }
-.gen-honesty strong { color: var(--accent); }
+.gen-honesty strong { color: var(--accent-ink); }
 .gen-keyword { width: 100%; margin-top: 6px; }
 .gen-modes { display: flex; gap: 6px; margin: 10px 0; }
 .gen-modes .gen-mode { flex: 1; padding: 7px 4px; font-size: 0.76rem; }
 .gen-mode.active {
-  color: var(--accent);
+  color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   font-weight: 650;
@@ -1359,7 +1437,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
 .gen-log-item.info { border-left-color: var(--accent); }
 .gen-log-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .gen-log-kind {
-  display: inline-block; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.04em;
+  display: inline-block; font-size: 0.6rem; text-transform: uppercase; letter-spacing: var(--track-label);
   font-weight: 700; color: var(--text); background: color-mix(in srgb, var(--accent) 16%, transparent);
   padding: 0 6px; border-radius: 5px;
 }
@@ -1414,7 +1492,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   background: color-mix(in srgb, var(--warn) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
 }
-.example-synth strong { color: var(--warn); }
+.example-synth strong { color: var(--warn-ink); }
 .example-data { margin: 0; display: grid; grid-template-columns: 1fr; gap: 3px; }
 .example-data > div {
   display: flex;
@@ -1433,7 +1511,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   padding: 9px 11px;
   border-radius: 9px;
   font-size: 0.75rem;
-  color: var(--danger, #dc2626);
+  color: var(--danger-ink, #b91c1c);
   background: color-mix(in srgb, var(--danger, #dc2626) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger, #dc2626) 45%, transparent);
 }
@@ -1464,7 +1542,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .wmsdata-kpis .k {
   padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2);
 }
-.wmsdata-kpis .k .lbl { display: block; font-size: 0.64rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.wmsdata-kpis .k .lbl { display: block; font-size: 0.64rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: var(--track-label); }
 .wmsdata-kpis .k .val { font-family: var(--mono); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 .wmsdata-cap { font-size: 0.68rem; color: var(--text-dim); margin: 6px 0 2px; }
 .wmsdata-stats .cat-table { margin-top: 4px; }
@@ -1575,7 +1653,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .flow-pool-stats { font-size: 0.74rem; color: var(--text-dim); margin: 0; line-height: 1.55; }
 .flow-pool-stats strong { color: var(--text); font-variant-numeric: tabular-nums; }
 .flow-pool-cap { font-size: 0.66rem; color: var(--text-dim); margin: 8px 0 0; line-height: 1.45; }
-.flow-pool-cap strong { color: var(--warn); }
+.flow-pool-cap strong { color: var(--warn-ink); }
 
 /* P3.1: Live KPI dashboard (kpicharts.js). A compact plant-sim cockpit
  * strip drawn on its own screen-space canvas (outside the world zoom/pan
@@ -1591,7 +1669,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   background: var(--surface-2);
 }
 .flow-kpi-cap { font-size: 0.68rem; color: var(--text-dim); margin: 7px 0 0; line-height: 1.45; }
-.flow-kpi-cap strong { color: var(--warn); }
+.flow-kpi-cap strong { color: var(--warn-ink); }
 
 /* =====================================================================
  * P8: Guided demo HUD + About / why-this panel
@@ -1700,7 +1778,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 #aboutBody h3 {
   font-size: 0.74rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--track-label);
   color: var(--text-dim);
   margin: 16px 0 6px;
 }
@@ -1709,7 +1787,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .about-chip {
   font-size: 0.68rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-ink);
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   border-radius: 999px;
@@ -1756,15 +1834,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
-.proc-kpi-val { font-size: 1.05rem; font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
-.proc-kpi-lbl { font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.proc-kpi-val { font-size: 1.05rem; font-weight: 700; color: var(--text); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.proc-kpi-lbl { font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: var(--track-label); }
 .proc-sub { font-size: 0.78rem; color: var(--text); margin: 4px 0; }
 .proc-basis { font-size: 0.68rem; color: var(--text-dim); line-height: 1.45; margin: 4px 0 0; }
 .proc-details { margin-top: 8px; }
 .proc-bars { display: flex; flex-direction: column; gap: 5px; margin: 8px 0; }
 .proc-bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.74rem; }
 .proc-bar-name { flex: 0 0 34%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-.proc-bar-row.is-bottleneck .proc-bar-name { color: var(--danger); font-weight: 700; }
+.proc-bar-row.is-bottleneck .proc-bar-name { color: var(--danger-ink); font-weight: 700; }
 .proc-bar-track {
   flex: 1 1 auto; height: 9px; border-radius: 5px; overflow: hidden;
   background: color-mix(in srgb, var(--text-dim) 22%, transparent);
@@ -1778,7 +1856,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   border-radius: 5px; background: var(--bg); color: var(--text); font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
 }
-.proc-cycle-inp:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.proc-cycle-inp:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 1px; }
 .proc-little { font-size: 0.74rem; color: var(--text); margin: 6px 0 4px; line-height: 1.5; }
 
 /* ================================================================
@@ -1795,11 +1873,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
   background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
-.proc-delta-good { color: var(--ok, #16a34a); font-weight: 700; }
+.proc-delta-good { color: var(--ok-ink, #15803d); font-weight: 700; }
 .opt-group { margin-top: 8px; }
 .opt-group > summary { cursor: pointer; }
 .opt-group-body { padding: 6px 0 2px; }
-.opt-group-body h4 { font-size: 0.72rem; margin: 8px 0 4px; color: var(--text); text-transform: uppercase; letter-spacing: 0.03em; }
+.opt-group-body h4 { font-size: 0.72rem; margin: 8px 0 4px; color: var(--text); text-transform: uppercase; letter-spacing: var(--track-label); }
 .opt-matrix, .opt-rpw {
   width: 100%; border-collapse: collapse; font-size: 0.7rem; margin: 2px 0 4px;
   font-variant-numeric: tabular-nums; display: block; overflow-x: auto;
@@ -1821,7 +1899,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
  * ================================================================ */
 .analyze-headline .empty { color: var(--text-dim); font-size: 0.8rem; line-height: 1.5; }
 .analyze-mode-pill {
-  display: inline-block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.04em;
+  display: inline-block; font-size: 0.64rem; font-weight: 700; letter-spacing: var(--track-label);
   text-transform: uppercase; color: var(--text-dim);
   border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; margin: 4px 0 6px;
   background: color-mix(in srgb, var(--accent) 6%, transparent);
@@ -1835,7 +1913,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .an-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; margin: 6px 0; }
 .an-table caption { text-align: left; }
 .an-table thead th {
-  font-size: 0.64rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+  font-size: 0.64rem; font-weight: 600; text-transform: uppercase; letter-spacing: var(--track-label);
   color: var(--text-dim); text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--border);
 }
 .an-table thead th:last-child, .an-table td.an-val { text-align: right; }
@@ -1844,8 +1922,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .an-name { color: var(--text); min-width: 0; }
 .an-detail { display: block; font-size: 0.66rem; color: var(--text-dim); line-height: 1.4; }
 .an-tag {
-  display: inline-block; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
-  color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  display: inline-block; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: var(--track-label);
+  color: var(--danger-ink); border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
   border-radius: 999px; padding: 0 6px; margin-left: 4px; vertical-align: middle;
 }
 .an-bar-cell { width: 38%; }
@@ -1856,7 +1934,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .an-bar-fill { display: block; height: 100%; border-radius: 5px; background: var(--accent-2); }
 .an-bar-fill.is-constraint { background: var(--danger); }
 .an-val { color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.an-row.is-constraint .an-name { color: var(--danger); font-weight: 700; }
+.an-row.is-constraint .an-name { color: var(--danger-ink); font-weight: 700; }
 
 .an-bar-chart, .an-sankey { margin: 8px 0 4px; overflow-x: auto; }
 .an-bar-svg, .an-sankey-svg { display: block; width: 100%; height: auto; }
@@ -2093,9 +2171,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   cursor: pointer;
 }
 .tb-menu-item:hover { background: var(--surface-2); border-color: var(--border); }
-.tb-menu-item:focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
+.tb-menu-item:focus-visible { outline: 2px solid var(--accent-ink) !important; outline-offset: 2px; }
 .tb-menu-item > svg { flex: 0 0 auto; color: var(--text-dim); }
-.tb-menu-item.danger { color: var(--danger); }
+.tb-menu-item.danger { color: var(--danger-ink); }
 
 /* ---- v3.16 ICON-EXTEND: the "Add component" flyout ----
  * The Add icon opens the Class Library CATEGORIES; each is a keyboard-
@@ -2122,7 +2200,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   cursor: pointer;
 }
 .tb-submenu-head:hover { background: var(--surface-2); border-color: var(--border); }
-.tb-submenu-head:focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
+.tb-submenu-head:focus-visible { outline: 2px solid var(--accent-ink) !important; outline-offset: 2px; }
 .tb-submenu-caret { flex: 0 0 auto; width: 12px; color: var(--text-dim); font-size: 0.72rem; }
 .tb-submenu-label { flex: 1 1 auto; min-width: 0; }
 .tb-submenu-count {

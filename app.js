@@ -171,13 +171,18 @@
   // ================================================================
   // THEME COLOURS (canvas can't read CSS vars directly)
   // ================================================================
+  // v3.20.1 CRAFT: grid contrast tuned per theme — in dark the 5 m major
+  // lines step up a touch (#2b3d5c -> #34486b) so the floor reads structured
+  // on the dark hero canvas; in light the 1 m minor lines recede a hair
+  // (#e8edf3 -> #eaeff5) so placed elements pop. Signal colours (stages,
+  // congestion, violations) are untouched — colour stays reserved for state.
   function themeColors() {
     const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     return dark
-      ? { bg: "#0e1626", void: "#080d17", grid: "#1c2942", gridStrong: "#2b3d5c", text: "#e2e8f0", dim: "#94a3b8", sel: "#38bdf8", violation: "#f87171", io: "#facc15", flow: "#2dd4bf", warnMark: "#f87171", heat: "#fb923c",
+      ? { bg: "#0e1626", void: "#080d17", grid: "#1c2942", gridStrong: "#34486b", text: "#e2e8f0", dim: "#94a3b8", sel: "#38bdf8", violation: "#f87171", io: "#facc15", flow: "#2dd4bf", warnMark: "#f87171", heat: "#fb923c",
           flowStages: { receiving: "#60a5fa", storage: "#c084fc", picking: "#fbbf24", packing: "#2dd4bf", shipping: "#4ade80" },
           flowCongest: { low: "#4ade80", mid: "#fbbf24", high: "#f87171" } }
-      : { bg: "#ffffff", void: "#eef2f7", grid: "#e8edf3", gridStrong: "#cbd5e1", text: "#0f172a", dim: "#64748b", sel: "#0284c7", violation: "#dc2626", io: "#ca8a04", flow: "#0d9488", warnMark: "#dc2626", heat: "#c2410c",
+      : { bg: "#ffffff", void: "#eef2f7", grid: "#eaeff5", gridStrong: "#cbd5e1", text: "#0f172a", dim: "#64748b", sel: "#0284c7", violation: "#dc2626", io: "#ca8a04", flow: "#0d9488", warnMark: "#dc2626", heat: "#c2410c",
           flowStages: { receiving: "#2563eb", storage: "#9333ea", picking: "#d97706", packing: "#0d9488", shipping: "#16a34a" },
           flowCongest: { low: "#16a34a", mid: "#d97706", high: "#dc2626" } };
   }
@@ -457,7 +462,20 @@
       roundRect(px + 2, py + 2, pw - 4, ph - 4, 6);
       ctx.fillStyle = hexA(def.color, 0.22);
       ctx.fill();
-      ctx.lineWidth = e.id === state.selectedId ? 3 : 1.5;
+      // v3.20.1 CRAFT: disciplined depth — the ONE selected element earns a
+      // soft accent halo behind its outline (state demands attention; nothing
+      // else on the floor glows). Deterministic (no time input) and drawn for
+      // at most one element per frame, so the cost is nil.
+      if (e.id === state.selectedId) {
+        ctx.save();
+        ctx.shadowColor = hexA(COLORS.sel, 0.55);
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = COLORS.sel;
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.lineWidth = e.id === state.selectedId ? 2 : 1.5;
       ctx.strokeStyle = e.id === state.selectedId ? COLORS.sel : def.color;
       ctx.stroke();
       // Distinct top-down glyph from the single shape registry (WT.shapes);
@@ -504,6 +522,22 @@
           ctx.font = `500 ${Math.max(8, fontSize - 2)}px system-ui, sans-serif`;
           clipText(D.elementCapacity(e) + " pos", px + 6, py + 6 + fontSize, pw - 10);
         }
+      }
+      // v3.20.1 CRAFT: four corner ticks complete the selection affordance —
+      // drawn last so they sit above the glyph, sized to the footprint and
+      // capped so a huge rack never grows crosshair antlers. Deterministic.
+      if (e.id === state.selectedId) {
+        const t = Math.max(4, Math.min(10, Math.min(pw, ph) * 0.22));
+        const x0 = px + 1, y0 = py + 1, x1 = px + pw - 1, y1 = py + ph - 1;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = COLORS.sel;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x0, y0 + t); ctx.lineTo(x0, y0); ctx.lineTo(x0 + t, y0);
+        ctx.moveTo(x1 - t, y0); ctx.lineTo(x1, y0); ctx.lineTo(x1, y0 + t);
+        ctx.moveTo(x1, y1 - t); ctx.lineTo(x1, y1); ctx.lineTo(x1 - t, y1);
+        ctx.moveTo(x0 + t, y1); ctx.lineTo(x0, y1); ctx.lineTo(x0, y1 - t);
+        ctx.stroke();
       }
       ctx.restore();
     }
@@ -1446,6 +1480,18 @@
       roundRect(px - rad, py - rad, rad * 2, rad * 2, 3);
       ctx.fillStyle = hexA(col, q >= thr ? 0.28 : 0.14);
       ctx.fill();
+      // v3.20.1 CRAFT: stage-glow discipline — ONLY a congested station earns
+      // a soft halo (glow is reserved for state that demands attention; calm
+      // stations stay flat). State-driven, deterministic, few per frame.
+      if (q >= thr) {
+        ctx.save();
+        ctx.shadowColor = hexA(col, 0.6);
+        ctx.shadowBlur = 10;
+        ctx.lineWidth = 2.4;
+        ctx.strokeStyle = col;
+        ctx.stroke();
+        ctx.restore();
+      }
       ctx.lineWidth = q >= thr ? 2.4 : 1.4;
       ctx.strokeStyle = col;
       ctx.stroke();
