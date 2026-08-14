@@ -64,7 +64,7 @@
  *         - the shipped wiring: app.js serialize() calls overridesOf and
  *           deserialize() calls applyOverrides, the Inspector carries the
  *           role-aware rate fields (data-flkey / applyFluidOverride),
- *           sw.js is at the bumped wt-v77 cache, the runner lists this
+ *           sw.js is at the bumped wt-v78 cache, the runner lists this
  *           harness and the self-test carries the two new live checks
  *
  * Runs the REAL app modules under the same window shim as the other
@@ -457,8 +457,8 @@ function rebuildShape(rawEls, withOverrides) {
   check("the grouped Inspector carries the role-aware fluid rate fields (data-flkey inputs -> applyFluidOverride)",
     /data-flkey/.test(app) && /function applyFluidOverride\(/.test(app) &&
     /function fluidOverrideFields\(/.test(app));
-  check("sw.js cache is at the bumped wt-v77 (trail preserved: previously wt-v73)",
-    /CACHE_VERSION\s*=\s*"wt-v77"/.test(sw) && /Previously wt-v73/.test(sw));
+  check("sw.js cache is at the bumped wt-v78 (trail preserved: previously wt-v73)",
+    /CACHE_VERSION\s*=\s*"wt-v78"/.test(sw) && /Previously wt-v73/.test(sw));
   check("the self-test carries the two new live checks; test/run-all.mjs lists this harness",
     /fluids-override-persists-through-serialize/.test(st) &&
     /optimize-craft-F-from-resolved-flows/.test(st) &&

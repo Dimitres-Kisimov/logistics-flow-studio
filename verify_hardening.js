@@ -27,9 +27,9 @@
  *   7.  app.js exposes window.__WT_TEST_API__ ONLY under the ?selftest=1
  *       guard (never on a normal load).
  *   8.  sw.js precaches errors.js + selftest.js and the cache is bumped to
- *       wt-v77 (v3.22 living workers: an articulated, deterministic
- *       workforce that walks, bends, carries and packs in both views;
- *       previously wt-v76, v3.21 industrial material identity).
+ *       wt-v78 (v3.23 the goods are physical: pallet-loads, cartons,
+ *       totes and parcels riding the belts, decks and benches that carry
+ *       them; previously wt-v77, v3.22 living workers).
  *   9.  Offline guard on the two new files: no external hosts referenced.
  *
  * Everything is deterministic. Usage:  node verify_hardening.js
@@ -232,9 +232,9 @@ check(
   "both in APP_SHELL"
 );
 check(
-  "sw.js cache bumped to wt-v77 (and no longer wt-v76)",
-  /CACHE_VERSION\s*=\s*"wt-v77"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v76"/.test(swJs),
-  "CACHE_VERSION = wt-v77"
+  "sw.js cache bumped to wt-v78 (and no longer wt-v77)",
+  /CACHE_VERSION\s*=\s*"wt-v78"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v77"/.test(swJs),
+  "CACHE_VERSION = wt-v78"
 );
 
 // ---- 9. the two new files reference no external hosts -------------------

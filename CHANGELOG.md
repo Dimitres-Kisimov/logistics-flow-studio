@@ -6,6 +6,76 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [3.23] — 2026-08-14
+
+**The goods are physical.** Since P3 the material flow has been a swarm of
+abstract stage-coloured squares — and a warehouse does not move squares. New
+`goods.js` (`WT.goods`) is a pure, deterministic model that turns every
+handling unit the flow sim *already carries* into the object it actually is at
+that point in the chain, and puts it on the surface that is carrying it.
+Structure is untouched, every saved scenario stays **byte-identical**, and this
+layer adds **no model and no number** — it is strictly read-only over the
+existing sim.
+
+**What a unit looks like at each stage** (mapped onto the sim's *own* stage
+machine — nothing is invented):
+
+| stage | form | the real event |
+|---|---|---|
+| receiving | wrapped **EUR pallet-load** — three bottom runners, a boarded deck, three tiers of kraft cartons, stretch-wrap film bands | a loaded pallet comes off the inbound trailer |
+| storage | **kraft carton** with a taped seam | the put-away station **depalletises** it |
+| picking | moulded **plastic tote** — lip and hand grips, signal blue with a red in the mix | cartons are **picked** into a tote |
+| packing | taped, labelled **parcel** | the tote is **packed** |
+| shipping | **parcel** | parcels are **loaded** on the outbound trailer |
+
+The form changes exactly where the sim's own FIFO server does the work: a unit
+**waiting** in a queue still shows the form it arrived in, and becomes the next
+thing at the instant the station *serves* it. **Units are conserved** — this is
+a change of *appearance only*: one MU stays one MU, so flowsim's invariant
+(spawned == in-flight + completed) is untouched.
+
+**Riding the active components.** A support index over the layout records the
+belt top of every conveyor, curve, track and sorter, the deck of every RGV and
+AGV, and the top of every pack bench — so a carton on a belt is drawn at **belt
+height**, not floating over the floor. Because the sim already routes along the
+conveyor cell centres (and along a curved conveyor's quarter-arc), a unit
+follows the belt **round the bend** with its nose pointing the way it travels.
+
+**Queues back up nose-to-tail.** A waiting unit is no longer stacked in a pile:
+the queue extends *back along the sim's own route*, one unit length plus a
+bumper gap per place in it, so congestion looks like congestion. The queue's
+order, length and service rate remain entirely the sim's.
+
+**Trucks carry the goods.** A forklift, RGV or AGV carries a pallet on its
+forks or deck, moved by the **same lane parameter and the same animation phase**
+its own carriage is drawn at — and a reach truck's forks *raise* with the load
+and come back down empty.
+
+**Racks show stock.** The rich tier's **existing** deterministic fill pattern is
+scaled by the storage stage's share of the live flow, clamped inside the shape
+registry's own `RICH_FILL` bound — the same slots, emptying and refilling in the
+pattern's own order. No second inventory model, no new number, and byte-identical
+to before whenever the plant is not running.
+
+**One model, both views.** Every corner goes through the caller's
+`project(x, y, heightM)`, so a unit is a solid oriented box with a contact
+shadow on its carrying surface in 2.5D and a correctly oriented plan shape
+top-down, by construction. The oriented-box painter and the kraft are
+`WT.workers`' own (`boxFaces` + PPE) — the carton on the belt is literally the
+same code and the same board as the carton in a worker's hands.
+
+LOD-gated and culled (a cheap stage-coloured mark when a unit is a couple of
+pixels across, a solid form at normal zoom, the full pallet at rich zoom, and a
+*uniform* degrade above the drawing budget so the largest hall stays smooth);
+deterministic (no `Date`, no `Math.random` — the clock is the sim's own tick, so
+a paused plant and `prefers-reduced-motion` both resolve to a legible static
+frame). Illustrative only: nominal generic handling-unit dimensions used as
+drawing constants — **not** CAD/BIM, **not** a survey, **not** a measurement.
+
+New `verify_goods.js` harness (48th); the browser self-test gains 7 checks
+(140/140); the offline guard is clean; the cache is bumped to `wt-v78` with
+every `verify_*.js` pin synced.
+
 ## [3.22] — 2026-08-14
 
 **The plant has people in it, and they do their job.** Since v2.1 a "worker"

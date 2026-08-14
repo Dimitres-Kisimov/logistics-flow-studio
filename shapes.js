@@ -2126,7 +2126,16 @@
   }
   const RICH_FILL = 0.62; // illustrative share of positions shown loaded
   // "Is slot i (of a rack seeded by `seed`) carrying a load-unit?"
-  function loaded(i, seed, frac) { return hash01(i + 1, (seed | 0) + 1) < (frac > 0 ? frac : RICH_FILL); }
+  // v3.23: `stock` (default 1) scales the fill so the SAME deterministic
+  // pattern empties and refills in its own order as the flow sim moves
+  // goods - a rack gains and loses load-units without a second inventory
+  // model and without ever exceeding the fill it already drew. Omitted /
+  // non-finite -> exactly the pre-v3.23 picture.
+  function loaded(i, seed, frac, stock) {
+    const base = frac > 0 ? frac : RICH_FILL;
+    const k = (isFinite(stock) && stock >= 0 && stock <= 1) ? stock : 1;
+    return hash01(i + 1, (seed | 0) + 1) < base * k;
+  }
 
   /* ---- rich 2D primitives ------------------------------------------ */
   // Small pallet load-units in a deterministic share of an inner bay grid.
@@ -2151,7 +2160,7 @@
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const idx = r * cols + c;
-        if (!loaded(idx, seed, opt.frac)) continue;
+        if (!loaded(idx, seed, opt.frac, opt.stock)) continue;
         const bx = ix + c * cw + pad, by = iy + r * ch + pad;
         const bw = cw - 2 * pad, bh = ch - 2 * pad;
         if (bw <= 0 || bh <= 0) continue;
@@ -2164,23 +2173,23 @@
     }
     ctx.restore();
   }
-  function r2Rack(ctx, x, y, w, d, cell, gc, color, theme, seed) {
-    richPallets2D(ctx, x, y, w, d, cell, gc, color, theme, seed, {});
+  function r2Rack(ctx, x, y, w, d, cell, gc, color, theme, seed, anim, arc, stock) {
+    richPallets2D(ctx, x, y, w, d, cell, gc, color, theme, seed, { stock: stock });
   }
-  function r2Asrs(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+  function r2Asrs(ctx, x, y, w, d, cell, gc, color, theme, seed, anim, arc, stock) {
     const m = clampN(Math.min(w, d) * 0.12, 2, 6);
     const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
     const aisle = clampN(ih * 0.3, 4, 14);
     const topH = (ih - aisle) / 2, botY = iy + topH + aisle;
-    richPallets2D(ctx, ix, iy, iw, topH, cell, gc, color, theme, seed, { margin: 0.06, rows: 1, frac: 0.75 });
-    richPallets2D(ctx, ix, botY, iw, topH, cell, gc, color, theme, seed + 7, { margin: 0.06, rows: 1, frac: 0.75 });
+    richPallets2D(ctx, ix, iy, iw, topH, cell, gc, color, theme, seed, { margin: 0.06, rows: 1, frac: 0.75, stock: stock });
+    richPallets2D(ctx, ix, botY, iw, topH, cell, gc, color, theme, seed + 7, { margin: 0.06, rows: 1, frac: 0.75, stock: stock });
   }
-  function r2Shuttle(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+  function r2Shuttle(ctx, x, y, w, d, cell, gc, color, theme, seed, anim, arc, stock) {
     const m = clampN(Math.min(w, d) * 0.14, 2, 6);
     const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
     const lift = clampN(cell * 0.4, 4, 10);
     richPallets2D(ctx, ix + lift, iy, iw - lift, ih, cell, gc, color, theme, seed,
-      { rows: clampN(Math.round(ih / (cell * 0.5)), 2, 6), frac: 0.66 });
+      { rows: clampN(Math.round(ih / (cell * 0.5)), 2, 6), frac: 0.66, stock: stock });
   }
   function r2Conveyor(ctx, x, y, w, d, cell, gc, color, theme, seed, anim) {
     if (typeof anim === "number" && isFinite(anim)) return; // base already scrolls loads
@@ -2287,8 +2296,8 @@
     ctx.fillRect(cx - s / 2, cy - s / 2, s, s); ctx.strokeRect(cx - s / 2, cy - s / 2, s, s); // load on the vehicle
     ctx.restore();
   }
-  function r2Staging(ctx, x, y, w, d, cell, gc, color, theme, seed) {
-    richPallets2D(ctx, x, y, w, d, cell, gc, color, theme, seed, { frac: 0.5, rows: 2 });
+  function r2Staging(ctx, x, y, w, d, cell, gc, color, theme, seed, anim, arc, stock) {
+    richPallets2D(ctx, x, y, w, d, cell, gc, color, theme, seed, { frac: 0.5, rows: 2, stock: stock });
   }
   function r2Sorter(ctx, x, y, w, d, cell, gc, color, theme, seed) {
     const m = clampN(Math.min(w, d) * 0.16, 3, 10);
@@ -2332,7 +2341,7 @@
     for (let i = 0; i < n; i++) seg(ctx, ix + iw * i / n, th, ix + iw * (i + 0.5) / n, th - clampN(cell * 0.15, 2, 5)); // threshold hazard
     ctx.restore();
   }
-  function r2Cantilever(ctx, x, y, w, d, cell, gc, color, theme, seed) {
+  function r2Cantilever(ctx, x, y, w, d, cell, gc, color, theme, seed, anim, arc, stock) {
     const m = clampN(Math.min(w, d) * 0.16, 2, 6);
     const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
     const colX = ix + iw * 0.12, arms = clampN(Math.round(ih / (cell * 0.5)), 2, 4);
@@ -2340,7 +2349,7 @@
     ctx.save();
     ctx.fillStyle = gc.fill; ctx.strokeStyle = gc.stroke; ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
     for (let j = 0; j <= arms; j++) {
-      if (!loaded(j, seed, 0.6)) continue;
+      if (!loaded(j, seed, 0.6, stock)) continue;
       const gy = iy + (ih * j) / arms;
       ctx.fillRect(colX + iw * 0.1, gy - bh / 2, iw * 0.7, bh); // long-goods load bar
       ctx.strokeRect(colX + iw * 0.1, gy - bh / 2, iw * 0.7, bh);
@@ -2362,9 +2371,9 @@
     "staging": r2Staging, "sorter": r2Sorter, "stretch-wrap": r2StretchWrap,
     "charging-station": r2Charging, "gate": r2Gate,
   };
-  function richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim, arc) {
+  function richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim, arc, stock) {
     const fn = RICH2D[type];
-    if (fn) fn(ctx, x, y, w, d, cell, gc, color, theme, seed, anim, arc);
+    if (fn) fn(ctx, x, y, w, d, cell, gc, color, theme, seed, anim, arc, stock);
   }
 
   /* ---- rich 3D primitives ------------------------------------------ */
@@ -2391,27 +2400,27 @@
     for (let lvl = 0; lvl < levels; lvl++) {
       const z0 = (h * lvl) / levels + (h / levels) * 0.08;
       for (let b = 0; b < bays; b++) {
-        if (!loaded(lvl * bays + b, seed, frac)) continue;
+        if (!loaded(lvl * bays + b, seed, frac, opt.stock)) continue;
         const bx = x + (w * b) / bays + ((w / bays) - bw) / 2;
         box3dZ(ctx, P, bx, py, bw, pd, z0, z0 + ph, litc);
       }
     }
   }
   function f3Rack(levels) {
-    return function (ctx, P, x, y, w, d, h, color, theme, seed) {
-      richRack3D(ctx, P, x, y, w, d, h, color, theme, seed, { levels: levels, bays: Math.max(1, Math.round(w / 1.5)), frac: RICH_FILL });
+    return function (ctx, P, x, y, w, d, h, color, theme, seed, anim, arc, stock) {
+      richRack3D(ctx, P, x, y, w, d, h, color, theme, seed, { levels: levels, bays: Math.max(1, Math.round(w / 1.5)), frac: RICH_FILL, stock: stock });
     };
   }
-  function f3Asrs(ctx, P, x, y, w, d, h, color, theme, seed) {
+  function f3Asrs(ctx, P, x, y, w, d, h, color, theme, seed, anim, arc, stock) {
     const side = w * 0.4, aisle = w - 2 * side;
-    richRack3D(ctx, P, x, y, side, d, h, color, theme, seed, { levels: 6, bays: Math.max(2, Math.round(side / 1.2)), frac: 0.7 });
-    richRack3D(ctx, P, x + side + aisle, y, side, d, h, color, theme, seed + 11, { levels: 6, bays: Math.max(2, Math.round(side / 1.2)), frac: 0.7 });
+    richRack3D(ctx, P, x, y, side, d, h, color, theme, seed, { levels: 6, bays: Math.max(2, Math.round(side / 1.2)), frac: 0.7, stock: stock });
+    richRack3D(ctx, P, x + side + aisle, y, side, d, h, color, theme, seed + 11, { levels: 6, bays: Math.max(2, Math.round(side / 1.2)), frac: 0.7, stock: stock });
   }
-  function f3Shuttle(ctx, P, x, y, w, d, h, color, theme, seed) {
+  function f3Shuttle(ctx, P, x, y, w, d, h, color, theme, seed, anim, arc, stock) {
     const lw = clampN(w * 0.14, 0.4, 1.2);
-    richRack3D(ctx, P, x + lw, y, w - lw, d, h, color, theme, seed, { levels: 6, bays: Math.max(1, Math.round((w - lw) / 1.4)), frac: 0.6 });
+    richRack3D(ctx, P, x + lw, y, w - lw, d, h, color, theme, seed, { levels: 6, bays: Math.max(1, Math.round((w - lw) / 1.4)), frac: 0.6, stock: stock });
   }
-  function f3Mezz(ctx, P, x, y, w, d, h, color, theme, seed) {
+  function f3Mezz(ctx, P, x, y, w, d, h, color, theme, seed, anim, arc, stock) {
     const deckZ = h * 0.5, deckT = clampN(h * 0.06, 0.15, 0.4);
     const t = clampN(Math.min(w, d) * 0.06, 0.08, 0.2);
     const cols = clampN(Math.round(w / 2.5), 2, 5), rows = clampN(Math.round(d / 2.5), 1, 4);
@@ -2419,7 +2428,7 @@
     const top = deckZ + deckT;
     const pw = clampN(w * 0.16, 0.4, 1.4), pd = clampN(d * 0.3, 0.4, 2), ph = clampN(h * 0.18, 0.3, 1.2);
     for (let i = 0; i < 3; i++) {
-      if (!loaded(i, seed, 0.7)) continue;
+      if (!loaded(i, seed, 0.7, stock)) continue;
       box3dZ(ctx, P, x + w * (0.2 + 0.3 * i), y + d * 0.35, pw, pd, top, top + ph, lighten(color, 0.14)); // pallets on the deck
     }
   }
@@ -2468,9 +2477,9 @@
     "push-station": f3StationWork, "pull-station": f3StationWork,
     "pack-station": f3StationWork, "returns-station": f3StationWork,
   };
-  function richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim, arc) {
+  function richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim, arc, stock) {
     const fn = RICH3D[type];
-    if (fn) fn(ctx, P, x, y, w, d, h, color, theme, seed, anim, arc);
+    if (fn) fn(ctx, P, x, y, w, d, h, color, theme, seed, anim, arc, stock);
   }
 
   /* ==================================================================
@@ -2667,7 +2676,10 @@
         r.d2(ctx, x, y, w, d, cell, gc, color, theme, anim, g.arc);
         // Rich (zoomed-in) tier: layer the high-detail overlay ON TOP of the
         // base glyph so animated parts keep moving and the fill is additive.
-        if (level === "rich") richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim, g.arc);
+        // v3.23: `g.stock` (a scale in [0,1], omitted -> 1) rides as a trailing
+        // arg so the rack's EXISTING deterministic fill pattern can empty and
+        // refill with the flow. Absent -> byte-identical to before.
+        if (level === "rich") richDraw2D(ctx, type, x, y, w, d, cell, gc, color, theme, seed, anim, g.arc, g.stock);
       } else {
         // Custom type: generic glyph parameterised by g.glyph.
         genericGlyph2D(ctx, g.glyph, x, y, w, d, cell, gc, color, theme, anim);
@@ -2708,7 +2720,7 @@
       // element (o.seed, else its world corner) - stable, testable, no random.
       if (isFinite(o.lod) && detailLevel(o.lod) === "rich") {
         const seed = isFinite(o.seed) ? (o.seed | 0) : (((x | 0) * 73856093) ^ ((y | 0) * 19349663));
-        richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim, o.arc);
+        richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim, o.arc, o.stock);
       }
     } else {
       // Custom type: generic extruded form parameterised by o.base.
@@ -2759,5 +2771,11 @@
     // test can assert the vocabulary exists and stays theme-complete.
     MATERIALS,
     mat,
+    // v3.23: the illustrative share of rack positions the rich tier draws
+    // as loaded. Exposed so the GOODS layer can scale stock WITHIN this
+    // existing bound (racks fill and empty through the SAME deterministic
+    // pattern) instead of inventing a second inventory model.
+    RICH_FILL,
+    loaded,
   };
 })();

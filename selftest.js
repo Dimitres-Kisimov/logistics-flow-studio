@@ -2757,6 +2757,161 @@
         detail: threw ? "threw " + threw : "bench work animates=" + moved + " figureRemovedFromGlyph=" + noPerson };
     });
 
+    /* ---- v3.23 THE GOODS ARE PHYSICAL --------------------------------
+     * The material flow stopped being abstract squares. These run against
+     * the LIVE app: the units the renderer actually draws, the surfaces
+     * they ride, the form transformation at the sim's own stations, and
+     * the real draw pass in BOTH view modes.
+     * ---------------------------------------------------------------- */
+    var GDS = window.WT && window.WT.goods;
+    var gdApi = haveApi && API.goods ? API.goods : null;
+
+    check("goods-are-real-handling-units-on-the-live-flow", function () {
+      if (!GDS || !gdApi || !haveApi) return { ok: false, detail: "WT.goods / test API absent" };
+      var threw = "";
+      var forms = {}, n = 0, bad = [];
+      try {
+        API.flowPlay();
+        for (var k = 0; k < 40; k++) API.flowStep();
+        var list = gdApi.units();
+        n = list.length;
+        for (var i = 0; i < list.length; i++) {
+          var u = list[i];
+          forms[u.form] = (forms[u.form] || 0) + 1;
+          if (GDS.FORMS.indexOf(u.form) < 0) bad.push("unknown form " + u.form);
+          if (!isFinite(u.x) || !isFinite(u.y) || !isFinite(u.z) || !isFinite(u.heading)) bad.push("non-finite " + u.id);
+          if (!(u.size && u.size.f > 0 && u.size.l > 0 && u.size.z > 0)) bad.push("no size " + u.id);
+        }
+      } catch (e) { threw = e && e.message ? e.message : String(e); }
+      var keys = Object.keys(forms).sort().map(function (f) { return f + "=" + forms[f]; });
+      return { ok: !threw && bad.length === 0 && n > 0,
+        detail: threw ? "threw " + threw : bad.length ? bad.slice(0, 3).join(",") : n + " live units: " + keys.join(" ") };
+    });
+
+    check("goods-ride-the-belts-decks-and-benches-not-the-air", function () {
+      if (!GDS || !gdApi) return { ok: false, detail: "WT.goods absent" };
+      var sup = gdApi.support();
+      if (!sup) return { ok: false, detail: "no support index" };
+      var list = gdApi.units(), bad = [], rides = {};
+      for (var i = 0; i < list.length; i++) {
+        var u = list[i];
+        var s = GDS.supportAt(sup, u.x, u.y);
+        rides[u.ride] = (rides[u.ride] || 0) + 1;
+        if (Math.abs(u.z - s.z) > 1e-9) bad.push(u.id + " floats " + u.z + " over " + s.z);
+        if (u.z < 0 || u.z > 25) bad.push(u.id + " absurd height " + u.z);
+      }
+      var keys = Object.keys(rides).sort().map(function (r) { return r + "=" + rides[r]; });
+      return { ok: bad.length === 0 && list.length > 0,
+        detail: bad.length ? bad.slice(0, 3).join(",") : list.length + " units on " + (sup.count || 0) +
+          " carrier cells: " + keys.join(" ") };
+    });
+
+    check("goods-change-form-at-the-station-that-does-the-work", function () {
+      // The honest visual of a warehouse: a unit WAITING at a station still
+      // shows what it arrived as; it becomes the next thing when the sim's
+      // own FIFO server SERVES it. Assert the mapping on the live module.
+      if (!GDS) return { ok: false, detail: "WT.goods absent" };
+      var want = [
+        ["receiving", "active", "pallet-load"], ["storage", "queued", "pallet-load"],
+        ["storage", "active", "carton"], ["picking", "queued", "carton"],
+        ["picking", "active", "tote"], ["packing", "queued", "tote"],
+        ["packing", "active", "parcel"], ["shipping", "active", "parcel"],
+      ];
+      var bad = [];
+      for (var i = 0; i < want.length; i++) {
+        var got = GDS.formFor({ stage: want[i][0], status: want[i][1] });
+        if (got !== want[i][2]) bad.push(want[i][0] + "/" + want[i][1] + "->" + got);
+      }
+      // ...and one MU is still one unit: the form change is not a split.
+      var sim = haveApi && API.state.flow ? API.state.flow.sim : null;
+      var conserved = !sim || (sim.spawned === sim.inflight + sim.completed &&
+        (!gdApi || gdApi.units().length === sim.mus.length));
+      return { ok: bad.length === 0 && conserved,
+        detail: bad.length ? bad.join(",") : want.length + " stage/status cases correct; conserved=" + conserved +
+          (sim ? " (spawned " + sim.spawned + " = inflight " + sim.inflight + " + completed " + sim.completed + ")" : "") };
+    });
+
+    check("goods-draw-in-both-views-on-the-live-canvas", function () {
+      if (!haveApi || !gdApi) return { ok: false, detail: "test API absent" };
+      var errsBefore = (window.__WT_ERRORS__ || []).length;
+      var threw = "";
+      var mode = API.state.viewMode;
+      var simBefore = "", simAfter = "";
+      try {
+        var sim = API.state.flow.sim;
+        var snap = function () {
+          return sim ? JSON.stringify([sim.tick, sim.spawned, sim.completed, sim.inflight,
+            sim.mus.map(function (m) { return [m.id, m.cx, m.cy, m.stage, m.status]; })]) : "";
+        };
+        simBefore = snap();
+        API.setViewMode("top"); API.render(); gdApi.draw();
+        API.setViewMode("iso"); API.render(); gdApi.draw();
+        API.setViewMode(mode); API.render();
+        simAfter = snap();
+      } catch (e) { threw = e && e.message ? e.message : String(e); }
+      var errsAfter = (window.__WT_ERRORS__ || []).length;
+      var tier = gdApi.tier();
+      return { ok: !threw && errsAfter === errsBefore && simBefore === simAfter &&
+          (tier === "icon" || tier === "glyph" || tier === "rich"),
+        detail: threw ? "threw " + threw : "top + iso drew clean, sim untouched=" +
+          (simBefore === simAfter) + "; LOD tier at this zoom = " + tier };
+    });
+
+    check("goods-trucks-carry-a-pallet-and-rest-legibly-without-a-clock", function () {
+      if (!GDS || !gdApi) return { ok: false, detail: "WT.goods absent" };
+      var fleet = gdApi.fleet();
+      if (!fleet.length) return { ok: true, detail: "no forklift/RGV/AGV on this floor - nothing to carry" };
+      var bad = [], moved = 0;
+      for (var i = 0; i < fleet.length; i++) {
+        var v = fleet[i];
+        var rest = GDS.sampleVehicle(v, null);
+        if (!rest.resting) bad.push(v.id + " not resting");
+        if (rest.x < v.x - 0.8 || rest.x > v.x + v.w + 0.8 || rest.y < v.y - 0.8 || rest.y > v.y + v.d + 0.8) {
+          bad.push(v.id + " load off its truck at rest");
+        }
+        var a = GDS.sampleVehicle(v, 0.3), b = GDS.sampleVehicle(v, 1.5);
+        if (Math.abs(a.x - b.x) > 1e-9 || Math.abs(a.y - b.y) > 1e-9 || Math.abs(a.z - b.z) > 1e-9) moved++;
+      }
+      return { ok: bad.length === 0 && moved > 0,
+        detail: bad.length ? bad.slice(0, 3).join(",") : fleet.length + " trucks carrying, " + moved + " visibly moving their load" };
+    });
+
+    check("goods-racks-show-stock-inside-the-existing-fill-model", function () {
+      var SH = window.WT && window.WT.shapes;
+      if (!GDS || !SH || !gdApi) return { ok: false, detail: "WT.goods / WT.shapes absent" };
+      var lo = 1 - SH.RICH_FILL;
+      var v = gdApi.stock();
+      var inBand = v === undefined || (v >= lo - 1e-9 && v <= 1 + 1e-9);
+      // The same deterministic pattern, emptying and refilling in its own
+      // order - and byte-identical to the pre-v3.23 picture with no scale.
+      var monotone = true, unchanged = true;
+      for (var seed = 0; seed < 24; seed++) {
+        for (var i = 0; i < 24; i++) {
+          if (SH.loaded(i, seed, undefined, 0.4) && !SH.loaded(i, seed, undefined, 0.9)) monotone = false;
+          if (SH.loaded(i, seed) !== SH.loaded(i, seed, undefined, 1)) unchanged = false;
+        }
+      }
+      return { ok: inBand && monotone && unchanged,
+        detail: "stock=" + (v === undefined ? "off (plant stopped)" : v.toFixed(3)) +
+          " band [" + lo.toFixed(2) + ",1] monotone=" + monotone + " unchangedWithoutScale=" + unchanged };
+    });
+
+    check("goods-no-clock-or-rng-in-the-goods-layer", function () {
+      if (!GDS) return { ok: false, detail: "WT.goods absent" };
+      var src = "", n = 0;
+      for (var k in GDS) {
+        if (typeof GDS[k] !== "function") continue;
+        src += String(GDS[k]) + "\n";
+        n++;
+      }
+      var hasClock = /Date\.now|new Date\(/.test(src);
+      var hasRng = /Math\.random/.test(src);
+      var hasModel = typeof GDS.formFor === "function" && typeof GDS.supportIndex === "function" &&
+        typeof GDS.units === "function" && typeof GDS.draw === "function";
+      return { ok: !hasClock && !hasRng && hasModel && n >= 12,
+        detail: n + " goods functions scanned; clock=" + hasClock + " rng=" + hasRng + " model=" + hasModel };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

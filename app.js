@@ -474,7 +474,7 @@
     _workerSig = sig;
     return _workerRoster;
   }
-  function invalidateWorkers() { _workerRoster = null; _workerSig = ""; _stageWoken = null; }
+  function invalidateWorkers() { _workerRoster = null; _workerSig = ""; _stageWoken = null; invalidateGoods(); }
 
   // The animation clock for the workforce: the sim's own continuous tick
   // while the plant is running (frozen when paused), null otherwise.
@@ -501,6 +501,81 @@
       const stage = WORKER_STAGE[spec.task];
       return stage ? !!_stageWoken[stage] : true;
     };
+  }
+
+  /* ------------------------------------------------------------------
+   * v3.23 THE GOODS ARE PHYSICAL. Every live handling unit of the flow
+   * sim is drawn as the object it actually is at that point in the chain
+   * - a wrapped EUR pallet-load off the inbound trailer, a kraft carton
+   * after put-away depalletises it, a plastic tote after it is picked, a
+   * packed parcel after the bench - riding whatever surface carries it
+   * (belt top, vehicle deck, bench top, slab) and pointing the way it is
+   * travelling. The model is the pure WT.goods module; everything here
+   * is the render wiring, and it writes NOTHING back to the sim.
+   * ------------------------------------------------------------------ */
+  // The rack stock scale for THIS frame: how full the racking draws,
+  // bounded by the shape registry's own fill pattern. Undefined (= the
+  // historic picture) whenever the plant is not running.
+  function rackStockScale() {
+    if (!WT.goods || !state.flow || !state.flow.on || !state.flow.sim) return undefined;
+    return WT.goods.rackStock(state.flow.sim);
+  }
+
+  // The carrying-surface index for the current floor. A pure function of
+  // the layout, so it is rebuilt only when the floor actually changes -
+  // the same signature the flow sim and the workforce use.
+  let _goodsSupport = null, _goodsSupportSig = "";
+  function goodsSupport() {
+    if (!WT.goods) return null;
+    const sig = flowSignature();
+    if (_goodsSupport && _goodsSupportSig === sig) return _goodsSupport;
+    _goodsSupport = WT.goods.supportIndex(currentLayout());
+    _goodsSupportSig = sig;
+    return _goodsSupport;
+  }
+  let _goodsFleet = null, _goodsFleetSig = "";
+  function goodsFleet() {
+    if (!WT.goods) return [];
+    const sig = flowSignature();
+    if (_goodsFleet && _goodsFleetSig === sig) return _goodsFleet;
+    _goodsFleet = WT.goods.vehicles(currentLayout());
+    _goodsFleetSig = sig;
+    return _goodsFleet;
+  }
+  function invalidateGoods() { _goodsSupport = null; _goodsSupportSig = ""; _goodsFleet = null; _goodsFleetSig = ""; }
+
+  // The shared draw options for the goods layer (both views, both themes).
+  function goodsOpts(tier) {
+    return {
+      project: projPx,
+      cellPx: cellPx,
+      tier: tier,
+      theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+      congest: (COLORS.flowCongest && COLORS.flowCongest.high) || COLORS.violation,
+    };
+  }
+
+  // The pallets riding the trucks. Drawn with the workforce (a parked
+  // reach truck still has a pallet on its forks), frozen to a legible
+  // static frame when there is no clock (stopped plant / reduced motion).
+  function drawGoodsVehicles() {
+    if (!WT.goods || !WT.shapes || typeof WT.shapes.detailLevel !== "function") return;
+    const tier = WT.shapes.detailLevel(cellPx * view.scale);
+    if (tier === "icon") return; // too small to read a load on a truck
+    const fleet = goodsFleet();
+    if (!fleet.length) return;
+    const t = workerAnimT(); // the SAME clock the workforce + equipment use
+    const opts = goodsOpts(tier);
+    const stages = COLORS.flowStages || {};
+    const vb = state.viewMode === "iso" ? null : V.viewBounds(view, viewCssW, viewCssH);
+    for (let i = 0; i < fleet.length; i++) {
+      const spec = fleet[i];
+      if (vb && (spec.x + spec.w < vb.minX - 2 || spec.x > vb.maxX + 2 ||
+        spec.y + spec.d < vb.minY - 2 || spec.y > vb.maxY + 2)) continue;
+      const u = WT.goods.sampleVehicle(spec, t);
+      opts.stageColor = stages.storage || COLORS.flow;
+      WT.goods.draw(ctx, u, opts);
+    }
   }
 
   // Draw the whole workforce. Called from BOTH the top-down render and
@@ -763,6 +838,11 @@
           // Deterministic per-element seed for the rich-tier load-unit fill
           // (stable frame-to-frame; identical racks at different spots differ).
           seed: elemAnimSeed(e),
+          // v3.23 RACKS SHOW STOCK: a scale in [0,1] on the EXISTING rich-tier
+          // fill pattern, driven by the flow sim's own storage-stage occupancy
+          // (WT.goods.rackStock). Undefined while the plant is stopped, so the
+          // static picture is byte-identical to before.
+          stock: rackStockScale(),
           // Deterministic moving part while the flow plays (draw2D itself
           // skips it on the tiny LOD-icon path, so this stays legible + cheap).
           // Built-in animatable types + custom conveying/transporter objects move.
@@ -826,6 +906,8 @@
     // the racks they work) and under the flow overlays, in the SAME world
     // transform, so they are zoom/pan-safe like everything else.
     drawWorkers();
+    // v3.23: and the pallets the trucks are carrying, on the same layer.
+    drawGoodsVehicles();
 
     // P3: material-flow chain arrows + broken-chain markers
     const chains = D.analyzeChains(state.elements);
@@ -1291,6 +1373,10 @@
       // ON-SCREEN px/cell so the iso forms pick their rich LOD tier when
       // zoomed in (rich only above the px threshold - big maps stay fast).
       pxPerCell: onScreenCell,
+      // v3.23 RACKS SHOW STOCK: the same scale the top-down glyphs use, so
+      // both presentations show the same stock. Undefined when the plant is
+      // stopped -> byte-identical to the pre-v3.23 scene.
+      stock: rackStockScale(),
       // v3.8 REDESIGN-1: building-shell perimeter walls (the two BACK edges,
       // so interior content is never occluded). Render-only - derived from the
       // floor size, never serialized. Absent WT.floor -> no walls, nothing breaks.
@@ -1310,6 +1396,8 @@
     // blocks (an honest illustrative overlay, not per-pixel occlusion -
     // the same limitation the flow boxes have always carried).
     drawWorkers();
+    // v3.23: and the pallets the trucks are carrying, on the same layer.
+    drawGoodsVehicles();
     // v3.12: the material-flow CONNECTION overlay, HINTED into 2.5D too -
     // projPx projects the links/nodes into the iso scene (illustrative, not
     // true per-pixel occlusion). Drawn under the animated boxes.
@@ -1775,12 +1863,46 @@
     return (WT.flowsim && WT.flowsim.PARAMS && WT.flowsim.PARAMS.congestQueueThreshold) || 6;
   }
 
-  // Draw the live MUs as small rounded boxes, colour-coded by stage. MUs
-  // waiting in a CONGESTED station queue get a red congestion outline.
-  // World-space math (world cell * cellPx) so the transform scales them.
+  // v3.23: draw the live MUs as the PHYSICAL HANDLING UNITS they are -
+  // pallet-loads, cartons, totes and parcels - sitting on the surface
+  // that carries them (belt top, vehicle deck, bench, slab), oriented
+  // along their route, queued nose-to-tail back along it, and painted
+  // through projPx so ONE model serves the top-down and the 2.5D view.
+  // The stage colour survives as the contact-shadow tint (so the legend
+  // still reads) and as the whole mark at the tiny LOD tier. Falls back
+  // to the pre-v3.23 stage-coloured box if WT.goods is unavailable.
   function drawFlowMUs() {
     const s = state.flow.sim;
     if (!s || !s.mus || !s.mus.length) return;
+    const colors = COLORS.flowStages || {};
+    if (!WT.goods || !WT.shapes || typeof WT.shapes.detailLevel !== "function") { drawFlowMUsFallback(); return; }
+    // LOD: a mark when a unit is smaller than a couple of pixels, a solid
+    // form at normal zoom, the full pallet/carton/tote at rich zoom. Above
+    // the drawing budget EVERY unit degrades to the mark together (uniform,
+    // so no single unit flickers between fidelities) - the biggest hall
+    // stays smooth.
+    let tier = WT.shapes.detailLevel(cellPx * view.scale);
+    if (s.mus.length > WT.goods.MAX_FORM_UNITS) tier = "icon";
+    const opts = goodsOpts(tier);
+    const list = WT.goods.units(s, goodsSupport());
+    // Top-down culls to the visible world rect; the iso projection moves
+    // points off that rect, so the 2.5D path draws them all (the live-unit
+    // count is capped by the sim, so the cost is bounded either way).
+    const vb = state.viewMode === "iso" ? null : V.viewBounds(view, viewCssW, viewCssH);
+    ctx.save();
+    for (let i = 0; i < list.length; i++) {
+      const u = list[i];
+      if (vb && (u.x < vb.minX - 2 || u.x > vb.maxX + 2 || u.y < vb.minY - 2 || u.y > vb.maxY + 2)) continue;
+      opts.stageColor = colors[u.stage] || COLORS.flow;
+      WT.goods.draw(ctx, u, opts);
+    }
+    ctx.restore();
+  }
+
+  // The pre-v3.23 stage-coloured box. Kept as the honest fallback for a
+  // build without goods.js - nothing about the sim depends on either.
+  function drawFlowMUsFallback() {
+    const s = state.flow.sim;
     const colors = COLORS.flowStages || {};
     const cong = COLORS.flowCongest || {};
     const thr = flowCongestThreshold();
@@ -1790,17 +1912,12 @@
     ctx.save();
     ctx.lineWidth = 1;
     for (const mu of s.mus) {
-      // World cell -> base-px. In iso mode this projects the MU (raised a
-      // little off the floor) into the isometric scene; in top-down it is
-      // the plain world*cellPx mapping.
       const c = projPx(mu.cx, mu.cy, 0.3);
       const px = c.x, py = c.y;
       roundRect(px - half, py - half, size, size, r);
       ctx.fillStyle = colors[mu.stage] || COLORS.flow;
       ctx.globalAlpha = mu.stage === "shipping" ? 0.98 : 0.9;
       ctx.fill();
-      // A queued MU whose station is congested is outlined in the
-      // congestion colour so a growing queue reads as "hot" at a glance.
       const hot = mu.status === "queued" && mu.station && mu.station.queue.length >= thr;
       if (hot) { ctx.globalAlpha = 0.85; ctx.strokeStyle = cong.high || COLORS.violation; ctx.lineWidth = 1.4; }
       else { ctx.globalAlpha = 0.45; ctx.strokeStyle = COLORS.text; ctx.lineWidth = 1; }
@@ -8903,6 +9020,18 @@
         tier: () => (WT.shapes ? WT.shapes.detailLevel(cellPx * view.scale) : null),
         draw: () => drawWorkers(),
         invalidate: invalidateWorkers,
+      },
+      // v3.23 PHYSICAL GOODS: the carrying-surface index, the drawable
+      // unit list and the REAL draw pass - so the live self-test exercises
+      // the same path the plant does, in both view modes.
+      goods: {
+        support: () => goodsSupport(),
+        units: () => (WT.goods && state.flow.sim ? WT.goods.units(state.flow.sim, goodsSupport()) : []),
+        fleet: () => goodsFleet(),
+        stock: () => rackStockScale(),
+        tier: () => (WT.shapes ? WT.shapes.detailLevel(cellPx * view.scale) : null),
+        draw: () => { if (state.flow && state.flow.sim) drawFlowMUs(); drawGoodsVehicles(); },
+        invalidate: invalidateGoods,
       },
       drawFlowKpis: drawFlowKpis,
       // v3.12: drive + read the material-flow CONNECTION overlay ("Flow

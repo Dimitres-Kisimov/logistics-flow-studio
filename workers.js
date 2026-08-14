@@ -917,5 +917,11 @@
     drawSpec,
     // exposed for tests / reuse (pure)
     ik, ease, easeSpeed, frac, hash01,
+    // v3.23: the ORIENTED-BOX painter (body-frame centre + size, projected
+    // through the caller's project()) is exposed so the GOODS layer draws a
+    // carton on a belt with the SAME code and the SAME kraft as the carton
+    // in a worker's hands - one painter, no duplicated geometry.
+    boxFaces,
+    toWorld,
   };
 })();

@@ -575,6 +575,33 @@
  *      loaded + precached at wt-v77, drawn from BOTH app.js render paths
  *      through projPx, LOD-gated + reduced-motion-safe, self-test + runner).
  *
+ *  40. verify_goods.js  - THE GOODS ARE PHYSICAL (v3.23): the pure model
+ *      behind the handling units on the floor (goods.js). Asserts the FORM
+ *      CHAIN maps onto the flow sim OWN stage machine (receiving pallet-
+ *      load -> put-away carton -> pick tote -> pack parcel -> ship parcel)
+ *      with a QUEUED unit still showing the incoming form (the station
+ *      transforms it when it SERVES it); that UNITS ARE CONSERVED - the
+ *      layer is strictly READ-ONLY, the sim state is byte-identical after
+ *      sampling + drawing, exactly one drawable unit exists per MU (a form
+ *      change is not a split) and spawned == in-flight + completed still
+ *      holds; determinism (byte-identical unit lists / vehicle loads / rack
+ *      stock, no Date and no Math.random in the source OR the live exports);
+ *      finite, in-bounds coordinates on two plants over 80 steps plus
+ *      garbage-safety; BELT-SURFACE PLACEMENT (a unit over a conveyor sits
+ *      at the belt top from the shared domain heightM, over an RGV at the
+ *      deck, over a bench on the bench top, on slab at 0 - and no live unit
+ *      ever floats); NOSE-TO-TAIL queue spacing back along the sim own
+ *      route; the trucks carrying a pallet on the forks/deck with the
+ *      forks raising and the reduced-motion static frame; no input
+ *      mutation; RACK STOCK bounded by the EXISTING deterministic fill
+ *      model (1 with no plant running, never outside [1 - RICH_FILL, 1],
+ *      monotone in the pattern own order, byte-identical when omitted); a
+ *      draw() smoke through BOTH projectors x themes x LOD tiers proving
+ *      the painter is WT.workers own (reuse, not duplication); the honesty
+ *      labels; and the shipped wiring (goods.js after workers.js +
+ *      precached at wt-v78, drawn from BOTH app.js render paths through
+ *      projPx, LOD-gated with a drawing budget, self-test + runner).
+ *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
  * ===================================================================== */
@@ -631,6 +658,7 @@ const HARNESSES = [
   { name: "Ctrl/Cmd-K command palette: model + wiring (verify_palette.js)", args: ["verify_palette.js"] },
   { name: "Material-flow connection overlay / Flow links (verify_flowlinks.js)", args: ["verify_flowlinks.js"] },
   { name: "Living workforce: pose + gait model (verify_workers.js)", args: ["verify_workers.js"] },
+  { name: "Physical goods: pallets/cartons/totes riding the plant (verify_goods.js)", args: ["verify_goods.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

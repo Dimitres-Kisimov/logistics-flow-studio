@@ -387,6 +387,10 @@
           selected: e.id === o.selectedId, selColor: colors.sel,
           anim: animFor ? animFor(e) : undefined,
           lod: pxc, // ON-SCREEN px/cell so the form can pick its rich LOD tier
+          // v3.23: the live RACK STOCK scale (a number in [0,1]) on the rich
+          // tier's EXISTING deterministic fill pattern, so rack faces gain and
+          // lose load-units as the flow sim moves goods. Omitted -> unchanged.
+          stock: isFinite(o.stock) ? o.stock : undefined,
         });
       } else {
         drawBox(ctx, P, e.x, e.y, e.w, e.d, h, color, {
