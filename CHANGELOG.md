@@ -6,6 +6,27 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [3.20.2] — 2026-08-14
+
+**The tier default is now `full`.** A first-time visitor used to meet a
+component library with most storage systems padlocked, because the
+demo/full showcase gate (`tiers.js`) defaulted to `demo`. This deployment
+is a portfolio showcase, not a sales funnel, so the complete library — all
+14 storage systems, every slotting strategy, the MRO preset, CSV import,
+the floor-plan underlay and the unabridged advisor — is what the app opens
+with.
+
+The gate itself is untouched and still a first-class feature: the header
+button now reads **"Switch to demo"**, and flipping it re-applies every
+capability limit exactly as before, so the engineered entitlement split
+(one capability-flag module, no scattered `if`s) stays demonstrable on
+demand. Only `tiers.js`'s `current()` fallback changed — no capability
+list, no behaviour, no copy, no serialization, and every scenario stays
+byte-identical. `lsp/verify.js` now pins the new default *and* proves the
+demo gate still bites by stubbing the entitlement store, and
+`PUBLISH_ANDROID.md` §C states the default plus what a real paid
+deployment would do instead. Cache `wt-v75`.
+
 ## [3.20.1] — 2026-08-12
 
 An **award-level visual craft pass** — "industrial control room": the dark

@@ -77,12 +77,16 @@
 
   function current() {
     // Real deployment: this would read a verified entitlement
-    // (see the honesty note above). Default is the demo tier.
+    // (see the honesty note above). Here the DEFAULT IS FULL: this is a
+    // portfolio showcase, so a first-time visitor should meet the whole
+    // component library, not a padlocked one. The demo tier stays a
+    // first-class, switchable state (header: "Switch to demo") so the
+    // entitlement engineering is still demonstrable on demand.
     try {
       const t = localStorage.getItem(LS_KEY);
-      return TIERS[t] ? t : "demo";
+      return TIERS[t] ? t : "full";
     } catch (_) {
-      return "demo";
+      return "full";
     }
   }
 

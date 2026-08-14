@@ -407,8 +407,8 @@ function costEnergyChecks(tag, input) {
   check("index.html ships the Cost + Energy drill-ins in the Analyze card (v3.2)",
     /id="analyzeCost"/.test(idx) && /id="analyzeEnergy"/.test(idx) &&
     /id="analyzeCostDetails"/.test(idx) && /id="analyzeEnergyDetails"/.test(idx));
-  check("sw.js precaches ./analytics.js at the bumped wt-v74 cache",
-    /["']\.\/analytics\.js["']/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v74"/.test(sw));
+  check("sw.js precaches ./analytics.js at the bumped wt-v75 cache",
+    /["']\.\/analytics\.js["']/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v75"/.test(sw));
   check("app.js wires the Analyze button + exposes the self-test hooks (bottleneck + cost + energy)",
     /analyzeBtn"\)\.addEventListener\("click", renderAnalyzePanel\)/.test(app) &&
     /renderAnalyzePanel:\s*renderAnalyzePanel/.test(app) &&

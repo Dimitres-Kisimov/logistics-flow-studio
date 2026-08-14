@@ -142,19 +142,32 @@ console.log("3. L4 lesson: the cross-dock improves the score");
 
 // ---- 4. Tier gate --------------------------------------------------
 console.log("");
-console.log("4. Tier gate: demo locks L3+ (../tiers.js, stubbed window)");
+console.log("4. Tier gate: default is full; the demo tier still locks L3+ (../tiers.js, stubbed window)");
 {
   global.window = global.window || {};
   require(path.join(__dirname, "..", "tiers.js"));
   const tiers = global.window.WT.tiers;
-  // No localStorage in Node -> current() falls back to "demo".
+  // No localStorage in Node -> current() falls back to the DEFAULT, which is
+  // "full" since v3.20.2: this deployment is a portfolio showcase, so a
+  // first-time visitor meets the complete library rather than a padlocked one.
+  const defCaps = tiers.caps();
+  check("default tier is full", defCaps.tier === "full" && defCaps.isDemo === false);
+  check("default unlocks every level",
+    ["L1", "L2", "L3", "L4", "L5"].every((l) => defCaps.lspLevelAllowed(l) === true));
+  // The demo tier stays a first-class, switchable state - stub the
+  // entitlement store so current() reads "demo" and prove the gate still bites.
+  const savedLS = Object.prototype.hasOwnProperty.call(global, "localStorage")
+    ? global.localStorage : undefined;
+  global.localStorage = { getItem: () => "demo", setItem() {}, removeItem() {} };
   const demoCaps = tiers.caps();
-  check("default tier is demo", demoCaps.isDemo === true);
+  check("demo tier still reachable via the entitlement store", demoCaps.isDemo === true);
   check("demo allows L1", demoCaps.lspLevelAllowed("L1") === true);
   check("demo allows L2", demoCaps.lspLevelAllowed("L2") === true);
   check("demo locks L3", demoCaps.lspLevelAllowed("L3") === false);
   check("demo locks L4", demoCaps.lspLevelAllowed("L4") === false);
   check("demo locks L5", demoCaps.lspLevelAllowed("L5") === false);
+  if (savedLS === undefined) delete global.localStorage;
+  else global.localStorage = savedLS;
   const full = tiers.TIERS.full;
   check("full tier unlocks all levels (lspLevels = null)", full.lspLevels === null);
 }

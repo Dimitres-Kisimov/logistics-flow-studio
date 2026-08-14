@@ -144,9 +144,15 @@ The app ships with a **demo/full tier switch** (`tiers.js` + the
 - **What it is:** a client-side showcase gate. The demo tier limits the
   palette to the starter six elements, slotting to Random + ABC, locks the
   MRO preset, and caps the advisor at 2 suggestions. Locked items stay
-  visible with an original padlock glyph — nothing is hidden. "Unlock full
-  version" flips a `localStorage` flag; the whole app is delivered to the
-  client either way.
+  visible with an original padlock glyph — nothing is hidden. The switch
+  flips a `localStorage` flag; the whole app is delivered to the client
+  either way.
+- **Default in this portfolio build: FULL.** A first-time visitor meets the
+  complete component library, because this deployment is a showcase rather
+  than a sales funnel; the demo tier remains a first-class switchable state
+  ("Switch to demo" in the header) so the gating is still demonstrable. A
+  real paid deployment would default to demo and unlock on a verified
+  entitlement — that is the only line that would change.
 - **What it is NOT:** DRM, security, or copy protection. Anyone can flip the
   flag in DevTools. That is fine — its purpose is to demonstrate cleanly
   engineered tier gating (one capability-flag module, no scattered ifs).
