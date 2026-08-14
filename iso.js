@@ -303,27 +303,45 @@
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(c0.x, c0.y); ctx.lineTo(c1.x, c1.y); ctx.lineTo(c2.x, c2.y); ctx.lineTo(c3.x, c3.y); ctx.closePath();
-    ctx.fillStyle = colors.bg || "#ffffff";
+    ctx.fillStyle = colors.concrete || colors.bg || "#ffffff";
     ctx.fill();
+    // v3.21 INDUSTRIAL MATERIAL IDENTITY: the SAME baked poured-concrete slab
+    // the top-down view stands on (deterministic exposed aggregate, handed in
+    // by the caller as a CanvasPattern), clipped to the floor diamond and
+    // scaled so the aggregate keeps its real physical size. Absent -> the
+    // plain fill above, exactly as before.
+    if (o.floorPattern && isFinite(o.floorPatternScale) && o.floorPatternScale > 0) {
+      const k = o.floorPatternScale;
+      ctx.save();
+      ctx.clip();
+      ctx.scale(k, k);
+      ctx.fillStyle = o.floorPattern;
+      const bx0 = Math.min(c0.x, c1.x, c2.x, c3.x) / k, bx1 = Math.max(c0.x, c1.x, c2.x, c3.x) / k;
+      const by0 = Math.min(c0.y, c1.y, c2.y, c3.y) / k, by1 = Math.max(c0.y, c1.y, c2.y, c3.y) / k;
+      ctx.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
+      ctx.restore();
+    }
 
-    // Iso grid lines every 5 cells (strong) with lighter lines between.
-    const grid = colors.grid || "#e8edf3";
-    const gridStrong = colors.gridStrong || "#cbd5e1";
+    // v3.21: the 5 m lines are SAW-CUT CONTROL JOINTS in the slab (concrete is
+    // poured in bays and cut so it cracks where you choose); the 1 m lines stay
+    // the faint trowel/measure aid. Warm concrete tones - no blueprint grid.
+    const grid = colors.grid || "#cec8bc";
+    const joint = colors.joint || colors.gridStrong || "#a49b8c";
     ctx.lineWidth = 1;
     for (let x = 0; x <= gridW; x++) {
       const a = P(x, 0, 0), b = P(x, gridH, 0);
-      ctx.strokeStyle = x % 5 === 0 ? gridStrong : grid;
+      ctx.strokeStyle = x % 5 === 0 ? joint : grid;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
     for (let y = 0; y <= gridH; y++) {
       const a = P(0, y, 0), b = P(gridW, y, 0);
-      ctx.strokeStyle = y % 5 === 0 ? gridStrong : grid;
+      ctx.strokeStyle = y % 5 === 0 ? joint : grid;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
-    // Floor outline.
+    // Floor outline (the building line).
     ctx.beginPath();
     ctx.moveTo(c0.x, c0.y); ctx.lineTo(c1.x, c1.y); ctx.lineTo(c2.x, c2.y); ctx.lineTo(c3.x, c3.y); ctx.closePath();
-    ctx.strokeStyle = gridStrong;
+    ctx.strokeStyle = joint;
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();

@@ -2450,6 +2450,136 @@
         detail: "reduceGuard=" + foundReduce + " noPrefLift=" + foundNoPref };
     });
 
+    /* ---- v3.21 INDUSTRIAL MATERIAL IDENTITY -------------------------
+     * The design correction is GATE-VERIFIED, not eyeballed: the machine-
+     * console token layer exists, its text really passes WCAG AA against
+     * the powder-coat it sits on (contrast COMPUTED live from the resolved
+     * custom properties, both themes), the neutrals are genuinely WARM
+     * rather than the blue-gray of the drafting-tool pass, the canvas
+     * material palette is complete, and the concrete/paint geometry is
+     * DETERMINISTIC (same seed -> byte-identical, no Date, no RNG).
+     * ---------------------------------------------------------------- */
+
+    check("material-console-tokens-present", function () {
+      var need = ["--console", "--console-2", "--console-line", "--console-ink",
+        "--console-ink-dim", "--led-run", "--led-attn", "--led-stop", "--led-off"];
+      var missing = need.filter(function (n) { return cssVar(n) === ""; });
+      return { ok: missing.length === 0,
+        detail: missing.length ? "missing: " + missing.join(",") : "all " + need.length + " console tokens resolve" };
+    });
+
+    check("material-console-ink-passes-aa-on-powder-coat", function () {
+      // The rail is a dark powder-coated column in BOTH themes, so its own
+      // ink pair must pass on its own background - not on --surface.
+      var coat = cssVar("--console");
+      var pairs = [["--console-ink", 4.5], ["--console-ink-dim", 4.5],
+        ["--led-run", 3], ["--led-attn", 3], ["--led-stop", 3]];
+      var bad = [], seen = [];
+      for (var i = 0; i < pairs.length; i++) {
+        var cr = contrast(cssVar(pairs[i][0]), coat);
+        seen.push(pairs[i][0] + "=" + cr.toFixed(2));
+        if (cr < pairs[i][1]) bad.push(pairs[i][0] + " " + cr.toFixed(2) + "<" + pairs[i][1]);
+      }
+      return { ok: bad.length === 0,
+        detail: bad.length ? bad.join("; ") : "on " + coat + ": " + seen.join(" ") };
+    });
+
+    check("material-neutrals-are-warm-not-blueprint-slate", function () {
+      // The correction in one assertion: in a WARM neutral the red channel is
+      // >= the blue channel. The v3.20.1 drafting palette failed this on every
+      // surface (slate #0f172a, #f1f5f9, canvas #0e1626 - all blue-dominant).
+      var names = ["--bg", "--surface", "--surface-2", "--border", "--text",
+        "--text-dim", "--canvas-bg", "--canvas-grid", "--canvas-grid-strong", "--console"];
+      var cold = [], seen = [];
+      for (var i = 0; i < names.length; i++) {
+        var v = cssVar(names[i]);
+        var h = String(v).replace("#", "");
+        if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+        if (!/^[0-9a-fA-F]{6}$/.test(h)) { cold.push(names[i] + "=?" + v); continue; }
+        var r = parseInt(h.slice(0, 2), 16), b = parseInt(h.slice(4, 6), 16);
+        seen.push(names[i] + "(r" + r + ">=b" + b + ")");
+        if (r < b) cold.push(names[i] + " " + v + " is blue-dominant (r" + r + "<b" + b + ")");
+      }
+      return { ok: cold.length === 0,
+        detail: cold.length ? cold.join("; ") : names.length + " neutrals all warm: " + seen.join(" ") };
+    });
+
+    check("material-canvas-palette-complete-and-warm", function () {
+      // app.js owns the canvas palette (a canvas cannot read CSS vars). Every
+      // material the floor renderer names must be present in BOTH themes.
+      var need = ["concrete", "aggDark", "aggLight", "joint", "paintYellow",
+        "paintWhite", "hazardDark", "steel", "upright", "guard", "wood",
+        "kraft", "toteBlue", "toteRed"];
+      if (!haveApi || !API.themeColors) return { ok: false, detail: "no themeColors() on the test API" };
+      var c = API.themeColors();
+      var missing = need.filter(function (k) { return !/^#[0-9a-fA-F]{6}$/.test(String(c[k])); });
+      // The slab itself must be a warm neutral, never the old blue-black.
+      var h = String(c.concrete).replace("#", "");
+      var warm = /^[0-9a-fA-F]{6}$/.test(h) &&
+        parseInt(h.slice(0, 2), 16) >= parseInt(h.slice(4, 6), 16);
+      return { ok: missing.length === 0 && warm,
+        detail: missing.length ? "missing: " + missing.join(",")
+          : "14 materials present; concrete=" + c.concrete + " warm=" + warm };
+    });
+
+    check("material-concrete-and-paint-are-deterministic", function () {
+      // The slab's aggregate and the paint's wear are PURE functions of a
+      // seed: identical across calls, and different seeds really do differ.
+      var F = window.WT && window.WT.floor;
+      if (!F || typeof F.concreteSpecks !== "function") return { ok: false, detail: "WT.floor material helpers absent" };
+      var a = JSON.stringify(F.concreteSpecks(16, 4242, 0.6));
+      var b = JSON.stringify(F.concreteSpecks(16, 4242, 0.6));
+      var c = JSON.stringify(F.concreteSpecks(16, 99, 0.6));
+      var w1 = F.wearAt(3.5, 8.25, 7717), w2 = F.wearAt(3.5, 8.25, 7717);
+      var inRange = w1 >= 0.62 && w1 <= 1;
+      // Every stone must sit fully inside the tile (0..1 on both axes).
+      var specks = F.concreteSpecks(16, 4242, 0.6);
+      var escaped = specks.filter(function (s) {
+        return !(s.x > 0 && s.x < 1 && s.y > 0 && s.y < 1 && s.r > 0 && s.r < 0.5);
+      }).length;
+      return { ok: a === b && a !== c && w1 === w2 && inRange && escaped === 0 && specks.length > 0,
+        detail: "stable=" + (a === b) + " seedSensitive=" + (a !== c) +
+          " wear=" + w1.toFixed(4) + " stones=" + specks.length + " escaped=" + escaped };
+    });
+
+    check("material-no-clock-or-rng-in-the-floor-material-layer", function () {
+      // Determinism is STRUCTURAL, not incidental: read the shipped source of
+      // every exported floor helper straight off the live functions (no
+      // network, so this holds from file:// too) and prove none of them can
+      // reach a clock or an RNG.
+      var F = window.WT && window.WT.floor;
+      if (!F) return { ok: false, detail: "WT.floor absent" };
+      var src = "", n = 0;
+      for (var k in F) {
+        if (typeof F[k] !== "function") continue;
+        src += String(F[k]) + "\n";
+        n++;
+      }
+      var hasClock = /Date\.now|new Date\(/.test(src);
+      var hasRng = /Math\.random/.test(src);
+      var hasMaterial = typeof F.concreteSpecks === "function" && typeof F.hazardBands === "function";
+      return { ok: !hasClock && !hasRng && hasMaterial && n > 0,
+        detail: n + " floor helpers scanned; clock=" + hasClock + " rng=" + hasRng +
+          " materialHelpers=" + hasMaterial };
+    });
+
+    check("material-shapes-vocabulary-theme-complete", function () {
+      // The shared material vocabulary (steel beam, painted upright, safety
+      // guard, pallet timber, kraft board, plastic totes) must resolve in
+      // BOTH themes, or one renderer would silently fall back to gray.
+      var S = window.WT && window.WT.shapes;
+      if (!S || !S.MATERIALS) return { ok: false, detail: "WT.shapes.MATERIALS absent" };
+      var need = ["beam", "upright", "guard", "wood", "kraft", "toteBlue", "toteRed"];
+      var bad = [];
+      for (var i = 0; i < need.length; i++) {
+        var l = S.mat(need[i], "light"), d = S.mat(need[i], "dark");
+        if (!/^#[0-9a-fA-F]{6}$/.test(l) || !/^#[0-9a-fA-F]{6}$/.test(d)) bad.push(need[i]);
+      }
+      return { ok: bad.length === 0,
+        detail: bad.length ? "incomplete: " + bad.join(",")
+          : need.length + " materials x 2 themes; beam=" + S.mat("beam", "light") + "/" + S.mat("beam", "dark") };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

@@ -277,6 +277,97 @@ console.log("");
     "stage=" + one[0].stage);
 })();
 
+/* ---- 10b. v3.21 INDUSTRIAL MATERIAL IDENTITY --------------------- *
+ * The floor is POURED CONCRETE with PAINTED markings. Everything the
+ * renderer needs for that is a PURE, DETERMINISTIC function here: same
+ * seed -> byte-identical geometry, no Date, no Math.random, and every
+ * generated point provably inside the region it belongs to.
+ * ------------------------------------------------------------------ */
+(() => {
+  // --- concrete aggregate ------------------------------------------
+  const a = F.concreteSpecks(20, 4242, 0.6);
+  const b = F.concreteSpecks(20, 4242, 0.6);
+  const other = F.concreteSpecks(20, 99, 0.6);
+  const escaped = a.filter((s) =>
+    !(s.x > 0 && s.x < 1 && s.y > 0 && s.y < 1 && s.r > 0 && s.r < 0.5)).length;
+  const tones = new Set(a.map((s) => s.tone));
+  check("concreteSpecks is byte-identical for the same seed and differs for another (deterministic aggregate)",
+    a.length > 0 && JSON.stringify(a) === JSON.stringify(b) &&
+    JSON.stringify(a) !== JSON.stringify(other),
+    a.length + " stones, seed-stable");
+  check("every aggregate stone lies fully inside the tile (0..1 both axes) and carries a dark/light tone",
+    escaped === 0 && tones.has(-1) && tones.has(1),
+    "escaped=" + escaped + " tones=" + [...tones].sort().join(","));
+  check("concreteSpecks honours density, clamps garbage, and never throws",
+    F.concreteSpecks(20, 1, 0).length === 0 &&
+    F.concreteSpecks(20, 1, 1).length === 400 &&
+    Array.isArray(F.concreteSpecks("x", "y", "z")) &&
+    F.CONCRETE_TILE_M > 0,
+    "d=0 -> 0 stones, d=1 -> 400, tile=" + F.CONCRETE_TILE_M + " m");
+
+  // --- painted aisle lines + travel arrows --------------------------
+  const pairs = [{ a: { x: 0, y: 0, w: 10, d: 1 }, b: { x: 0, y: 4, w: 10, d: 1 }, axis: "y" }];
+  const paint = F.aislePaint(pairs);
+  const guides = F.aisleGuides(pairs);
+  check("aislePaint promotes the SAME aisleGuides centreline to a painted band of a real width (100 mm)",
+    paint.length === 1 && guides.length === 1 &&
+    paint[0].x0 === guides[0].x0 && paint[0].y0 === guides[0].y0 &&
+    paint[0].x1 === guides[0].x1 && paint[0].y1 === guides[0].y1 &&
+    paint[0].width === F.PAINT_W.aisle && F.PAINT_W.aisle === 0.10 &&
+    Math.abs(paint[0].lengthM - 10) < 1e-9 && paint[0].axis === "x",
+    "width=" + paint[0].width + " m, length=" + paint[0].lengthM + " m");
+
+  const arrows = F.aisleArrows(paint, 3);
+  const inLine = arrows.every((r) =>
+    r.x >= paint[0].x0 - 1e-9 && r.x <= paint[0].x1 + 1e-9 &&
+    Math.abs(r.y - paint[0].y0) < 1e-9 &&
+    Math.abs(Math.sqrt(r.dx * r.dx + r.dy * r.dy) - 1) < 1e-9);
+  const shortOne = F.aisleArrows([{ x0: 0, y0: 0, x1: 1, y1: 0 }], 6);
+  check("aisleArrows stencils one arrow every spacing, on the line, unit-directioned, inset from both ends",
+    arrows.length === 3 && inLine && arrows[0].x > paint[0].x0 &&
+    arrows[arrows.length - 1].x < paint[0].x1,
+    arrows.length + " arrows at x=" + arrows.map((r) => r.x.toFixed(1)).join("/"));
+  check("an aisle shorter than one spacing still gets a single centred arrow (never zero, never off the end)",
+    shortOne.length === 1 && Math.abs(shortOne[0].x - 0.5) < 1e-9,
+    "x=" + shortOne[0].x);
+  check("aisleArrows is deterministic and safe on garbage",
+    JSON.stringify(F.aisleArrows(paint, 3)) === JSON.stringify(arrows) &&
+    F.aisleArrows(null, 3).length === 0 &&
+    F.aisleArrows([{ x0: 0, y0: 0, x1: 0, y1: 0 }], 3).length === 0);
+
+  // --- black/yellow hazard hatch ------------------------------------
+  const rect = { x: 2, y: 3, w: 4, h: 2 };
+  const bands = F.hazardBands(rect, 0.5);
+  const inside = bands.every((band) => band.points.every((p) =>
+    p[0] >= rect.x - 1e-9 && p[0] <= rect.x + rect.w + 1e-9 &&
+    p[1] >= rect.y - 1e-9 && p[1] <= rect.y + rect.h + 1e-9));
+  const alternates = bands.every((band, i) => band.dark === (i % 2 === 0));
+  check("hazardBands paints alternating black/yellow diagonal quads that stay inside the apron",
+    bands.length > 1 && inside && alternates &&
+    bands.every((band) => band.points.length === 4),
+    bands.length + " bands, all in-rect, alternating");
+  check("hazardBands is deterministic and returns [] for a degenerate apron",
+    JSON.stringify(F.hazardBands(rect, 0.5)) === JSON.stringify(bands) &&
+    F.hazardBands({ x: 0, y: 0, w: 0, h: 2 }, 0.5).length === 0 &&
+    F.hazardBands(null, 0.5).length === 0);
+
+  // --- paint wear ---------------------------------------------------
+  const w1 = F.wearAt(3.5, 8.25, 7717);
+  const w2 = F.wearAt(3.5, 8.25, 7717);
+  const many = [];
+  for (let i = 0; i < 40; i++) many.push(F.wearAt(i * 0.5, 2, 7717));
+  const distinct = new Set(many.map((v) => v.toFixed(3))).size;
+  check("wearAt is a stable, bounded (0.62..1) scuff multiplier that actually varies along a line",
+    w1 === w2 && many.every((v) => v >= 0.62 && v <= 1) && distinct > 8,
+    "w=" + w1.toFixed(4) + ", " + distinct + " distinct values over 20 m");
+
+  // --- structural determinism --------------------------------------
+  const src = Object.keys(F).filter((k) => typeof F[k] === "function")
+    .map((k) => String(F[k])).join("\n");
+  check("the whole material layer is clock-free and RNG-free (structural determinism)",
+    !/Date\.now|new Date\(/.test(src) && !/Math\.random/.test(src));
+})();
+
 /* ---- 11. honesty label ------------------------------------------- */
 (() => {
   const d = String(F.DISCLAIMER || "").toLowerCase();

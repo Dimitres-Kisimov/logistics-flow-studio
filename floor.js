@@ -313,6 +313,198 @@
     return out;
   }
 
+  /* ==================================================================
+   * v3.21 INDUSTRIAL MATERIAL IDENTITY - the floor is POURED CONCRETE
+   * with PAINTED markings, not a blueprint. Everything below is a PURE,
+   * DETERMINISTIC function of position + an integer seed: no Date, no
+   * Math.random, no DOM. Same seed -> byte-identical geometry, every
+   * run, every machine (verify_floor.js asserts exactly that).
+   * ================================================================== */
+
+  /* ------------------------------------------------------------------
+   * hash2(x, y, seed) -> a stable 32-bit-ish integer for an integer
+   * lattice point. A plain integer mix (xorshift-flavoured, all ops on
+   * |0 values) so it is identical in every JS engine. Used to place the
+   * concrete's aggregate speckle, which must never move between frames
+   * or between runs.
+   * ------------------------------------------------------------------ */
+  function hash2(x, y, seed) {
+    let h = (Math.round(x) | 0) * 374761393;
+    h = (h + (Math.round(y) | 0) * 668265263) | 0;
+    h = (h + ((seed | 0) * 1274126177)) | 0;
+    h ^= h >>> 13;
+    h = Math.imul(h, 1274126177);
+    h ^= h >>> 16;
+    return h >>> 0;
+  }
+  // hash2 mapped into [0,1). Deterministic, uniform enough for speckle.
+  function hash01(x, y, seed) { return hash2(x, y, seed) / 4294967296; }
+
+  /* ------------------------------------------------------------------
+   * CONCRETE_TILE_M - the world size (metres) of one aggregate texture
+   * tile. The renderer bakes ONE tile and repeats it across the slab, so
+   * the whole floor costs a single fill no matter how large the hall is.
+   *
+   * concreteSpecks(cells, seed, density) -> the aggregate exposed in a
+   * poured, power-floated slab: a deterministic list of
+   *   { x, y, r, tone }
+   * in TILE-NORMALISED coordinates (0..1 on both axes, so the renderer
+   * can bake them into a tile of any pixel size). `tone` is -1 (a darker
+   * stone) or +1 (a lighter stone) so the speckle reads as aggregate
+   * rather than noise. `cells` is the lattice resolution (how many
+   * candidate stones per axis); `density` (0..1) is the fraction of
+   * lattice points that actually carry a stone. Every stone is fully
+   * inside [0,1) by construction. Pure; garbage -> [].
+   * ------------------------------------------------------------------ */
+  // 8 m of floor per tile: large enough that the repeat does not read as a
+  // pattern at normal zooms (a 4 m tile visibly checkerboarded an empty hall).
+  const CONCRETE_TILE_M = 8;
+  function concreteSpecks(cells, seed, density) {
+    const n = Math.max(1, Math.min(96, Math.round(num(cells)) || 24));
+    const s = (Math.round(num(seed)) | 0) || 0;
+    let dRaw = num(density);
+    const d = isFinite(dRaw) ? Math.max(0, Math.min(1, dRaw)) : 0.55;
+    const out = [];
+    for (let gy = 0; gy < n; gy++) {
+      for (let gx = 0; gx < n; gx++) {
+        if (hash01(gx, gy, s) >= d) continue;
+        // Jitter inside the lattice cell, never across its border, so a
+        // stone can never escape [0,1).
+        const jx = hash01(gx + 101, gy + 7, s);
+        const jy = hash01(gx + 13, gy + 211, s);
+        const rr = hash01(gx + 977, gy + 977, s);
+        const tn = hash01(gx + 31, gy + 57, s);
+        out.push({
+          x: (gx + 0.15 + jx * 0.7) / n,
+          y: (gy + 0.15 + jy * 0.7) / n,
+          r: (0.12 + rr * 0.26) / n, // radius in tile units, < half a cell
+          tone: tn < 0.5 ? -1 : 1,
+        });
+      }
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------
+   * PAINTED FLOOR MARKINGS. Real plant paint is a BAND of a real width,
+   * applied with a roller and worn by traffic - not a CAD hairline.
+   *
+   * PAINT_W - the standard painted line widths (metres), the widths a
+   * facility actually uses: a 100 mm aisle line, a 75 mm zone border,
+   * a 150 mm hazard band.
+   * ------------------------------------------------------------------ */
+  const PAINT_W = { aisle: 0.10, zone: 0.075, hazard: 0.15 };
+
+  /* ------------------------------------------------------------------
+   * aislePaint(facingPairs) -> the painted aisle lines: exactly the
+   * WT.floor.aisleGuides centreline geometry, promoted to a painted BAND
+   * with a real width and a travel direction:
+   *   { x0, y0, x1, y1, width, axis, lengthM }
+   * Reusing aisleGuides means the paint can never disagree with the
+   * compliance aisle model. Pure; degenerate pairs are skipped.
+   * ------------------------------------------------------------------ */
+  function aislePaint(facingPairs) {
+    const guides = aisleGuides(facingPairs);
+    const out = [];
+    for (let i = 0; i < guides.length; i++) {
+      const g = guides[i];
+      const dx = g.x1 - g.x0, dy = g.y1 - g.y0;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (!(len > 1e-6)) continue;
+      out.push({
+        x0: g.x0, y0: g.y0, x1: g.x1, y1: g.y1,
+        width: PAINT_W.aisle, axis: Math.abs(dx) >= Math.abs(dy) ? "x" : "y",
+        lengthM: len,
+      });
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------
+   * aisleArrows(paintLines, spacingM) -> painted DIRECTION ARROWS along
+   * each aisle line, one every spacingM metres, each
+   *   { x, y, dx, dy, size }
+   * where (dx,dy) is the unit travel direction. Arrows are inset half a
+   * spacing from both ends so paint never runs off the end of the aisle;
+   * an aisle shorter than one spacing gets a single centred arrow. Pure +
+   * deterministic (position is a pure function of the line geometry).
+   * ------------------------------------------------------------------ */
+  function aisleArrows(paintLines, spacingM) {
+    const lines = paintLines || [];
+    let step = num(spacingM);
+    if (!isFinite(step) || step <= 0) step = 6;
+    const out = [];
+    for (let i = 0; i < lines.length; i++) {
+      const g = lines[i]; if (!g) continue;
+      const dx = num(g.x1) - num(g.x0), dy = num(g.y1) - num(g.y0);
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (!(len > 1e-6)) continue;
+      const ux = dx / len, uy = dy / len;
+      // A stencilled floor arrow is a SMALL mark (~0.3-0.5 m across), not a
+      // billboard: it tells a driver the direction of travel at a glance and
+      // then gets out of the way.
+      const size = Math.max(0.22, Math.min(0.45, step * 0.06));
+      if (len < step) {
+        out.push({ x: g.x0 + ux * len / 2, y: g.y0 + uy * len / 2, dx: ux, dy: uy, size: size });
+        continue;
+      }
+      const n = Math.floor(len / step);
+      const pad = (len - (n - 1) * step) / 2;
+      for (let k = 0; k < n; k++) {
+        const t = pad + k * step;
+        out.push({ x: g.x0 + ux * t, y: g.y0 + uy * t, dx: ux, dy: uy, size: size });
+      }
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------
+   * hazardBands(rect, bandM) -> the black/yellow diagonal HAZARD HATCH
+   * that gets painted in front of a dock door or across a danger apron.
+   * Returns a list of 45-degree bands, each a QUAD (4 corner points)
+   * fully inside `rect`, alternating `dark:true|false` so the renderer
+   * paints the real two-tone hazard stripe. Pure; garbage -> [].
+   * ------------------------------------------------------------------ */
+  function hazardBands(rect, bandM) {
+    const r = rect || {};
+    const rx = num(r.x), ry = num(r.y), rw = num(r.w), rh = num(r.h);
+    if (![rx, ry, rw, rh].every(isFinite) || rw <= 1e-6 || rh <= 1e-6) return [];
+    let b = num(bandM);
+    if (!isFinite(b) || b <= 0) b = 0.5;
+    const span = rw + rh;
+    const out = [];
+    let idx = 0;
+    for (let o = 0; o < span - 1e-9; o += b, idx++) {
+      const o2 = Math.min(o + b, span);
+      // The band between diagonal offsets o and o2, clipped to the rect
+      // by construction (both endpoints of each diagonal are clamped).
+      const p = (t) => {
+        const ax = rx + Math.max(0, t - rh), ay = ry + Math.min(t, rh);
+        const bx = rx + Math.min(t, rw), by = ry + Math.max(0, t - rw);
+        return [[ax, ay], [bx, by]];
+      };
+      const a = p(o), c = p(o2);
+      out.push({ points: [a[0], a[1], c[1], c[0]], dark: idx % 2 === 0 });
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------
+   * WEAR - painted lines in a working plant are SCUFFED. wearAt(x, y,
+   * seed) -> a deterministic 0..1 opacity multiplier for the paint at a
+   * world point: mostly near-solid with occasional worn patches, so a
+   * long aisle line reads as painted-and-driven-over instead of vector-
+   * perfect. Pure function of the quantised position + seed (quantised to
+   * 0.5 m so the wear pattern is stable under zoom).
+   * ------------------------------------------------------------------ */
+  function wearAt(x, y, seed) {
+    const qx = Math.round(num(x) * 2), qy = Math.round(num(y) * 2);
+    if (!isFinite(qx) || !isFinite(qy)) return 1;
+    const h = hash01(qx, qy, (seed | 0) || 0);
+    // 0.62 .. 1.0 - never invisible, never uniform.
+    return 0.62 + h * 0.38;
+  }
+
   // Honest scope, asserted by verify_floor.js and shown in the app.
   const DISCLAIMER =
     "Illustrative facility rendering of a synthetic model - the measurements " +
@@ -338,6 +530,16 @@
     aisleGuides,
     stageOfType,
     zoneTints,
+    // v3.21 INDUSTRIAL MATERIAL IDENTITY (concrete + paint), all pure.
+    CONCRETE_TILE_M,
+    PAINT_W,
+    hash2,
+    hash01,
+    concreteSpecks,
+    aislePaint,
+    aisleArrows,
+    hazardBands,
+    wearAt,
     DISCLAIMER,
   };
 })();

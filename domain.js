@@ -146,55 +146,55 @@
   const ELEMENTS = {
     "selective-racking": {
       id: "selective-racking", label: "Selective racking", category: "storage",
-      w: 6, d: 1, color: "#3b82f6", resizable: true,
+      w: 6, d: 1, color: "#b84a22", resizable: true,
       density: 2.4, levels: 3, selectivity: 1.0, rotation: "FIFO/LIFO", costIndex: 3, heightM: 6.0,
       desc: "Single-deep adjustable pallet racking. Every pallet directly accessible (100% selective). Needs a working aisle in front. Good FIFO.",
     },
     "block-stack": {
       id: "block-stack", label: "Block-stack zone", category: "storage",
-      w: 4, d: 4, color: "#8b5cf6", resizable: true,
+      w: 4, d: 4, color: "#a8763f", resizable: true,
       density: 3.2, levels: 3, selectivity: 0.35, rotation: "LIFO", costIndex: 1, heightM: 4.5,
       handlingDeltaSec: 8,
       desc: "Floor block stacking, no racking. Highest floor density and lowest cost, but LIFO and low selectivity (honeycombing losses). +8 s/line repositioning in the sim.",
     },
     "drive-in": {
       id: "drive-in", label: "Drive-in racking", category: "storage",
-      w: 4, d: 4, color: "#b45309", resizable: true,
+      w: 4, d: 4, color: "#96401f", resizable: true,
       density: 3.0, levels: 3, selectivity: 0.25, rotation: "LIFO", costIndex: 2, heightM: 6.0,
       handlingDeltaSec: 10,
       desc: "Deep-lane racking the truck drives into. High density, low cost per position, but LIFO and poor selectivity (~25%): reaching a specific pallet often means digging. +10 s/line in the sim. Best for few SKUs in volume.",
     },
     "double-deep": {
       id: "double-deep", label: "Double-deep racking", category: "storage",
-      w: 6, d: 2, color: "#0369a1", resizable: true,
+      w: 6, d: 2, color: "#c4552a", resizable: true,
       density: 2.9, levels: 3, selectivity: 0.5, rotation: "FIFO within pairs", costIndex: 4, heightM: 6.0,
       handlingDeltaSec: 6,
       desc: "Two pallets deep; needs a telescopic-fork reach truck. ~20% denser than selective, but only the front pallet of each pair is directly accessible (~50% selectivity). +6 s/line in the sim.",
     },
     "push-back": {
       id: "push-back", label: "Push-back racking", category: "storage",
-      w: 4, d: 3, color: "#c026d3", resizable: true,
+      w: 4, d: 3, color: "#8c4a2a", resizable: true,
       density: 3.0, levels: 3, selectivity: 0.4, rotation: "LIFO", costIndex: 5, heightM: 6.0,
       handlingDeltaSec: 4,
       desc: "Nested carts on inclined rails, loaded and picked from the same aisle face. Dense, fast face access - but strictly LIFO per lane. +4 s/line in the sim. Avoid for FIFO-critical (shelf-life/batch) SKUs.",
     },
     "pallet-flow": {
       id: "pallet-flow", label: "Pallet-flow racking", category: "storage",
-      w: 4, d: 4, color: "#15803d", resizable: true,
+      w: 4, d: 4, color: "#7d6a4a", resizable: true,
       density: 3.4, levels: 3, selectivity: 0.45, rotation: "FIFO", costIndex: 7, heightM: 6.0,
       handlingDeltaSec: -2,
       desc: "Gravity roller lanes: load the back, pick the front - true FIFO. The front pallet is always presented at the pick face (-2 s/line in the sim). High density; higher capital cost; great for high-velocity SKUs.",
     },
     "carton-flow": {
       id: "carton-flow", label: "Carton-flow pick faces", category: "storage",
-      w: 3, d: 1, color: "#ea580c", resizable: true, pickFace: true,
+      w: 3, d: 1, color: "#a37b45", resizable: true, pickFace: true,
       density: 1.6, levels: 4, selectivity: 1.0, rotation: "FIFO", costIndex: 4, heightM: 2.5,
       handlingDeltaSec: -4,
       desc: "Inclined roller shelves presenting cartons at ergonomic pick faces, replenished from the back - FIFO at carton level. Fastest manual picking in the model (-4 s/line). Capacity in pallet-equivalents.",
     },
     "mobile-racking": {
       id: "mobile-racking", label: "Mobile (compact) racking", category: "storage",
-      w: 6, d: 4, color: "#4338ca", resizable: true,
+      w: 6, d: 4, color: "#6e6259", resizable: true,
       density: 3.8, levels: 4, selectivity: 1.0, rotation: "FIFO/LIFO", costIndex: 8, heightM: 8.0,
       handlingDeltaSec: 15,
       desc: "Racking on powered mobile bases sharing ONE opening aisle. Near block-stack density with 100% selectivity - but you wait for the aisle to open (+15 s/line amortised in the sim). Suits slow movers / cold storage.",
@@ -208,21 +208,21 @@
     },
     "asrs": {
       id: "asrs", label: "AS/RS crane aisle", category: "storage",
-      w: 8, d: 2, color: "#dc2626", resizable: true,
+      w: 8, d: 2, color: "#8c9196", resizable: true,
       density: 5.0, levels: 10, selectivity: 1.0, rotation: "FIFO", costIndex: 10, heightM: 20.0,
       goodsToPerson: true, cycleSec: 45,
       desc: "Automated high-bay aisle: a stacker crane serves double-sided racking. Goods-to-person: a pick line costs a ~45 s machine cycle instead of walking. Highest density (10+ levels) and highest capital cost. Informed by VDI 3564 high-bay design guidance (not certified).",
     },
     "shuttle": {
       id: "shuttle", label: "Shuttle system", category: "storage",
-      w: 6, d: 3, color: "#0891b2", resizable: true,
+      w: 6, d: 3, color: "#6f7c85", resizable: true,
       density: 4.5, levels: 6, selectivity: 0.9, rotation: "FIFO/LIFO", costIndex: 9, heightM: 12.0,
       goodsToPerson: true, cycleSec: 28,
       desc: "Deep-lane channels served by autonomous shuttle carts + lifts. Goods-to-person (~28 s cycle/line). Denser than AS/RS per channel, per-level throughput scales with shuttle count (simplified to one cycle time here).",
     },
     "mezzanine": {
       id: "mezzanine", label: "Mezzanine pick level", category: "storage",
-      w: 6, d: 4, color: "#65a30d", resizable: true, pickFace: true,
+      w: 6, d: 4, color: "#9a8a6a", resizable: true, pickFace: true,
       density: 2.0, levels: 2, selectivity: 1.0, rotation: "FIFO", costIndex: 5, heightM: 5.0,
       handlingDeltaSec: 5,
       desc: "A steel platform doubling the floor for small-parts shelving above/below. Capacity in pallet-equivalents across both levels; +5 s/line in the sim for the level change (stairs/lift).",
@@ -233,36 +233,36 @@
     // racking. Honest, synthetic teaching values - no vendor spec, no brand.
     "pick-to-light": {
       id: "pick-to-light", label: "Pick-to-light rack", category: "storage",
-      w: 4, d: 1, color: "#ca8a04", resizable: true, pickFace: true,
+      w: 4, d: 1, color: "#d79b28", resizable: true, pickFace: true,
       density: 1.8, levels: 4, selectivity: 1.0, rotation: "FIFO", costIndex: 5, heightM: 2.2,
       handlingDeltaSec: -3,
       desc: "Small-parts shelving whose bays carry light modules that direct the operator to the location and quantity - light-directed picking. Fully selective each/carton pick faces (capacity in pallet-equivalents), fast confirmed picks (-3 s/line in the sim). Replenished from behind/above.",
     },
     "vna": {
       id: "vna", label: "VNA narrow-aisle racking", category: "storage",
-      w: 6, d: 1, color: "#1d4ed8", resizable: true,
+      w: 6, d: 1, color: "#a05a2c", resizable: true,
       density: 4.0, levels: 5, selectivity: 1.0, rotation: "FIFO/LIFO", costIndex: 6, heightM: 10.0,
       handlingDeltaSec: 4,
       desc: "Very-narrow-aisle racking served by a guided man-up turret truck. A ~1.6-1.8 m guided aisle gives near-drive-in floor density with 100% selectivity across full height, but the man-up turret cycle is slower per line (+4 s/line in the sim) and the aisle must be wire/rail guided. Informed by DIN 15185 VNA aisle guidance (not certified).",
     },
     "dock-in": {
       id: "dock-in", label: "Dock door (inbound)", category: "flow",
-      w: 2, d: 1, color: "#22c55e", resizable: false, io: "receiving", heightM: 4.5,
+      w: 2, d: 1, color: "#2e7d32", resizable: false, io: "receiving", heightM: 4.5,
       desc: "Inbound (receiving) dock door. Goods arrive here and enter the flow.",
     },
     "dock-out": {
       id: "dock-out", label: "Dock door (outbound)", category: "flow",
-      w: 2, d: 1, color: "#ef4444", resizable: false, io: "shipping", heightM: 4.5,
+      w: 2, d: 1, color: "#c1272d", resizable: false, io: "shipping", heightM: 4.5,
       desc: "Outbound (shipping) dock door. Picked orders leave here - it is the default I/O point for pick travel.",
     },
     "staging": {
       id: "staging", label: "Staging area", category: "flow",
-      w: 4, d: 2, color: "#f59e0b", resizable: true, heightM: 1.5,
+      w: 4, d: 2, color: "#e8b01e", resizable: true, heightM: 1.5,
       desc: "Marshalling / staging buffer for inbound put-away or outbound consolidation. Buffer, not long-term storage.",
     },
     "conveyor": {
       id: "conveyor", label: "Conveyor segment", category: "flow",
-      w: 6, d: 1, color: "#64748b", resizable: true, heightM: 0.9,
+      w: 6, d: 1, color: "#8c9196", resizable: true, heightM: 0.9,
       // unitsPerHr: throughput of ONE powered conveyor segment (units/hr).
       // Synthetic order-of-magnitude teaching value, informed by general
       // material-flow throughput practice (VDI 4480 family). Seeds the
@@ -276,7 +276,7 @@
       // Square footprint so the quarter-arc belt turns cleanly inside it; the
       // `arc` field is the corner the belt wraps around ("tr" top-right, "br"
       // bottom-right, "bl" bottom-left, "tl" top-left) and rotate cycles it.
-      w: 3, d: 3, color: "#475569", resizable: true, heightM: 0.9, arc: "tr",
+      w: 3, d: 3, color: "#767c82", resizable: true, heightM: 0.9, arc: "tr",
       // unitsPerHr mirrors the straight conveyor: a curved segment carries the
       // SAME synthetic order-of-magnitude throughput (a turn, not a bottleneck).
       // Informed by general material-flow throughput practice (VDI 4480 family).
@@ -286,17 +286,17 @@
     },
     "push-station": {
       id: "push-station", label: "Push station", category: "flow",
-      w: 2, d: 2, color: "#0ea5e9", flow: "push", heightM: 1.2,
+      w: 2, d: 2, color: "#b07a12", flow: "push", heightM: 1.2,
       desc: "PUSH control point: material is released to storage on a forecast/schedule (make-to-stock replenishment). Can build buffer ahead of demand.",
     },
     "pull-station": {
       id: "pull-station", label: "Pull station", category: "flow",
-      w: 2, d: 2, color: "#14b8a6", flow: "pull", heightM: 1.2,
+      w: 2, d: 2, color: "#3d7a45", flow: "pull", heightM: 1.2,
       desc: "PULL control point: material moves only when a downstream order/kanban signal asks for it (make-to-order). Lower inventory, demand-paced.",
     },
     "pack-station": {
       id: "pack-station", label: "Pack station", category: "flow",
-      w: 3, d: 2, color: "#eab308", resizable: true, stage: "pack", heightM: 1.1,
+      w: 3, d: 2, color: "#a8763f", resizable: true, stage: "pack", heightM: 1.1,
       desc: "Packing/consolidation bench between picking and shipping. A complete outbound chain runs storage → (conveyor) → pack → outbound dock.",
     },
     // TRANSPORT LANES (added for the AI Environment Generator). These are
@@ -308,7 +308,7 @@
     // them with the other movement elements.
     "rgv": {
       id: "rgv", label: "RGV transport lane", category: "flow",
-      w: 4, d: 1, color: "#7c3aed", resizable: true, transport: true, heightM: 1.2,
+      w: 4, d: 1, color: "#b8641f", resizable: true, transport: true, heightM: 1.2,
       // movesPerHr: transport moves per hour of ONE rail-guided-vehicle
       // lane. Synthetic teaching value informed by VDI 2510 (AGV systems)
       // transport-cycle framing; seeds "auto.rgv.movesPerHr". NOT measured.
@@ -317,7 +317,7 @@
     },
     "agv": {
       id: "agv", label: "AGV / AMR route", category: "flow",
-      w: 4, d: 1, color: "#9333ea", resizable: true, transport: true, heightM: 0.8,
+      w: 4, d: 1, color: "#d17a1a", resizable: true, transport: true, heightM: 0.8,
       // movesPerHr: delivery moves per hour of ONE AGV / AMR route.
       // Informed by VDI 2510 (Automated Guided Vehicle Systems); seeds
       // "auto.agv.movesPerHr". Synthetic teaching value, NOT a vendor spec.
@@ -333,27 +333,27 @@
     // - no vendor spec, no real brand or model.
     "forklift": {
       id: "forklift", label: "Forklift / reach truck", category: "flow",
-      w: 2, d: 2, color: "#d97706", resizable: false, heightM: 2.5,
+      w: 2, d: 2, color: "#e4610f", resizable: false, heightM: 2.5,
       desc: "A materials-handling truck (counterbalance or reach) shown at an operating / parking spot. Handling equipment only: 0 storage capacity; it occupies floor like a working position. The working aisle a real truck needs is placed separately as a gap. Illustrative, not a vendor spec.",
     },
     "charging-station": {
       id: "charging-station", label: "Charging station", category: "flow",
-      w: 2, d: 1, color: "#84cc16", resizable: false, heightM: 1.4,
+      w: 2, d: 1, color: "#7a8f3a", resizable: false, heightM: 1.4,
       desc: "A battery / opportunity charging point for the AGV/AMR or truck fleet. Support equipment: 0 storage capacity; a fixed servicing position on the floor. Synthetic teaching element, not a vendor spec.",
     },
     "sorter": {
       id: "sorter", label: "Sorter loop (tilt-tray)", category: "flow",
-      w: 6, d: 4, color: "#f43f5e", resizable: true, heightM: 1.2,
+      w: 6, d: 4, color: "#a05a2c", resizable: true, heightM: 1.2,
       desc: "A closed-loop tilt-tray / cross-belt sortation system that carries items past divert chutes to their destination lane. Movement only: 0 storage capacity; occupies floor as a reserved sortation footprint. Distinct from a straight conveyor segment (a routing LOOP, not a point-to-point link). Synthetic teaching element.",
     },
     "stretch-wrap": {
       id: "stretch-wrap", label: "Stretch-wrap / palletiser", category: "flow",
-      w: 2, d: 2, color: "#be185d", resizable: false, heightM: 2.6,
+      w: 2, d: 2, color: "#5f5a63", resizable: false, heightM: 2.6,
       desc: "An end-of-line station that builds and stretch-wraps a pallet on a rotating turntable before dispatch. Processing equipment: 0 storage capacity; a fixed working position. Synthetic teaching element, not a vendor spec.",
     },
     "returns-station": {
       id: "returns-station", label: "Returns / QA station", category: "flow",
-      w: 3, d: 2, color: "#0d9488", resizable: true, heightM: 1.1,
+      w: 3, d: 2, color: "#5d7a5a", resizable: true, heightM: 1.1,
       desc: "A bench for processing customer returns and quality inspection - grade, re-label, then restock or scrap. Processing equipment: 0 storage capacity; a working bench position. Synthetic teaching element.",
     },
     "gate": {
@@ -388,7 +388,7 @@
     // ==================================================================
     "mfg-source": {
       id: "mfg-source", label: "Source (parts)", category: "flow",
-      base: "dock", io: "receiving", w: 2, d: 2, color: "#16a34a", resizable: false, heightM: 1.6,
+      base: "dock", io: "receiving", w: 2, d: 2, color: "#3d7a45", resizable: false, heightM: 1.6,
       // emitRatePerHr: work-piece parts EMITTED per hour (inter-arrival =
       // 3600 / rate seconds). Synthetic order-of-magnitude teaching value;
       // the live part-flow reuses the WMS/flow line rate (no separate clock).
@@ -397,20 +397,20 @@
     },
     "mfg-drain": {
       id: "mfg-drain", label: "Drain / Sink (parts)", category: "flow",
-      base: "dock", io: "shipping", w: 2, d: 2, color: "#b91c1c", resizable: false, heightM: 1.6,
+      base: "dock", io: "shipping", w: 2, d: 2, color: "#a52a24", resizable: false, heightM: 1.6,
       sink: true,
       desc: "Production DRAIN / SINK: consumes FINISHED parts and counts throughput - the end of a production line. A flow EXIT endpoint (maps onto the shipping-dock path). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
     },
     "mfg-station": {
       id: "mfg-station", label: "Station (process)", category: "flow",
-      base: "station", w: 3, d: 2, color: "#2563eb", resizable: true, heightM: 2.2,
+      base: "station", w: 3, d: 2, color: "#6f7c85", resizable: true, heightM: 2.2,
       // cycleSec: single-machine process time per part; servers: 1 machine.
       cycleSec: 30, servers: 1,
       desc: "Single-machine process STATION: one server with a cycle time (~30 s/part). Maps onto the station-SERVER flow path (parts pass THROUGH it, like a pack station). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
     },
     "mfg-parallel-station": {
       id: "mfg-parallel-station", label: "Parallel station (N machines)", category: "flow",
-      base: "station", w: 4, d: 3, color: "#4f46e5", resizable: true, heightM: 2.2,
+      base: "station", w: 4, d: 3, color: "#5c6975", resizable: true, heightM: 2.2,
       // servers: N identical machines in parallel; stage throughput scales
       // with the machine count (deep per-server queueing deferred to line-sim).
       cycleSec: 30, servers: 3,
@@ -418,14 +418,14 @@
     },
     "mfg-assembly": {
       id: "mfg-assembly", label: "Assembly station (join)", category: "flow",
-      base: "station", w: 4, d: 3, color: "#7c3aed", resizable: true, heightM: 2.4,
+      base: "station", w: 4, d: 3, color: "#a8541f", resizable: true, heightM: 2.4,
       // inputs: how many input parts combine into one (a simple BOM count).
       cycleSec: 40, servers: 1, inputs: 2,
       desc: "Assembly STATION: combines SEVERAL input parts into ONE (a simple BOM - inputs = 2 here) before releasing it downstream. Represented STRUCTURALLY now (a station carrying an inputs count); the deep combine / BOM flow logic is DEFERRED to the line-simulation build. Maps onto the station-server path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
     },
     "mfg-dismantle": {
       id: "mfg-dismantle", label: "Dismantle station (split)", category: "flow",
-      base: "station", w: 4, d: 3, color: "#db2777", resizable: true, heightM: 2.4,
+      base: "station", w: 4, d: 3, color: "#8c4a2a", resizable: true, heightM: 2.4,
       // outputs: how many parts one input splits into.
       cycleSec: 40, servers: 1, outputs: 2,
       desc: "Dismantle STATION: SPLITS one part into SEVERAL (outputs = 2 here). Represented STRUCTURALLY now (a station carrying an outputs count); the deep split flow logic is DEFERRED to the line-simulation build. Maps onto the station-server path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
@@ -463,7 +463,7 @@
     // ==================================================================
     "converter": {
       id: "converter", label: "Converter (transfer)", category: "flow",
-      base: "conveyor", w: 3, d: 3, color: "#06b6d4", resizable: true, heightM: 0.9,
+      base: "conveyor", w: 3, d: 3, color: "#7e858c", resizable: true, heightM: 0.9,
       // divert: the lateral direction material can be redirected to; the
       // straight-through path continues in the belt-run direction. unitsPerHr
       // mirrors the straight conveyor (a transfer, not a bottleneck).
@@ -472,7 +472,7 @@
     },
     "angular-converter": {
       id: "angular-converter", label: "Angular converter (90 deg transfer)", category: "flow",
-      base: "conveyor", w: 3, d: 3, color: "#0e7490", resizable: true, heightM: 0.9,
+      base: "conveyor", w: 3, d: 3, color: "#68707a", resizable: true, heightM: 0.9,
       // divert: a right-angle transfer between two PERPENDICULAR lines - a
       // corner transfer, distinct from the curved belt (a sharp 90 deg hand-off,
       // not a swept arc).
@@ -481,7 +481,7 @@
     },
     "turntable": {
       id: "turntable", label: "Turntable (rotating disc)", category: "flow",
-      base: "conveyor", w: 3, d: 3, color: "#a855f7", resizable: true, heightM: 0.9,
+      base: "conveyor", w: 3, d: 3, color: "#96751f", resizable: true, heightM: 0.9,
       // rotates: the disc turns a carrier / MU to a new heading. A subtle
       // DETERMINISTIC rotation animates from equipmentPhase (NO Date/RNG).
       rotates: true, unitsPerHr: 180,
@@ -489,7 +489,7 @@
     },
     "turnplate": {
       id: "turnplate", label: "Turnplate (rotating track plate)", category: "flow",
-      base: "conveyor", w: 3, d: 3, color: "#7e22ce", resizable: true, heightM: 0.9,
+      base: "conveyor", w: 3, d: 3, color: "#7d6620", resizable: true, heightM: 0.9,
       // rotates: a rotating SQUARE plate carrying a track segment (rotates the
       // whole track section, not just a disc). Animated deterministically.
       rotates: true, unitsPerHr: 180,
@@ -497,7 +497,7 @@
     },
     "flow-control": {
       id: "flow-control", label: "Flow control (routing rule)", category: "flow",
-      base: "conveyor", w: 2, d: 2, color: "#f97316", resizable: true, heightM: 1.0,
+      base: "conveyor", w: 2, d: 2, color: "#e4610f", resizable: true, heightM: 1.0,
       // outputs: how many downstream lines the node can route to; rule: the
       // (illustrative) routing policy label. Represented STRUCTURALLY - the
       // deep per-output routing DECISION logic is deferred to the line-sim.
@@ -506,7 +506,7 @@
     },
     "cycle": {
       id: "cycle", label: "Cycle (carrier loop)", category: "flow",
-      base: "conveyor", w: 6, d: 4, color: "#ec4899", resizable: true, heightM: 1.0,
+      base: "conveyor", w: 6, d: 4, color: "#9a6a5a", resizable: true, heightM: 1.0,
       // loop: a closed carrier loop - a carrier circulates the track endlessly.
       // A DETERMINISTIC carrier animates around the loop (NO Date/RNG).
       loop: true, unitsPerHr: 180,
@@ -514,7 +514,7 @@
     },
     "track": {
       id: "track", label: "Track (AGV guide path)", category: "flow",
-      base: "transporter", w: 4, d: 1, color: "#6366f1", resizable: true, transport: true, heightM: 0.4,
+      base: "transporter", w: 4, d: 1, color: "#6e6a62", resizable: true, transport: true, heightM: 0.4,
       // lanes: a SINGLE guided lane (the passive guide PATH an AGV / vehicle
       // rides). Same movement family as rgv / agv (base transporter). A carrier
       // marker travels the lane when animating (deterministic, NO Date/RNG).
@@ -523,7 +523,7 @@
     },
     "two-lane-track": {
       id: "two-lane-track", label: "Two-lane track (dual guide path)", category: "flow",
-      base: "transporter", w: 4, d: 2, color: "#3730a3", resizable: true, transport: true, heightM: 0.4,
+      base: "transporter", w: 4, d: 2, color: "#57544e", resizable: true, transport: true, heightM: 0.4,
       // lanes: TWO parallel guided lanes running OPPOSITE directions (a
       // bidirectional dual-lane guide path). Two markers travel opposite ways
       // when animating (deterministic, NO Date/RNG).
@@ -570,7 +570,7 @@
     // ==================================================================
     "pipe": {
       id: "pipe", label: "Pipe (fluid conduit)", category: "flow",
-      base: "conveyor", w: 6, d: 1, color: "#0ea5e9", resizable: true, heightM: 0.6, fluid: true,
+      base: "conveyor", w: 6, d: 1, color: "#4a7f9e", resizable: true, heightM: 0.6, fluid: true,
       // flowRateM3h: the continuous throughput of fluid through the conduit
       // (cubic metres per hour). Synthetic order-of-magnitude teaching value;
       // the live parcel rides the EXISTING material-flow line rate (no separate
@@ -582,7 +582,7 @@
     },
     "fluid-source": {
       id: "fluid-source", label: "Fluid source (supply)", category: "flow",
-      base: "dock", io: "receiving", w: 2, d: 2, color: "#0891b2", resizable: false, heightM: 1.8, fluid: true,
+      base: "dock", io: "receiving", w: 2, d: 2, color: "#2f6e8f", resizable: false, heightM: 1.8, fluid: true,
       // rateM3h: fluid SUPPLIED per hour (a continuous supply). The live fluid
       // flow reuses the WMS / flow line rate (no separate clock).
       rateM3h: 40,
@@ -590,12 +590,12 @@
     },
     "fluid-drain": {
       id: "fluid-drain", label: "Fluid drain (outfall)", category: "flow",
-      base: "dock", io: "shipping", w: 2, d: 2, color: "#155e75", resizable: false, heightM: 1.8, fluid: true, sink: true,
+      base: "dock", io: "shipping", w: 2, d: 2, color: "#1f5470", resizable: false, heightM: 1.8, fluid: true, sink: true,
       desc: "Fluid DRAIN / OUTFALL: consumes FLUID and counts throughput - the end of a fluid process line. A flow EXIT endpoint (maps onto the shipping-dock path). 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
     },
     "tank": {
       id: "tank", label: "Tank (fluid storage)", category: "flow",
-      base: "storage", w: 3, d: 3, color: "#2563eb", resizable: true, heightM: 5.0, fluid: true,
+      base: "storage", w: 3, d: 3, color: "#7e8c94", resizable: true, heightM: 5.0, fluid: true,
       // capacityM3: the fluid the tank holds (cubic metres); fillPct: the
       // current fill level as a percent (0..100), used to drive the
       // illustrative fill-level animation + the inspector read-out. Represented
@@ -609,7 +609,7 @@
     },
     "mixer": {
       id: "mixer", label: "Mixer (blend fluids)", category: "flow",
-      base: "station", w: 3, d: 3, color: "#4f46e5", resizable: true, heightM: 2.6, fluid: true,
+      base: "station", w: 3, d: 3, color: "#6f7c85", resizable: true, heightM: 2.6, fluid: true,
       // cycleSec: blend time per batch; servers: 1 vessel; inputs: how many
       // input fluids combine into one (a simple blend count). A rotating
       // AGITATOR animates deterministically. Deep blend / recipe / mass-balance
@@ -619,7 +619,7 @@
     },
     "portioner": {
       id: "portioner", label: "Portioner (fluid to portions)", category: "flow",
-      base: "station", w: 3, d: 2, color: "#7c3aed", resizable: true, heightM: 2.2, fluid: true,
+      base: "station", w: 3, d: 2, color: "#5f6d78", resizable: true, heightM: 2.2, fluid: true,
       // cycleSec: fill time per portion; servers: 1 filling head. Converts a
       // CONTINUOUS fluid into DISCRETE portions (a filler / doser). The
       // continuous -> discrete conversion is represented STRUCTURALLY (deferred).
@@ -628,7 +628,7 @@
     },
     "deportioner": {
       id: "deportioner", label: "DePortioner (portions to fluid)", category: "flow",
-      base: "station", w: 3, d: 2, color: "#9333ea", resizable: true, heightM: 2.2, fluid: true,
+      base: "station", w: 3, d: 2, color: "#546270", resizable: true, heightM: 2.2, fluid: true,
       // cycleSec: empty time per portion; servers: 1 emptying head. Converts
       // DISCRETE portions back into a CONTINUOUS fluid (an emptier / dumper -
       // the inverse of the portioner). Represented STRUCTURALLY (deferred).

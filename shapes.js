@@ -79,8 +79,35 @@
   // Face-shade multipliers for the 3D forms (top brightest, then right,
   // then left) - a consistent single light direction, no lighting model.
   const FACE = { top: 1.14, right: 0.82, left: 0.6 };
+
+  /* ------------------------------------------------------------------
+   * v3.21 INDUSTRIAL MATERIALS. A rack is not "a coloured rectangle": it
+   * is GALVANISED STEEL BEAMS bolted to PAINTED ORANGE-RED UPRIGHTS, and
+   * what sits on it is WOODEN PALLETS and KRAFT CARTONS - not tinted
+   * copies of the rack's own hue. These are the real materials, named
+   * once here so the 2D glyph and the 3D form can never disagree.
+   * Generic industrial appearance only - no brand, no trademark.
+   * ------------------------------------------------------------------ */
+  const MATERIALS = {
+    beam:     { light: "#8a9096", dark: "#9aa1a8" }, // galvanised beam steel
+    upright:  { light: "#b84a22", dark: "#c4552a" }, // painted rack upright
+    guard:    { light: "#e4610f", dark: "#e8721f" }, // safety-orange machine guard
+    wood:     { light: "#c08a45", dark: "#a8783d" }, // European pallet timber
+    kraft:    { light: "#a8763f", dark: "#96683a" }, // corrugated board
+    toteBlue: { light: "#1f6fb2", dark: "#3d8fd1" }, // moulded plastic tote
+    toteRed:  { light: "#c0392b", dark: "#d1493c" }, // moulded plastic tote
+  };
+  function mat(name, theme) {
+    const m = MATERIALS[name];
+    if (!m) return "#8a9096";
+    return theme === "dark" ? m.dark : m.light;
+  }
+
+  // Rack BEAMS are steel, whatever colour the uprights happen to be painted.
+  // (Before v3.21 the beams were a shade of the element's own colour, which is
+  // exactly why every rack read as a monochrome diagram instead of a structure.)
   function beamColor(color, theme) {
-    return theme === "dark" ? lighten(color, 0.28) : shade(color, 0.72);
+    return mat("beam", theme);
   }
 
   /* ==================================================================
@@ -2126,15 +2153,23 @@
     const cw = iw / cols, ch = ih / rows;
     const pad = clampN(Math.min(cw, ch) * 0.22, 1, 4);
     ctx.save();
-    ctx.fillStyle = rgba(theme === "dark" ? lighten(color, 0.2) : shade(color, 0.82), theme === "dark" ? 0.6 : 0.5);
+    // v3.21: what is ON the rack is GOODS, not more rack. Each position holds
+    // a wooden pallet or a kraft carton stack, picked deterministically from
+    // the same `seed` that decides whether the position is loaded at all - so
+    // a rack reads as mixed stock and two identical racks at different spots
+    // still differ, with no RNG and no clock anywhere in the decision.
+    const woodC = mat("wood", theme), kraftC = mat("kraft", theme);
     ctx.strokeStyle = gc.stroke;
     ctx.lineWidth = clampN(cell * 0.04, 0.8, 1.6);
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        if (!loaded(r * cols + c, seed, opt.frac)) continue;
+        const idx = r * cols + c;
+        if (!loaded(idx, seed, opt.frac)) continue;
         const bx = ix + c * cw + pad, by = iy + r * ch + pad;
         const bw = cw - 2 * pad, bh = ch - 2 * pad;
         if (bw <= 0 || bh <= 0) continue;
+        ctx.fillStyle = rgba(((idx * 7 + (seed | 0)) % 3) === 0 ? kraftC : woodC,
+          theme === "dark" ? 0.72 : 0.66);
         ctx.fillRect(bx, by, bw, bh);
         ctx.strokeRect(bx, by, bw, bh);
         seg(ctx, bx + bw / 2, by, bx + bw / 2, by + bh); // unit-load centre seam
@@ -2700,5 +2735,11 @@
     DETAIL_RICH_MIN,
     // Exposed for reuse/tests; illustrative schematic drawing only.
     colors: { rgba, shade, lighten },
+    // v3.21 INDUSTRIAL MATERIAL IDENTITY: the named real-world materials
+    // (steel beam, painted upright, safety-orange guard, pallet timber,
+    // kraft board, plastic totes) both renderers draw with. Exposed so a
+    // test can assert the vocabulary exists and stays theme-complete.
+    MATERIALS,
+    mat,
   };
 })();

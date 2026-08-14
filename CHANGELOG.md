@@ -6,6 +6,82 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [3.21] — 2026-08-14
+
+**The design correction: this is factory work, not a drafting tool.** The
+v3.20.1 craft pass dressed the simulator as a *blueprint* — deep-blue slate
+chrome, a blue-black canvas, cyan hairline grid, candy-pastel element tints.
+Every one of those choices named the wrong subject. A plant floor is not an
+IDE, and this release re-tokens the whole product to the **material world of a
+factory**. Structure is untouched (the rail + drawers + icon-expand layout is
+the user's own choice); nothing about behaviour, copy or serialization changes,
+and **every saved scenario stays byte-identical**.
+
+**The canvas is a plant floor.**
+- The slab is **poured concrete** — a warm neutral gray with a deterministic
+  *exposed-aggregate* speckle. The stones come from a pure, seeded function
+  (`WT.floor.concreteSpecks`; no `Date`, no `Math.random`) baked once into an
+  8 m repeating tile, so painting the whole hall costs a single `fillRect` no
+  matter how large it is, and the same layout pours an identical slab on every
+  run and every machine.
+- The 5 m lines are **saw-cut control joints** with a chamfer highlight.
+  Concrete really is poured in ~5 m bays and cut so it cracks where you choose
+  — which happens to be the model's own major grid step, so the measurement aid
+  and the material finally agree instead of arguing.
+- The markings are **paint**: 100 mm safety-yellow aisle lines with stencilled
+  travel arrows, 75 mm white zone borders, and a 150 mm black/yellow hazard
+  hatch on every dock apron. All of it is *scuffed* by a deterministic wear
+  function, because paint in a working plant gets driven over. None of it is a
+  CAD hairline any more. The aisle paint is promoted from the **same**
+  facing-pair model the compliance aisle check uses, so the paint on the floor
+  can never disagree with the rule that governs it.
+- Equipment gains a **contact shadow** so it stands *on* the slab instead of
+  being drawn on top of it, and the building shell reads as a clad steel wall.
+- **High-bay lighting** is modelled only where it is real: warm sodium/LED
+  pools on the night shift, and *nothing added* to the evenly-lit daylit hall
+  (every attempt to model daylight pooling either washed the concrete out to
+  paper or left square seams where the gradients met — restraint was the
+  correct answer, not more paint).
+
+**Colour is material, not decoration.** 51 element types are re-toned off the
+candy/blueprint ramp onto real materials: orange-red painted rack uprights on
+galvanised steel beams, machine gray with safety-orange guards, kraft board,
+pallet timber, and genuine plant signage (amber = attention, red = stop, green
+= running). `shapes.js` gains a shared `MATERIALS` vocabulary so the 2D glyph
+and the 2.5D form can never disagree; rack **beams are steel whatever the
+uprights are painted**; and what sits on a rack is now wooden pallets and kraft
+cartons rather than tinted copies of the rack's own hue. Blue survives only
+where it is honest — plastic totes, cold-store and fluid cues, and ISO 7010
+*mandatory-action* blue for the selection ring. No brands, no trademarks: every
+motif stays a generic industrial schematic.
+
+**The chrome is a machine console.** The rail is a powder-coated steel column
+with brushed-metal separators, recessed lit keys, a condensed silk-screened
+label set, an amber indicator keel on the engaged tool and a green ready LED.
+Neutrals are warm concrete/steel throughout — in **both** themes, because a
+night shift is not blue.
+
+- **Light = daylit hall**, **dark = night shift**: the slab recedes into warm
+  light pools while the machines and the painted lines stay lit.
+- **Accessibility:** every text pair is WCAG AA in both themes, with the ratios
+  *computed* and asserted live by the extended self-test — including the
+  console's own ink against the powder-coat it sits on (11.3:1 / 5.3:1) and the
+  indicator LEDs at ≥ 3:1 as non-text UI. `prefers-reduced-motion` is honoured
+  exactly as before.
+
+**Gates:** all 46 harnesses pass; the in-browser self-test grows 118 → **125**
+checks (7 new: console tokens present, console ink AA on the powder-coat,
+neutrals provably warm rather than blue-dominant, the canvas material palette
+complete in both themes, concrete/paint determinism, a structural clock/RNG-free
+scan of the material layer, and the shapes material vocabulary theme-complete);
+`verify_floor.js` adds 13 checks over the new pure geometry; the offline guard
+is clean across 97 files; the cache is bumped to `wt-v76` with every
+`verify_*.js` pin synced.
+
+**Honest limitation:** the material identity is a *rendering* correction. It
+changes no number, no model and no export — capacities, KPIs, compliance
+outcomes and the IFC geometry path are exactly what they were in v3.20.2.
+
 ## [3.20.2] — 2026-08-14
 
 **The tier default is now `full`.** A first-time visitor used to meet a

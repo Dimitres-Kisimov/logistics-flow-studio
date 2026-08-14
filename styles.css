@@ -4,40 +4,70 @@
  * No @import, no url(http...), no external references anywhere.
  * ===================================================================== */
 
+/* =====================================================================
+ * v3.21 INDUSTRIAL MATERIAL IDENTITY (the design correction).
+ * ---------------------------------------------------------------------
+ * v3.20.1 dressed this app as a DRAFTING TOOL: slate/blue neutrals,
+ * blueprint hairlines, an IDE palette. Wrong subject. This is factory
+ * work, so the chrome is now a MACHINE CONSOLE standing in a plant:
+ *
+ *   LIGHT = DAYLIT HALL  - warm concrete ground, painted-steel panels.
+ *   DARK  = NIGHT SHIFT  - the hall goes dark, the console stays lit.
+ *
+ * Neutrals are WARM (concrete/steel/paint), never blue-gray. Colour is
+ * plant SIGNAGE, not decoration: amber = attention, red = stop, green =
+ * running, and ISO 7010 blue = MANDATORY ACTION (so the one structural
+ * blue left in the product is the "act on this" accent). Every -ink
+ * value below is a TEXT colour whose contrast against --surface is
+ * COMPUTED, not eyeballed, and asserted live by the self-test.
+ * ===================================================================== */
 :root {
-  --bg: #f1f5f9;
-  --surface: #ffffff;
-  --surface-2: #f8fafc;
-  --text: #0f172a;
-  --text-dim: #475569;
-  --border: #e2e8f0;
-  --accent: #0ea5e9;
-  --accent-2: #14b8a6;
-  --primary: #0284c7;
+  --bg: #dcd8d0;          /* concrete ground the console stands on */
+  --surface: #f7f5f0;     /* painted-steel panel face */
+  --surface-2: #eceae3;   /* recessed panel / inset well */
+  --text: #1c1917;        /* 16.0:1 on --surface */
+  --text-dim: #5c554b;    /*  6.8:1 on --surface */
+  --border: #cfc9bd;      /* steel panel edge */
+  --accent: #2a7ab0;      /* ISO 7010 mandatory blue - borders/tints */
+  --accent-2: #7a8f3a;    /* olive electrical green */
+  --primary: #1b5e8c;     /* the act-on-this button (6.9:1 vs white) */
   --primary-ink: #ffffff;
-  --danger: #dc2626;
-  --ok: #16a34a;
-  --warn: #d97706;
-  /* v3.20.1 CRAFT: ink-role status tokens. The vivid base tokens above keep
-   * painting borders/tints/fills (signal stays saturated); any place a status
-   * colour is TEXT wears its -ink twin so every text pair passes WCAG AA
-   * (light accent #0ea5e9 on white was 2.77:1; #0369a1 is 5.93:1 - computed,
-   * not eyeballed; the self-test asserts these ratios live). In dark the inks
-   * equal the base colours (they already pass), so dark is unchanged. */
-  --accent-ink: #0369a1;
-  --ok-ink: #15803d;
-  --warn-ink: #b45309;
-  --danger-ink: #b91c1c;
-  --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
-  /* v3.20.1 CRAFT: a disciplined three-step elevation ladder. --shadow is the
-   * resting card; --shadow-2 the docked drawer; --shadow-3 a floating panel.
-   * Light-theme depth is slate-tinted (not dead black) so chrome stays quiet. */
-  --shadow-2: 0 10px 32px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.08);
-  --shadow-3: 0 18px 50px rgba(15, 23, 42, 0.20), 0 3px 10px rgba(15, 23, 42, 0.12);
+  --danger: #c1272d;      /* stop / violation */
+  --ok: #2e7d32;          /* running */
+  --warn: #c07a10;        /* attention */
+  /* Ink-role status tokens: the vivid base tokens above keep painting
+   * borders/tints/fills so signal stays saturated; any place a status
+   * colour is TEXT wears its -ink twin. Ratios on --surface #f7f5f0:
+   * accent 7.3:1 · ok 6.1:1 · warn 5.4:1 · danger 7.1:1 (COMPUTED). */
+  --accent-ink: #17557f;
+  --ok-ink: #26692a;
+  --warn-ink: #8a5a00;
+  --danger-ink: #a01f24;
+  /* v3.21: MACHINE CONSOLE. The rail is a powder-coated steel column with
+   * brushed-metal separators and small indicator LEDs - the same object in
+   * both themes, because a machine's console does not repaint itself when
+   * the sun goes down. Ratios on --console #2f2c28: ink 11.3:1, dim 5.3:1. */
+  --console: #2f2c28;
+  --console-2: #3a3630;
+  --console-line: #575048;   /* brushed-metal separator */
+  --console-ink: #ece7dd;
+  --console-ink-dim: #a89f92;
+  --led-run: #4ec46a;        /* green  - running */
+  --led-attn: #f0b72a;       /* amber  - attention */
+  --led-stop: #f0736b;       /* red    - stop / violation */
+  --led-off: #4a443c;        /* unlit indicator */
+  /* Depth is warm (concrete dust, not slate). Three steps: resting card,
+   * docked drawer, floating panel. */
+  --shadow: 0 1px 3px rgba(41, 35, 28, 0.10), 0 1px 2px rgba(41, 35, 28, 0.07);
+  --shadow-2: 0 10px 32px rgba(41, 35, 28, 0.16), 0 2px 6px rgba(41, 35, 28, 0.10);
+  --shadow-3: 0 18px 50px rgba(41, 35, 28, 0.22), 0 3px 10px rgba(41, 35, 28, 0.14);
   --radius: 12px;
-  --canvas-bg: #ffffff;
-  --canvas-grid: #e2e8f0;
-  --canvas-grid-strong: #cbd5e1;
+  /* The canvas tokens mirror app.js themeColors() - poured concrete slab,
+   * faint trowel grid, saw-cut control joints. Kept in sync by hand; the
+   * canvas cannot read CSS vars, so app.js owns the authoritative copy. */
+  --canvas-bg: #c9c5bd;
+  --canvas-grid: #bcb6ab;
+  --canvas-grid-strong: #9c9486;
   /* v3.20.1 CRAFT: shared type + motion tokens. One tracking value for every
    * uppercase micro-label (the letter-spacing was 0.03-0.06em ad hoc); one
    * confident ease + two durations for every chrome transition. */
@@ -50,32 +80,36 @@
   --mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
 }
 
+/* v3.21 NIGHT SHIFT. The hall goes dark and warm - sodium/LED pools, the
+ * slab receding - while the console keeps its powder-coat and its lit
+ * indicators. Neutrals stay WARM here too: a night shift is not blue. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b1220;
-    --surface: #0f172a;
-    --surface-2: #111c31;
-    --text: #e2e8f0;
-    --text-dim: #94a3b8;
-    --border: #1e293b;
-    --accent: #38bdf8;
-    --accent-2: #2dd4bf;
-    --primary: #0ea5e9;
-    --primary-ink: #04121f;
-    --danger: #f87171;
-    --ok: #4ade80;
-    --warn: #fbbf24;
-    /* Dark inks == base colours (8.3:1 / 10.3:1 / 10.7:1 / 6.5:1 on --surface). */
-    --accent-ink: #38bdf8;
-    --ok-ink: #4ade80;
-    --warn-ink: #fbbf24;
-    --danger-ink: #f87171;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    --shadow-2: 0 12px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.30);
-    --shadow-3: 0 22px 60px rgba(0, 0, 0, 0.50), 0 4px 12px rgba(0, 0, 0, 0.35);
-    --canvas-bg: #0e1626;
-    --canvas-grid: #1c2942;
-    --canvas-grid-strong: #2b3d5c;
+    --bg: #1a1815;
+    --surface: #262320;
+    --surface-2: #2f2b27;
+    --text: #ede8df;     /* 12.8:1 on --surface */
+    --text-dim: #a89f92; /*  6.0:1 on --surface */
+    --border: #3a3630;
+    --accent: #5aa7d8;
+    --accent-2: #9ab84e;
+    --primary: #1b5e8c;
+    --primary-ink: #ffffff;
+    --danger: #f0736b;
+    --ok: #5ec46a;
+    --warn: #e8b23a;
+    /* Ratios on --surface #262320: 7.2:1 / 9.6:1 / 9.5:1 / 6.3:1 (COMPUTED). */
+    --accent-ink: #6db8e6;
+    --ok-ink: #6ecf78;
+    --warn-ink: #f0bd4a;
+    --danger-ink: #f5837b;
+    /* The console is the SAME painted steel in both themes (see :root). */
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    --shadow-2: 0 12px 40px rgba(0, 0, 0, 0.50), 0 2px 8px rgba(0, 0, 0, 0.34);
+    --shadow-3: 0 22px 60px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.38);
+    --canvas-bg: #2a2724;
+    --canvas-grid: #332f2a;
+    --canvas-grid-strong: #453f37;
   }
 }
 
@@ -267,10 +301,14 @@ a.btn.app-link { color: var(--accent-ink); border-color: color-mix(in srgb, var(
   flex-direction: column;
   gap: 4px;
   padding: 6px 4px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  /* v3.21 MACHINE CONSOLE: a powder-coated steel column, not a white card.
+   * The faint vertical gradient is the sheen on painted sheet metal; the
+   * inset top highlight is its brushed edge. Same object in both themes. */
+  background:
+    linear-gradient(180deg, var(--console-2) 0%, var(--console) 28%, var(--console) 100%);
+  border: 1px solid var(--console-line);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255, 255, 255, 0.09);
   z-index: 30;
 }
 .wt-rail-btn {
@@ -290,8 +328,9 @@ a.btn.app-link { color: var(--accent-ink); border-color: color-mix(in srgb, var(
   line-height: 1;
   transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
 }
-.wt-rail-btn:hover { background: var(--surface-2, rgba(127, 127, 127, 0.12)); }
-.wt-rail-ico { display: inline-flex; color: var(--text-dim); transition: color var(--dur-1) var(--ease-out); }
+.wt-rail-btn { color: var(--console-ink); }
+.wt-rail-btn:hover { background: rgba(255, 255, 255, 0.07); }
+.wt-rail-ico { display: inline-flex; color: var(--console-ink-dim); transition: color var(--dur-1) var(--ease-out); }
 .wt-rail-ico svg { display: block; }
 /* v3.20.1 CRAFT: a whisper of lift on the hovered rail icon - motion-pref
  * gated at the source (inside no-preference), so reduce never sees it. */
@@ -300,20 +339,27 @@ a.btn.app-link { color: var(--accent-ink); border-color: color-mix(in srgb, var(
   .wt-rail-btn:hover .wt-rail-ico { transform: translateY(-1px); }
   .wt-rail-btn:active .wt-rail-ico { transform: translateY(0); }
 }
+/* v3.21: condensed, tracked-out INDUSTRIAL LABELS - the way a machine's
+ * console is silk-screened, not the way an IDE labels a sidebar. */
 .wt-rail-label {
-  font-size: 0.6rem;
-  letter-spacing: 0.01em;
-  color: var(--text-dim);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-stretch: condensed;
+  font-weight: 600;
+  color: var(--console-ink-dim);
   text-align: center;
 }
 .wt-rail-btn:hover .wt-rail-ico,
-.wt-rail-btn:hover .wt-rail-label { color: var(--text); }
+.wt-rail-btn:hover .wt-rail-label { color: var(--console-ink); }
+/* v3.21: an ENGAGED control on a machine console is a lit, recessed key. */
 .wt-rail-btn.active {
-  background: color-mix(in srgb, var(--accent, #2563eb) 16%, transparent);
-  border-color: color-mix(in srgb, var(--accent, #2563eb) 40%, transparent);
+  background: rgba(255, 255, 255, 0.10);
+  border-color: var(--console-line);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
 }
-/* v3.20.1 CRAFT: an open tool carries a quiet accent keel on its left edge -
- * the active state reads in the periphery without the icon shouting. */
+/* An open tool carries a lit AMBER KEEL on its left edge - the same way a
+ * machine tells you which station is selected: an indicator, not a glow. */
 .wt-rail-btn { position: relative; }
 .wt-rail-btn.active::before {
   content: "";
@@ -323,14 +369,20 @@ a.btn.app-link { color: var(--accent-ink); border-color: color-mix(in srgb, var(
   bottom: 22%;
   width: 3px;
   border-radius: 3px;
-  background: var(--accent-ink, #2563eb);
+  background: var(--led-attn);
 }
 .wt-rail-btn.active .wt-rail-ico,
-.wt-rail-btn.active .wt-rail-label { color: var(--accent-ink, #2563eb); }
+.wt-rail-btn.active .wt-rail-label { color: var(--led-attn); }
 .wt-rail-btn:focus-visible {
-  outline: 2px solid var(--accent-ink, #2563eb);
+  outline: 2px solid var(--led-attn);
   outline-offset: 2px;
 }
+/* Brushed-metal SEPARATOR between console keys - the hairline of bare metal
+ * a painted panel shows where two pressings meet, so the rail reads as banked
+ * controls rather than a list. Uses the key's own top border (the ::after slot
+ * is already the ready LED), so nothing overlaps. */
+.wt-rail-btn + .wt-rail-btn { border-top-color: var(--console-line); border-radius: 0 0 10px 10px; }
+.wt-rail-btn + .wt-rail-btn.active { border-top-color: var(--console-line); }
 /* v3.11 RUN DISCOVERABILITY: a calm "ready to run" affordance on the Simulate
    rail tool once the floor has simulatable content - a small accent dot that
    points a first-timer at where ▶ Run lives, without cluttering the header or
@@ -344,8 +396,10 @@ a.btn.app-link { color: var(--accent-ink); border-color: color-mix(in srgb, var(
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--accent, #2563eb);
-  box-shadow: 0 0 0 2px var(--bg, #fff);
+  /* v3.21: a real INDICATOR LED on the console - green = ready to run, seated
+   * in a dark bezel and carrying its own small halo, the way a lit lamp does. */
+  background: var(--led-run);
+  box-shadow: 0 0 0 2px var(--console), 0 0 6px 1px rgba(78, 196, 106, 0.55);
   animation: wt-rail-ready 2.6s ease-in-out infinite;
 }
 @keyframes wt-rail-ready {

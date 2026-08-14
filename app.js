@@ -171,22 +171,156 @@
   // ================================================================
   // THEME COLOURS (canvas can't read CSS vars directly)
   // ================================================================
-  // v3.20.1 CRAFT: grid contrast tuned per theme — in dark the 5 m major
-  // lines step up a touch (#2b3d5c -> #34486b) so the floor reads structured
-  // on the dark hero canvas; in light the 1 m minor lines recede a hair
-  // (#e8edf3 -> #eaeff5) so placed elements pop. Signal colours (stages,
-  // congestion, violations) are untouched — colour stays reserved for state.
+  // v3.21 INDUSTRIAL MATERIAL IDENTITY. This canvas is a PLANT FLOOR, not a
+  // drafting sheet: every colour below names a real material or a real piece
+  // of plant signage, and nothing here is decoration.
+  //
+  //   LIGHT = DAYLIT HALL - bright sealed concrete under high-bay light.
+  //   DARK  = NIGHT SHIFT - the slab recedes into warm sodium/LED pools while
+  //                         the machines and the painted lines stay lit.
+  //
+  // The v3.20.1 pass dressed this as a BLUEPRINT (blue-black slab, cyan
+  // hairline grid). Corrected here: the slab is poured concrete (warm neutral
+  // gray + deterministic exposed aggregate), the 5 m lines are SAW-CUT CONTROL
+  // JOINTS (concrete really is poured in ~5 m bays - the model's own major
+  // step, so the measurement aid and the material finally agree), and the
+  // markings are PAINT, not hairlines.
+  //
+  // Signal colours are genuine plant signage, not a UI ramp:
+  //   amber = attention    red = stop / violation    green = running
+  //   ISO 7010 blue = MANDATORY ACTION -> the selection ring ("you are acting
+  //   on this"). That is the only structural blue that survives the correction;
+  //   every other blue on this floor is a plastic tote or a cold-store cue.
   function themeColors() {
     const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     return dark
-      ? { bg: "#0e1626", void: "#080d17", grid: "#1c2942", gridStrong: "#34486b", text: "#e2e8f0", dim: "#94a3b8", sel: "#38bdf8", violation: "#f87171", io: "#facc15", flow: "#2dd4bf", warnMark: "#f87171", heat: "#fb923c",
-          flowStages: { receiving: "#60a5fa", storage: "#c084fc", picking: "#fbbf24", packing: "#2dd4bf", shipping: "#4ade80" },
-          flowCongest: { low: "#4ade80", mid: "#fbbf24", high: "#f87171" } }
-      : { bg: "#ffffff", void: "#eef2f7", grid: "#eaeff5", gridStrong: "#cbd5e1", text: "#0f172a", dim: "#64748b", sel: "#0284c7", violation: "#dc2626", io: "#ca8a04", flow: "#0d9488", warnMark: "#dc2626", heat: "#c2410c",
-          flowStages: { receiving: "#2563eb", storage: "#9333ea", picking: "#d97706", packing: "#0d9488", shipping: "#16a34a" },
-          flowCongest: { low: "#16a34a", mid: "#d97706", high: "#dc2626" } };
+      ? { bg: "#2a2724", void: "#141210", grid: "#332f2a", gridStrong: "#453f37",
+          text: "#ede8df", dim: "#a29a8d", sel: "#4ea8de", violation: "#f0736b",
+          io: "#f0b72a", flow: "#5ec46a", warnMark: "#f0736b", heat: "#f08a3c",
+          // --- materials (night shift: lit by warm sodium / LED) ---
+          concrete: "#2a2724", aggDark: "#221f1c", aggLight: "#3a3630",
+          joint: "#413b33", paintYellow: "#f0b72a", paintWhite: "#d6cfc0",
+          hazardDark: "#17150f", steel: "#7e858c", upright: "#c4552a",
+          guard: "#e8721f", wood: "#c08a45", kraft: "#a8763f",
+          toteBlue: "#3d8fd1", toteRed: "#d1493c",
+          flowStages: { receiving: "#4e94bd", storage: "#c4652a", picking: "#d79b28", packing: "#b08a5a", shipping: "#5ea866" },
+          flowCongest: { low: "#5ec46a", mid: "#e8b23a", high: "#f0736b" } }
+      : { bg: "#c9c5bd", void: "#a19b90", grid: "#bcb6ab", gridStrong: "#9c9486",
+          text: "#1c1917", dim: "#4d473e", sel: "#1b5e8c", violation: "#c1272d",
+          io: "#a8730b", flow: "#2e7d32", warnMark: "#c1272d", heat: "#b8431c",
+          // --- materials (daylit hall) ---
+          // Sealed concrete photographs as a MID gray, not cream: the slab has
+          // to sit a clear step below the painted white lines, or the paint has
+          // nothing to read against and the whole floor turns to paper.
+          concrete: "#c9c5bd", aggDark: "#b0aba2", aggLight: "#d8d4cd",
+          joint: "#8f8779", paintYellow: "#e8b01e", paintWhite: "#f7f4ec",
+          hazardDark: "#211e1a", steel: "#8c9196", upright: "#b84a22",
+          guard: "#e4610f", wood: "#c08a45", kraft: "#a8763f",
+          toteBlue: "#1f6fb2", toteRed: "#c0392b",
+          flowStages: { receiving: "#2f6e8f", storage: "#a8541f", picking: "#b07a12", packing: "#8c6239", shipping: "#3d7a45" },
+          flowCongest: { low: "#2e7d32", mid: "#b07a12", high: "#c1272d" } };
   }
   let COLORS = themeColors();
+
+  /* ------------------------------------------------------------------
+   * v3.21 CONCRETE SLAB. The floor is a poured, power-floated slab with
+   * exposed aggregate, not a flat fill and not a blueprint grid. The
+   * speckle geometry is a PURE function of an integer seed
+   * (WT.floor.concreteSpecks - no Date, no Math.random), baked ONCE into
+   * a small repeating tile so painting the whole hall costs a single
+   * fillRect no matter how large it is. Rebuilt only when the theme
+   * flips (the cache key is the concrete colour), never per frame.
+   * ------------------------------------------------------------------ */
+  const CONCRETE_TILE_PX = 256;      // baked tile resolution (8 m of floor)
+  const CONCRETE_SEED = 20250814;    // fixed: the slab never re-pours
+  let _concreteTile = null, _concreteKey = "";
+  function concretePattern() {
+    if (!F || typeof F.concreteSpecks !== "function") return null;
+    const key = COLORS.concrete + "|" + COLORS.aggDark + "|" + COLORS.aggLight;
+    if (_concreteTile && _concreteKey === key) return _concreteTile;
+    const tile = document.createElement("canvas");
+    tile.width = CONCRETE_TILE_PX;
+    tile.height = CONCRETE_TILE_PX;
+    const tc = tile.getContext("2d");
+    tc.fillStyle = COLORS.concrete;
+    tc.fillRect(0, 0, CONCRETE_TILE_PX, CONCRETE_TILE_PX);
+    // A power-floated slab shows FINE aggregate, not terrazzo: many small,
+    // low-contrast stones. A coarser, higher-contrast speckle made the tile
+    // repeat legible across an empty hall and read as decorative texture.
+    const specks = F.concreteSpecks(58, CONCRETE_SEED, 0.5);
+    for (const s of specks) {
+      tc.beginPath();
+      tc.arc(s.x * CONCRETE_TILE_PX, s.y * CONCRETE_TILE_PX,
+        Math.max(0.6, s.r * CONCRETE_TILE_PX), 0, Math.PI * 2);
+      tc.fillStyle = hexA(s.tone < 0 ? COLORS.aggDark : COLORS.aggLight, 0.45);
+      tc.fill();
+    }
+    try { _concreteTile = ctx.createPattern(tile, "repeat"); }
+    catch (_) { _concreteTile = null; }
+    _concreteKey = key;
+    return _concreteTile;
+  }
+  // Invalidate the baked slab when the theme (and so the concrete) changes.
+  function invalidateConcrete() { _concreteTile = null; _concreteKey = ""; }
+
+  /* ------------------------------------------------------------------
+   * Paint the concrete slab across [0,0,w,h] canvas base-px. The tile
+   * covers WT.floor.CONCRETE_TILE_M metres, so the aggregate stays the
+   * same physical size as the layout grows - it is a material, not a
+   * screen texture.
+   * ------------------------------------------------------------------ */
+  function paintConcrete(w, h) {
+    ctx.fillStyle = COLORS.concrete;
+    ctx.fillRect(0, 0, w, h);
+    const pat = concretePattern();
+    if (!pat) return;
+    const tileM = (F && F.CONCRETE_TILE_M) || 4;
+    const k = (tileM * cellPx) / CONCRETE_TILE_PX;
+    if (!(k > 0)) return;
+    ctx.save();
+    ctx.scale(k, k);
+    ctx.fillStyle = pat;
+    ctx.fillRect(0, 0, w / k, h / k);
+    ctx.restore();
+  }
+
+  /* ------------------------------------------------------------------
+   * HIGH-BAY LIGHTING. Deterministic light pools from a regular luminaire
+   * grid (every ~10 m, the spacing a real high-bay layout uses). In DARK
+   * (night shift) they are warm sodium/LED pools that let the slab recede
+   * between them; in LIGHT (daylit hall) a much fainter wash keeps the
+   * concrete from reading as flat paper. No time input - static, so a
+   * still frame and a playing frame are lit identically.
+   * ------------------------------------------------------------------ */
+  const BAY_SPACING_M = 10;
+  function paintHighBay(w, h, dark) {
+    const step = BAY_SPACING_M * cellPx;
+    if (!(step > 0)) return;
+    const r = step * 0.78;
+    ctx.save();
+    if (dark) {
+      // NIGHT SHIFT: real light pools. Additive, so overlapping luminaires
+      // brighten each other the way they actually do, and the slab genuinely
+      // recedes into the dark between them.
+      ctx.globalCompositeOperation = "lighter";
+      for (let x = step / 2; x < w + step; x += step) {
+        for (let y = step / 2; y < h + step; y += step) {
+          const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+          g.addColorStop(0, "rgba(255, 214, 150, 0.13)");
+          g.addColorStop(0.55, "rgba(255, 205, 140, 0.06)");
+          g.addColorStop(1, "rgba(255, 200, 130, 0)");
+          ctx.fillStyle = g;
+          ctx.fillRect(x - r, y - r, r * 2, r * 2);
+        }
+      }
+    }
+    // DAYLIT HALL: nothing is painted. A hall under daylight plus high-bay is
+    // EVENLY lit - there are no visible pools to draw, and every attempt to
+    // model them either washed the concrete out to paper (additive) or left
+    // square seams where the gradients met. The slab's own aggregate carries
+    // the material; restraint is the correct answer here, not more paint.
+    ctx.restore();
+  }
 
   // ================================================================
   // GEOMETRY HELPERS (grid cell coordinates)
@@ -376,9 +510,10 @@
       return;
     }
 
-    // Floor background (the warehouse footprint itself).
-    ctx.fillStyle = COLORS.bg;
-    ctx.fillRect(0, 0, cssW, cssH);
+    // v3.21: the floor is a POURED CONCRETE SLAB (warm neutral gray + a
+    // deterministic exposed-aggregate speckle baked into a repeating tile),
+    // not a flat sheet. One fillRect for the whole hall.
+    paintConcrete(cssW, cssH);
 
     // W3: floor-plan underlay - drawn UNDER the grid lines and every
     // element so racks are traced over the real plan. Local dataURL
@@ -396,28 +531,55 @@
     // - a huge floor zoomed out isn't a smear and the per-line cost is
     // skipped. At normal zooms the minor lines show, so the base look is
     // unchanged. Fallback-safe if WT.floor is absent (draw every line).
+    // v3.21: the 5 m majors are now SAW-CUT CONTROL JOINTS - the real reason a
+    // concrete slab has lines on it (poured in bays, cut so it cracks where you
+    // choose). Each joint is a dark groove with a light chamfer on its lower
+    // edge, so it reads as cut INTO the slab rather than drawn on top of it.
+    // The 1 m minors stay as the faint trowel/measure aid they always were.
     const _onCell = cellPx * view.scale; // px per 1 m cell on screen
     const _majorStep = F ? F.MAJOR_STEP_M : 5;
     const _showMinor = F ? F.minorGridVisible(_onCell) : true;
+    const _chamfer = _onCell >= 10; // only worth drawing when the joint is legible
     ctx.lineWidth = 1;
     for (let x = 0; x <= GRID_W; x++) {
       const major = x % _majorStep === 0;
       if (!major && !_showMinor) continue;
-      ctx.strokeStyle = major ? COLORS.gridStrong : COLORS.grid;
+      const gx = Math.round(x * cellPx) + 0.5;
+      ctx.strokeStyle = major ? COLORS.joint : COLORS.grid;
       ctx.beginPath();
-      ctx.moveTo(Math.round(x * cellPx) + 0.5, 0);
-      ctx.lineTo(Math.round(x * cellPx) + 0.5, cssH);
+      ctx.moveTo(gx, 0);
+      ctx.lineTo(gx, cssH);
       ctx.stroke();
+      if (major && _chamfer) {
+        ctx.strokeStyle = hexA(COLORS.aggLight, 0.5);
+        ctx.beginPath();
+        ctx.moveTo(gx + 1, 0);
+        ctx.lineTo(gx + 1, cssH);
+        ctx.stroke();
+      }
     }
     for (let y = 0; y <= GRID_H; y++) {
       const major = y % _majorStep === 0;
       if (!major && !_showMinor) continue;
-      ctx.strokeStyle = major ? COLORS.gridStrong : COLORS.grid;
+      const gy = Math.round(y * cellPx) + 0.5;
+      ctx.strokeStyle = major ? COLORS.joint : COLORS.grid;
       ctx.beginPath();
-      ctx.moveTo(0, Math.round(y * cellPx) + 0.5);
-      ctx.lineTo(cssW, Math.round(y * cellPx) + 0.5);
+      ctx.moveTo(0, gy);
+      ctx.lineTo(cssW, gy);
       ctx.stroke();
+      if (major && _chamfer) {
+        ctx.strokeStyle = hexA(COLORS.aggLight, 0.5);
+        ctx.beginPath();
+        ctx.moveTo(0, gy + 1);
+        ctx.lineTo(cssW, gy + 1);
+        ctx.stroke();
+      }
     }
+
+    // v3.21: HIGH-BAY LIGHTING over the slab (deterministic luminaire grid).
+    // In dark this is the night shift's warm sodium/LED pools; in light it is
+    // the faint daylit-hall wash that keeps concrete from reading as paper.
+    paintHighBay(cssW, cssH, window.matchMedia("(prefers-color-scheme: dark)").matches);
 
     // v3.8 REDESIGN-1: building-shell perimeter WALL band. Drawn over the grid
     // but UNDER the elements (never obscures content), in the world transform,
@@ -459,8 +621,20 @@
       const def = ELEMENTS[e.type];
       const px = e.x * cellPx, py = e.y * cellPx, pw = e.w * cellPx, ph = e.d * cellPx;
       ctx.save();
+      // v3.21: a CONTACT SHADOW so the object stands ON the slab instead of
+      // being drawn on top of it. One offset fill per element - no shadowBlur,
+      // no gradient - so it costs nothing on a large hall, and it is skipped
+      // when the footprint is too small on screen for the offset to read.
+      if (pw > 14 && ph > 10) {
+        roundRect(px + 3.5, py + 4, pw - 4, ph - 4, 6);
+        ctx.fillStyle = "rgba(28, 24, 19, 0.16)";
+        ctx.fill();
+      }
       roundRect(px + 2, py + 2, pw - 4, ph - 4, 6);
-      ctx.fillStyle = hexA(def.color, 0.22);
+      // v3.21: equipment is MADE OF SOMETHING. A 0.22 wash read as a pastel
+      // diagram tint on the old white sheet; on concrete the body needs enough
+      // opacity to read as painted steel standing on the slab.
+      ctx.fillStyle = hexA(def.color, 0.34);
       ctx.fill();
       // v3.20.1 CRAFT: disciplined depth — the ONE selected element earns a
       // soft accent halo behind its outline (state demands attention; nothing
@@ -763,16 +937,16 @@
     if (!band || !(band.inner.w > 0) || !(band.inner.h > 0)) return;
     ctx.save();
     // Fill just the ring: outer rect + inner rect, even-odd cuts the middle.
+    // v3.21: the shell is a BUILT WALL (precast/clad panel), not a grid line -
+    // solid warm structure against the slab, with a crisp steel inner edge.
     ctx.beginPath();
     ctx.rect(band.outer.x * cellPx, band.outer.y * cellPx, band.outer.w * cellPx, band.outer.h * cellPx);
     ctx.rect(band.inner.x * cellPx, band.inner.y * cellPx, band.inner.w * cellPx, band.inner.h * cellPx);
-    ctx.fillStyle = COLORS.gridStrong;
-    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = hexA(COLORS.steel, 0.5);
     ctx.fill("evenodd");
-    ctx.globalAlpha = 1;
     // Crisp inner edge so the interior boundary reads at a glance.
     ctx.lineWidth = 1;
-    ctx.strokeStyle = COLORS.gridStrong;
+    ctx.strokeStyle = COLORS.joint;
     ctx.strokeRect(
       band.inner.x * cellPx + 0.5, band.inner.y * cellPx + 0.5,
       band.inner.w * cellPx - 1, band.inner.h * cellPx - 1
@@ -780,45 +954,111 @@
     ctx.restore();
   }
 
+  /* ------------------------------------------------------------------
+   * v3.21: the markings are PAINT. A plant floor is marked with a roller
+   * and a stencil - 100 mm safety-yellow aisle lines with travel arrows,
+   * 75 mm white zone borders, and a 150 mm black/yellow hazard hatch on
+   * every dock apron - and that paint is SCUFFED by the traffic that runs
+   * over it. Nothing here is a CAD hairline any more.
+   *
+   * Every band width, arrow position and wear value comes from the pure
+   * WT.floor helpers (deterministic: a fixed seed, no Date, no RNG), so
+   * the same layout paints identically on every run and every machine.
+   * ------------------------------------------------------------------ */
+  const PAINT_SEED = 7717; // fixed: the wear pattern never re-rolls
+
   function drawFloorMarkings(onCell) {
     if (!F) return;
     ctx.save();
+
+    // The building line: a structural edge, kept quiet so the paint reads.
     const per = F.perimeter(GRID_W, GRID_H);
     if (per) {
       ctx.lineWidth = 2;
-      ctx.strokeStyle = COLORS.gridStrong;
+      ctx.strokeStyle = COLORS.joint;
       ctx.strokeRect(per.x * cellPx + 1, per.y * cellPx + 1, per.w * cellPx - 2, per.h * cellPx - 2);
     }
+
     if (F.markingsVisible(onCell)) {
-      const pairs = (typeof D.facingAislePairs === "function") ? D.facingAislePairs(state.elements) : [];
-      const guides = F.aisleGuides(pairs);
-      if (guides.length) {
+      // ---- WHITE ZONE BORDERS (75 mm) -------------------------------
+      // Every functional zone gets its footprint painted out on the slab.
+      const zones = (typeof F.zoneTints === "function") ? F.zoneTints(state.elements) : [];
+      if (zones.length) {
         ctx.save();
-        ctx.strokeStyle = COLORS.dim;
-        ctx.globalAlpha = 0.32;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        for (const g of guides) {
-          ctx.beginPath();
-          ctx.moveTo(g.x0 * cellPx, g.y0 * cellPx);
-          ctx.lineTo(g.x1 * cellPx, g.y1 * cellPx);
-          ctx.stroke();
+        ctx.lineWidth = Math.max(1, F.PAINT_W.zone * cellPx);
+        ctx.strokeStyle = COLORS.paintWhite;
+        for (const z of zones) {
+          ctx.globalAlpha = 0.55 * F.wearAt(z.x, z.y, PAINT_SEED);
+          ctx.strokeRect(z.x * cellPx, z.y * cellPx, z.w * cellPx, z.h * cellPx);
         }
         ctx.restore();
       }
+
+      // ---- SAFETY-YELLOW AISLE LINES (100 mm) + TRAVEL ARROWS -------
+      // Same facing-pair model the compliance aisle check uses, so the
+      // paint on the floor can never disagree with the rule that governs it.
+      const pairs = (typeof D.facingAislePairs === "function") ? D.facingAislePairs(state.elements) : [];
+      const paint = F.aislePaint(pairs);
+      if (paint.length) {
+        ctx.save();
+        ctx.lineCap = "butt";
+        for (const g of paint) {
+          // A worn line: painted in short runs whose opacity varies with
+          // position, so traffic wear reads along its length.
+          const segs = Math.max(1, Math.round(g.lengthM));
+          for (let i = 0; i < segs; i++) {
+            const t0 = i / segs, t1 = (i + 1) / segs;
+            const ax = g.x0 + (g.x1 - g.x0) * t0, ay = g.y0 + (g.y1 - g.y0) * t0;
+            const bx = g.x0 + (g.x1 - g.x0) * t1, by = g.y0 + (g.y1 - g.y0) * t1;
+            ctx.globalAlpha = 0.92 * F.wearAt(ax, ay, PAINT_SEED);
+            ctx.lineWidth = Math.max(1.2, g.width * cellPx);
+            ctx.strokeStyle = COLORS.paintYellow;
+            ctx.beginPath();
+            ctx.moveTo(ax * cellPx, ay * cellPx);
+            ctx.lineTo(bx * cellPx, by * cellPx);
+            ctx.stroke();
+          }
+        }
+        // Stencilled direction arrows down the aisle.
+        const arrows = F.aisleArrows(paint, 6);
+        ctx.fillStyle = COLORS.paintYellow;
+        for (const a of arrows) {
+          const s = a.size * cellPx;
+          if (s < 3) continue;
+          ctx.globalAlpha = 0.8 * F.wearAt(a.x, a.y, PAINT_SEED);
+          const cx = a.x * cellPx, cy = a.y * cellPx;
+          const nx = -a.dy, ny = a.dx; // in-plane normal
+          // Elongated along travel (a real stencil is a long, narrow head),
+          // not a squat triangle.
+          ctx.beginPath();
+          ctx.moveTo(cx + a.dx * s * 2.2, cy + a.dy * s * 2.2);
+          ctx.lineTo(cx - a.dx * s * 0.9 + nx * s * 0.85, cy - a.dy * s * 0.9 + ny * s * 0.85);
+          ctx.lineTo(cx - a.dx * s * 0.9 - nx * s * 0.85, cy - a.dy * s * 0.9 - ny * s * 0.85);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // ---- BLACK / YELLOW HAZARD HATCH on every dock apron (150 mm) --
       ctx.save();
-      ctx.strokeStyle = COLORS.io;
-      ctx.globalAlpha = 0.26;
-      ctx.lineWidth = 1;
       for (const e of state.elements) {
         if (e.type !== "dock-in" && e.type !== "dock-out") continue;
         const ap = F.dockApproach(e, GRID_W, GRID_H, 3);
-        if (!ap || !ap.lines.length) continue;
-        for (const ln of ap.lines) {
+        if (!ap || !(ap.w > 0) || !(ap.h > 0)) continue;
+        const bands = F.hazardBands(ap, 0.5);
+        for (const b of bands) {
+          const p = b.points;
+          if (!p || p.length < 4) continue;
+          // Painted ON the slab, not a solid tarpaulin over it - the concrete
+          // must still read through the hatch.
+          ctx.globalAlpha = (b.dark ? 0.20 : 0.36) * F.wearAt(ap.x + b.dark, ap.y, PAINT_SEED);
+          ctx.fillStyle = b.dark ? COLORS.hazardDark : COLORS.paintYellow;
           ctx.beginPath();
-          ctx.moveTo(ln.x0 * cellPx, ln.y0 * cellPx);
-          ctx.lineTo(ln.x1 * cellPx, ln.y1 * cellPx);
-          ctx.stroke();
+          ctx.moveTo(p[0][0] * cellPx, p[0][1] * cellPx);
+          for (let i = 1; i < p.length; i++) ctx.lineTo(p[i][0] * cellPx, p[i][1] * cellPx);
+          ctx.closePath();
+          ctx.fill();
         }
       }
       ctx.restore();
@@ -955,7 +1195,13 @@
       // floor size, never serialized. Absent WT.floor -> no walls, nothing breaks.
       walls: (F && typeof F.wallBand === "function") ? F.wallBand(GRID_W, GRID_H) : null,
       wallHeightM: 3,
-      wallColor: COLORS.gridStrong,
+      // v3.21: the shell is clad steel, not a grid line.
+      wallColor: COLORS.steel,
+      // v3.21: the same baked CONCRETE SLAB the top-down view stands on, so
+      // both presentations are the same floor. `floorPatternScale` maps the
+      // tile back to CONCRETE_TILE_M metres inside the iso diamond.
+      floorPattern: concretePattern(),
+      floorPatternScale: (((F && F.CONCRETE_TILE_M) || 4) * cellPx) / CONCRETE_TILE_PX,
     });
     // v3.12: the material-flow CONNECTION overlay, HINTED into 2.5D too -
     // projPx projects the links/nodes into the iso scene (illustrative, not
@@ -8602,6 +8848,11 @@
       closeAbout: closeAbout,
       zoomAt: zoomAt,
       fitToFloor: fitToFloor,
+      // v3.21 INDUSTRIAL MATERIAL IDENTITY: the canvas material palette. The
+      // canvas cannot read CSS custom properties, so app.js owns this copy -
+      // exposing it lets the self-test assert the materials are complete and
+      // that the slab really is a WARM neutral, not the old blue-black.
+      themeColors: themeColors,
       // v1.6 a11y/perf hooks for the self-test:
       prefersReducedMotion: prefersReducedMotion,
       cullToView: (els, bounds, pad) => V.cullToView(els, bounds, pad),
@@ -9266,6 +9517,7 @@
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     (mq.addEventListener ? mq.addEventListener.bind(mq, "change") : mq.addListener.bind(mq))(() => {
       COLORS = themeColors();
+      invalidateConcrete(); // v3.21: re-pour the slab in the new light
       render();
       drawFlowKpis(); // repaint the cockpit in the new theme
       if (typeof buildPalette === "function") buildPalette(); // v3.9: redraw the icon-led library glyphs for the new theme
