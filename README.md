@@ -6,7 +6,7 @@
 
 - **What** — draw *or* generate a whole warehouse floor (racks, docks, staging, conveyor, automation), then run the material flow and the standard WMS operation as a living, animated plant-sim.
 - **Why** — clarity over enterprise complexity: a transparent, game-like teaching twin that is standards-*informed* rather than a black-box tool.
-- **Proof** — an **894-element signature plant**, a browser self-test **118/118**, **46 headless logic harnesses** all green, and a **100%-offline** installable PWA.
+- **Proof** — an **894-element signature plant**, a browser self-test **149/149**, **49 headless logic harnesses** all green, and a **100%-offline** installable PWA.
 
 ### ▶ Live app — <https://dimitres-kisimov.github.io/logistics-flow-studio/>
 
@@ -142,7 +142,7 @@ The 49 harnesses above cover the **pure logic** in Node. The **DOM/UI** is cover
 index.html?selftest=1
 ```
 
-After boot it runs 133 checks against the live app (every `WT.*` module present and correctly shaped, a clean error-free boot, the scenario deep-link parser returning a real library id with onboarding suppressed, the key panels/buttons in the DOM, loading an example, running WMS ops, stepping/playing the flow, the 2.5D toggle being a layout no-op, **a real `KeyboardEvent` for `P` toggling the view mode `top → iso → top`**, building the report, opening About/KB, the zoom controls, plus the v1.6 a11y/perf checks — canvas aria-label + offscreen summary, toolbar accessible names, the reduced-motion flag, the pure `cullToView` culling, and the v3.20.1 craft-pass gates — design tokens present, tabular KPI numerals, live-computed WCAG AA contrast on the ink text tokens, and both reduced-motion guards in the shipped stylesheet) and writes a machine-readable line into the `#wt-selftest` element and the console:
+After boot it runs 149 checks against the live app (every `WT.*` module present and correctly shaped, a clean error-free boot, the scenario deep-link parser returning a real library id with onboarding suppressed, the key panels/buttons in the DOM, loading an example, running WMS ops, stepping/playing the flow, the 2.5D toggle being a layout no-op, **a real `KeyboardEvent` for `P` toggling the view mode `top → iso → top`**, building the report, opening About/KB, the zoom controls, plus the v1.6 a11y/perf checks — canvas aria-label + offscreen summary, toolbar accessible names, the reduced-motion flag, the pure `cullToView` culling, and the v3.20.1 craft-pass gates — design tokens present, tabular KPI numerals, live-computed WCAG AA contrast on the ink text tokens, and both reduced-motion guards in the shipped stylesheet) and writes a machine-readable line into the `#wt-selftest` element and the console:
 
 ```
 WT-SELFTEST: PASS 149/149

@@ -1,6 +1,6 @@
 # Production hardening — running the in-browser self-test
 
-WarehouseTwin's 28 Node harnesses (`node test/run-all.mjs`) cover the **pure
+WarehouseTwin's 49 Node harnesses (`node test/run-all.mjs`) cover the **pure
 logic**. The **DOM/UI** is covered by a **real in-browser end-to-end self-test**
 that drives the live app through the same handlers the UI uses. This document
 describes how to run it, and the two other hardening pieces shipped alongside it
