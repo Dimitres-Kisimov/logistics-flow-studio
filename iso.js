@@ -363,6 +363,12 @@
     }
 
     // ---- Elements: extruded blocks, back-to-front ---------------------
+    // v3.24: `o.hideFor(el) -> true` lets a caller take an element's form
+    // over for this frame - a MANNED TRUCK that is out hauling is drawn by
+    // the shift layer at where it actually IS, so the static block must
+    // not also be drawn back in its bay. Absent (or false for every
+    // element) -> byte-identical to before.
+    const hideFor = typeof o.hideFor === "function" ? o.hideFor : null;
     const ordered = sortByDepth(o.elements || []);
     const labelFn = typeof o.shortLabel === "function" ? o.shortLabel : null;
     const theme = isDarkBg(colors.bg) ? "dark" : "light";
@@ -370,6 +376,7 @@
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const e of ordered) {
+      if (hideFor && hideFor(e)) continue;
       const def = defs[e.type] || {};
       const h = elementHeight(e.type);
       const color = def.color || "#8b5cf6";

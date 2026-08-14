@@ -474,7 +474,7 @@
     _workerSig = sig;
     return _workerRoster;
   }
-  function invalidateWorkers() { _workerRoster = null; _workerSig = ""; _stageWoken = null; invalidateGoods(); }
+  function invalidateWorkers() { _workerRoster = null; _workerSig = ""; _stageWoken = null; invalidateGoods(); invalidateShift(); }
 
   // The animation clock for the workforce: the sim's own continuous tick
   // while the plant is running (frozen when paused), null otherwise.
@@ -572,9 +572,158 @@
       const spec = fleet[i];
       if (vb && (spec.x + spec.w < vb.minX - 2 || spec.x > vb.maxX + 2 ||
         spec.y + spec.d < vb.minY - 2 || spec.y > vb.maxY + 2)) continue;
-      const u = WT.goods.sampleVehicle(spec, t);
+      // v3.24: a MANNED truck that is out hauling carries its load on the
+      // TRAVELLING tines - the same pose its body is drawn at (haulPose),
+      // so the pallet rides the truck across the hall instead of hovering
+      // over an empty bay. Absent (RGV / AGV, or the haul layer off) ->
+      // exactly the v3.23 in-footprint treatment.
+      const u = WT.goods.sampleVehicle(spec, t, haulPoseFor(spec));
       opts.stageColor = stages.storage || COLORS.flow;
       WT.goods.draw(ctx, u, opts);
+    }
+  }
+
+  /* ------------------------------------------------------------------
+   * v3.24 THE PLANT READS LIKE A WORKING SHIFT. Manned trucks haul their
+   * loads down real aisles, congestion smooths into a signal that cannot
+   * strobe, dock doors carry trailers while they work, and the painted
+   * travel arrows agree with the direction the sim actually routes
+   * material. The model is the pure WT.shift module; everything here is
+   * the render wiring, and it writes NOTHING back to the sim.
+   * ------------------------------------------------------------------ */
+  // The smoothing STORE is render-layer memory (a filter's state), never
+  // sim state. Reset with the workforce/goods caches whenever the floor
+  // changes, and by WT.shift itself when a run restarts.
+  let _shiftStore = null;
+  let _shiftTrucks = null, _shiftTrucksSig = "";
+  let _shiftDocks = null, _shiftDocksSig = "";
+  let _haulPoses = null, _haulPoseKey = "";
+
+  function shiftStore() {
+    if (!WT.shift) return null;
+    if (!_shiftStore) _shiftStore = WT.shift.createStore();
+    return _shiftStore;
+  }
+  function invalidateShift() {
+    _shiftStore = null;
+    _shiftTrucks = null; _shiftTrucksSig = "";
+    _shiftDocks = null; _shiftDocksSig = "";
+    _haulPoses = null; _haulPoseKey = "";
+  }
+
+  // The haul roster: a pure function of the layout AND the sim's own plan
+  // (the plan gives each truck the direction material flows past its bay),
+  // so it is rebuilt only when the floor changes.
+  function shiftTrucks() {
+    if (!WT.shift) return [];
+    const sig = flowSignature();
+    if (_shiftTrucks && _shiftTrucksSig === sig) return _shiftTrucks;
+    const plan = state.flow && state.flow.sim ? state.flow.sim.plan : null;
+    _shiftTrucks = WT.shift.hauls(currentLayout(), plan);
+    _shiftTrucksSig = sig;
+    return _shiftTrucks;
+  }
+  function shiftDocks() {
+    if (!WT.shift) return [];
+    const sig = flowSignature();
+    if (_shiftDocks && _shiftDocksSig === sig) return _shiftDocks;
+    _shiftDocks = WT.shift.docks(currentLayout());
+    _shiftDocksSig = sig;
+    return _shiftDocks;
+  }
+
+  // Is the haul layer live this frame? Only then does a truck leave its
+  // bay - a stopped plant, reduced motion or a too-small zoom all keep the
+  // historic static glyph exactly where it has always been.
+  function haulLive() {
+    if (!WT.shift || !WT.workers || !WT.shapes || typeof WT.shapes.detailLevel !== "function") return false;
+    if (WT.shapes.detailLevel(cellPx * view.scale) === "icon") return false;
+    return workerAnimT() != null;
+  }
+
+  // This frame's haul poses, keyed by the truck's own element position so
+  // the body, its load and the hidden-glyph test can never disagree.
+  // Rebuilt once per (clock, layout) - not once per lookup.
+  function haulPoses() {
+    if (!haulLive()) return null;
+    const t = workerAnimT();
+    const key = _shiftTrucksSig + "|" + t;
+    if (_haulPoses && _haulPoseKey === key) return _haulPoses;
+    const list = shiftTrucks();
+    const m = new Map();
+    for (let i = 0; i < list.length; i++) {
+      const spec = list[i];
+      m.set((spec.x | 0) + "," + (spec.y | 0), WT.shift.truckPose(spec, t));
+    }
+    _haulPoses = m; _haulPoseKey = key;
+    return m;
+  }
+  // The pose for a goods-layer vehicle spec (they key on the same element
+  // position), or null when this vehicle is not a hauling manned truck.
+  function haulPoseFor(spec) {
+    if (!spec || spec.type !== "forklift") return null;
+    const m = haulPoses();
+    return m ? (m.get((spec.x | 0) + "," + (spec.y | 0)) || null) : null;
+  }
+  // Is THIS element currently out on a haul (so its static form must not
+  // also be drawn back in its bay)?
+  function elementIsHauling(e) {
+    if (!e || e.type !== "forklift") return false;
+    const m = haulPoses();
+    if (!m) return false;
+    const p = m.get((e.x | 0) + "," + (e.y | 0));
+    return !!p;
+  }
+
+  // Advance the congestion / door smoother by the sim's OWN elapsed time.
+  // Called once per render; a frame that did not advance the sim advances
+  // nothing (dt = 0), so pan/zoom can never move the filter.
+  function updateShift() {
+    if (!WT.shift) return null;
+    const sim = state.flow && state.flow.on ? state.flow.sim : null;
+    const store = shiftStore();
+    if (!store) return null;
+    return WT.shift.updateStore(store, sim, { docks: shiftDocks() });
+  }
+
+  // Draw every manned truck that is out hauling, plus the bay it left.
+  // LOD-gated and view-culled exactly like the workforce.
+  function drawTrucks() {
+    const m = haulPoses();
+    if (!m || !m.size) return;
+    const tier = WT.shapes.detailLevel(cellPx * view.scale);
+    const themeName = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const opts = { project: projPx, cellPx: cellPx, tier: tier, theme: themeName, color: (ELEMENTS.forklift || {}).color };
+    const vb = state.viewMode === "iso" ? null : V.viewBounds(view, viewCssW, viewCssH);
+    const list = shiftTrucks();
+    for (let i = 0; i < list.length; i++) {
+      const spec = list[i];
+      const pose = m.get((spec.x | 0) + "," + (spec.y | 0));
+      if (!pose) continue;
+      if (vb && (pose.x < vb.minX - 3 || pose.x > vb.maxX + 3 || pose.y < vb.minY - 3 || pose.y > vb.maxY + 3)) continue;
+      WT.shift.drawTruck(ctx, pose, opts);
+    }
+  }
+
+  // Draw the docks: a trailer backed onto every door that is working, its
+  // shutter up, the leveller down and empty pallets on the apron. Driven
+  // by the SIM's stage occupancy through the same smoother, so a trailer
+  // never blinks; nothing at all is drawn while the plant is stopped.
+  function drawDocks() {
+    if (!WT.shift || !WT.shapes || typeof WT.shapes.detailLevel !== "function") return;
+    const store = _shiftStore;
+    if (!store || !state.flow || !state.flow.on || !state.flow.sim) return;
+    const tier = WT.shapes.detailLevel(cellPx * view.scale);
+    if (tier === "icon") return;
+    const list = shiftDocks();
+    if (!list.length) return;
+    const themeName = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const opts = { project: projPx, cellPx: cellPx, tier: tier, theme: themeName };
+    for (let i = 0; i < list.length; i++) {
+      const spec = list[i];
+      const st = WT.shift.dockRead(store, spec, state.flow.sim);
+      if (!st.open && !st.trailer && tier !== "rich") continue;
+      WT.shift.drawDock(ctx, spec, st, opts);
     }
   }
 
@@ -598,6 +747,12 @@
     // capped, so the cost is bounded either way).
     const vb = state.viewMode === "iso" ? null : V.viewBounds(view, viewCssW, viewCssH);
     const opt = { busy: true };
+    // v3.24: the worker's PACE and their idle/working read now come from
+    // their own station's SMOOTHED queue signal instead of the stage-level
+    // latch v3.22 had to settle for. `work` is the station's integrated
+    // effective clock - handing in an already-integrated clock is what lets
+    // the pace change without the pose jumping (see workers.js sample()).
+    const store = (WT.shift && t != null) ? _shiftStore : null;
     for (let i = 0; i < list.length; i++) {
       const spec = list[i];
       if (vb) {
@@ -606,6 +761,18 @@
             Math.max(a.y, b.y) < vb.minY - 2 || Math.min(a.y, b.y) > vb.maxY + 2) continue;
       }
       opt.busy = busyFn ? busyFn(spec) : false;
+      opt.work = undefined;
+      opt.speed = undefined;
+      if (store) {
+        const st = WT.shift.stationAt(store, spec.anchor.x, spec.anchor.y);
+        if (st) {
+          // A station with nothing in its queue has nobody to serve: the
+          // worker waits. Hysteresis + a 1.5 s dwell guard the switch, so
+          // a queue flickering around zero can never strobe the pose.
+          if (st.starved) opt.busy = false;
+          opt.work = st.eff;
+        }
+      }
       WT.workers.draw(ctx, WT.workers.sample(spec, t, opt), opts);
     }
   }
@@ -652,6 +819,11 @@
     // (shown only when there are no elements). Cheap - only touches the DOM when
     // the empty/non-empty state flips - so calling it every frame is fine.
     updateEmptyState();
+    // v3.24: advance the congestion / door smoother by the SIM's OWN
+    // elapsed time before anything reads it, so both views and the readout
+    // agree on one filtered signal per frame. A frame that did not advance
+    // the sim advances nothing (dt = 0) - pan and zoom cannot move it.
+    updateShift();
     const cssW = GRID_W * cellPx; // floor extent in base (scale-1) px
     const cssH = GRID_H * cellPx;
 
@@ -826,7 +998,13 @@
       // Distinct top-down glyph from the single shape registry (WT.shapes);
       // fall back to the built-in drawGlyph if the type has no custom shape
       // or the module is absent (nothing breaks). `lod` = on-screen px/cell.
-      if (WT.shapes && (WT.shapes.has(e.type) || def.custom)) {
+      // v3.24: a MANNED TRUCK that is out on a haul is drawn by the shift
+      // layer where it actually IS, so its glyph must not also appear back
+      // in its bay - the footprint plate, its label and the selection
+      // affordance stay, because that IS the truck's marked bay.
+      if (elementIsHauling(e)) {
+        // nothing: the shift layer owns this element's form this frame
+      } else if (WT.shapes && (WT.shapes.has(e.type) || def.custom)) {
         WT.shapes.draw2D(ctx, e.type, {
           x: px, y: py, w: pw, d: ph,
           cellPx: cellPx, color: def.color, theme: themeName, lod: cellPx * view.scale,
@@ -902,6 +1080,12 @@
     // Toggled from the Automation systems panel.
     if (state.showAutoUtil) drawAutomationUtil();
 
+    // v3.24: THE DOCKS. Trailers on the doors that are working, shutters
+    // up, levellers down. Drawn before the people and the trucks (they are
+    // building fabric, and the apron traffic passes in front of them).
+    drawDocks();
+    // v3.24: THE MANNED TRUCKS, out on their hauls.
+    drawTrucks();
     // v3.22: THE PEOPLE. Drawn after the equipment (they stand in front of
     // the racks they work) and under the flow overlays, in the SAME world
     // transform, so they are zoom/pan-safe like everything else.
@@ -1202,8 +1386,19 @@
             ctx.stroke();
           }
         }
-        // Stencilled direction arrows down the aisle.
-        const arrows = F.aisleArrows(paint, 6);
+        // Stencilled direction arrows down the aisle. v3.24: the arrow's
+        // direction came from the geometry of the facing PAIR, which is
+        // arbitrary - so half the paint could point against the traffic.
+        // WT.shift.orientArrows flips each mark to agree with the direction
+        // the flow sim actually routes material past that point (same
+        // place, same size - only the sign of the heading can change), so
+        // the paint on the floor and the flow can no longer disagree. No
+        // plan yet (the plant has never been run) -> the arrows are exactly
+        // what v3.21 painted.
+        const flowPlan = state.flow && state.flow.sim ? state.flow.sim.plan : null;
+        const arrows = (WT.shift && flowPlan)
+          ? WT.shift.orientArrows(F.aisleArrows(paint, 6), WT.shift.legsOf(flowPlan))
+          : F.aisleArrows(paint, 6);
         ctx.fillStyle = COLORS.paintYellow;
         for (const a of arrows) {
           const s = a.size * cellPx;
@@ -1384,12 +1579,20 @@
       wallHeightM: 3,
       // v3.21: the shell is clad steel, not a grid line.
       wallColor: COLORS.steel,
+      // v3.24: a manned truck that is out hauling is drawn by the shift
+      // layer at where it actually is, so its static block must not also
+      // be drawn back in its bay. No haul running -> nothing is hidden.
+      hideFor: elementIsHauling,
       // v3.21: the same baked CONCRETE SLAB the top-down view stands on, so
       // both presentations are the same floor. `floorPatternScale` maps the
       // tile back to CONCRETE_TILE_M metres inside the iso diamond.
       floorPattern: concretePattern(),
       floorPatternScale: (((F && F.CONCRETE_TILE_M) || 4) * cellPx) / CONCRETE_TILE_PX,
     });
+    // v3.24: the docks and the hauling manned trucks, on the same layer
+    // and through the same pose model as the top-down view.
+    drawDocks();
+    drawTrucks();
     // v3.22: the SAME workforce as the top-down view, through the SAME
     // pose model - projPx is the iso projection here, so the skeleton
     // stands up and a pick reads as a pick in both views. Drawn after the
@@ -1884,7 +2087,13 @@
     let tier = WT.shapes.detailLevel(cellPx * view.scale);
     if (s.mus.length > WT.goods.MAX_FORM_UNITS) tier = "icon";
     const opts = goodsOpts(tier);
-    const list = WT.goods.units(s, goodsSupport());
+    // v3.24 CONGESTION YOU CAN SEE: spread a genuinely deep queue further
+    // back along the sim's own route than the default drawing cap, so a
+    // station that is really backed up shows a nose-to-tail LINE instead of
+    // piling every extra unit on the eighth place. Nothing about the queue
+    // itself changes - its order, length and service are the sim's.
+    const list = WT.goods.units(s, goodsSupport(),
+      WT.shift ? { queueMax: WT.shift.QUEUE_SHOW_MAX } : undefined);
     // Top-down culls to the visible world rect; the iso projection moves
     // points off that rect, so the 2.5D path draws them all (the live-unit
     // count is capped by the sim, so the cost is bounded either way).
@@ -1935,6 +2144,15 @@
     if (!s || !s.stations || !s.stations.length) return;
     const cong = COLORS.flowCongest || {};
     const thr = flowCongestThreshold();
+    // v3.24: the station's COLOUR reads the SMOOTHED congestion band, not
+    // the raw queue length. An integer queue crosses its threshold many
+    // times a second, and binding the colour straight to it made the whole
+    // floor flicker; the band is an exponential average behind a Schmitt
+    // trigger behind a minimum dwell, so it can change at most a couple of
+    // times a second however hard the queue chatters. The NUMBER on the
+    // badge below is still the sim's own raw count - only the paint is
+    // deliberately slow. No shift store (module absent) -> the raw read.
+    const store = WT.shift ? _shiftStore : null;
     ctx.save();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -1942,18 +2160,21 @@
       const c = projPx(st.x, st.y, 0.1);
       const px = c.x, py = c.y;
       const q = st.queue.length;
-      const col = q >= thr ? (cong.high || COLORS.violation)
-        : q >= thr * 0.5 ? (cong.mid || COLORS.io)
+      const sm = store ? WT.shift.readStation(store, st.id) : null;
+      const band = sm ? sm.band : (q >= thr ? 2 : q >= thr * 0.5 ? 1 : 0);
+      const hot = band >= 2;
+      const col = band >= 2 ? (cong.high || COLORS.violation)
+        : band >= 1 ? (cong.mid || COLORS.io)
         : (cong.low || COLORS.flow);
       const rad = Math.max(4, cellPx * 0.42);
       // Station marker: a rounded ring, filled brighter as it congests.
       roundRect(px - rad, py - rad, rad * 2, rad * 2, 3);
-      ctx.fillStyle = hexA(col, q >= thr ? 0.28 : 0.14);
+      ctx.fillStyle = hexA(col, hot ? 0.28 : 0.14);
       ctx.fill();
       // v3.20.1 CRAFT: stage-glow discipline — ONLY a congested station earns
       // a soft halo (glow is reserved for state that demands attention; calm
       // stations stay flat). State-driven, deterministic, few per frame.
-      if (q >= thr) {
+      if (hot) {
         ctx.save();
         ctx.shadowColor = hexA(col, 0.6);
         ctx.shadowBlur = 10;
@@ -2249,6 +2470,27 @@
     if (pause) pause.disabled = !state.flow.playing;
   }
 
+  /* v3.24 THE ANDON READ. The three states a real plant signal shows,
+   * given as SHAPE + colour + words (never colour alone), inside the flow
+   * panel that already exists - no new surface, no restructuring. The
+   * state comes from WT.shift.andon over the SMOOTHED congestion bands, so
+   * the lamp is as slow as the station colours it summarises. It is a
+   * READ of numbers the app already computes: no new metric, no claim. */
+  function andonState() {
+    if (!WT.shift) return null;
+    const sim = state.flow && state.flow.on ? state.flow.sim : null;
+    return WT.shift.andon(sim, _shiftStore, { on: !!sim });
+  }
+  function andonHtml(sim) {
+    const a = andonState();
+    if (!a) return "";
+    const det = sim && !state.flow.playing && a.state === "running" ? "holding the last frame" : a.detail;
+    return '<p class="flow-andon andon-' + a.state + '" role="status">' +
+      '<span class="andon-lamp" aria-hidden="true">' + a.mark + "</span>" +
+      '<strong class="andon-label">' + a.label + "</strong>" +
+      '<span class="andon-detail">' + det + "</span></p>";
+  }
+
   function updateFlowReadout() {
     const out = $("flowReadout");
     if (!out || !WT.flowsim) return;
@@ -2267,7 +2509,10 @@
       ? " · queued <strong>" + (s.queued || 0) + "</strong> · max queue <strong>" + (s.maxQueue || 0) +
         "</strong> · congested " + (s.congestedStations || 0) + "/" + s.stations.length
       : "";
-    out.innerHTML =
+    // v3.24 ANDON. A plant floor tells you its state with three lamps, and
+    // it tells you with SHAPE as well as colour. Off the SMOOTHED bands, so
+    // the lamp cannot flicker either; the counts beside it stay raw.
+    out.innerHTML = andonHtml(s) +
       '<div class="flow-chips">' + chips + "</div>" +
       '<p class="flow-stats">In-flight <strong>' + s.inflight + "</strong> · Shipped <strong>" + s.completed +
       "</strong> · tick " + s.tick + " · bottleneck throughput ~" + s.plan.lineThroughput.toFixed(0) + " units/hr" +
@@ -9032,6 +9277,23 @@
         tier: () => (WT.shapes ? WT.shapes.detailLevel(cellPx * view.scale) : null),
         draw: () => { if (state.flow && state.flow.sim) drawFlowMUs(); drawGoodsVehicles(); },
         invalidate: invalidateGoods,
+      },
+      // v3.24 THE WORKING SHIFT: the haul roster + this frame's truck
+      // poses, the dock roster, the live congestion store and the andon
+      // read - plus the REAL draw passes, so the live self-test exercises
+      // the same path the plant does, in both view modes.
+      shift: {
+        trucks: () => shiftTrucks(),
+        docks: () => shiftDocks(),
+        poses: () => haulPoses(),
+        live: () => haulLive(),
+        store: () => _shiftStore,
+        update: () => updateShift(),
+        station: (x, y) => (WT.shift && _shiftStore ? WT.shift.stationAt(_shiftStore, x, y) : null),
+        andon: () => andonState(),
+        tier: () => (WT.shapes ? WT.shapes.detailLevel(cellPx * view.scale) : null),
+        draw: () => { drawDocks(); drawTrucks(); },
+        invalidate: invalidateShift,
       },
       drawFlowKpis: drawFlowKpis,
       // v3.12: drive + read the material-flow CONNECTION overlay ("Flow

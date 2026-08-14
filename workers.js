@@ -435,6 +435,15 @@
    * `t` (sim ticks). `t == null` (or non-finite) is the STATIC FRAME -
    * what `prefers-reduced-motion` and a stopped plant get: the cycle's
    * `rest` phase, which is a person standing at their station.
+   *
+   * v3.24 `o.work`: an EFFECTIVE work clock in sim ticks, supplied by the
+   * caller instead of the raw tick. A worker's PACE has to be able to
+   * change with how loaded their station is - but scaling `t` by a speed
+   * that changes mid-run TELEPORTS the phase (p depends on t*speed, so a
+   * speed step at t = 1000 jumps the pose by hundreds of ticks). The fix
+   * is to hand in an already-INTEGRATED clock: WT.shift advances it at the
+   * station's own pace, so it is continuous and monotone whatever the
+   * pace does, and the pose can never pop. Absent -> `t` as before.
    * ================================================================== */
   function sample(spec, t, opts) {
     const o = opts || {};
@@ -443,7 +452,8 @@
     const task = busy ? (CYCLES[spec.task] ? spec.task : "idle") : "idle";
     const cyc = CYCLES[task];
     const speed = isFinite(o.speed) && o.speed > 0 ? o.speed : 1;
-    const p = live ? frac(t / (cyc.ticks / speed) + spec.phase) : cyc.rest;
+    const clock = isFinite(o.work) ? o.work : t;
+    const p = live ? frac(clock / (cyc.ticks / speed) + spec.phase) : cyc.rest;
 
     // Locate the step this phase falls in (steps are ordered, shares sum
     // to 1; the last step absorbs any floating-point remainder).

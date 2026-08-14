@@ -37,7 +37,7 @@
  *     validated process simulation / NOT CFD labels; index.html loads
  *     fluids.js before app.js and ships the #fluidsReadout container in
  *     the EXISTING Factory line card; app.js renders + refreshes it;
- *     sw.js precaches ./fluids.js at the bumped wt-v78 cache; the
+ *     sw.js precaches ./fluids.js at the bumped wt-v79 cache; the
  *     runner lists this harness; the self-test carries the live checks.
  *
  * Runs the REAL app modules under the same window shim as the other
@@ -268,8 +268,8 @@ check("the honesty NOTE: steady-state analytical, modelled not measured, NOT a v
     idx.indexOf('<script src="fluids.js"></script>') !== -1 &&
     idx.indexOf('<script src="fluids.js"></script>') < idx.indexOf('<script src="app.js"></script>') &&
     /id="fluidsReadout"/.test(idx));
-  check("sw.js precaches ./fluids.js at the bumped wt-v78 cache",
-    /["']\.\/fluids\.js["']/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v78"/.test(sw));
+  check("sw.js precaches ./fluids.js at the bumped wt-v79 cache",
+    /["']\.\/fluids\.js["']/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v79"/.test(sw));
   check("app.js renders the read-out (renderFluidsReadout) and refreshes it on every layout mutation",
     /function renderFluidsReadout\(\)/.test(app) && /renderFluidsReadout\(\);/.test(app) &&
     /WT\.fluids\.analyze/.test(app));

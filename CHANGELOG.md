@@ -6,6 +6,131 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [3.24] — 2026-08-14
+
+**The plant reads like a working shift.** v3.21 gave the hall its materials,
+v3.22 put people in it and v3.23 made the goods physical. Four things still
+gave the floor away as a diorama, and new `shift.js` (`WT.shift`) fixes all
+four as **one strictly read-only drawing layer** over the flow sim: it adds
+**no model, no number and no export**, it never writes a byte of sim state,
+and every position is a pure function of (layout, plan, sim state, element
+identity, the sim's own tick). Structure is untouched and every saved
+scenario stays **byte-identical**.
+
+**1 · Manned trucks actually haul.** v3.23's own honest limitation was that a
+forklift / reach truck **body** was static in `shapes.js` — only its forks
+cycled. It was the one piece of the plant drawn moving without ever going
+anywhere. Now it works:
+
+- it takes a load at its bay, drives out along the aisle **in the direction
+  the sim's own plan routes material** (a flow-direction field over the plan
+  polyline, snapped to the dominant axis, because aisles are axial), raises
+  the forks at the far end, sets the pallet in, **turns**, and comes back
+  with the empty pallet on the tines;
+- the haul lane is **marched against the real layout** at half-cell steps and
+  stops about half a truck short of whatever blocks it, so the body stays out
+  of the racking and only the **tines and the pallet** reach into the face —
+  which is what putting a load away looks like. A truck with nowhere to go
+  keeps working its forks on the spot, exactly as in v3.23;
+- the cycle is a **closed loop** whose position, heading and fork height are
+  continuous at every step boundary and across the wrap (verified over a
+  4000-sample sweep) — no pop, anywhere;
+- with **no clock** (a stopped plant, or `prefers-reduced-motion`) every truck
+  is parked at its own bay centre, squared up, forks down, loaded: *exactly*
+  the picture v3.23 drew;
+- the load rides the travelling tines through the **same pose** the body is
+  drawn at, so a pallet can no more drift off a moving truck than off a
+  parked one; RGV and AGV keep their existing in-footprint lane travel, and
+  all three now resolve through one pose model.
+
+**2 · Congestion you can see, without strobing.** v3.22 deferred the
+per-station queue read and shipped a coarse stage-level latch instead,
+because an integer queue depth crosses its threshold many times a second and
+anything bound straight to it *flickers*. The fix is a filter, not a latch,
+in three layers:
+
+- **smooth** — `level` is an exponential average of `queue / threshold`,
+  integrated in **sim time** in the analytic form, which makes it *exactly*
+  invariant to how that time is chopped into frames (advancing 1 tick once
+  and 0.5 ticks twice against the same observation are bit-identical), so the
+  plant cannot look different on a faster machine;
+- **Schmitt trigger** — the three-state band (clear / building / backed up)
+  rises at one threshold and falls at a lower one, so a level sitting on a
+  boundary must travel the whole dead band to come back;
+- **minimum dwell** — a band that has just changed is frozen for 48 sim
+  ticks, which puts a hard ceiling on how often *any* station can change its
+  read.
+
+Against a queue that crosses the threshold on **every tick for 900 ticks**
+the band changes **zero** times; against a square wave slamming from empty to
+double the threshold *faster than the dwell*, it tracks the signal but never
+changes twice inside the dwell. **The number stays raw:** the queue count on
+the badge and every KPI remain the sim's own instantaneous value — only the
+paint is deliberately slow.
+
+The same signal drives the **workforce**: a station's pace rides its smoothed
+level, and a genuinely starved station (behind its own 1.5 s dwell) puts its
+worker into the idle cycle — the per-station busy/idle v3.22 had to defer.
+Pace is handed to `workers.js` as an **integrated effective work clock**
+rather than a speed multiplier, because scaling the raw tick by a speed that
+changes mid-run *teleports* the phase — a pose pop of hundreds of ticks. The
+integrated clock is monotone and Lipschitz by construction, so the pace can
+change without the pose moving. And a genuinely deep queue is now spread
+further back along the sim's own route, so real congestion reads as a **line**
+instead of a pile on the eighth place.
+
+**3 · Dock realism.** A door that is working has a **trailer** backed onto
+it, its shutter up, a leveller plate bridging the gap and empty pallets
+stacked on the apron; a door that is not stays shut. Which one you see is the
+sim's own stage occupancy through the same smoother with a **two-second
+dwell**, so a trailer never blinks — and with the plant stopped nothing is
+drawn at all.
+
+**4 · The paint agrees with the flow.** v3.21 stencilled travel arrows down
+every painted aisle, but their direction came from the geometry of the facing
+*pair*, which is arbitrary — half the paint could point against the traffic.
+Each arrow is now flipped to agree with the direction the sim actually routes
+material past that point (same place, same size — only the sign changes). And
+an **andon** lamp reduces the run to the three states a real plant signal
+shows, as **shape + colour + words** (never colour alone), on the flow panel
+that already exists — read off the *smoothed* bands, so the lamp cannot
+flicker either.
+
+**One model, both views.** The truck, the trailer and the apron are oriented
+boxes through the caller's `project(x, y, heightM)` — the plain world→px map
+top-down, the iso projection in 2.5D — painted by `WT.workers`' own box
+painter, so the trucks, the goods and the people are literally the same
+geometry code. LOD-gated (culled below the glyph tier), view-culled top-down
+and capped, so the mega hall stays smooth.
+
+**Gates:** all **49** harnesses pass (new `verify_shift.js`, 14 checks: the
+flow-direction field and arrow orientation; haul lanes that never cross an
+element; truck path continuity over the cycle and the wrap; the no-clock
+static frame; finite, in-bounds poses on two plants including the
+894-element mega hall plus garbage-safety; **the anti-strobe guarantee** on
+three signals; frame-rate invariance; the Schmitt dead band; the monotone
+work clock; strict read-only over sim state with conservation intact; dock
+geometry and the no-blink door; a draw smoke through both projectors ×
+themes × LOD tiers; determinism with no `Date` / `Math.random` in source *or*
+live exports; and the andon, the honesty label and the shipped wiring). The
+in-browser self-test grows 140 → **149**; the offline guard is clean; the
+cache is bumped to `wt-v79` with every `verify_*.js` pin synced.
+
+**Honest limitations.** This is an ILLUSTRATIVE schematic animation of
+warehouse work. The trucks are **not** a fleet model and the haul cycle is
+**not** a duty cycle — one truck per placed forklift element, driving a lane
+derived from the layout, on a fixed-length cycle. The trailer is a generic
+schematic box showing the **rear section** at the door (a real 13.6 m trailer
+continues outside the drawn frame), not a vehicle spec and not a brand. The
+congestion bands are a **drawing filter** over the existing synthetic queue
+heuristic — not a measurement, not a queueing-theory result and not a KPI. A
+hauling truck is drawn as an overlay after the blocks, so it is not occluded
+per-pixel by what it passes behind (the same limitation the workforce and the
+flow boxes have always carried), and its top-down footprint plate stays put
+as the marked bay it drove out of. Still to do: a truck does not yet steer
+round a corner (its lane is one axis), and the docks model no turnaround time
+and no yard.
+
 ## [3.23] — 2026-08-14
 
 **The goods are physical.** Since P3 the material flow has been a swarm of

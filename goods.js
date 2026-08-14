@@ -349,14 +349,21 @@
   }
 
   /**
-   * sample(state, mu, support) -> everything needed to DRAW one unit.
+   * sample(state, mu, support, opts) -> everything needed to DRAW one unit.
    * PURE: reads the sim state, writes nothing.
+   *
+   * v3.24: `opts.queueMax` raises how many WAITING units are spread
+   * nose-to-tail before the rest pile onto the last place, so a station
+   * that is genuinely backed up shows a genuinely long line. Omitted ->
+   * the sim's own drawing cap, i.e. byte-identical to v3.23. It changes
+   * NO model value - the queue's order, length and service stay the sim's.
    *
    * Returns { id, form, size, x, y, z, heading, ride, status, stage,
    *           queueIndex, hot }
    * where z is the height of the unit's UNDERSIDE (the carrying surface).
    */
-  function sample(state, mu, support) {
+  function sample(state, mu, support, opts) {
+    const so = opts || {};
     const plan = (state && state.plan) || {};
     const wp = plan.waypoints || [];
     const form = formFor(mu);
@@ -367,9 +374,11 @@
       const st = mu.station;
       const q = st.queue ? st.queue.indexOf(mu) : 0;
       qIndex = q < 0 ? 0 : q;
-      // Cap the DRAWN trail at the sim's own queue-stack cap so a huge
-      // queue can never run off the far end of the floor.
-      const cap = (WT.flowsim && WT.flowsim.PARAMS && WT.flowsim.PARAMS.queueStackMax) || 8;
+      // Cap the DRAWN trail so a huge queue can never run off the far end
+      // of the floor: the sim's own queue-stack cap, or the caller's
+      // (v3.24 hands in a deeper one so real congestion reads as a line).
+      const dflt = (WT.flowsim && WT.flowsim.PARAMS && WT.flowsim.PARAMS.queueStackMax) || 8;
+      const cap = isFinite(so.queueMax) && so.queueMax > 0 ? (so.queueMax | 0) : dflt;
       const shown = Math.min(qIndex, cap);
       const t = queueTrail(plan, st.wpIndex, shown, size.f + NOSE_GAP);
       x = t.x; y = t.y; heading = t.heading;
@@ -410,7 +419,7 @@
     const o = opts || {};
     const out = [];
     const mus = (state && state.mus) || [];
-    for (let i = 0; i < mus.length; i++) out.push(sample(state, mus[i], support));
+    for (let i = 0; i < mus.length; i++) out.push(sample(state, mus[i], support, o));
     out.sort(function (a, b) {
       const ka = a.x + a.y, kb = b.x + b.y;
       if (ka !== kb) return ka - kb;
@@ -465,13 +474,36 @@
   }
 
   /**
-   * sampleVehicle(spec, t) -> the load this vehicle is carrying right
-   * now. `t` is the sim's own continuous tick; `null` (a stopped plant
-   * or prefers-reduced-motion) gives the STATIC frame - the truck parked
-   * mid-lane with its forks down, never a load frozen in mid-air.
+   * sampleVehicle(spec, t, haul) -> the load this vehicle is carrying
+   * right now. `t` is the sim's own continuous tick; `null` (a stopped
+   * plant or prefers-reduced-motion) gives the STATIC frame - the truck
+   * parked mid-lane with its forks down, never a load frozen in mid-air.
+   *
+   * v3.24: a MANNED truck no longer works its forks on the spot - it
+   * hauls. When the caller hands in that truck's haul pose (WT.shift's
+   * `truckPose`, the SAME pose its body is drawn at), the load rides on
+   * the travelling tines instead: one pose, so the pallet can no more
+   * drift off a moving truck than it could off a parked one. Omitted ->
+   * exactly the v3.23 behaviour, so nothing that does not haul changes.
    */
-  function sampleVehicle(spec, t) {
+  function sampleVehicle(spec, t, haul) {
     const live = typeof t === "number" && isFinite(t);
+    if (haul && isFinite(haul.x) && isFinite(haul.y) && isFinite(haul.heading)) {
+      // The tines project HAUL-forward of the truck's own centre; the
+      // pallet's centre sits half a pallet further out again.
+      const fwd = num(haul.forkF, 1.05);
+      const cosH = Math.cos(haul.heading), sinH = Math.sin(haul.heading);
+      const hform = haul.form === "pallet" ? "pallet" : "pallet-load";
+      return {
+        id: spec.id, form: hform, size: sizeOf(hform),
+        x: haul.x + cosH * fwd, y: haul.y + sinH * fwd,
+        z: num(haul.deckZ, 0.13) + Math.max(0, num(haul.lift, 0)),
+        heading: haul.heading,
+        ride: "fork",
+        stage: "storage", status: "carried", queueIndex: -1, hot: false,
+        lift: Math.max(0, num(haul.lift, 0)), resting: !live, hauling: true,
+      };
+    }
     const S = WT.shapes;
     const phase = live && S && typeof S.equipmentPhase === "function"
       ? S.equipmentPhase(t, spec.seed)

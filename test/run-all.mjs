@@ -599,8 +599,42 @@
  *      draw() smoke through BOTH projectors x themes x LOD tiers proving
  *      the painter is WT.workers own (reuse, not duplication); the honesty
  *      labels; and the shipped wiring (goods.js after workers.js +
- *      precached at wt-v78, drawn from BOTH app.js render paths through
+ *      precached at wt-v79, drawn from BOTH app.js render paths through
  *      projPx, LOD-gated with a drawing budget, self-test + runner).
+ *
+ *  41. verify_shift.js  - THE PLANT READS LIKE A WORKING SHIFT (v3.24):
+ *      the pure model behind hauling trucks, non-strobing congestion,
+ *      dock realism and flow-true floor paint (shift.js). Asserts the
+ *      FLOW DIRECTION FIELD is the sim OWN plan polyline and that every
+ *      painted travel arrow is flipped to agree with it without moving,
+ *      resizing or otherwise changing a mark; that HAUL LANES ARE REAL
+ *      AISLES - axial, on the slab, agreeing with the flow axis and,
+ *      marched at 0.1-cell resolution, never inside another element
+ *      footprint (a boxed-in truck stays parked); TRUCK PATH CONTINUITY
+ *      over a 4000-sample sweep of the whole cycle and across the wrap
+ *      (no jump in position, heading or fork height; the loop is closed;
+ *      loaded out, empty pallet back); that the NO-CLOCK static frame is
+ *      exactly the pre-v3.24 picture (parked at the bay, squared up,
+ *      forks down); finite + in-bounds poses on two plants including the
+ *      894-element mega hall, plus garbage-safety; THE HYSTERESIS DOES
+ *      NOT STROBE - against a queue crossing the threshold every tick for
+ *      900 ticks, a square wave slamming across it faster than the dwell
+ *      for 1500, and every station of a real 600-tick run, no band ever
+ *      changes twice inside the minimum dwell and the level is Lipschitz;
+ *      that the filter is FRAME-RATE INVARIANT (30x1 tick == 60x0.5 tick,
+ *      bit-identical); that the Schmitt dead band holds for 4000 ticks
+ *      from either side; that the per-station WORK CLOCK the workforce
+ *      poses from is monotone at the documented pace (which is what lets
+ *      pace change without the pose jumping); STRICT READ-ONLY over sim
+ *      state with conservation intact; DOCK realism (outward normals by
+ *      the nearest wall, the trailer outside the building line, no
+ *      trailer at all on a stopped plant, and a door that cannot blink);
+ *      a draw() smoke through BOTH projectors x themes x LOD tiers on
+ *      WT.workers own box painter; determinism with no Date and no
+ *      Math.random in source OR live exports; the andon three-state read
+ *      as shape + colour + words; the honesty label; and the shipped
+ *      wiring (shift.js after goods.js + precached at wt-v79, drawn from
+ *      BOTH app.js render paths, self-test + runner).
  *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
@@ -659,6 +693,7 @@ const HARNESSES = [
   { name: "Material-flow connection overlay / Flow links (verify_flowlinks.js)", args: ["verify_flowlinks.js"] },
   { name: "Living workforce: pose + gait model (verify_workers.js)", args: ["verify_workers.js"] },
   { name: "Physical goods: pallets/cartons/totes riding the plant (verify_goods.js)", args: ["verify_goods.js"] },
+  { name: "The working shift: hauling trucks, non-strobing congestion, docks (verify_shift.js)", args: ["verify_shift.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

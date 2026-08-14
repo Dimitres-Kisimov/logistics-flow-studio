@@ -2912,6 +2912,282 @@
         detail: n + " goods functions scanned; clock=" + hasClock + " rng=" + hasRng + " model=" + hasModel };
     });
 
+    /* ---- v3.24 THE PLANT READS LIKE A WORKING SHIFT ------------------
+     * Manned trucks that actually haul, a congestion signal that cannot
+     * strobe, trailers on the doors that are working, and floor paint
+     * that agrees with the flow. These run against the LIVE app: the
+     * app's own smoothing store, its own haul roster and its own draw
+     * passes in BOTH view modes.
+     * ---------------------------------------------------------------- */
+    var SFT = window.WT && window.WT.shift;
+    var sfApi = haveApi && API.shift ? API.shift : null;
+
+    check("shift-module-present-and-honest-about-what-it-is", function () {
+      if (!SFT) return { ok: false, detail: "WT.shift absent" };
+      var model = typeof SFT.hauls === "function" && typeof SFT.truckPose === "function" &&
+        typeof SFT.updateStore === "function" && typeof SFT.bandStep === "function" &&
+        typeof SFT.docks === "function" && typeof SFT.orientArrows === "function" &&
+        typeof SFT.andon === "function";
+      var H = SFT.HONESTY || "";
+      var honest = /READ-ONLY/i.test(H) && /NO model/i.test(H) && /NO number/i.test(H) &&
+        /DRAWING FILTER/i.test(H) && /NOT a measurement/i.test(H) && H.length > 400;
+      return { ok: model && honest, detail: "model=" + model + " honesty=" + H.length + " chars" };
+    });
+
+    check("shift-floor-arrows-agree-with-the-direction-the-flow-goes", function () {
+      if (!SFT || !haveApi || !window.WT.floor || !window.WT.domain) {
+        return { ok: false, detail: "WT.shift / floor / domain absent" };
+      }
+      var sim = API.state.flow && API.state.flow.sim;
+      if (!sim) { API.flowPlay(); API.flowStep(); sim = API.state.flow.sim; }
+      if (!sim) return { ok: false, detail: "no live sim" };
+      var legs = SFT.legsOf(sim.plan);
+      var pairs = window.WT.domain.facingAislePairs(API.state.elements);
+      var arrows = window.WT.floor.aisleArrows(window.WT.floor.aislePaint(pairs), 6);
+      var fixed = SFT.orientArrows(arrows, legs);
+      var bad = [], flipped = 0;
+      for (var ai = 0; ai < arrows.length; ai++) {
+        var a0 = arrows[ai], b0 = fixed[ai];
+        if (a0.x !== b0.x || a0.y !== b0.y || a0.size !== b0.size) bad.push("mark moved");
+        var fd = SFT.dirAt(legs, b0.x, b0.y);
+        if (fd && b0.dx * fd.dx + b0.dy * fd.dy < -1e-12) bad.push("arrow fights the flow");
+        if (b0.flipped) flipped++;
+      }
+      return { ok: bad.length === 0 && legs.length > 0,
+        detail: bad.length ? bad.slice(0, 2).join(",") : arrows.length + " painted arrows over " +
+          legs.length + " flow legs, " + flipped + " flipped to agree, geometry untouched" };
+    });
+
+    check("shift-congestion-band-cannot-strobe-on-the-live-store", function () {
+      if (!SFT || !sfApi || !haveApi) return { ok: false, detail: "WT.shift / test API absent" };
+      var threw = "", bad = [], changes = 0, minGap = Infinity, samples = 0;
+      try {
+        API.flowPlay();
+        var seen = {};
+        for (var k = 0; k < 60; k++) {
+          API.flowStep();
+          var store = sfApi.update();
+          var sim = API.state.flow.sim;
+          if (!sim || !sim.stations) break;
+          for (var i = 0; i < sim.stations.length; i++) {
+            var st = sim.stations[i];
+            var rec = SFT.readStation(store, st.id);
+            if (!rec) continue;
+            samples++;
+            if (!isFinite(rec.level) || rec.level < 0 || rec.level > SFT.CONG.levelMax + 1e-9) {
+              bad.push(st.id + " level " + rec.level);
+            }
+            var p = seen[st.id];
+            if (!p) { seen[st.id] = p = { band: rec.band, at: null, eff: rec.eff }; }
+            else {
+              if (rec.band !== p.band) {
+                changes++;
+                if (p.at !== null) minGap = Math.min(minGap, k - p.at);
+                p.at = k; p.band = rec.band;
+              }
+              if (rec.eff < p.eff - 1e-9) bad.push(st.id + " work clock ran backwards");
+              p.eff = rec.eff;
+            }
+          }
+        }
+      } catch (e) { threw = e && e.message ? e.message : String(e); }
+      // The dwell is in SIM TICKS; Step advances a whole bucket at a time,
+      // so the observed gap is converted before it is compared.
+      var perStep = 8; // API.flowStep() advances FLOW_STEP_TICKS
+      var gapTicks = minGap === Infinity ? Infinity : minGap * perStep;
+      return { ok: !threw && bad.length === 0 && samples > 0 &&
+          (gapTicks === Infinity || gapTicks >= SFT.CONG.dwell),
+        detail: threw ? "threw " + threw : bad.length ? bad.slice(0, 3).join(",") :
+          samples + " station samples, " + changes + " band changes, closest " +
+          (gapTicks === Infinity ? "n/a" : gapTicks + " ticks") + " apart (dwell " + SFT.CONG.dwell + ")" };
+    });
+
+    check("shift-workers-pace-from-their-own-station-clock", function () {
+      if (!SFT || !sfApi || !window.WT.workers) return { ok: false, detail: "WT.shift / WT.workers absent" };
+      var store = sfApi.update();
+      var sim = API.state.flow && API.state.flow.sim;
+      if (!store || !sim || !sim.stations || !sim.stations.length) {
+        return { ok: false, detail: "no live stations" };
+      }
+      var bad = [], found = 0;
+      for (var i = 0; i < sim.stations.length; i++) {
+        var st = sim.stations[i];
+        var rec = sfApi.station(st.x, st.y);
+        if (!rec) continue;
+        found++;
+        if (!(rec.pace >= SFT.CONG.paceLo - 1e-9 && rec.pace <= SFT.CONG.paceHi + 1e-9)) {
+          bad.push(st.id + " pace " + rec.pace);
+        }
+        if (!isFinite(rec.eff) || rec.eff < 0) bad.push(st.id + " clock " + rec.eff);
+      }
+      // and a worker really poses from that clock rather than the raw tick
+      var spec = window.WT.workers.roster(API.currentLayout())[0];
+      var usesWork = true;
+      if (spec) {
+        var pa = JSON.stringify(window.WT.workers.sample(spec, 100, { busy: true, work: 40 }));
+        var pb = JSON.stringify(window.WT.workers.sample(spec, 100, { busy: true }));
+        usesWork = pa !== pb;
+      }
+      return { ok: bad.length === 0 && found > 0 && usesWork,
+        detail: bad.length ? bad.slice(0, 3).join(",") : found + " stations paced inside [" +
+          SFT.CONG.paceLo + "," + SFT.CONG.paceHi + "], workers read the station clock=" + usesWork };
+    });
+
+    check("shift-manned-trucks-haul-a-real-aisle-and-park-where-they-always-did", function () {
+      if (!SFT || !haveApi) return { ok: false, detail: "WT.shift / test API absent" };
+      var lib = (WT.examples && WT.examples.library) || [];
+      // The shipped small halls are conveyor/RGV plants; the mega showcase
+      // is the one with manned trucks on it, so the truck path is exercised
+      // there and the first example is restored afterwards.
+      var mega = lib.filter(function (e) { return e.config && e.config.mega; })[0];
+      if (!mega) return { ok: false, detail: "no mega scenario in library" };
+      var bad = [], n = 0, lanes = [], threw = "";
+      try {
+        API.loadExample(mega.id);
+        var lay = API.currentLayout();
+        var sim = API.state.flow && API.state.flow.sim;
+        var trucks = SFT.hauls(lay, sim ? sim.plan : null);
+        var occ = SFT.occupancy(lay.elements);
+        n = trucks.length;
+        for (var i = 0; i < trucks.length; i++) {
+          var t = trucks[i];
+          lanes.push(t.len.toFixed(1));
+          // parked exactly at its own bay with no clock (the old picture)
+          var rest = SFT.truckPose(t, null);
+          if (Math.abs(rest.x - t.home.x) > 1e-9 || Math.abs(rest.y - t.home.y) > 1e-9 || rest.lift !== 0) {
+            bad.push(t.id + " does not park at its bay");
+          }
+          // the lane is on the slab and clear of every other element
+          for (var s = 0; s <= t.len + 1e-9; s += 0.25) {
+            var x = t.home.x + t.dir.x * s, y = t.home.y + t.dir.y * s;
+            if (x < 0 || y < 0 || x > lay.gridW || y > lay.gridH) bad.push(t.id + " lane leaves the slab");
+            var hit = occ.get(Math.floor(x) + "," + Math.floor(y));
+            if (hit != null && lay.elements[hit] && lay.elements[hit].type !== "forklift") {
+              bad.push(t.id + " lane crosses a " + lay.elements[hit].type);
+            }
+          }
+          // and the path is continuous over the whole cycle
+          var prev = null, jump = 0;
+          for (var q = 0; q <= 600; q++) {
+            var p = SFT.truckPose(t, (q / 600) * SFT.HAUL.ticks * 1.2);
+            if (!isFinite(p.x) || !isFinite(p.y) || !isFinite(p.lift)) bad.push(t.id + " non-finite pose");
+            if (prev) {
+              var dx = p.x - prev.x, dy = p.y - prev.y;
+              jump = Math.max(jump, Math.sqrt(dx * dx + dy * dy));
+            }
+            prev = p;
+          }
+          if (jump > Math.max(0.25, t.len * 0.05)) bad.push(t.id + " path jumps " + jump.toFixed(3));
+        }
+      } catch (e) { threw = e && e.message ? e.message : String(e); }
+      try { if (lib[0]) API.loadExample(lib[0].id); } catch (_) { /* best effort */ }
+      return { ok: !threw && bad.length === 0 && n > 0,
+        detail: threw ? "threw " + threw : bad.length ? bad.slice(0, 3).join(",") :
+          n + " manned trucks, lanes " + lanes.join("/") + " cells, all clear of the racking, " +
+          "continuous over the cycle and parked at their bays without a clock" };
+    });
+
+    check("shift-docks-carry-trailers-only-while-they-work", function () {
+      if (!SFT || !sfApi || !haveApi) return { ok: false, detail: "WT.shift / test API absent" };
+      var lay = API.currentLayout();
+      var docks = SFT.docks(lay);
+      if (!docks.length) return { ok: false, detail: "no dock doors on this floor" };
+      var bad = [];
+      // no sim at all -> no trailer and no open door (the pre-v3.24 picture)
+      var cold = SFT.createStore();
+      for (var i = 0; i < docks.length; i++) {
+        var d = docks[i];
+        var s0 = SFT.dockRead(cold, d, null);
+        if (s0.open || s0.trailer) bad.push(d.id + " docked with the plant stopped");
+        // the trailer body stands OUTSIDE the building line
+        var nx = d.face.x + d.dir.x * SFT.DOCK.gap, ny = d.face.y + d.dir.y * SFT.DOCK.gap;
+        if (nx > 0.001 && ny > 0.001 && nx < lay.gridW - 0.001 && ny < lay.gridH - 0.001) {
+          bad.push(d.id + " trailer would stand on the floor");
+        }
+      }
+      // running -> the working doors take a trailer
+      API.flowPlay();
+      for (var k = 0; k < 12; k++) { API.flowStep(); sfApi.update(); }
+      var store = sfApi.store();
+      var open = 0;
+      for (var j = 0; j < docks.length; j++) {
+        if (SFT.dockRead(store, docks[j], API.state.flow.sim).trailer) open++;
+      }
+      return { ok: bad.length === 0,
+        detail: bad.length ? bad.slice(0, 3).join(",") : docks.length + " doors: none docked with the plant " +
+          "stopped, " + open + " with a trailer once the flow is running, every trailer outside the building line" };
+    });
+
+    check("shift-draws-in-both-views-on-the-live-canvas", function () {
+      if (!haveApi || !sfApi) return { ok: false, detail: "test API absent" };
+      var errsBefore = (window.__WT_ERRORS__ || []).length;
+      var threw = "", mode = API.state.viewMode, simBefore = "", simAfter = "";
+      try {
+        var sim = API.state.flow.sim;
+        var snap = function () {
+          return sim ? JSON.stringify([sim.tick, sim.spawned, sim.completed, sim.inflight,
+            sim.stations.map(function (s) { return [s.id, s.queue.length]; })]) : "";
+        };
+        simBefore = snap();
+        API.setViewMode("top"); API.render(); sfApi.draw();
+        API.setViewMode("iso"); API.render(); sfApi.draw();
+        API.setViewMode(mode); API.render();
+        simAfter = snap();
+      } catch (e) { threw = e && e.message ? e.message : String(e); }
+      var errsAfter = (window.__WT_ERRORS__ || []).length;
+      var tier = sfApi.tier();
+      return { ok: !threw && errsAfter === errsBefore && simBefore === simAfter &&
+          (tier === "icon" || tier === "glyph" || tier === "rich"),
+        detail: threw ? "threw " + threw : "top + iso drew clean, sim untouched=" +
+          (simBefore === simAfter) + "; LOD tier at this zoom = " + tier };
+    });
+
+    check("shift-andon-reads-the-run-as-shape-plus-colour-plus-words", function () {
+      if (!SFT || !sfApi || !haveApi) return { ok: false, detail: "WT.shift / test API absent" };
+      var live = sfApi.andon();
+      var stopped = SFT.andon(null, sfApi.store(), { on: false });
+      // a jammed plant reads ATTENTION off the SMOOTHED bands
+      var jamStore = SFT.createStore();
+      var sim = API.state.flow.sim;
+      var sts = [], i, z;
+      for (i = 0; i < (sim && sim.stations ? sim.stations.length : 0); i++) {
+        var s = sim.stations[i];
+        var q = [];
+        for (z = 0; z < 40; z++) q.push(0);
+        sts.push({ id: s.id, kind: s.kind, stage: s.stage, x: s.x, y: s.y, queue: q });
+      }
+      var jam = { tick: 0, tickAccum: 0, stations: sts, perStage: { picking: 40 }, completed: 0, inflight: 40 };
+      for (i = 0; i <= 200; i++) { jam.tick = i; SFT.updateStore(jamStore, jam, { docks: [] }); }
+      var hot = SFT.andon(jam, jamStore);
+      var marks = {};
+      marks[stopped.mark] = 1; marks[hot.mark] = 1;
+      if (live) marks[live.mark] = 1;
+      var distinct = 0;
+      for (var mk in marks) if (marks.hasOwnProperty(mk)) distinct++;
+      // the panel really shows it, with a per-state class (never colour alone)
+      var el = document.querySelector(".flow-andon");
+      var classed = !!el && /andon-(running|attention|stopped)/.test(el.className) && el.textContent.length > 0;
+      return { ok: stopped.state === "stopped" && hot.state === "attention" && !!live &&
+          distinct >= 2 && (!sts.length || hot.congested > 0) && (classed || !el),
+        detail: "live=" + (live ? live.state + " " + live.mark : "none") + " stopped=" + stopped.mark +
+          " jammed=" + hot.state + " " + hot.mark + " (" + hot.congested + "/" + hot.stations +
+          " backed up) distinctMarks=" + distinct + " panel=" + classed };
+    });
+
+    check("shift-no-clock-or-rng-in-the-shift-layer", function () {
+      if (!SFT) return { ok: false, detail: "WT.shift absent" };
+      var src = "", n = 0;
+      for (var k in SFT) {
+        if (typeof SFT[k] !== "function") continue;
+        src += String(SFT[k]) + "\n";
+        n++;
+      }
+      var hasClock = /Date\.now|new Date\(/.test(src);
+      var hasRng = /Math\.random/.test(src);
+      return { ok: !hasClock && !hasRng && n >= 20,
+        detail: n + " shift functions scanned; clock=" + hasClock + " rng=" + hasRng };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

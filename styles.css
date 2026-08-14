@@ -1641,6 +1641,40 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .flow-stats { font-size: 0.75rem; color: var(--text-dim); margin: 0; line-height: 1.5; }
 .flow-stats strong { color: var(--text); font-variant-numeric: tabular-nums; }
 
+/* v3.24 ANDON. The three states a plant signal actually shows, on the flow
+ * panel that already exists — no new surface, no restructuring. Read as
+ * SHAPE (disc / triangle / square) + colour + words, never colour alone, so
+ * it survives a colourblind reader; the lamp colours are the app's own
+ * signal tokens (running / attention / stop), not a new palette. The state
+ * is the SMOOTHED congestion band (WT.shift), so the lamp cannot flicker. */
+.flow-andon {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  background: var(--surface-2);
+  font-size: 0.74rem;
+  color: var(--text-dim);
+}
+.flow-andon .andon-lamp { font-size: 0.8rem; line-height: 1; }
+.flow-andon .andon-label {
+  color: var(--text);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+}
+.flow-andon .andon-detail { font-variant-numeric: tabular-nums; }
+.flow-andon.andon-running { border-left-color: var(--ok); }
+.flow-andon.andon-running .andon-lamp { color: var(--ok); }
+.flow-andon.andon-attention { border-left-color: var(--warn); }
+.flow-andon.andon-attention .andon-lamp { color: var(--warn); }
+.flow-andon.andon-stopped { border-left-color: var(--text-dim); }
+.flow-andon.andon-stopped .andon-lamp { color: var(--text-dim); }
+
 /* v1.3: Live ORDER POOL readout — the visible demand side (WT.orderpool).
  * A compact backlog + fill bar, generated/selected/completed counters, live
  * in/out rates, a starving/saturating flag and a backlog sparkline. All the
