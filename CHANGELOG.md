@@ -6,6 +6,101 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## [3.22] — 2026-08-14
+
+**The plant has people in it, and they do their job.** Since v2.1 a "worker"
+was a head disc and a shoulder bar bolted onto the furniture of a pack bench:
+it could bob, it could not *work*. This release gives the floor an actual
+workforce. New `workers.js` (`WT.workers`) is a pure, deterministic **pose +
+gait model** — an articulated 1.75 m figure (hips, knees, feet, shoulders,
+elbows, hands, head) placed by two-link IK and driven by named **work cycles**,
+one per station type. Structure is untouched (no rail/drawer/panel change),
+every saved scenario stays **byte-identical**, and nothing here feeds a KPI.
+
+**What a worker actually does now.**
+- **Pick face** — walks to the face with a real alternating gait and
+  counter-swinging arms, **bends and reaches in**, straightens with a **kraft
+  carton in its hands**, carries it back at chest height and sets it down. The
+  reach height is stable per element, so a rack row is picked at *several*
+  levels — and the body follows the hands: a floor-level face is a deep bend
+  with the knees in it, a chest-level face is barely a lean.
+- **Pack / processing bench** — draws the goods in, works over the bench
+  (hands working at the carton), sweeps a tape gun **one-handed** across it
+  while the other hand stays put, then pushes the finished parcel away and
+  reaches out for the next one.
+- **Staging (put-away)** — carries a carton in at chest height, places it,
+  straightens, walks back empty, takes up the next one.
+- **Dock door** — steps up to the door, **raises a handheld** above the
+  shoulder, reads the label, lowers it and steps back.
+- **Nobody is a mannequin.** A stationary worker still has a weight shift and
+  breath; and a stage that has no goods in it yet stands **idle** until the
+  shift wakes (latched per run, so a queue flickering around zero can never
+  strobe the poses).
+
+**The gait is driven by travel, not by the clock.** The stride phase is
+`distance / stride length`, so a worker crossing a longer leg takes *more*
+steps; the stride amplitude follows the leg's own speed profile, so the feet
+come together as they arrive. Every cycle is a **closed pose loop** (each
+step's end pose is the next one's start), verified over a fine sweep — there
+is no pose pop at any step boundary or at the wrap.
+
+**One skeleton, both views.** Joints live in a body frame (forward / lateral /
+up, in metres) and are projected through the caller's
+`project(x, y, heightM)` — the plain world→px map top-down, the iso projection
+in 2.5D — and solid parts (torso, carton, tote, scanner) are drawn as
+**oriented boxes** through that same projector. So from above you look down on
+the shoulders and see the feet swing fore and aft; from the 2.5D camera the
+same skeleton stands up; and a pick reads as a pick in both **by
+construction**. The head's on-screen size is *measured* through the projector,
+so the 2.5D figure never gets a balloon for a head.
+
+**Hi-vis that reads at distance.** An EN ISO 20471-family yellow-green vest
+with a retroreflective band, work-shirt sleeves that read *against* the vest,
+dark trousers, safety boots, a hard hat and a deliberately **neutral head — no
+skin tone, no gender, no identity is modelled** — all outlined in near-black,
+which is what actually keeps a 7 px figure legible on the daylit slab *and*
+the night shift (asserted at ≥ 3:1 as non-text UI in both themes). Full detail
+(knees, elbows, helmet, reflective band, taped carton, contact shadow) only at
+the zoomed-in tier; figures are culled entirely below the glyph tier,
+view-culled top-down and capped at 64, so a big hall stays fast.
+
+**Deterministic by construction.** No `Date` and no `Math.random` anywhere in
+`workers.js` — the clock is the flow sim's own tick, so the workforce freezes
+exactly when the sim pauses, and a null clock (plant stopped, or
+`prefers-reduced-motion`) gives every worker the legible **standing** pose
+their cycle rests at, never a leg-in-the-air freeze.
+
+**Two fixes that fell out of the work.**
+- Manned stations no longer draw a person welded into the glyph; they draw the
+  **work in progress** — a carton that travels the bench and closes as it is
+  made up (2D and 2.5D). People are their own layer now.
+- **The dark-theme glyph pen was broken, and had been for a while.**
+  `shade()`/`lighten()` hand back CSS `rgb(r,g,b)` strings while the colour
+  parser only understood hex, so *every* `rgba(lighten(...))` call — which is
+  the whole dark-theme pen — parsed `"rg"`/`"b("`/`"21"` as hex and collapsed
+  to the **same dark crimson for every element**, whatever its material. That
+  is the "interior strokes read redder than intended" note from v3.21: the
+  dark pen now really is each element's own material colour, lightened.
+
+**Gates:** all **47** harnesses pass (new `verify_workers.js`, 15 checks over
+the pose/gait geometry: roster correctness + determinism + cap, finite and
+bounded joints over full cycles, the gait laws, cycle continuity, the pose
+matching the station, the load being in the hands, the reduced-motion static
+frame, a draw smoke through both projectors × themes × tiers with no input
+mutation, both views agreeing, no clock/RNG in source *or* live functions, the
+honesty labels and the shipped wiring); `verify_shapes.js` gains a check
+pinning the dark-theme pen; the in-browser self-test grows 125 → **133**; the
+offline guard is clean; the cache is bumped to `wt-v77` with every
+`verify_*.js` pin synced.
+
+**Still honest about what this is:** an ILLUSTRATIVE schematic animation of
+warehouse work — not motion capture, not ergonomics or biomechanics, not a
+labour standard, not a measurement of anyone's workload, and the
+one-worker-per-manned-element roster is a drawing heuristic, **not** a staffing
+recommendation. The goods themselves are still the abstract stage-coloured
+flow boxes; turning those into real pallets, cartons and totes riding the
+equipment is the next step (A3).
+
 ## [3.21] — 2026-08-14
 
 **The design correction: this is factory work, not a drafting tool.** The

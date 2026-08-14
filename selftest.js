@@ -2580,6 +2580,183 @@
           : need.length + " materials x 2 themes; beam=" + S.mat("beam", "light") + "/" + S.mat("beam", "dark") };
     });
 
+    /* ---- v3.22 LIVING WORKERS ---------------------------------------
+     * The plant has people in it and they do their job. These run against
+     * the LIVE app: the roster the renderer actually draws, the pure pose
+     * model behind it, and the real draw pass in BOTH view modes.
+     * ---------------------------------------------------------------- */
+    var WKR = window.WT && window.WT.workers;
+    var wkApi = haveApi && API.workers ? API.workers : null;
+
+    check("workers-roster-staffs-the-live-layout", function () {
+      if (!WKR || !wkApi) return { ok: false, detail: "WT.workers / test API absent" };
+      var a = wkApi.roster(), b = wkApi.roster();
+      if (!a.length) return { ok: false, detail: "nobody staffed on the live layout" };
+      var jobs = {}, bad = [];
+      for (var i = 0; i < a.length; i++) {
+        jobs[a[i].task] = (jobs[a[i].task] || 0) + 1;
+        if (WKR.TASKS.indexOf(a[i].task) < 0) bad.push(a[i].task);
+        if (!(a[i].route && a[i].route.length === 2)) bad.push(a[i].id + " has no route");
+      }
+      var keys = Object.keys(jobs).sort().map(function (k) { return k + "=" + jobs[k]; });
+      return { ok: bad.length === 0 && a.length <= WKR.MAX_WORKERS && a === b,
+        detail: bad.length ? bad.join(",") : a.length + " workers (" + keys.join(" ") + "), cached=" + (a === b) };
+    });
+
+    check("workers-pose-is-deterministic-bounded-and-alive", function () {
+      if (!WKR || !wkApi) return { ok: false, detail: "WT.workers absent" };
+      var roster = wkApi.roster();
+      if (!roster.length) return { ok: false, detail: "empty roster" };
+      var bad = [], moved = 0, keys = ["hip", "head", "handL", "handR", "footL", "footR", "kneeL", "elR"];
+      for (var i = 0; i < roster.length && i < 12; i++) {
+        var prev = null;
+        for (var s = 0; s <= 24; s++) {
+          var t = (s / 24) * WKR.CYCLES[roster[i].task].ticks;
+          var p1 = WKR.pose(WKR.sample(roster[i], t));
+          var p2 = WKR.pose(WKR.sample(roster[i], t));
+          if (JSON.stringify(p1) !== JSON.stringify(p2)) bad.push(roster[i].id + " non-deterministic");
+          for (var k = 0; k < keys.length; k++) {
+            var j = p1[keys[k]];
+            if (!isFinite(j.f) || !isFinite(j.l) || !isFinite(j.z) ||
+                Math.abs(j.f) > 1.1 || Math.abs(j.l) > 0.8 || j.z < -0.02 || j.z > 2.1) {
+              bad.push(roster[i].id + "." + keys[k]);
+            }
+          }
+          if (prev && JSON.stringify(prev) !== JSON.stringify(p1)) moved++;
+          prev = p1;
+        }
+      }
+      // Nobody is a mannequin: the pose really changes across the cycle.
+      return { ok: bad.length === 0 && moved > 100,
+        detail: bad.length ? bad.slice(0, 3).join(",") : "poses bounded + deterministic; " + moved + " live pose changes" };
+    });
+
+    check("workers-walk-with-a-real-gait-and-carry-the-load-in-their-hands", function () {
+      if (!WKR || !wkApi) return { ok: false, detail: "WT.workers absent" };
+      var roster = wkApi.roster(), spec = null;
+      for (var i = 0; i < roster.length; i++) {
+        if (roster[i].task === "pick" || roster[i].task === "put") { spec = roster[i]; break; }
+      }
+      if (!spec) return { ok: false, detail: "no walking worker on this layout" };
+      var per = WKR.CYCLES[spec.task].ticks, steps = 0, alt = 0, counter = 0, swing = 0, held = 0, inHands = 0;
+      for (var s = 0; s <= 240; s++) {
+        var w = WKR.sample(spec, (s / 240) * per);
+        var sk = WKR.pose(w);
+        if (w.gaitAmp > 0.4 && Math.abs(sk.footL.f - sk.footR.f) > 0.05) {
+          steps++;
+          if ((sk.footL.f > 0) !== (sk.footR.f > 0)) alt++;
+          // The arms counter-swing when they are FREE. A worker carrying a
+          // carton holds it with both hands instead - which is the point.
+          if (w.params.task < 0.5) {
+            swing++;
+            if ((sk.footL.f > sk.footR.f) !== (sk.handL.f > sk.handR.f)) counter++;
+          }
+        }
+        if (sk.load) {
+          held++;
+          var mf = (sk.handL.f + sk.handR.f) / 2, ml = (sk.handL.l + sk.handR.l) / 2, mz = (sk.handL.z + sk.handR.z) / 2;
+          var d = Math.sqrt(Math.pow(sk.load.c.f - mf, 2) + Math.pow(sk.load.c.l - ml, 2) + Math.pow(sk.load.c.z - mz, 2));
+          if (d < 0.2) inHands++;
+        }
+      }
+      return { ok: steps > 10 && alt === steps && swing > 5 && counter === swing && held > 20 && inHands === held,
+        detail: "strideSamples=" + steps + " alternating=" + alt + " freeArmStrides=" + swing +
+          " counterSwing=" + counter + " carrying=" + held + " inHands=" + inHands };
+    });
+
+    check("workers-freeze-to-a-standing-pose-without-a-clock", function () {
+      // What prefers-reduced-motion (and a stopped plant) gets: the app
+      // passes a null clock and every worker rests in a legible stance.
+      if (!WKR || !wkApi) return { ok: false, detail: "WT.workers absent" };
+      var roster = wkApi.roster(), bad = [];
+      for (var i = 0; i < roster.length; i++) {
+        var w = WKR.sample(roster[i], null);
+        var sk = WKR.pose(w);
+        if (w.gaitAmp !== 0 || w.breath !== 0) bad.push(roster[i].id + " still moving");
+        if (sk.footL.z > 1e-9 || sk.footR.z > 1e-9) bad.push(roster[i].id + " foot in the air");
+        if (Math.abs(sk.footL.f - sk.footR.f) > 0.2) bad.push(roster[i].id + " mid-stride");
+        if (sk.head.z < 1.25) bad.push(roster[i].id + " folded over");
+      }
+      var wired = typeof wkApi.animT === "function";
+      return { ok: bad.length === 0 && wired && roster.length > 0,
+        detail: bad.length ? bad.slice(0, 3).join(",") : roster.length + " workers rest standing; app clock hook=" + wired };
+    });
+
+    check("workers-draw-in-both-views-on-the-live-canvas", function () {
+      if (!haveApi || !wkApi) return { ok: false, detail: "test API absent" };
+      var errsBefore = (window.__WT_ERRORS__ || []).length;
+      var threw = "";
+      var mode = API.state.viewMode;
+      try {
+        API.setViewMode("top"); API.render(); wkApi.draw();
+        API.setViewMode("iso"); API.render(); wkApi.draw();
+        API.setViewMode(mode); API.render();
+      } catch (e) { threw = e && e.message ? e.message : String(e); }
+      var errsAfter = (window.__WT_ERRORS__ || []).length;
+      var tier = wkApi.tier();
+      return { ok: !threw && errsAfter === errsBefore && (tier === "icon" || tier === "glyph" || tier === "rich"),
+        detail: threw ? "threw " + threw : "top + iso drew clean; LOD tier at this zoom = " + tier };
+    });
+
+    check("workers-hi-vis-outline-is-legible-in-both-themes", function () {
+      // A 7 px figure does not read by hue: it reads because hi-vis sits
+      // against a near-black outline. Assert that contrast as non-text UI
+      // (>= 3:1) in BOTH themes - and that the vest really is hi-vis
+      // yellow-green (green channel dominant, blue lowest).
+      if (!WKR) return { ok: false, detail: "WT.workers absent" };
+      var out = [], bad = [];
+      ["light", "dark"].forEach(function (th) {
+        var vest = WKR.ppe("vest", th), ink = WKR.ppe("ink", th);
+        var cr = contrast(vest, ink);
+        out.push(th + " vest " + vest + " on ink " + ink + " = " + cr.toFixed(2) + ":1");
+        if (cr < 3) bad.push(th + " outline " + cr.toFixed(2) + "<3");
+        var h = String(vest).replace("#", "");
+        var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
+        if (!(g > r && r > b)) bad.push(th + " vest is not hi-vis yellow-green");
+      });
+      return { ok: bad.length === 0, detail: bad.length ? bad.join("; ") : out.join(" | ") };
+    });
+
+    check("workers-no-clock-or-rng-in-the-workforce-layer", function () {
+      // Determinism is STRUCTURAL: read the shipped source straight off the
+      // live functions (no network, so this holds from file:// too).
+      if (!WKR) return { ok: false, detail: "WT.workers absent" };
+      var src = "", n = 0;
+      for (var k in WKR) {
+        if (typeof WKR[k] !== "function") continue;
+        src += String(WKR[k]) + "\n";
+        n++;
+      }
+      var hasClock = /Date\.now|new Date\(/.test(src);
+      var hasRng = /Math\.random/.test(src);
+      var hasModel = typeof WKR.pose === "function" && typeof WKR.roster === "function" && typeof WKR.draw === "function";
+      return { ok: !hasClock && !hasRng && hasModel && n >= 8,
+        detail: n + " workforce functions scanned; clock=" + hasClock + " rng=" + hasRng + " model=" + hasModel };
+    });
+
+    check("workers-station-glyph-shows-the-work-not-a-welded-figure", function () {
+      // The people moved OUT of the furniture: a manned station's rich
+      // glyph now draws the WORK IN PROGRESS (a carton that travels the
+      // bench with the phase), and the shape registry carries no person.
+      var S = window.WT && window.WT.shapes;
+      if (!S) return { ok: false, detail: "WT.shapes absent" };
+      var moved = false, threw = "";
+      try {
+        var draw = function (anim) {
+          var cc = document.createElement("canvas");
+          cc.width = 160; cc.height = 120;
+          var x = cc.getContext("2d");
+          S.draw2D(x, "pack-station", { x: 10, y: 10, w: 90, d: 60, cellPx: 30,
+            color: "#8a9096", theme: "light", lod: 60, anim: anim, seed: 3 });
+          return cc.toDataURL();
+        };
+        moved = draw(0.05) !== draw(0.75);
+      } catch (e) { threw = e && e.message ? e.message : String(e); }
+      var noPerson = !/person2D|person3D/.test(String(S.draw2D) + String(S.draw3D));
+      return { ok: !threw && moved && noPerson,
+        detail: threw ? "threw " + threw : "bench work animates=" + moved + " figureRemovedFromGlyph=" + noPerson };
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

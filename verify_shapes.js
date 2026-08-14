@@ -750,8 +750,49 @@ const FL_BASE = { "pipe": "conveyor", "fluid-source": "dock", "fluid-drain": "do
     err ? "threw " + err : "tankSchema=" + tankFluidSchema + " ctrlK=" + ctrlkOk + " ifc=" + ifcOk);
 })();
 
+/* =====================================================================
+ * v3.22 DARK-THEME GLYPH PEN. shade()/lighten() return CSS "rgb(r,g,b)"
+ * strings; the colour parser only understood hex, so every
+ * rgba(lighten(...)) call - which is the WHOLE dark-theme glyph pen -
+ * parsed "rg"/"b("/"21" as hex and collapsed to ONE dark crimson for
+ * every element, whatever its material. These assert the pen really is
+ * the element's own colour lightened, and can never regress to that.
+ * ===================================================================== */
+(() => {
+  const gc = typeof S.glyphColors === "function" ? S.glyphColors : null;
+  const parse = (s) => {
+    const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(String(s));
+    return m ? [+m[1], +m[2], +m[3]] : null;
+  };
+  const SAMPLES = ["#c4552a", "#1f6fb2", "#3d7a45", "#8a9096", "#d79b28", "#a8763f"];
+  let bad = gc ? null : "WT.shapes.glyphColors is not exposed";
+  const seen = new Set();
+  for (const hex of gc ? SAMPLES : []) {
+    const src = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+    const dark = parse(gc(hex, "dark").stroke);
+    const light = parse(gc(hex, "light").stroke);
+    if (!dark || !light) { bad = bad || hex + " unparseable pen"; continue; }
+    seen.add(dark.join(","));
+    // The dark pen is the SAME colour, lightened: no channel darker than
+    // the source, and the DOMINANT channel preserved (a blue element can
+    // never come out red).
+    for (let i = 0; i < 3; i++) if (dark[i] < src[i] - 1) bad = bad || hex + " dark pen channel " + i + " darker than the source";
+    const dom = (c) => c.indexOf(Math.max(c[0], c[1], c[2]));
+    if (dom(dark) !== dom(src)) bad = bad || hex + " dark pen changed the dominant channel (" + dark.join(",") + " vs " + src.join(",") + ")";
+    if (light.join(",") !== src.join(",")) bad = bad || hex + " light pen is not the element colour";
+  }
+  // The regression itself: distinct materials must give DISTINCT pens.
+  if (gc && seen.size !== SAMPLES.length) bad = bad || "the dark pen collapses " + SAMPLES.length + " materials onto " + seen.size + " colour(s)";
+  // ...and the colour parser now understands what lighten() returns.
+  const roundTrip = gc ? S.colors.rgba(S.colors.lighten("#1f6fb2", 0.3), 1) : "";
+  const rt = parse(roundTrip);
+  if (gc && (!rt || rt[2] <= rt[0])) bad = bad || "rgba(lighten(blue)) is not blue-dominant: " + roundTrip;
+  check("v3.22: the DARK-THEME glyph pen is the element's own material colour lightened (dominant channel preserved, distinct per material) - never the single crimson every element used to collapse to",
+    !bad, bad || SAMPLES.length + " materials -> " + seen.size + " distinct dark pens; rgba(lighten(blue))=" + roundTrip);
+})();
+
 console.log("");
 console.log(failures === 0
-  ? "ALL SHAPES CHECKS PASSED (32 checks)"
+  ? "ALL SHAPES CHECKS PASSED (33 checks)"
   : failures + " SHAPES CHECK(S) FAILED");
 process.exit(failures === 0 ? 0 : 1);

@@ -41,6 +41,18 @@
    * ================================================================== */
   function hx(hex) {
     let h = String(hex == null ? "#888888" : hex).replace("#", "");
+    // v3.22 FIX: shade()/lighten() hand back CSS "rgb(r,g,b)" strings, and
+    // this parser only ever understood hex - so every rgba(lighten(...))
+    // call (the whole DARK-THEME GLYPH PEN) silently parsed "rg"/"b("/"21"
+    // as hex and collapsed to the SAME dark crimson for every element,
+    // whatever its material colour. Parse the rgb() form properly and the
+    // dark pen becomes the lightened element colour it was always meant
+    // to be. Guarded by verify_shapes.js.
+    const m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(h);
+    if (m) {
+      const p = (v) => { const n = Math.round(Number(v)); return isFinite(n) ? Math.max(0, Math.min(255, n)) : 136; };
+      return [p(m[1]), p(m[2]), p(m[3])];
+    }
     if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
     let r = parseInt(h.slice(0, 2), 16);
     let g = parseInt(h.slice(2, 4), 16);
@@ -539,30 +551,14 @@
   }
 
   /* ==================================================================
-   * WORKER FIGURE (v2.1). A schematic, ILLUSTRATIVE person drawn at manned
-   * stations - a synthetic model, NOT a real person, NOT a scan or CAD/BIM.
-   * 2D top-down: a head disc + a shoulder bar + two arms reaching the bench.
-   * `anim` (a phase in [0,1) from the sim clock - NO Date, NO RNG) gives a
-   * subtle working motion (arms bob, the figure sways at the bench); omit it
-   * for a static figure (paused sim / prefers-reduced-motion). Kept inside a
-   * small radius r so it is LOD-gated to the rich (zoomed-in) tier only.
+   * v3.22: the WORKER FIGURE that used to be drawn inside a manned
+   * station's own glyph has MOVED OUT of the furniture and into its own
+   * layer (workers.js / WT.workers), where it can walk, bend, carry and
+   * be posed identically in both views instead of being a head disc
+   * welded to a bench. What a manned station draws now is the WORK IN
+   * PROGRESS on it (r2StationWork / f3StationWork below); the person
+   * doing that work is drawn standing at it by the renderer.
    * ================================================================== */
-  function person2D(ctx, cx, cy, r, gc, color, theme, anim) {
-    const sway = (typeof anim === "number" && isFinite(anim)) ? Math.sin(anim * TAU) : 0;
-    const armDrop = r * (0.85 + 0.2 * sway); // arms bob toward the bench as the worker works
-    ctx.save();
-    ctx.lineJoin = "round";
-    ctx.lineWidth = clampN(r * 0.16, 1, 2.4);
-    ctx.strokeStyle = gc.stroke;
-    ctx.fillStyle = theme === "dark" ? lighten(color, 0.28) : shade(color, 0.7);
-    seg(ctx, cx - r * 0.62, cy + r * 0.18, cx - r * 0.5, cy + armDrop); // left arm
-    seg(ctx, cx + r * 0.62, cy + r * 0.18, cx + r * 0.5, cy + armDrop); // right arm
-    const sw = r * 1.4, sh = r * 0.78;
-    ctx.fillRect(cx - sw / 2, cy + r * 0.02, sw, sh);   // shoulders / torso (top-down)
-    ctx.strokeRect(cx - sw / 2, cy + r * 0.02, sw, sh);
-    ctx.beginPath(); ctx.arc(cx + r * 0.16 * sway, cy - r * 0.4, r * 0.5, 0, TAU); ctx.fill(); ctx.stroke(); // head
-    ctx.restore();
-  }
 
   // A control-station workbench with a flow arrow (dir "push"/"pull").
   function d2Station(ctx, x, y, w, d, cell, gc, kind) {
@@ -1592,20 +1588,11 @@
     }
   }
 
-  // 3D iso WORKER FIGURE (v2.1): a schematic standing person - a base (legs) +
-  // torso + head extruded upward. ILLUSTRATIVE synthetic model, NOT a real
-  // person / scan / CAD-BIM. `anim` gives a subtle torso/head bob (from the sim
-  // clock - NO Date, NO RNG); omit it for a static figure (paused / reduced-motion).
-  function person3D(ctx, P, fx, fy, s, color, theme, anim) {
-    const bob = (typeof anim === "number" && isFinite(anim)) ? Math.sin(anim * TAU) : 0;
-    const skin = theme === "dark" ? lighten(color, 0.3) : shade(color, 0.72);
-    const legH = s * 0.85, torsoH = s * 1.05, headH = s * 0.5, lift = s * 0.06 * bob;
-    const bw = s * 0.5, bd = s * 0.42, bx = fx - bw / 2, by = fy - bd / 2;
-    box3d(ctx, P, bx, by, bw, bd, legH, shade(color, 0.85));                             // legs / base
-    box3dZ(ctx, P, bx, by, bw, bd, legH, legH + torsoH + lift, skin);                    // torso
-    const hw = s * 0.34, hbx = fx - hw / 2, hby = fy - hw / 2;
-    box3dZ(ctx, P, hbx, hby, hw, hw, legH + torsoH + lift, legH + torsoH + headH + lift, skin); // head
-  }
+  // (v3.22: the extruded 3-box "standing person" that used to live here is
+  // gone with its 2D twin - a person is not part of a bench's geometry. The
+  // workforce is its own layer now: workers.js poses an articulated figure
+  // and BOTH views project the SAME skeleton, so a worker can walk, bend and
+  // carry instead of standing inside the furniture.)
 
   function d3Station(ctx, P, x, y, w, d, h, color, theme, kind) {
     const topZ = h * 0.72, topT = clampN(h * 0.16, 0.08, 0.3);
@@ -2234,13 +2221,32 @@
     seg(ctx, bx, by + s * 0.4, bx + s, by + s * 0.4); // tote lip
     ctx.restore();
   }
-  // Manned station (rich): the bench tote PLUS a worker figure at the operating
-  // side. The worker is the illustrative person (person2D); it bobs when `anim`
-  // is supplied (sim playing) and stands static otherwise (paused/reduced-motion).
-  function r2StationWorker(ctx, x, y, w, d, cell, gc, color, theme, seed, anim) {
+  // Manned station (rich): the bench tote PLUS the WORK IN PROGRESS - a
+  // KRAFT CARTON that travels down the bench and whose flaps close as it is
+  // worked. Deterministic: driven by the caller's `anim` phase (NO Date, NO
+  // RNG); with no phase it sits mid-bench, half made up. (Before v3.22 this
+  // drew a person; people are their own layer now - workers.js - so they can
+  // walk, bend and carry instead of being welded to a bench.)
+  function r2StationWork(ctx, x, y, w, d, cell, gc, color, theme, seed, anim) {
     r2Bench(ctx, x, y, w, d, cell, gc, color, theme, seed);
-    const r = clampN(Math.min(w, d) * 0.17, 3, 13);
-    person2D(ctx, x + w * 0.66, y + d * 0.5, r, gc, color, theme, anim);
+    const m = clampN(Math.min(w, d) * 0.2, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const p = (typeof anim === "number" && isFinite(anim)) ? ((anim % 1) + 1) % 1 : 0.5;
+    const s = clampN(Math.min(iw, ih) * 0.3, 4, 16);
+    const bx = ix + iw * 0.36 + Math.max(0, iw * 0.5 - s) * p; // travels the bench
+    const by = iy + ih / 2 - s / 2;
+    const kraft = mat("kraft", theme);
+    ctx.save();
+    ctx.fillStyle = rgba(kraft, theme === "dark" ? 0.6 : 0.52);
+    ctx.strokeStyle = rgba(kraft, 0.95);
+    ctx.lineWidth = clampN(cell * 0.045, 0.9, 1.8);
+    ctx.fillRect(bx, by, s, s);
+    ctx.strokeRect(bx, by, s, s);
+    // The flaps close over the carton as the work finishes.
+    const gap = (1 - p) * s * 0.38, my = by + s / 2;
+    seg(ctx, bx, my, bx + s / 2 - gap / 2, my);
+    seg(ctx, bx + s / 2 + gap / 2, my, bx + s, my);
+    ctx.restore();
   }
   function r2Dock(ctx, x, y, w, d, cell, gc, color, theme, seed) {
     const m = clampN(Math.min(w, d) * 0.16, 2, 5);
@@ -2347,9 +2353,10 @@
     "mobile-racking": r2Rack, "vna": r2Rack, "pick-to-light": r2Rack,
     "cantilever": r2Cantilever, "asrs": r2Asrs, "shuttle": r2Shuttle,
     "conveyor": r2Conveyor, "conveyor-curve": r2ConveyorCurve,
-    // Manned stations gain a WORKER FIGURE at the rich (zoomed-in) tier.
-    "push-station": r2StationWorker, "pull-station": r2StationWorker,
-    "pack-station": r2StationWorker, "returns-station": r2StationWorker,
+    // Manned stations show the WORK IN PROGRESS at the rich (zoomed-in)
+    // tier; the worker doing it is drawn by the workforce layer.
+    "push-station": r2StationWork, "pull-station": r2StationWork,
+    "pack-station": r2StationWork, "returns-station": r2StationWork,
     "dock-in": r2Dock, "dock-out": r2Dock, "mezzanine": r2Mezz,
     "forklift": r2Forklift, "rgv": r2CartLoad, "agv": r2CartLoad,
     "staging": r2Staging, "sorter": r2Sorter, "stretch-wrap": r2StretchWrap,
@@ -2431,10 +2438,16 @@
     const ls = clampN(Math.min(w, d) * 0.2, 0.3, 1.2), top = bh + clampN(bh * 0.9, 0.3, 1.3);
     for (let i = 0; i < 2; i++) { const p = curvePt(g, 0.3 + 0.4 * i, 1); box3dZ(ctx, P, p.x - ls / 2, p.y - ls / 2, ls, ls, bh, top, litc); }
   }
-  // Rich 3D manned station: a WORKER FIGURE standing at the bench (person3D).
-  function f3StationWorker(ctx, P, x, y, w, d, h, color, theme, seed, anim) {
-    const s = clampN(Math.min(w, d) * 0.5, 0.3, 1.3);
-    person3D(ctx, P, x + w * 0.66, y + d * 0.72, s, color, theme, anim);
+  // Rich 3D manned station: the WORK IN PROGRESS on the bench - a kraft
+  // carton travelling the bench top as it is made up. Deterministic from
+  // the caller's phase; static (mid-bench) without one. The worker who is
+  // doing this is drawn standing at the bench by the workforce layer.
+  function f3StationWork(ctx, P, x, y, w, d, h, color, theme, seed, anim) {
+    const p = (typeof anim === "number" && isFinite(anim)) ? ((anim % 1) + 1) % 1 : 0.5;
+    const s = clampN(Math.min(w, d) * 0.34, 0.25, 1.1);
+    const z0 = h * 0.72 + clampN(h * 0.16, 0.08, 0.3);
+    const bx = x + w * 0.2 + Math.max(0, w * 0.6 - s) * p;
+    box3dZ(ctx, P, bx, y + (d - s) / 2, s, s, z0, z0 + s * 0.8, mat("kraft", theme));
   }
   function f3Forklift(ctx, P, x, y, w, d, h, color, theme, seed) {
     const s = clampN(Math.min(w, d) * 0.34, 0.3, 1.6);
@@ -2450,9 +2463,10 @@
     "mobile-racking": f3Rack(4), "vna": f3Rack(5), "pick-to-light": f3Rack(4),
     "asrs": f3Asrs, "shuttle": f3Shuttle, "mezzanine": f3Mezz,
     "conveyor": f3Conveyor, "conveyor-curve": f3ConveyorCurve, "forklift": f3Forklift, "rgv": f3Vehicle, "agv": f3Vehicle,
-    // Manned stations gain a standing WORKER FIGURE at the rich (zoomed-in) tier.
-    "push-station": f3StationWorker, "pull-station": f3StationWorker,
-    "pack-station": f3StationWorker, "returns-station": f3StationWorker,
+    // Manned stations show the WORK IN PROGRESS at the rich (zoomed-in)
+    // tier; the worker doing it is drawn by the workforce layer.
+    "push-station": f3StationWork, "pull-station": f3StationWork,
+    "pack-station": f3StationWork, "returns-station": f3StationWork,
   };
   function richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim, arc) {
     const fn = RICH3D[type];
@@ -2735,6 +2749,10 @@
     DETAIL_RICH_MIN,
     // Exposed for reuse/tests; illustrative schematic drawing only.
     colors: { rgba, shade, lighten },
+    // The theme-aware glyph PEN (v3.22: exposed so a test can prove the
+    // dark-theme stroke really is the element's own material colour
+    // lightened, not the crimson every element used to collapse to).
+    glyphColors,
     // v3.21 INDUSTRIAL MATERIAL IDENTITY: the named real-world materials
     // (steel beam, painted upright, safety-orange guard, pallet timber,
     // kraft board, plastic totes) both renderers draw with. Exposed so a

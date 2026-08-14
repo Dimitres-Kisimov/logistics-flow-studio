@@ -554,6 +554,27 @@
  *      actionKey switch, sw precache at wt-v60), and offline + NO Date/RNG +
  *      no eval. The live open/filter/run/close runs in the browser self-test.
  *
+ *  39. verify_workers.js  - the LIVING WORKFORCE (v3.22): the pure pose +
+ *      gait model behind the people on the floor (workers.js). Asserts the
+ *      roster staffs the right element classes (pick face / bench / staging
+ *      / dock) and leaves transport and bulk racking unstaffed, is
+ *      deterministic + non-mutating + capped + on the floor; that sample()
+ *      is deterministic, periodic in its cycle and garbage-safe; that every
+ *      joint of every pose over a full cycle is finite and inside a human
+ *      bounding box; the GAIT (legs alternate, arms counter-swing, cadence
+ *      driven by TRAVEL not by the clock); that the cycle is CONTINUOUS (no
+ *      pose pops at any step boundary or the wrap); that the POSE MATCHES
+ *      THE STATION (picker folds to its own face height, packer works
+ *      two-handed over the bench and one-handed to tape, put-away carries
+ *      at chest height, dock worker raises a handheld); that the LOAD IS IN
+ *      THE HANDS; that reduced-motion freezes to a legible STANDING pose;
+ *      a draw() smoke through BOTH projectors x themes x tiers (finite, no
+ *      mutation, rich adds detail); that BOTH VIEWS AGREE (one skeleton,
+ *      two projections); NO Date / NO Math.random (source AND live
+ *      functions); the honesty labels; and the shipped wiring (workers.js
+ *      loaded + precached at wt-v77, drawn from BOTH app.js render paths
+ *      through projPx, LOD-gated + reduced-motion-safe, self-test + runner).
+ *
  * Usage:  node test/run-all.mjs
  * ASCII-only output. Exit code 0 = every harness green.
  * ===================================================================== */
@@ -609,6 +630,7 @@ const HARNESSES = [
   { name: "Honest 'How we compare' page (verify_howwecompare.js)", args: ["verify_howwecompare.js"] },
   { name: "Ctrl/Cmd-K command palette: model + wiring (verify_palette.js)", args: ["verify_palette.js"] },
   { name: "Material-flow connection overlay / Flow links (verify_flowlinks.js)", args: ["verify_flowlinks.js"] },
+  { name: "Living workforce: pose + gait model (verify_workers.js)", args: ["verify_workers.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

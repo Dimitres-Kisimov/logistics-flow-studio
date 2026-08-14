@@ -423,8 +423,11 @@
   // frame). One source of truth (WT.shapes.equipmentPhase) drives BOTH the
   // top-down glyph and the 2.5D form. Equipment animates ONLY while the flow
   // is actively PLAYING (not on Step/Pause) and never under reduced-motion.
-  // v2.1: the curved conveyor scrolls loads along its arc; manned stations
-  // (pick/put/pack/returns) get a WORKER FIGURE that bobs at the rich tier.
+  // v2.1: the curved conveyor scrolls loads along its arc.
+  // v3.22: the PEOPLE moved out of the furniture into their own layer
+  // (drawWorkers below, model in workers.js) - a manned station now shows
+  // the work in progress ON the bench, and the worker doing it is a real
+  // articulated figure standing at it in BOTH views.
   const ANIMATABLE_TYPES = { conveyor: 1, "conveyor-curve": 1, rgv: 1, agv: 1, asrs: 1, shuttle: 1, sorter: 1, "stretch-wrap": 1, "pack-station": 1, "returns-station": 1, "push-station": 1, "pull-station": 1 };
   // A stable per-element seed from its (integer) floor position: deterministic
   // and allocation-free, so identical equipment at different spots is out of
@@ -437,6 +440,99 @@
       typeof WT.shapes.equipmentPhase === "function" && !prefersReducedMotion());
     const t = (on && state.flow.sim) ? (state.flow.sim.tick + (state.flow.sim.tickAccum || 0)) : 0;
     return { on: on, t: t };
+  }
+
+  /* ------------------------------------------------------------------
+   * v3.22 THE LIVING WORKFORCE. Manned elements (pick faces, pack /
+   * processing benches, staging pads, dock doors) get a WORKER who does
+   * that station's job: walks with a real gait, bends into the face,
+   * straightens with a carton in their hands, carries it, sets it down,
+   * works the bench, scans at the door. The pose model is the pure
+   * WT.workers module; everything here is the render wiring.
+   *
+   * DETERMINISTIC: the pose is a function of (element identity, sim
+   * tick). No Date, no Math.random. The clock is the flow sim's own tick,
+   * so the workforce FREEZES exactly when the sim pauses, and a null
+   * clock (plant not running, or prefers-reduced-motion) gives every
+   * worker the legible STANDING pose their cycle rests at - never a
+   * leg-in-the-air freeze.
+   *
+   * ONE SKELETON, BOTH VIEWS: draw() projects through projPx, which is
+   * the plain world->px map top-down and the iso projection in 2.5D - so
+   * a worker doing a pick reads as a pick in both, by construction.
+   * ------------------------------------------------------------------ */
+  const WORKER_STAGE = { pick: "picking", pack: "packing", put: "storage", scan: "receiving" };
+  let _workerRoster = null, _workerSig = "", _stageWoken = null;
+
+  // The roster is a pure function of the layout, so it is rebuilt only
+  // when the floor actually changes (the same signature the flow sim uses).
+  function workerRoster() {
+    if (!WT.workers || typeof WT.workers.roster !== "function") return [];
+    const sig = flowSignature();
+    if (_workerRoster && _workerSig === sig) return _workerRoster;
+    _workerRoster = WT.workers.roster(currentLayout());
+    _workerSig = sig;
+    return _workerRoster;
+  }
+  function invalidateWorkers() { _workerRoster = null; _workerSig = ""; _stageWoken = null; }
+
+  // The animation clock for the workforce: the sim's own continuous tick
+  // while the plant is running (frozen when paused), null otherwise.
+  function workerAnimT() {
+    if (prefersReducedMotion()) return null;
+    const sim = state.flow && state.flow.on ? state.flow.sim : null;
+    if (!sim) return null;
+    const t = sim.tick + (sim.tickAccum || 0);
+    return isFinite(t) ? t : null;
+  }
+
+  // Is this worker's stage actually moving goods yet? A shift SPINS UP:
+  // until the first units reach a stage its people have nothing to do and
+  // stand idle. Latched per run (a stage that has woken stays awake), so
+  // the poses can never strobe on a queue that flickers around zero.
+  function workerBusyFn() {
+    const sim = state.flow && state.flow.on ? state.flow.sim : null;
+    if (!sim) return null; // plant stopped -> everyone stands at their station
+    if (!_stageWoken) _stageWoken = {};
+    const ps = sim.perStage || {};
+    for (const k in ps) if (ps[k] > 0) _stageWoken[k] = 1;
+    if (sim.completed > 0) _stageWoken.shipping = 1;
+    return function (spec) {
+      const stage = WORKER_STAGE[spec.task];
+      return stage ? !!_stageWoken[stage] : true;
+    };
+  }
+
+  // Draw the whole workforce. Called from BOTH the top-down render and
+  // the 2.5D scene with the same projector, so the two views agree.
+  // LOD-gated (culled entirely when a cell reads too small to show a
+  // person) and view-culled in the top-down path, so a big hall stays fast.
+  function drawWorkers() {
+    if (!WT.workers || !WT.shapes || typeof WT.shapes.detailLevel !== "function") return;
+    const onCell = cellPx * view.scale;
+    const tier = WT.shapes.detailLevel(onCell);
+    if (tier === "icon") return; // too small to read a person: culled
+    const list = workerRoster();
+    if (!list.length) return;
+    const t = workerAnimT();
+    const busyFn = workerBusyFn();
+    const themeName = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const opts = { project: projPx, cellPx: cellPx, tier: tier, theme: themeName };
+    // Top-down culls to the visible world rect; the iso projection moves
+    // points off that rect, so the 2.5D path draws them all (the roster is
+    // capped, so the cost is bounded either way).
+    const vb = state.viewMode === "iso" ? null : V.viewBounds(view, viewCssW, viewCssH);
+    const opt = { busy: true };
+    for (let i = 0; i < list.length; i++) {
+      const spec = list[i];
+      if (vb) {
+        const a = spec.route[0], b = spec.route[1];
+        if (Math.max(a.x, b.x) < vb.minX - 2 || Math.min(a.x, b.x) > vb.maxX + 2 ||
+            Math.max(a.y, b.y) < vb.minY - 2 || Math.min(a.y, b.y) > vb.maxY + 2) continue;
+      }
+      opt.busy = busyFn ? busyFn(spec) : false;
+      WT.workers.draw(ctx, WT.workers.sample(spec, t, opt), opts);
+    }
   }
 
   // ================================================================
@@ -725,6 +821,11 @@
     // utilisation vs the flow demand). Same world transform -> zoom/pan safe.
     // Toggled from the Automation systems panel.
     if (state.showAutoUtil) drawAutomationUtil();
+
+    // v3.22: THE PEOPLE. Drawn after the equipment (they stand in front of
+    // the racks they work) and under the flow overlays, in the SAME world
+    // transform, so they are zoom/pan-safe like everything else.
+    drawWorkers();
 
     // P3: material-flow chain arrows + broken-chain markers
     const chains = D.analyzeChains(state.elements);
@@ -1203,6 +1304,12 @@
       floorPattern: concretePattern(),
       floorPatternScale: (((F && F.CONCRETE_TILE_M) || 4) * cellPx) / CONCRETE_TILE_PX,
     });
+    // v3.22: the SAME workforce as the top-down view, through the SAME
+    // pose model - projPx is the iso projection here, so the skeleton
+    // stands up and a pick reads as a pick in both views. Drawn after the
+    // blocks (an honest illustrative overlay, not per-pixel occlusion -
+    // the same limitation the flow boxes have always carried).
+    drawWorkers();
     // v3.12: the material-flow CONNECTION overlay, HINTED into 2.5D too -
     // projPx projects the links/nodes into the iso scene (illustrative, not
     // true per-pixel occlusion). Drawn under the animated boxes.
@@ -1843,6 +1950,7 @@
     if (shape) { opts.orders = shape.orders; opts.linesPerOrderMax = shape.linesPerOrderMax; }
     state.flow.sim = WT.flowsim.state(layout, opts);
     state.flow.sig = flowSignature();
+    invalidateWorkers(); // v3.22: a new run starts with an unwoken shift
     resetKpiHistory(); // new sim -> counters restart at 0, so does the chart
     buildOrderPool(seed, shape); // v1.3: the visible demand-side pool
     return true;
@@ -8786,6 +8894,16 @@
       flowPause: flowPause,
       flowStep: flowStep,
       flowReset: flowReset,
+      // v3.22 LIVING WORKFORCE: the roster the renderer actually draws, the
+      // clock it poses from, and the REAL draw pass - so the live self-test
+      // exercises the same path the plant does, in both view modes.
+      workers: {
+        roster: () => workerRoster(),
+        animT: () => workerAnimT(),
+        tier: () => (WT.shapes ? WT.shapes.detailLevel(cellPx * view.scale) : null),
+        draw: () => drawWorkers(),
+        invalidate: invalidateWorkers,
+      },
       drawFlowKpis: drawFlowKpis,
       // v3.12: drive + read the material-flow CONNECTION overlay ("Flow
       // links") through the SAME toggle + model the toolbar button uses, for
