@@ -24,8 +24,8 @@ the same cookie-cutter path.
   afterwards (the hint R3 turns into operation-driven goods drawing).
 - **8 ORDER ARCHETYPES**, each declaring the OPERATION SEQUENCE it requires - not a
   stage list. Full pallet out (receive > QC sample > put-away > pallet pick >
-  stretch-wrap > load, and NEVER depalletised, NEVER packed); case pick (+ depalletise
-  + pack); each / piece pick (+ replenish + tote consolidation - eight touches, not
+  stretch-wrap > load, and NEVER depalletised, NEVER packed); case pick (+ depalletise,
+  then consolidated, palletised and secured rather than re-packed - full cases ship as
   five); cross-dock (receive > QC > staging > load, and it NEVER enters storage);
   customer returns (receive > inspect, then a REAL two-outcome split to restock or
   scrap); value-add (pick > kitting / labelling > pack > load); export / fragile
@@ -66,8 +66,22 @@ them are honestly unfulfillable until R2 ships the stations.
 153/153 (4 new order-routing checks), offline guard clean, `sw.js` at `wt-v80` with
 every `verify_*.js` pin synced on both regex sides.
 
-**Still to come.** R2 the missing station types (QC bench, palletiser, depalletiser);
-R3 the visual truth (units visibly diverging by order type, operation-driven goods
+**Informed by, and honest about the gap.** The recipes follow the German process
+decomposition the trade guidelines use (goods receipt, quality assurance, returns,
+put-away, storage + replenishment, picking, packing, dispatch, empties) and the
+guideline-described unit-transformation chain. Informed by, NOT compliant with, NOT a
+certification. The engine states its own limits in `routing.js`: each archetype's
+operation order is FIXED (practice says the sequence is not necessarily determined and
+steps may be omitted); QC is a pass-through step rather than a branch into blocked
+stock; returns has two outcomes here where practice distinguishes four; replenishment
+is a step inside the each-pick sequence rather than the order-independent LOOP it
+really is; and dangerous goods, the cold chain as a routed zone, the empties
+counter-flow, second-stage batch sortation and dispatch-label application are not
+modelled at all. Expressing the loops needs a directed graph, which is a later step.
+
+**Still to come.** R2 the missing station types (QC bench, palletiser, depalletiser,
+VAS/kitting bench, consolidation buffer); R3 the visual truth (units visibly diverging
+by order type, operation-driven goods
 forms); R4 order-pool integration and per-archetype KPIs.
 ## [3.24] — 2026-08-14
 

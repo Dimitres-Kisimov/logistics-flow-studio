@@ -65,6 +65,29 @@
  *   - `depalletise` and `value-add` have NO element type at all in v3.25,
  *     so every archetype that needs them is honestly UNFULFILLABLE until
  *     the R2 station types land.
+ *   - The recipes are INFORMED BY the German process decomposition the
+ *     trade guidelines use (goods receipt, quality assurance, returns,
+ *     put-away, storage + replenishment, picking, packing, dispatch,
+ *     empties) and by the guideline-described unit-transformation chain
+ *     (pallet -> case -> piece -> tote -> collected unit -> dispatch
+ *     unit). Informed by, NOT compliant with, NOT a certification.
+ *   - KNOWN LIMITS of this R1 engine, stated plainly rather than implied:
+ *       * Each archetype's operation order is FIXED. Real practice says
+ *         the sequence is not necessarily determined and steps may be
+ *         omitted; expressing that needs the graph model, not a list.
+ *       * Quality control is a PASS-THROUGH step, not a branch. Real
+ *         goods-in QC can divert a unit to blocked stock, where it dwells
+ *         and is not pickable until it is explicitly released.
+ *       * Returns has TWO outcomes here (restock / scrap). Practice
+ *         distinguishes as-new, lightly damaged, dismantled for parts and
+ *         disposal - four - and the middle two need a refurbish bench.
+ *       * Replenishment is a STEP inside the each-pick sequence, not the
+ *         order-independent LOOP it really is; the same is true of
+ *         re-slotting and of the return leg inside picking. Cycles need
+ *         a directed graph.
+ *       * Not modelled at all: dangerous goods, the cold chain as a routed
+ *         zone, the empties counter-flow, second-stage batch sortation and
+ *         dispatch-label (SSCC) application.
  *
  * Classic script attaching to the global `WT` namespace (works from
  * file:// too). Pure model: no DOM, no geometry, no dependencies. The
@@ -333,11 +356,13 @@
       id: "case-pick",
       label: "Case pick (carton out)",
       short: "Case pick",
-      ops: ["receive", "qc-sample", "depalletise", "putaway", "case-pick", "pack", "load"],
+      ops: ["receive", "qc-sample", "depalletise", "putaway", "case-pick", "consolidate", "palletise", "wrap", "load"],
       share: 0.22,
       desc:
         "Retail replenishment. The inbound pallet is broken to cases, cases are put " +
-        "away, picked whole, packed onto an order pallet and loaded.",
+        "away, picked whole, consolidated, built into a dispatch pallet and secured. " +
+        "Note it is NOT re-packed: full cases usually ship as they are, which is why " +
+        "this route ends in palletise + stretch-wrap rather than at a pack bench.",
     },
     {
       id: "piece-pick",
@@ -360,7 +385,10 @@
       desc:
         "Straight across the building. Checked at goods-in, marshalled on the " +
         "outbound floor and loaded. It NEVER enters the racking - the defining " +
-        "property the old single spine could not express.",
+        "property the old single spine could not express. This is the SINGLE-STAGE " +
+        "form, where the supplier has already picked for the recipient and the load " +
+        "unit is never broken; the two-stage (break-and-re-form) variant needs the " +
+        "consolidation and de-consolidation stations R2 adds.",
     },
     {
       id: "returns",

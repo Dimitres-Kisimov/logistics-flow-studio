@@ -195,6 +195,22 @@ const BARE = bareFloor();
     R.ARCHETYPE_BY_ID["piece-pick"].ops.length === 8,
     R.ARCHETYPE_BY_ID["piece-pick"].ops.join(" > "));
 
+  // Full cases usually ship AS THEY ARE: the case-pick route is consolidated,
+  // built onto a dispatch pallet and secured - it does NOT end at a pack bench.
+  const cp = R.ARCHETYPE_BY_ID["case-pick"].ops;
+  check("1e2. a case pick is consolidated, palletised and wrapped - NOT re-packed",
+    cp.indexOf("pack") < 0 && cp.indexOf("consolidate") >= 0 &&
+    cp.indexOf("palletise") >= 0 && cp.indexOf("wrap") >= 0 &&
+    cp[cp.length - 1] === "load",
+    cp.join(" > "));
+
+  // The engine states its own limits rather than implying it has none.
+  check("1e3. the model documents what it does NOT yet do (fixed order, QC as a step, 2 return outcomes, no loops)",
+    /KNOWN LIMITS/.test(ROUTING_SRC) && /not necessarily determined/.test(ROUTING_SRC) &&
+    /PASS-THROUGH step, not a branch/.test(ROUTING_SRC) &&
+    /Cycles need/.test(ROUTING_SRC) && /dangerous goods/.test(ROUTING_SRC),
+    "the honesty header states five named limits");
+
   check("1f. the SYNTHETIC honesty label names the model, the teaching status and the unfulfillable rule",
     /SYNTHETIC/.test(R.SYNTHETIC_LABEL) && /NOT a WMS/.test(R.SYNTHETIC_LABEL) &&
     /UNFULFILLABLE/.test(R.SYNTHETIC_LABEL) && /never silently re-routed/.test(R.SYNTHETIC_LABEL),
