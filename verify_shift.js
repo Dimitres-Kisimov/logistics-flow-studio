@@ -763,7 +763,7 @@ function finitePts(c) { return c._pts.every((p) => isFinite(p[0]) && isFinite(p[
   const iShift = INDEX_SRC.indexOf('src="shift.js"');
   const iApp = INDEX_SRC.indexOf('src="app.js"');
   const inIndex = iGoods >= 0 && iShift > iGoods && iApp > iShift;
-  const inSw = /["']\.\/shift\.js["']/.test(SW_SRC) && /CACHE_VERSION\s*=\s*"wt-v79"/.test(SW_SRC);
+  const inSw = /["']\.\/shift\.js["']/.test(SW_SRC) && /CACHE_VERSION\s*=\s*"wt-v80"/.test(SW_SRC);
   const truckDraws = (APP_SRC.match(/drawTrucks\(\)/g) || []).length;
   const dockDraws = (APP_SRC.match(/drawDocks\(\)/g) || []).length;
   const viaProj = /project:\s*projPx/.test(APP_SRC) && /WT\.shift\.drawTruck/.test(APP_SRC);
@@ -775,7 +775,7 @@ function finitePts(c) { return c._pts.every((p) => isFinite(p[0]) && isFinite(p[
   const reducedSafe = /workerAnimT\(\)/.test(APP_SRC) && /prefersReducedMotion\(\)/.test(APP_SRC);
   const inSelftest = /shift-/.test(SELFTEST_SRC);
   const inRunner = /verify_shift\.js/.test(RUNALL_SRC);
-  check("the ANDON reads three distinct states as SHAPE + colour + words off the SMOOTHED bands; the HONESTY label states this is a read-only drawing filter that adds no model and no number and is not a vendor spec, not CAD/BIM and not a measurement; and the shipped wiring is in place (index.html loads shift.js after goods.js and before app.js, sw.js precaches it at wt-v79, app.js draws the trucks + docks in BOTH render paths through projPx, hides the hauling truck's static form, colours stations from the smoothed read, paces the workforce from the station clock, orients the floor arrows and shows the andon - self-test and runner covered)",
+  check("the ANDON reads three distinct states as SHAPE + colour + words off the SMOOTHED bands; the HONESTY label states this is a read-only drawing filter that adds no model and no number and is not a vendor spec, not CAD/BIM and not a measurement; and the shipped wiring is in place (index.html loads shift.js after goods.js and before app.js, sw.js precaches it at wt-v80, app.js draws the trucks + docks in BOTH render paths through projPx, hides the hauling truck's static form, colours stations from the smoothed read, paces the workforce from the station clock, orients the floor arrows and shows the andon - self-test and runner covered)",
     andonOk && marks.size === 3 && cssOk && honest && inIndex && inSw &&
     truckDraws >= 2 && dockDraws >= 2 && viaProj && hidesGlyph && smoothedColour &&
     pacesWorkers && arrowsAgree && andonWired && reducedSafe && inSelftest && inRunner,

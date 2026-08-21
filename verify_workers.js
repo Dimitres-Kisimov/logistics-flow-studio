@@ -46,7 +46,7 @@
  *  13. honesty labels: illustrative / not motion capture / not a labour
  *      standard / no identity modelled
  *  14. shipped wiring: index.html loads workers.js, sw.js precaches it at
- *      the bumped wt-v79 cache, app.js draws the workforce in BOTH render
+ *      the bumped wt-v80 cache, app.js draws the workforce in BOTH render
  *      paths (LOD-gated + reduced-motion-safe), selftest.js covers it and
  *      test/run-all.mjs lists this harness
  *
@@ -547,7 +547,7 @@ const isoProj = (x, y, z) => ({
   const inIndex = /<script src="workers\.js"><\/script>/.test(INDEX_SRC);
   const orderOk = INDEX_SRC.indexOf('src="workers.js"') > INDEX_SRC.indexOf('src="domain.js"') &&
     INDEX_SRC.indexOf('src="workers.js"') < INDEX_SRC.indexOf('src="app.js"');
-  const inSw = /["']\.\/workers\.js["']/.test(SW_SRC) && /CACHE_VERSION\s*=\s*"wt-v79"/.test(SW_SRC);
+  const inSw = /["']\.\/workers\.js["']/.test(SW_SRC) && /CACHE_VERSION\s*=\s*"wt-v80"/.test(SW_SRC);
   // app.js: the workforce is drawn in BOTH render paths, LOD-gated,
   // reduced-motion-safe, and posed from the sim's own tick.
   const hasFn = /function drawWorkers\s*\(/.test(APP_SRC);
@@ -558,7 +558,7 @@ const isoProj = (x, y, z) => ({
   const usesProjPx = /project: projPx/.test(APP_SRC);
   const inSelftest = /workers-/.test(SELFTEST_SRC);
   const inRunner = /verify_workers\.js/.test(RUNALL_SRC);
-  check("shipped wiring: index.html loads workers.js before app.js, sw.js precaches it at wt-v79, app.js draws the workforce in BOTH render paths through projPx (LOD-gated, reduced-motion-safe, posed from the sim tick), and the self-test + runner cover it",
+  check("shipped wiring: index.html loads workers.js before app.js, sw.js precaches it at wt-v80, app.js draws the workforce in BOTH render paths through projPx (LOD-gated, reduced-motion-safe, posed from the sim tick), and the self-test + runner cover it",
     inIndex && orderOk && inSw && hasFn && calls >= 2 && lodGated && reducedMotion && simClock && usesProjPx && inSelftest && inRunner,
     "index=" + inIndex + " order=" + orderOk + " sw=" + inSw + " drawWorkers=" + hasFn +
     " callSites=" + calls + " lodGated=" + lodGated + " reducedMotion=" + reducedMotion +

@@ -6,6 +6,69 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## v3.25 - EVERY PACKAGE TAKES ITS OWN PATH (order-driven routing, R1: the engine)
+
+**The defect.** `flowsim.js` hardcoded ONE spine - `receiving -> storage -> picking ->
+packing -> shipping` - and pushed EVERY handling unit onto that same waypoint list.
+There were no order types, no quality control, no depalletise or palletise step, and
+`stretch-wrap` was a placeable object rather than a routing step. Every package took
+the same cookie-cutter path.
+
+**The engine.** New `routing.js` (`WT.routing`) makes the ORDER decide the path.
+
+- **20 OPERATIONS** - the atomic things that happen to goods (receive, goods-in QC,
+  depalletise, put-away, replenish, pallet / case / piece pick, tote consolidation,
+  value-add, pack, palletise, stretch-wrap, outbound staging, load, returns inspection,
+  restock, scrap). Each declares the ANCHOR that performs it, the flow STAGE the unit
+  reports while doing it, the STATION kind that serves it, and the FORM the unit takes
+  afterwards (the hint R3 turns into operation-driven goods drawing).
+- **8 ORDER ARCHETYPES**, each declaring the OPERATION SEQUENCE it requires - not a
+  stage list. Full pallet out (receive > QC sample > put-away > pallet pick >
+  stretch-wrap > load, and NEVER depalletised, NEVER packed); case pick (+ depalletise
+  + pack); each / piece pick (+ replenish + tote consolidation - eight touches, not
+  five); cross-dock (receive > QC > staging > load, and it NEVER enters storage);
+  customer returns (receive > inspect, then a REAL two-outcome split to restock or
+  scrap); value-add (pick > kitting / labelling > pack > load); export / fragile
+  (pick > extra QC > palletise > wrap > load); and `legacy-spine`, the v3.24 path,
+  kept as the DEFAULT.
+- **A router** that resolves an archetype's operations against the anchors the CURRENT
+  layout actually has. Where an operation has no station, the order type is
+  UNFULFILLABLE and says so in plain language naming the element to place - it is
+  never silently skipped and never silently re-routed (the `process.js` `validateFlow`
+  / `fluids.js` discipline). `WT.flowsim.routingReport(layout)` gives the
+  per-archetype fulfillability read for a floor.
+- **Per-MU routes replace the single spine.** Each unit carries its own waypoint list,
+  its archetype and its current operation. The STATIONS stay global, so two order
+  types that both cross the pick face contend for ONE physical FIFO queue and
+  congestion stays real. Units are conserved exactly as before - globally AND per
+  order type, at every tick.
+- **Deterministic by construction.** Which archetype a unit is, is a largest-remaining-
+  QUOTA dispatch over the declared mix - the same rule `process.js` uses at a multi-way
+  split. No `Date`, no `Math.random`; a route is a pure function of order identity and
+  layout.
+
+**Backward compatibility is a hard gate.** With no mix declared the plan carries
+exactly ONE route - the legacy spine - whose waypoint array IS the plan's own. Proven,
+not asserted: the generic route builder fed the legacy operation list reproduces
+`buildWaypoints` waypoint for waypoint, and a 250-tick loop run plus a 400-tick pool
+run are byte-identical with and without the legacy mix, across all 31 example,
+generated and preset layouts in the repo.
+
+**Honesty.** The route recipes are SYNTHETIC teaching models informed by ordinary
+distribution-centre practice, not a WMS and not measured order-profile data. Two
+operations currently borrow a SHARED anchor because the app has no dedicated element
+yet - goods-in QC on the Returns / QA bench, palletising on the Stretch-wrap /
+palletiser - and every shared binding is disclosed on the step and in the report.
+`depalletise` and `value-add` have no element type at all, so the archetypes needing
+them are honestly unfulfillable until R2 ships the stations.
+
+**Gates.** 50 headless harnesses green (new `verify_routing.js`), browser self-test
+153/153 (4 new order-routing checks), offline guard clean, `sw.js` at `wt-v80` with
+every `verify_*.js` pin synced on both regex sides.
+
+**Still to come.** R2 the missing station types (QC bench, palletiser, depalletiser);
+R3 the visual truth (units visibly diverging by order type, operation-driven goods
+forms); R4 order-pool integration and per-archetype KPIs.
 ## [3.24] — 2026-08-14
 
 **The plant reads like a working shift.** v3.21 gave the hall its materials,

@@ -47,7 +47,7 @@
  *      top-down unit is a true plan shape, and the painter is WT.workers'
  *      own (reuse, not duplication).
  *  11. HONESTY labels, and the shipped wiring (goods.js loaded after
- *      workers.js + precached at wt-v79, app.js draws it in BOTH render
+ *      workers.js + precached at wt-v80, app.js draws it in BOTH render
  *      paths through projPx, the self-test + this runner entry).
  *
  * Usage:  node verify_goods.js      ASCII-only. Exit 0 = all pass.
@@ -498,7 +498,7 @@ const projIso = (x, y, z) => {
   const iGoods = INDEX_SRC.indexOf('src="goods.js"');
   const iApp = INDEX_SRC.indexOf('src="app.js"');
   const inIndex = iWorkers >= 0 && iGoods > iWorkers && iApp > iGoods;
-  const inSw = /["']\.\/goods\.js["']/.test(SW_SRC) && /CACHE_VERSION\s*=\s*"wt-v79"/.test(SW_SRC);
+  const inSw = /["']\.\/goods\.js["']/.test(SW_SRC) && /CACHE_VERSION\s*=\s*"wt-v80"/.test(SW_SRC);
   // Drawn from BOTH render paths, through projPx, LOD-gated, and the
   // vehicle loads ride with the workforce in both views.
   const muDraws = (APP_SRC.match(/drawFlowMUs\(\);/g) || []).length;
@@ -511,7 +511,7 @@ const projIso = (x, y, z) => {
   const reducedSafe = /workerAnimT\(\)/.test(APP_SRC) && /prefersReducedMotion\(\)/.test(APP_SRC);
   const inSelftest = /goods-/.test(SELFTEST_SRC);
   const inRunner = /verify_goods\.js/.test(RUNALL_SRC);
-  check("shipped wiring: index.html loads goods.js AFTER workers.js and before app.js, sw.js precaches it at wt-v79, app.js draws the goods + the truck loads in BOTH render paths through projPx (LOD-gated with a drawing budget, reduced-motion-safe, rack stock handed to both the glyph and the 2.5D forms), and the self-test + runner cover it",
+  check("shipped wiring: index.html loads goods.js AFTER workers.js and before app.js, sw.js precaches it at wt-v80, app.js draws the goods + the truck loads in BOTH render paths through projPx (LOD-gated with a drawing budget, reduced-motion-safe, rack stock handed to both the glyph and the 2.5D forms), and the self-test + runner cover it",
     inIndex && inSw && muDraws >= 2 && vehDraws >= 2 && viaProj && lodGated && stockWired && reducedSafe && inSelftest && inRunner,
     "index=" + inIndex + " sw=" + inSw + " muDraws=" + muDraws + " vehDraws=" + vehDraws +
     " projPx=" + viaProj + " lod=" + lodGated + " stock=" + stockWired +

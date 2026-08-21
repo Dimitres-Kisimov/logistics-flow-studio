@@ -3201,6 +3201,111 @@
     } catch (_) { /* restoration is best-effort */ }
 
     // ---- Final: driving the app introduced NO uncaught errors ----------
+    // ---- v3.25 ORDER-DRIVEN ROUTING (R1) ------------------------------
+    // Until v3.24 flowsim pushed EVERY handling unit onto one hardcoded
+    // spine. These four checks drive the SHIPPED routing engine in the live
+    // browser: the model is loaded and closed, the router reports what this
+    // floor cannot do instead of quietly re-routing, a cross-docked unit
+    // never enters the racking, and the legacy collapse is byte-identical.
+    check("routing-model-loaded-and-closed", function () {
+      var R = WT.routing, F = WT.flowsim;
+      if (!R || !F) return { ok: false, detail: "WT.routing / WT.flowsim missing" };
+      var want = ["legacy-spine", "full-pallet-out", "case-pick", "piece-pick", "cross-dock", "returns", "vas", "export-fragile"];
+      var ids = R.ARCHETYPES.map(function (a) { return a.id; });
+      var idsOk = ids.join(",") === want.join(",");
+      var stages = F.STAGES;
+      var closed = true;
+      R.OPERATION_ORDER.forEach(function (id) {
+        var op = R.OPERATIONS[id];
+        if (!op || !R.ANCHORS[op.anchor] || stages.indexOf(op.stage) < 0) closed = false;
+      });
+      R.ARCHETYPES.forEach(function (a) {
+        (a.ops || []).forEach(function (o) { if (!R.OPERATIONS[o]) closed = false; });
+      });
+      // A full pallet is never packed and never depalletised - the two things
+      // the old single spine forced onto every unit.
+      var fp = R.ARCHETYPE_BY_ID["full-pallet-out"].ops;
+      var fpOk = fp.indexOf("pack") < 0 && fp.indexOf("depalletise") < 0 && fp.indexOf("wrap") >= 0;
+      var labelOk = /SYNTHETIC/.test(R.SYNTHETIC_LABEL || "") && /NOT a WMS/.test(R.SYNTHETIC_LABEL || "");
+      return { ok: idsOk && closed && fpOk && labelOk,
+        detail: ids.length + " order types, " + R.OPERATION_ORDER.length + " operations, closed=" + closed + " fullPallet=" + fpOk };
+    });
+    check("routing-reports-unfulfillable-order-types-instead-of-re-routing", function () {
+      var F = WT.flowsim;
+      if (!F || typeof F.routingReport !== "function") return { ok: false, detail: "no routingReport" };
+      // A floor with a dock, racking, a pick face and a pack bench - but NO
+      // QA bench and NO wrapper. The spine still runs; the order types that
+      // need the missing kit must SAY SO and name the element to place.
+      var lay = { gridW: 30, gridH: 18, elements: [
+        { id: "i", type: "dock-in", x: 2, y: 0, w: 2, d: 1 },
+        { id: "r", type: "selective-racking", x: 8, y: 6, w: 4, d: 1 },
+        { id: "c", type: "carton-flow", x: 16, y: 6, w: 3, d: 1 },
+        { id: "k", type: "pack-station", x: 20, y: 12, w: 3, d: 2 },
+        { id: "o", type: "dock-out", x: 24, y: 17, w: 2, d: 1 }
+      ] };
+      var rep = F.routingReport(lay);
+      var legacyOk = rep.byArchetype["legacy-spine"].ok === true;
+      var xd = rep.byArchetype["cross-dock"];
+      var named = xd.ok === false && /returns-station|staging/.test(xd.message) &&
+        /Nothing has been re-routed/.test(xd.message);
+      // And nothing of an unfulfillable type is ever spawned.
+      var plan = F.spawnPlan(lay, { seed: 5, mix: ["cross-dock"] });
+      var st = F.state(plan);
+      F.step(st, 120);
+      var noneSpawned = plan.spawnable === false && st.blocked === true && st.spawned === 0 && st.blockedReason.length > 0;
+      return { ok: legacyOk && named && noneSpawned,
+        detail: "spine ok=" + legacyOk + " unfulfillable named=" + named + " spawned=" + st.spawned };
+    });
+    check("routing-cross-dock-never-enters-storage", function () {
+      var F = WT.flowsim, R = WT.routing;
+      if (!F || !R) return { ok: false, detail: "modules missing" };
+      var lay = { gridW: 30, gridH: 18, elements: [
+        { id: "i", type: "dock-in", x: 2, y: 0, w: 2, d: 1 },
+        { id: "r", type: "selective-racking", x: 8, y: 6, w: 4, d: 1 },
+        { id: "c", type: "carton-flow", x: 16, y: 6, w: 3, d: 1 },
+        { id: "k", type: "pack-station", x: 20, y: 12, w: 3, d: 2 },
+        { id: "s", type: "staging", x: 4, y: 12, w: 4, d: 2 },
+        { id: "q", type: "returns-station", x: 25, y: 3, w: 3, d: 2 },
+        { id: "o", type: "dock-out", x: 24, y: 17, w: 2, d: 1 }
+      ] };
+      var res = R.resolveRoute("cross-dock", F.anchors(lay), null);
+      if (!res.ok) return { ok: false, detail: res.message };
+      var noStorage = res.steps.every(function (s) { return s.anchor !== "storage" && s.stage !== "storage"; });
+      var plan = F.spawnPlan(lay, { seed: 5, mix: ["cross-dock"] });
+      var st = F.state(plan), sawStorage = false, units = 0;
+      for (var i = 0; i < 200; i++) {
+        F.step(st, 1);
+        for (var j = 0; j < st.mus.length; j++) {
+          units++;
+          if (st.mus[j].stage === "storage" || st.mus[j].stage === "picking") sawStorage = true;
+        }
+      }
+      return { ok: noStorage && !sawStorage && st.spawned > 0 && res.invariantOk,
+        detail: res.steps.map(function (s) { return s.op; }).join(" > ") + " | " + st.spawned + " units, storage touched=" + sawStorage };
+    });
+    check("routing-legacy-collapse-is-byte-identical", function () {
+      var F = WT.flowsim;
+      if (!F) return { ok: false, detail: "no flowsim" };
+      var lay = API.state ? { gridW: API.state.gridW, gridH: API.state.gridH, cell: API.state.cell,
+        elements: API.state.elements, config: API.state.config } : null;
+      if (!lay || !lay.elements || !lay.elements.length) return { ok: false, detail: "no live layout" };
+      function snap(opts) {
+        var st = F.state(lay, opts);
+        F.step(st, 180);
+        return JSON.stringify({
+          spawned: st.spawned, completed: st.completed, inflight: st.inflight,
+          queued: st.queued, perStage: st.perStage,
+          mus: st.mus.map(function (m) { return [m.id, m.seg, +m.t.toFixed(9), +m.cx.toFixed(9), +m.cy.toFixed(9), m.stage, m.status]; })
+        });
+      }
+      var noMix = snap({ seed: 7, loop: true });
+      var legacyMix = snap({ seed: 7, loop: true, mix: ["legacy-spine"] });
+      var plan = F.spawnPlan(lay, { seed: 7 });
+      var oneRoute = plan.mix === null && plan.routes.length === 1 &&
+        plan.routes[0].waypoints === plan.waypoints && plan.spawnShares.length === 1;
+      return { ok: noMix === legacyMix && oneRoute,
+        detail: "identical=" + (noMix === legacyMix) + " singleSpine=" + oneRoute + " on " + lay.elements.length + " elements" };
+    });
     check("no-errors-after-drive", function () {
       var e = window.__WT_ERRORS__ || [];
       return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" };

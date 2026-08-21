@@ -51,7 +51,48 @@
  *   - Throughput / speed come from the documented wms.js heuristic
  *     (PARAMS there are order-of-magnitude assumptions), not vendor specs.
  *
- * Determinism: same (layout, seed, ticks) -> byte-identical MU positions,
+ * v3.25 - ORDER-DRIVEN ROUTING (R1, the engine). The spine above is no
+ * longer the only path. Every MU now carries an ORDER ARCHETYPE, and each
+ * archetype declares the OPERATION SEQUENCE it requires (routing.js /
+ * WT.routing) rather than a fixed stage list:
+ *
+ *   full pallet out  receive -> QC sample -> put-away -> pallet pick ->
+ *                    stretch-wrap -> load          (never packed)
+ *   case pick        + depalletise + pack
+ *   each/piece pick  + replenish + tote consolidation   (eight touches)
+ *   cross-dock       receive -> QC -> staging -> load   (NEVER stored)
+ *   returns          receive -> inspect -> restock OR scrap  (a real split)
+ *   value-add        pick -> kitting/labelling -> pack -> load
+ *   export/fragile   pick -> extra QC -> palletise -> wrap -> load
+ *
+ *   anchorIndex(layout)        resolve every operation's place on the floor.
+ *                              The FIVE legacy anchors keep their exact v3.24
+ *                              fallback chains; every anchor added here is
+ *                              STRICT - no element, no fallback, no route.
+ *   buildRouteWaypoints(...)   one route's polyline from its resolved steps.
+ *                              Fed the LEGACY operation list it reproduces
+ *                              buildWaypoints EXACTLY - that identity is what
+ *                              makes the collapse byte-identical, and it is
+ *                              asserted in verify_routing.js, not assumed.
+ *   buildRoutes(...)           the plan's route set, the SPAWN vector and the
+ *                              honest list of what this floor cannot do.
+ *   routingReport(layout)      per-archetype fulfillability for a layout.
+ *
+ * An operation with NO station on the floor makes that order type
+ * UNFULFILLABLE: it is reported with a friendly message naming the element
+ * to place, and NO unit of that type is ever spawned. It is never skipped
+ * and never re-routed (the process.js validateFlow / fluids.js discipline).
+ *
+ * Stations stay GLOBAL: two order types that both cross the pick face
+ * contend for ONE physical FIFO queue, so congestion stays real. Which
+ * archetype a unit is, is a deterministic largest-remaining-QUOTA dispatch
+ * over the declared mix - the same rule process.js uses at a multi-way
+ * split - so a route is a pure function of order identity and layout.
+ *
+ * BACKWARD COMPATIBILITY IS A HARD GATE: with NO mix declared the plan
+ * carries exactly ONE route, the legacy spine, whose waypoint array IS the
+ * plan's own `waypoints`. Behaviour is byte-identical to v3.24.
+ * * Determinism: same (layout, seed, ticks) -> byte-identical MU positions,
  * queue contents and counters. All randomness flows through a seeded
  * mulberry32-style PRNG carried inside the state; no Date, no Math.random.
  * Verified in verify_flowsim.js + verify_flowB.js.
@@ -380,7 +421,7 @@
    * connected path exists (each inserted waypoint is a conveyor-cell
    * centre, flagged onConveyor).
    * ------------------------------------------------------------------ */
-  function buildWaypoints(layout) {
+  function anchorIndex(layout) {
     const els = (layout && layout.elements) || [];
     const gridW = Math.max(1, (layout && layout.gridW) || 40);
     const gridH = Math.max(1, (layout && layout.gridH) || 24);
@@ -427,33 +468,93 @@
       zoneCentre(layout, "picking") ||
       { x: (storage.x + packing.x) / 2, y: (storage.y + packing.y) / 2 };
 
-    const wp = [
-      { x: receiving.x, y: receiving.y, stage: "receiving" },
-      { x: storage.x, y: storage.y, stage: "storage" },
-    ];
+    // ---- The five LEGACY anchors, with their v3.24 fallback chains intact.
+    // The order above matters and is unchanged: storage is resolved (and
+    // slotting-anchored) before packing, and picking falls back to the
+    // midpoint of those two.
+    const A = {};
+    A["dock-in"] = { x: receiving.x, y: receiving.y, present: true, source: "element-or-zone", count: countOf(els, (e) => e.type === "dock-in" || dockDir(e) === "receiving") };
+    A.storage = { x: storage.x, y: storage.y, present: true, source: retrievalAnchored ? "slotting" : "element-or-zone", count: countOf(els, isStorage) };
+    A.pack = { x: packing.x, y: packing.y, present: true, source: "element-or-zone", count: countOf(els, (e) => e.type === "pack-station" || baseOf(e) === "station") };
+    A["dock-out"] = { x: shipping.x, y: shipping.y, present: true, source: "element-or-zone", count: countOf(els, (e) => e.type === "dock-out" || dockDir(e) === "shipping") };
+    A.pickface = { x: picking.x, y: picking.y, present: true, source: "element-or-zone", count: countOf(els, isPickFace) };
 
-    // Storage -> picking leg. Prefer conveyor-following routing (a polyline
-    // over connected conveyor cells); otherwise keep the original single
-    // conveyor/RGV/AGV centroid; otherwise a straight segment. All three
-    // preserve the honest fallback and the >=5-waypoint spine.
-    const route = conveyorRoute(els, storage, picking);
+    // ---- The STRICT anchors added by the order-routing engine (v3.25). No
+    // element, no route: there is NO zone fallback and NO geometric guess, so
+    // an order type that needs one is honestly reported UNFULFILLABLE instead
+    // of being quietly re-routed onto some other station.
+    strictAnchor(A, "staging", els, (e) => e.type === "staging");
+    strictAnchor(A, "qc", els, (e) => e.type === "returns-station");
+    strictAnchor(A, "returns", els, (e) => e.type === "returns-station");
+    strictAnchor(A, "wrap", els, (e) => e.type === "stretch-wrap");
+    strictAnchor(A, "palletise", els, (e) => e.type === "stretch-wrap");
+    // R2 pending: the app has NO element type for these yet, so they are
+    // ALWAYS absent and every archetype needing one says so in plain words.
+    A.depalletise = { x: NaN, y: NaN, present: false, source: "none", count: 0, pending: "R2" };
+    A.vas = { x: NaN, y: NaN, present: false, source: "none", count: 0, pending: "R2" };
+
+    A.gridW = gridW;
+    A.gridH = gridH;
+    A.retrievalAnchored = retrievalAnchored;
+    return A;
+  }
+
+  function countOf(els, pred) {
+    let k = 0;
+    for (const e of els) if (pred(e)) k++;
+    return k;
+  }
+  // A STRICT anchor: present ONLY when a real element carries it. No zone
+  // metadata fallback, no geometric guess - the honest 'this floor cannot do
+  // that operation' signal the router turns into a friendly message.
+  function strictAnchor(A, id, els, pred) {
+    const c = centroidOf(els, pred);
+    A[id] = c
+      ? { x: c.x, y: c.y, present: true, source: "element", count: countOf(els, pred) }
+      : { x: NaN, y: NaN, present: false, source: "none", count: 0 };
+    return A[id];
+  }
+
+  /* ------------------------------------------------------------------
+   * Build the waypoint polyline for ONE resolved route (an ordered list of
+   * router STEPS, each carrying its anchor point, stage, operation id and
+   * serving station kind). Straight segments connect the steps, EXCEPT a
+   * storage -> pick-face leg, which follows connected conveyor cells (and
+   * rides a curved conveyor's arc) exactly as the v3.24 spine does.
+   *
+   * With the LEGACY operation list this reproduces the v3.24 waypoint spine
+   * EXACTLY - that identity is what makes the legacy collapse byte-identical,
+   * and it is asserted, not assumed, in verify_routing.js.
+   * ------------------------------------------------------------------ */
+  function buildRouteWaypoints(layout, steps) {
+    const els = (layout && layout.elements) || [];
+    const gridW = Math.max(1, (layout && layout.gridW) || 40);
+    const gridH = Math.max(1, (layout && layout.gridH) || 24);
+    const wp = [];
     let routed = false;
-    if (route && route.points.length) {
-      // Where the route turns INSIDE a curved conveyor, ride the ARC (sampled
-      // centreline) instead of the right-angle cell corner. Gated on a curved
-      // conveyor being present, so a layout without one is BYTE-IDENTICAL.
-      const curves = curveElements(els);
-      const pts = curves.length ? spliceCurveArcs(route.points, curves, storage) : route.points;
-      for (const p of pts) wp.push({ x: p.x, y: p.y, stage: "storage", onConveyor: true, onCurve: !!p.onCurve });
-      routed = true;
-    } else {
-      const transport = centroidOf(els, isTransport);
-      if (transport) wp.push({ x: transport.x, y: transport.y, stage: "storage" });
+    for (let i = 0; i < steps.length; i++) {
+      const s = steps[i];
+      wp.push({ x: s.x, y: s.y, stage: s.stage, op: s.op, station: s.station || null });
+      const nx = steps[i + 1];
+      if (!nx) continue;
+      // The one automated leg: reserve / storage -> pick face.
+      if (!(s.anchor === "storage" && nx.anchor === "pickface")) continue;
+      const route = conveyorRoute(els, s, nx);
+      if (route && route.points.length) {
+        // Where the route turns INSIDE a curved conveyor, ride the ARC (sampled
+        // centreline) instead of the right-angle cell corner. Gated on a curved
+        // conveyor being present, so a layout without one is BYTE-IDENTICAL.
+        const curves = curveElements(els);
+        const pts = curves.length ? spliceCurveArcs(route.points, curves, s) : route.points;
+        // Intermediate conveyor points carry the FROM step's stage + operation
+        // but NEVER a station: they are travel, not a server.
+        for (const p of pts) wp.push({ x: p.x, y: p.y, stage: s.stage, op: s.op, station: null, onConveyor: true, onCurve: !!p.onCurve });
+        routed = true;
+      } else {
+        const transport = centroidOf(els, isTransport);
+        if (transport) wp.push({ x: transport.x, y: transport.y, stage: s.stage, op: s.op, station: null });
+      }
     }
-
-    wp.push({ x: picking.x, y: picking.y, stage: "picking" });
-    wp.push({ x: packing.x, y: packing.y, stage: "packing" });
-    wp.push({ x: shipping.x, y: shipping.y, stage: "shipping" });
 
     // Clamp every waypoint inside the floor so MUs can never render off it.
     const out = wp.map((p) => {
@@ -462,11 +563,229 @@
       // Add onCurve ONLY when the waypoint rides a curved conveyor's arc, so a
       // layout without one keeps the exact prior waypoint shape (byte-identical).
       if (p.onCurve) o.onCurve = true;
+      // v3.25 additive: which OPERATION the unit performs travelling away from
+      // this point, and whether a station SERVES it here. Purely additive - no
+      // existing reader looks at them.
+      o.op = p.op || null;
+      o.station = p.station || null;
       return o;
     });
     out.conveyorRouted = routed; // non-enumerable-ish flag (array property)
-    out.retrievalAnchored = retrievalAnchored; // P4: storage waypoint = real slotting anchor
     return out;
+  }
+
+  // The LEGACY operation sequence, in flowsim's own terms. Mirrors
+  // WT.routing.ARCHETYPE_BY_ID["legacy-spine"].ops and is duplicated here ONLY
+  // so the animation never depends on routing.js being loaded (verify_routing.js
+  // asserts the two lists are the same sequence).
+  const LEGACY_STEPS = [
+    { op: "receive", stage: "receiving", anchor: "dock-in", station: null },
+    { op: "putaway", stage: "storage", anchor: "storage", station: "put" },
+    { op: "pick", stage: "picking", anchor: "pickface", station: "pick" },
+    { op: "pack", stage: "packing", anchor: "pack", station: "pack" },
+    { op: "load", stage: "shipping", anchor: "dock-out", station: null },
+  ];
+
+  // Bind a proto step list to a resolved anchor index. Returns null when ANY
+  // anchor is missing - the caller reports it, it never routes around it.
+  function stepsFromAnchors(A, protoSteps) {
+    const out = [];
+    for (const p of protoSteps) {
+      const a = A[p.anchor];
+      if (!a || a.present === false || !isFinite(a.x) || !isFinite(a.y)) return null;
+      out.push({ op: p.op, stage: p.stage, anchor: p.anchor, station: p.station || null, x: a.x, y: a.y });
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------
+   * The v3.24 PUBLIC waypoint spine - unchanged in behaviour. It is now
+   * expressed as "the legacy archetype's route", which is exactly what makes
+   * the collapse provable: ONE code path with two callers.
+   * ------------------------------------------------------------------ */
+  function buildWaypoints(layout, anchorsIn) {
+    const A = anchorsIn || anchorIndex(layout);
+    const steps = stepsFromAnchors(A, LEGACY_STEPS);
+    const out = buildRouteWaypoints(layout, steps);
+    out.retrievalAnchored = !!A.retrievalAnchored; // P4: storage waypoint = real slotting anchor
+    return out;
+  }
+
+  /* ==================================================================
+   * ORDER-DRIVEN ROUTING (v3.25 R1). Until v3.24 EVERY handling unit was
+   * pushed onto the one waypoint spine above. Now each unit carries the
+   * ORDER ARCHETYPE it belongs to, and each archetype declares the
+   * OPERATION SEQUENCE it needs (routing.js). This block resolves those
+   * operations against the anchors the CURRENT layout actually has and
+   * turns each one into its own waypoint polyline.
+   *
+   * THE HARD GATE: with NO mix declared the plan carries exactly ONE route
+   * - the legacy spine - and its waypoint array IS the plan's own
+   * `waypoints` array (the same object, not a copy). Every spawn then
+   * resolves to route 0 and the sim is byte-identical to v3.24.
+   *
+   * A required operation with NO station on the floor makes that order type
+   * UNFULFILLABLE: it is reported with a friendly message and NO unit of
+   * that type is ever spawned. It is never skipped and never re-routed.
+   * ================================================================== */
+
+  // Group the station SPECS by kind so a route waypoint that declares a
+  // serving station kind can bind to the real servers.
+  function stationIndexByKind(specs) {
+    const by = {};
+    for (let i = 0; i < specs.length; i++) {
+      const k = specs[i].kind;
+      (by[k] = by[k] || []).push(i);
+    }
+    return by;
+  }
+
+  // segment index -> the station SPEC indices that serve the unit there.
+  // Only set where servers actually exist, so the lookup stays falsy
+  // elsewhere exactly as state.stationsByWp does today.
+  function stationSegsOf(waypoints, byKind) {
+    const map = {};
+    for (let i = 0; i < waypoints.length; i++) {
+      const k = waypoints[i] && waypoints[i].station;
+      if (!k) continue;
+      const idx = byKind[k];
+      if (idx && idx.length) map[i] = idx.slice();
+    }
+    return map;
+  }
+
+  function makeRoute(index, res, waypoints, byKind) {
+    return {
+      index: index,
+      routeId: res.routeId,
+      archetype: res.id,
+      outcome: res.outcome || null,
+      outcomeLabel: res.outcomeLabel || null,
+      label: res.label,
+      short: res.short || res.label,
+      legacy: !!res.legacy,
+      ok: !!res.ok && !!waypoints && waypoints.length >= 2,
+      ops: res.ops ? res.ops.slice() : [],
+      steps: res.steps || [],
+      missing: res.missing || [],
+      shared: res.shared || [],
+      message: res.message || '',
+      neverStorage: !!res.neverStorage,
+      touchesStorage: !!res.touchesStorage,
+      waypoints: waypoints || [],
+      conveyorRouted: !!(waypoints && waypoints.conveyorRouted),
+      stationSegs: waypoints ? stationSegsOf(waypoints, byKind) : {},
+    };
+  }
+
+  // The legacy route described WITHOUT routing.js, so the animation never
+  // depends on the new layer being loaded (file:// robustness).
+  function legacyRouteRes() {
+    return {
+      ok: true, id: LEGACY_ROUTE_ID, routeId: LEGACY_ROUTE_ID, outcome: null,
+      label: 'Standard flow spine (legacy default)', short: 'Standard spine', legacy: true,
+      ops: LEGACY_STEPS.map((p) => p.op), steps: null, missing: [], shared: [],
+      message: '', neverStorage: false, touchesStorage: true,
+    };
+  }
+  const LEGACY_ROUTE_ID = 'legacy-spine';
+
+  /* Build every route the plan needs.
+   *   routes[0] is ALWAYS the legacy spine and ALWAYS reuses `waypoints`.
+   *   With a mix declared, each declared archetype (and each OUTCOME branch
+   *   of a branching archetype) becomes its own route with its own polyline.
+   * Returns the routes plus the SPAWN vector (fulfillable routes + shares)
+   * and the honest report of what this floor cannot do. */
+  function buildRoutes(layout, A, waypoints, specs, mixSpec) {
+    const byKind = stationIndexByKind(specs || []);
+    const routes = [makeRoute(0, legacyRouteRes(), waypoints, byKind)];
+    const R = WT.routing;
+    const norm = mixSpec != null && R && typeof R.normalizeMix === 'function' ? R.normalizeMix(mixSpec) : null;
+
+    if (!norm || !norm.ok) {
+      // No mix (or nothing recognisable in it): the v3.24 single spine.
+      return {
+        routes: routes, mix: null, spawnRoutes: [0], spawnShares: [1], spawnable: true,
+        unfulfillable: [], messages: norm && norm.message ? [norm.message] : [],
+        unknownTypes: (norm && norm.unknown) || [],
+      };
+    }
+
+    const mix = [], spawnRoutes = [], spawnShares = [], unfulfillable = [], messages = [];
+    const msgSeen = {}; // one friendly message per ORDER TYPE, not per outcome branch
+    for (const ent of norm.entries) {
+      // One route per OUTCOME branch: a return that is restocked and a return
+      // that is scrapped are two different paths through the building.
+      const arch = R.ARCHETYPE_BY_ID[ent.id];
+      const branches = arch && arch.outcomes && arch.outcomes.length
+        ? arch.outcomes.map((o) => ({ outcome: o.id, share: o.share }))
+        : [{ outcome: null, share: 1 }];
+      let bTotal = 0;
+      for (const b of branches) bTotal += b.share > 0 ? b.share : 0;
+      if (!(bTotal > 0)) bTotal = branches.length;
+      for (const b of branches) {
+        const res = R.resolveRoute(ent.id, A, { outcome: b.outcome });
+        let idx = -1;
+        if (ent.id === LEGACY_ROUTE_ID) {
+          idx = 0; // reuse the spine object; never build it twice
+        } else {
+          const wps = res.ok ? buildRouteWaypoints(layout, res.steps) : null;
+          idx = routes.length;
+          routes.push(makeRoute(idx, res, wps, byKind));
+        }
+        const share = ent.share * ((b.share > 0 ? b.share : 0) / bTotal);
+        const ok = routes[idx].ok;
+        mix.push({ id: ent.id, outcome: b.outcome, routeId: routes[idx].routeId, routeIndex: idx, share: share, ok: ok });
+        if (ok) { spawnRoutes.push(idx); spawnShares.push(share); }
+        else {
+          unfulfillable.push({ routeId: routes[idx].routeId, label: routes[idx].label, share: share, missing: routes[idx].missing, message: routes[idx].message });
+          if (routes[idx].message && !msgSeen[ent.id]) { msgSeen[ent.id] = 1; messages.push(routes[idx].message); }
+        }
+      }
+    }
+    // Renormalise the shares over the routes this floor CAN actually run, so
+    // the arrival rate is still fully used - the unfulfillable demand is
+    // reported separately, never quietly absorbed into a wrong path.
+    let tot = 0;
+    for (const v of spawnShares) tot += v;
+    if (tot > 0) for (let i = 0; i < spawnShares.length; i++) spawnShares[i] = spawnShares[i] / tot;
+    return {
+      routes: routes, mix: mix,
+      spawnRoutes: spawnRoutes, spawnShares: spawnShares,
+      spawnable: spawnRoutes.length > 0,
+      unfulfillable: unfulfillable, messages: messages,
+      unknownTypes: norm.unknown || [],
+    };
+  }
+
+  // Largest-remaining-QUOTA branch pick - the SAME rule process.js uses at a
+  // multi-way split. Deterministic, ties -> the earliest declared branch, NO
+  // RNG: the k-th unit's order type is an exact function of k and the mix.
+  function quotaPick(shares, sent, dispatched) {
+    if (WT.routing && typeof WT.routing.pickBranch === 'function') return WT.routing.pickBranch(shares, sent, dispatched);
+    let best = 0, bestDef = -Infinity;
+    for (let i = 0; i < shares.length; i++) {
+      const def = shares[i] * (dispatched + 1) - sent[i];
+      if (def > bestDef + 1e-12) { bestDef = def; best = i; }
+    }
+    return best;
+  }
+
+  // Which ROUTE the next spawned unit walks. With one spawnable route this is
+  // a constant 0 and the legacy behaviour is untouched.
+  function pickSpawnRoute(state) {
+    const plan = state.plan;
+    const i = quotaPick(plan.spawnShares, state.mixSent, state.mixTotal);
+    state.mixSent[i]++;
+    state.mixTotal++;
+    return plan.spawnRoutes[i];
+  }
+
+  // PUBLIC: the per-archetype FULFILLABILITY report for a layout - which order
+  // types this floor can serve, which it cannot, and exactly why.
+  function routingReport(layout) {
+    if (!WT.routing || typeof WT.routing.resolveAll !== 'function') return null;
+    return WT.routing.resolveAll(layout, { anchors: anchorIndex(layout) });
   }
 
   /* ------------------------------------------------------------------
@@ -566,9 +885,12 @@
     const gridW = Math.max(1, (layout && layout.gridW) || 40);
     const gridH = Math.max(1, (layout && layout.gridH) || 24);
 
-    const waypoints = buildWaypoints(layout);
+    const anchors = anchorIndex(layout);
+    const waypoints = buildWaypoints(layout, anchors);
     const tp = throughputOf(layout, seed);
     const stations = buildStationSpecs(layout, waypoints, tp);
+    // v3.25: per-order-type routes. `o.mix` absent -> the single legacy spine.
+    const rb = buildRoutes(layout, anchors, waypoints, stations, o.mix != null ? o.mix : null);
 
     const orders = Math.max(1, Math.round(o.orders != null ? o.orders : PARAMS.defaultOrders));
     const avgUnits = (1 + (o.linesPerOrderMax || cfg.linesPerOrderMax || PARAMS.linesPerOrderMax)) / 2;
@@ -588,6 +910,17 @@
       gridH: gridH,
       waypoints: waypoints,
       conveyorRouted: !!waypoints.conveyorRouted,
+      anchors: anchors, // resolved layout anchors (what each operation binds to)
+      // v3.25 ORDER-DRIVEN ROUTING. routes[0] is always the legacy spine and
+      // its waypoints ARE `waypoints` above, so an undeclared mix is a no-op.
+      routes: rb.routes,
+      mix: rb.mix, // null unless an order mix was declared
+      spawnRoutes: rb.spawnRoutes, // route indices units are actually spawned onto
+      spawnShares: rb.spawnShares, // matching shares, renormalised over the fulfillable
+      spawnable: rb.spawnable, // false when NOTHING the caller asked for can be routed
+      unfulfillable: rb.unfulfillable, // order types this floor cannot serve, with reasons
+      routingMessages: rb.messages, // friendly, specific, user-facing
+      unknownOrderTypes: rb.unknownTypes,
       stations: stations, // static specs; live queues live on the state
       caps: tp.caps,
       capByStage: tp.capByStage,
@@ -599,6 +932,9 @@
       cellsPerTick: PARAMS.cellsPerTick,
       totalUnits: totalUnits, // order pool size (drained unless loop)
       loop: loop,
+      routingModel:
+        "ORDER-DRIVEN per-unit routing (v3.25): every unit carries an order ARCHETYPE whose OPERATION SEQUENCE is resolved against the anchors this layout actually has, so a cross-dock unit never enters storage, a return runs counter-flow to restock or scrap, and a full pallet is never packed. An operation with no station on the floor makes that order type UNFULFILLABLE and is reported, never skipped and never re-routed. Route selection is a deterministic largest-remaining-quota dispatch over the declared mix (no RNG). With NO mix declared there is exactly one route - the v3.24 spine - and behaviour is unchanged. SYNTHETIC teaching recipes, NOT a WMS."
+        ,
       routing:
         "conveyor-following polyline routing along connected conveyor/track cells " +
         "where a path exists between storage and picking; otherwise straight-segment " +
@@ -630,6 +966,27 @@
       (stationsByWp[st.wpIndex] = stationsByWp[st.wpIndex] || []).push(st);
     }
 
+    // v3.25: per-ROUTE lookups. routeWp[i] is route i's own waypoint list and
+    // routeStations[i][seg] the LIVE servers waiting at that segment. The
+    // stations themselves stay GLOBAL - two order types that both use the pick
+    // face share ONE physical queue, which is what makes congestion real.
+    const planRoutes = plan.routes || [];
+    const routeWp = [], routeStations = [], perArchetype = {};
+    for (let ri = 0; ri < planRoutes.length; ri++) {
+      const r = planRoutes[ri];
+      routeWp.push(r.waypoints);
+      const segs = {};
+      const src = r.stationSegs || {};
+      for (const k in src) {
+        const arr = [];
+        for (const si of src[k]) if (stations[si]) arr.push(stations[si]);
+        if (arr.length) segs[k] = arr;
+      }
+      routeStations.push(segs);
+      perArchetype[r.routeId] = { routeId: r.routeId, archetype: r.archetype, outcome: r.outcome, label: r.label, spawned: 0, completed: 0, inflight: 0 };
+    }
+    const spawnShares = plan.spawnShares || [1];
+
     return {
       kind: "wt-flowsim-state",
       plan: plan,
@@ -652,6 +1009,14 @@
       queued: 0, // total MUs currently in any station queue
       maxQueue: 0, // longest single-station queue
       congestedStations: 0, // stations with queue >= congestQueueThreshold
+      // v3.25 order-driven routing (all additive; inert with no mix declared).
+      routeWp: routeWp,
+      routeStations: routeStations,
+      mixSent: spawnShares.map(() => 0), // quota dispatcher counters (deterministic)
+      mixTotal: 0,
+      perArchetype: perArchetype, // per-order-type spawned / completed / in-flight
+      blocked: !plan.spawnable, // nothing the caller asked for can be routed here
+      blockedReason: (plan.routingMessages || []).slice(),
       done: false,
       dataLabel: plan.dataLabel,
     };
@@ -671,7 +1036,7 @@
   // World position of a MOVING MU on its current segment, with a small
   // fixed perpendicular offset (its jitter) so many units fan out visually.
   function positionOf(state, mu) {
-    const wp = state.plan.waypoints;
+    const wp = (state.routeWp && state.routeWp[mu.route]) || state.plan.waypoints;
     if (mu.arrivedShip) {
       const last = wp[wp.length - 1];
       return clampPt({ x: last.x, y: last.y }, state.gridW, state.gridH);
@@ -716,7 +1081,6 @@
   function advanceOneTick(state) {
     const plan = state.plan;
     const wp = plan.waypoints;
-    const lastSeg = wp.length - 2; // index of the final segment (-> shipping)
 
     // --- 1) Spawn ------------------------------------------------------
     const arrivalPerHr = plan.arrivalUnitsPerHr != null ? plan.arrivalUnitsPerHr : plan.lineThroughput;
@@ -724,24 +1088,37 @@
     const noise = PARAMS.spawnNoiseLo + (PARAMS.spawnNoiseHi - PARAMS.spawnNoiseLo) * nextRand(state);
     state.spawnAccum += ratePerTick * noise;
     while (state.spawnAccum >= 1) {
+      // Nothing the caller asked for can be routed on this floor: spawn NOTHING
+      // and let plan.routingMessages say why (never a silent wrong path).
+      if (!plan.spawnable) { state.spawnAccum = 0; break; }
       if (!plan.loop && state.poolRemaining <= 0) { state.spawnAccum = 0; break; }
       if (state.mus.length >= PARAMS.maxInFlight) { break; } // perf soft cap (keeps conservation)
       state.spawnAccum -= 1;
+      // WHICH ORDER TYPE this unit is - deterministic quota dispatch, no RNG,
+      // resolved BEFORE the jitter draw so the PRNG sequence is untouched.
+      const rIdx = pickSpawnRoute(state);
+      const rwp = state.routeWp[rIdx] || wp;
       const jitter = (nextRand(state) - 0.5) * 2 * PARAMS.jitterCells;
       const mu = {
         id: state.nextId++,
         seg: 0, t: 0,
-        stage: wp[0].stage, stageIndex: 0,
+        stage: rwp[0].stage, stageIndex: STAGES.indexOf(rwp[0].stage),
         jitter: jitter,
         arrivedShip: false, dwell: 0,
         status: "active",
         station: null, stationId: null,
         cx: 0, cy: 0,
+        // v3.25: the unit's OWN route through the building.
+        route: rIdx,
+        archetype: (plan.routes[rIdx] && plan.routes[rIdx].routeId) || LEGACY_ROUTE_ID,
+        op: rwp[0].op || null,
       };
       const p = positionOf(state, mu);
       mu.cx = p.x; mu.cy = p.y;
       state.mus.push(mu);
       state.spawned++;
+      const pa0 = state.perArchetype[mu.archetype];
+      if (pa0) pa0.spawned++;
       if (!plan.loop) state.poolRemaining--;
     }
 
@@ -764,9 +1141,16 @@
     const speed = plan.cellsPerTick * plan.autoFactor; // world cells this tick
     const survivors = [];
     for (const mu of state.mus) {
+      const rwp = state.routeWp[mu.route] || wp;
+      const lastSeg = rwp.length - 2; // index of this ROUTE's final segment
       if (mu.arrivedShip) {
         mu.dwell--;
-        if (mu.dwell <= 0) { state.completed++; continue; } // retire
+        if (mu.dwell <= 0) {
+          state.completed++;
+          const paC = state.perArchetype[mu.archetype];
+          if (paC) paC.completed++;
+          continue; // retire
+        }
         const p = positionOf(state, mu);
         mu.cx = p.x; mu.cy = p.y;
         survivors.push(mu);
@@ -785,8 +1169,8 @@
       let remaining = speed;
       let guard = 0;
       let queuedNow = false;
-      while (remaining > 0 && !mu.arrivedShip && guard++ < wp.length + 2) {
-        const a = wp[mu.seg], b = wp[mu.seg + 1];
+      while (remaining > 0 && !mu.arrivedShip && guard++ < rwp.length + 2) {
+        const a = rwp[mu.seg], b = rwp[mu.seg + 1];
         const L = segLen(a, b);
         const need = (1 - mu.t) * L; // distance left on this segment
         if (remaining >= need) {
@@ -794,16 +1178,20 @@
           mu.seg++;
           mu.t = 0;
           if (mu.seg >= lastSeg + 1) {
-            // reached the final (shipping) waypoint
+            // reached this route's FINAL waypoint (the trailer for an outbound
+            // order, the returns bench for a write-off, the racking for a restock)
+            const term = rwp[rwp.length - 1];
             mu.arrivedShip = true;
-            mu.stage = "shipping";
-            mu.stageIndex = STAGES.indexOf("shipping");
+            mu.stage = term.stage;
+            mu.stageIndex = STAGES.indexOf(term.stage);
+            mu.op = term.op || mu.op;
             mu.dwell = PARAMS.shipDwellTicks;
           } else {
-            mu.stage = wp[mu.seg].stage;
+            mu.stage = rwp[mu.seg].stage;
             mu.stageIndex = STAGES.indexOf(mu.stage);
+            mu.op = rwp[mu.seg].op || mu.op;
             // Station at this waypoint? Join its queue and stop advancing.
-            const group = state.stationsByWp[mu.seg];
+            const group = (state.routeStations[mu.route] || state.stationsByWp)[mu.seg];
             if (group && group.length) {
               enqueueAt(state, mu, group);
               queuedNow = true;
@@ -825,12 +1213,18 @@
 
     // --- 4) Live counters (stage mix + queue/congestion) --------------
     const counts = emptyStageCounts();
-    for (const mu of state.mus) counts[mu.stage] = (counts[mu.stage] || 0) + 1;
+    const pa = state.perArchetype;
+    for (const k in pa) pa[k].inflight = 0;
+    for (const mu of state.mus) {
+      counts[mu.stage] = (counts[mu.stage] || 0) + 1;
+      const r = pa[mu.archetype];
+      if (r) r.inflight++;
+    }
     state.perStage = counts;
     state.inflight = state.mus.length; // includes queued MUs
     refreshQueueStats(state);
     state.tick++;
-    if (!plan.loop && state.poolRemaining <= 0 && state.mus.length === 0) state.done = true;
+    if (!plan.loop && (state.poolRemaining <= 0 || !plan.spawnable) && state.mus.length === 0) state.done = true;
   }
 
   // Roll up per-station queue lengths into the state's congestion scalars.
@@ -885,6 +1279,14 @@
     buildWaypoints: buildWaypoints,
     throughputOf: throughputOf,
     buildStationSpecs: buildStationSpecs,
+    // v3.25 ORDER-DRIVEN ROUTING (R1). All pure + deterministic.
+    anchors: anchorIndex, // the layout anchors every operation binds to
+    buildRouteWaypoints: buildRouteWaypoints, // one route's polyline from its steps
+    buildRoutes: buildRoutes, // the plan's route set + spawn vector + honest gaps
+    routingReport: routingReport, // per-archetype fulfillability for a layout
+    quotaPick: quotaPick, // the deterministic split rule (shared with process.js)
+    LEGACY_STEPS: LEGACY_STEPS,
+    LEGACY_ROUTE_ID: LEGACY_ROUTE_ID,
     conveyorCells: conveyorCells,
     conveyorRoute: conveyorRoute,
     // v2.1: quarter-arc centreline samples for a curved conveyor element (world
