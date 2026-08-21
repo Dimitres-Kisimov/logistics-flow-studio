@@ -55,7 +55,7 @@
     "Realistic-but-illustrative SYNTHETIC scenario - no real company/brand; " +
     "dataProfile numbers are plausible estimates, labelled, not measured.";
   const COMPLIANCE_LABEL =
-    "Informed by ASR A1.8 / ASR A2.3 / DIN 15185 - a design aid, NOT a certification.";
+    "Informed by ASR A1.8 / ASR A2.3 - a design aid, NOT a certification.";
 
   /* ------------------------------------------------------------------
    * THE LIBRARY. 24 named, distinct, realistic industry scenarios
@@ -400,7 +400,7 @@
    *      the street grid is always empty.
    *   2. AISLE-SAFE    - the only facing storage-row gaps are 0 (racks
    *      back-to-back, not an aisle) or >= MIN_AISLE (a working aisle or
-   *      a street). No gap ever lands in (0, MIN_AISLE), so the DIN 15185
+   *      a street). No gap ever lands in (0, MIN_AISLE), so the ASR A1.8
    *      aisle-width check can WARN (tight) but NEVER FAIL.
    *   3. ESCAPE-SAFE   - every storage row has an empty working aisle on
    *      a side that opens onto the always-empty street grid, which runs

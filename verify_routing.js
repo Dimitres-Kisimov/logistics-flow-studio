@@ -208,8 +208,10 @@ const BARE = bareFloor();
   check("1e3. the model documents what it does NOT yet do (fixed order, QC as a step, 2 return outcomes, no loops)",
     /KNOWN LIMITS/.test(ROUTING_SRC) && /not necessarily determined/.test(ROUTING_SRC) &&
     /PASS-THROUGH step, not a branch/.test(ROUTING_SRC) &&
-    /Cycles need/.test(ROUTING_SRC) && /dangerous goods/.test(ROUTING_SRC),
-    "the honesty header states five named limits");
+    /Cycles need/.test(ROUTING_SRC) && /dangerous goods/.test(ROUTING_SRC) &&
+    /VDI 3590/.test(ROUTING_SRC) && /VDI 4490/.test(ROUTING_SRC) &&
+    /nicht notwendigerweise determiniert/.test(ROUTING_SRC),
+    "five named limits, and the guideline quote that justifies the change");
 
   check("1f. the SYNTHETIC honesty label names the model, the teaching status and the unfulfillable rule",
     /SYNTHETIC/.test(R.SYNTHETIC_LABEL) && /NOT a WMS/.test(R.SYNTHETIC_LABEL) &&

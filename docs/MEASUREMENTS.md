@@ -17,7 +17,7 @@ are demonstrations of method, not claims about any real warehouse.
 
 **Configuration** (the app's first-run defaults, `app.js`): starter demo layout from
 `demoLayout()`, seed **42**, **ABC 80/20** slotting, **200** orders, **80** SKUs, pull
-replenishment, DIN 15185-informed minimum aisle 2.9 m, EUR1 pallets. The optimizer
+replenishment, ASR A1.8-informed minimum aisle 2.9 m, EUR1 pallets. The optimizer
 (`optimizer.js`) measures before/after with the real simulation (`simulation.js`) at the same
 seed, so the delta isolates the spatial change. Deterministic: the same code always produces
 the same numbers.

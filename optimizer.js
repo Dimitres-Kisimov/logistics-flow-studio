@@ -7,7 +7,7 @@
  * closest to the outbound dock. It does a greedy hill-climb that steps
  * storage elements one cell at a time toward the I/O point, keeping the
  * layout legal (in bounds, no overlap, and never increasing the count of
- * DIN 15185-informed aisle violations). Flow elements (docks, staging,
+ * ASR A1.8-informed aisle violations). Flow elements (docks, staging,
  * conveyor, push/pull) stay put - they anchor the flow.
  *
  * It never mutates the caller's layout: it works on clones and returns a

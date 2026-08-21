@@ -43,6 +43,16 @@
  *                k-th order's route is an exact function of k and the mix.
  *                NO Date, NO Math.random anywhere.
  *
+ * WHY THE OLD HARDCODED ARRAY WAS WRONG, in the words of the guideline the
+ * app already cites: VDI 3590 states that the sequence of its basic
+ * functions is "nicht notwendigerweise determiniert" and that steps
+ * "teilweise auch entfallen koennen" - not necessarily determined, and
+ * steps may be omitted. A single `STAGES` array that every unit had to
+ * walk contradicted the very guideline it claimed to be informed by. An
+ * order declaring the operations it needs is the guideline-consistent
+ * shape; expressing the remaining freedom (arbitrary order, omitted
+ * steps, cycles) needs the graph model noted under KNOWN LIMITS below.
+ *
  * BACKWARD COMPATIBILITY IS A HARD GATE. The archetype `legacy-spine` is
  * the default: its operation list resolves to EXACTLY the v3.24 waypoint
  * spine, so a caller that declares no mix gets byte-identical behaviour.
@@ -65,15 +75,17 @@
  *   - `depalletise` and `value-add` have NO element type at all in v3.25,
  *     so every archetype that needs them is honestly UNFULFILLABLE until
  *     the R2 station types land.
- *   - The recipes are INFORMED BY the German process decomposition the
- *     trade guidelines use (goods receipt, quality assurance, returns,
- *     put-away, storage + replenishment, picking, packing, dispatch,
- *     empties) and by the guideline-described unit-transformation chain
- *     (pallet -> case -> piece -> tote -> collected unit -> dispatch
- *     unit). Informed by, NOT compliant with, NOT a certification.
+ *   - The recipes are INFORMED BY the German process decomposition in
+ *     VDI 4490 (Wareneingang, Qualitaetssicherung, Retouren, Einlagerung,
+ *     Lagerung/Nachschub, Kommissionierung, Verpackung, Versand, Leergut)
+ *     and by the VDI 3590 unit-transformation chain (Lagereinheit ->
+ *     Transporteinheit -> Beschickungseinheit -> Bereitstelleinheit ->
+ *     Entnahmeeinheit -> Sammeleinheit -> Versandeinheit). Informed by,
+ *     NOT compliant with, NOT a certification. The full texts are
+ *     paywalled; nothing here reproduces them.
  *   - KNOWN LIMITS of this R1 engine, stated plainly rather than implied:
- *       * Each archetype's operation order is FIXED. Real practice says
- *         the sequence is not necessarily determined and steps may be
+ *       * Each archetype's operation order is FIXED. VDI 3590 says the
+ *         sequence is not necessarily determined and that steps may be
  *         omitted; expressing that needs the graph model, not a list.
  *       * Quality control is a PASS-THROUGH step, not a branch. Real
  *         goods-in QC can divert a unit to blocked stock, where it dwells

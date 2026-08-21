@@ -187,7 +187,9 @@ check("regression: wide aisle still PASS (default KB unchanged)",
   findN(C.check(layoutObj(wide), CFG), "aisle-width", "pass") === 1 &&
   findN(C.check(layoutObj(wide), CFG), "aisle-width", "fail") === 0);
 // The guidelines summary reflects the KB values (default -> the constants).
-const gl = repNarrow.guidelines.find((g) => g.code === "ASR A1.8");
+// ASR A1.8 governs BOTH working aisles and main traffic routes, so select the
+// row by its ruleId rather than by the code it shares with the aisle row.
+const gl = repNarrow.guidelines.find((g) => g.ruleId === "traffic-route");
 check("guidelines summary shows the KB main-route value (default = constant)",
   gl && gl.value.indexOf(String(D.COMPLIANCE.mainRouteMinMetres) + " m") !== -1, gl && gl.value);
 

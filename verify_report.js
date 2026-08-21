@@ -398,9 +398,9 @@ check("runs on a generated layout (generate.js) with all sections + compliance c
 const hon = rep.honesty;
 const honestyOk =
   /SYNTHETIC/.test(hon) && /NOT a certification/i.test(hon) && /NOT measured/i.test(hon) &&
-  /ISO 22400/.test(hon) && /DIN 15185/.test(hon) && /VDI/.test(hon) &&
+  /ISO 22400/.test(hon) && /ASR A1\.8/.test(hon) && !/DIN 15185/.test(hon) && /VDI/.test(hon) &&
   /SYNTHETIC/.test(html) && /NOT measured/i.test(html);
-check("honesty: report.honesty + toHtml restate SYNTHETIC / NOT measured / NOT a certification / informed by ISO/DIN/VDI",
+check("honesty: report.honesty + toHtml restate SYNTHETIC / NOT measured / NOT a certification / informed by ISO/ASR/VDI, with no DIN 15185 aisle mis-citation",
   honestyOk);
 
 /* --------------------------------------------------------------------

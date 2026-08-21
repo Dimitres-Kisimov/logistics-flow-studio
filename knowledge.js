@@ -62,7 +62,7 @@
 
   const CATEGORIES = [
     { key: "compliance", label: "Compliance thresholds",
-      desc: "Guidance values the Compliance Check reasons over (ASR A1.8 / ASR A2.3 / DIN 15185)." },
+      desc: "Guidance values the Compliance Check reasons over (ASR A1.8 traffic routes and working-aisle widths, ASR A2.3 escape routes)." },
     { key: "advisor", label: "Advisor thresholds",
       desc: "Heuristic trigger points the offline Advisor uses to raise suggestions." },
     { key: "generator", label: "Generator profile params",
@@ -88,7 +88,7 @@
     id: "compliance.aisle.min", category: "compliance",
     label: "Min working-aisle width (default truck class)",
     value: num(A.defaultMinMetres, 2.9), unit: "m",
-    source: "DIN 15185-1/-2 (warehouse systems with narrow-aisle trucks). Corpus 2.1: standard-aisle safety clearance ~500 mm/side [PS]. Reach-truck default.",
+    source: "ASR A1.8 Verkehrswege (2022-03): vehicle-route width = widest transport means or load + a lateral safety margin each side (0.50 m vehicles only, 0.75 m mixed pedestrian/vehicle traffic below 20 km/h) + a meeting allowance of 0.40 m. Reach-truck default; a teaching value between the vehicle-only and mixed-traffic results, not derived from the rule. NOT DIN 15185, which covers floor tolerances and guided-aisle person protection.",
     note: NOTE_PAYWALL, editable: true, kind: "number", min: 0.5, max: 12,
   });
   seed({
@@ -159,7 +159,7 @@
 
   /* ---- generator profile working-aisle (mirrors generate.js PROFILES) ---- */
   const GEN_AISLE_SOURCE =
-    "Plant-profile working aisle (informed by DIN 15185 truck classes: VNA ~1.8 m, reach ~2.9-3.0 m, counterbalance ~3.8 m). Synthetic best-practice teaching value.";
+    "Plant-profile working aisle (informed by ASR A1.8 vehicle-route geometry, by truck class: VNA ~1.8 m guided, reach ~2.9-3.0 m, counterbalance ~3.8 m). Synthetic best-practice teaching value.";
   seed({ id: "generator.ecommerce-fulfilment.minAisle", category: "generator",
     label: "E-commerce fulfilment centre - min working aisle", value: 2.9, unit: "m",
     source: GEN_AISLE_SOURCE, note: NOTE_INFORMED, editable: true, kind: "number", min: 0.5, max: 12 });

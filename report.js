@@ -38,7 +38,7 @@
  *
  * HARD HONESTY (mirrored in the UI + README): every figure is a
  * transparent, deterministic HEURISTIC informed by published standards
- * (ISO 22400, DIN 15185, ASR A1.8/A2.3, EN/VDI 4480/2510). All numbers are
+ * (ISO 22400, ASR A1.8/A2.3, EN 15512, EPAL/DIN EN 13698, VDI 4480/2510). All numbers are
  * SYNTHETIC teaching estimates unless the user imported their own data.
  * The report is NOT a certification, NOT measured and NOT a compliance /
  * safety statement. No real brands.
@@ -57,7 +57,7 @@
 
   const HONESTY =
     "SYNTHETIC WMS report - every figure is a transparent, deterministic " +
-    "HEURISTIC informed by published standards (ISO 22400, DIN 15185, " +
+    "HEURISTIC informed by published standards (ISO 22400, EN 15512, " +
     "ASR A1.8 / A2.3, EN / VDI 4480 / VDI 2510). All numbers are SYNTHETIC " +
     "teaching estimates unless you imported your own SKU / order data, in " +
     "which case that layer is yours and stays on this device. This report " +

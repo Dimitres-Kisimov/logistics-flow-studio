@@ -1023,9 +1023,9 @@
         <h2 class="card-title">Compliance Check</h2>
         <div id="complDisclaimer" class="compl-disclaimer">
           <strong>Design aid, NOT a certification, legal-compliance guarantee, or Gefährdungsbeurteilung.</strong>
-          Informed by German workplace guidelines (ASR A1.8, ASR A2.3, DIN 15185). Verify any real design with the official texts and a qualified professional.
+          Informed by German workplace guidelines (ASR A1.8 traffic routes and working-aisle widths, ASR A2.3 escape routes). Verify any real design with the official texts and a qualified professional.
         </div>
-        <p class="hint">Reviews the current layout against <strong>published German workplace-guideline values</strong> — working aisles (<em>informed by</em> DIN 15185), main traffic routes (ASR A1.8) and escape-route reachability/width (ASR A2.3). Each finding shows the measured value, the informed-by guidance value and the offending element. Deterministic, fully offline. The figures are guidance, not legally binding limits.</p>
+        <p class="hint">Reviews the current layout against <strong>published German workplace-guideline values</strong> — working aisles and main traffic routes (<em>informed by</em> ASR A1.8) and escape-route reachability/width (ASR A2.3). Each finding shows the measured value, the informed-by guidance value and the offending element. Deterministic, fully offline. The figures are guidance, not legally binding limits.</p>
         <button id="complBtn" class="btn primary wide" type="button">Run compliance check</button>
         <div id="complSummary" class="compl-summary" hidden></div>
         <div id="complOut" class="compl-out"><p class="empty">Run the check to see pass / warn / fail findings. Click a finding to highlight the element(s) on the floor.</p></div>
@@ -1043,7 +1043,7 @@
           <summary class="std-summary">Knowledge base (standards) — <em>editable &amp; versioned</em></summary>
           <div id="kbHonesty" class="gen-honesty kb-honesty"></div>
           <p class="hint">The standards-derived <strong>parameters and thresholds the app reasons over</strong> — the
-            Compliance Check (ASR A1.8 / ASR A2.3 / DIN 15185), the Advisor, the AI Environment Generator and the
+            Compliance Check (ASR A1.8 / ASR A2.3), the Advisor, the AI Environment Generator and the
             capacity model — as one editable, versioned store. Change a value and the engines use it on the next run;
             <strong>Reset</strong> restores the sourced default. <strong>Export/Import</strong> saves or shares your whole KB as JSON.</p>
           <div class="kb-toolbar">
@@ -1068,7 +1068,7 @@
       <section class="card" id="stdCard">
         <details id="stdDetails">
           <summary class="std-summary">German standards this app is <em>informed by</em></summary>
-          <p id="stdAisleLive" class="std-live">Live DIN 15185 check: —</p>
+          <p id="stdAisleLive" class="std-live">Live ASR A1.8 check: —</p>
           <div id="stdList" class="std-list"><!-- filled by app.js --></div>
           <p class="std-disclaimer"><strong>This is a guidance-aligned design aid, NOT a certification or a legal-compliance guarantee.</strong> WarehouseTwin references these standards to keep layouts sensible; it does not certify conformance. Verify any real design with the current official texts and a qualified professional.</p>
         </details>

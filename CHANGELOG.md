@@ -62,6 +62,38 @@ palletiser - and every shared binding is disclosed on the step and in the report
 `depalletise` and `value-add` have no element type at all, so the archetypes needing
 them are honestly unfulfillable until R2 ships the stations.
 
+### Honesty defect corrected in the same release: DIN 15185 -> ASR A1.8
+
+The app cited **DIN 15185** as the source for **working-aisle widths** in the advisor
+rule, the canvas guard, the standards panel, the Compliance Check (including the
+`guideline` field exported into reports), the knowledge base, both optimizers and the
+docs. **That citation was wrong.** DIN 15185 covers floor tolerances and person
+protection in guided narrow aisles - not working-aisle geometry - and its part 2 is
+withdrawn.
+
+Every aisle-width attribution now reads **ASR A1.8** (*Verkehrswege*, 2022-03), whose
+construction is: widest transport means or load, plus a lateral safety margin on each
+side (**0,50 m** vehicles only, **0,75 m** where pedestrians share the route below
+20 km/h), plus a **0,40 m** meeting allowance - reducible to **1,10 m** total where
+encounters are infrequent (~10/h) - with a clear height of at least **2,00 m**.
+DIN 15185 stays in the standards panel as **landscape context only**, with its real
+scope and an explicit note that no feature is informed by it (the same pattern the
+panel already used for VDI 2510).
+
+**The published 2.9 m default is NOT changed, and here is why it is worth knowing.**
+Applying the ASR A1.8 construction to a reach truck whose widest envelope is ~1,27 m
+gives about **2,67 m** for vehicle-only traffic and **3,17 m** where pedestrians share
+the route. The app's 2.9 m sits **between** the two. It is therefore a truck-class
+teaching value, **not** a figure derived from the rule, and it is now documented as
+such in `domain.js`, the knowledge base and `docs/DOMAIN_NOTES.md` rather than being
+silently adjusted. A real design must be worked from the actual truck and load
+envelope and the traffic mix.
+
+`verify_compliance.js` now asserts the aisle finding is attributed to `ASR A1.8` and
+that `DIN 15185` no longer appears in the Compliance Check's guidelines list;
+`verify_compare.js` and `verify_report.js` assert the same of the exported honesty
+strings.
+
 **Gates.** 50 headless harnesses green (new `verify_routing.js`), browser self-test
 153/153 (4 new order-routing checks), offline guard clean, `sw.js` at `wt-v80` with
 every `verify_*.js` pin synced on both regex sides.

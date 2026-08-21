@@ -96,21 +96,21 @@
       }
     }
 
-    // ---- Rule 3: aisle width (DIN 15185-informed live check) -------
+    // ---- Rule 3: aisle width (ASR A1.8-informed live check) --------
     const viol = D.aisleViolations(els, config.minAisleMetres);
     if (viol.length) {
       const narrowest = Math.min.apply(null, viol.map((v) => v.gapM));
       out.push(s(
         "high",
         `${viol.length} rack-row gap${viol.length > 1 ? "s are" : " is"} below the ${config.minAisleMetres} m minimum working aisle (narrowest ${narrowest.toFixed(1)} m).`,
-        "DIN 15185-informed working-aisle guidance: trucks need a minimum clear aisle to turn and access racking safely.",
+        "ASR A1.8-informed working-aisle guidance: a vehicle route must clear the widest transport means or load plus a lateral safety margin on each side, so trucks can turn and reach the racking safely.",
         "Widen the flagged aisles, or select a narrower-aisle truck class (e.g. VNA). Design guidance only - not a compliance certification."
       ));
     } else if (storage.length >= 2) {
       out.push(s(
         "good",
         `All rack-row aisles meet the ${config.minAisleMetres} m minimum.`,
-        "DIN 15185-informed working-aisle guidance.",
+        "ASR A1.8-informed working-aisle guidance.",
         "No aisle-width issues at the current truck-class setting."
       ));
     }

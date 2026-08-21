@@ -17,7 +17,7 @@
  *
  * Checks (each -> pass / warn / fail, with measured + informed-by value,
  * offending element ids and a plain-language DE/EN explanation):
- *   1. aisle-width   - working aisle width per the truck class (DIN 15185)
+ *   1. aisle-width   - working aisle width per the truck class (ASR A1.8)
  *   2. traffic-route - clear run of the main route in front of each dock
  *                      (ASR A1.8 traffic routes)
  *   3. escape-route  - egress reachability + route width + travel
@@ -61,9 +61,9 @@
   // the domain.js "design aid only, not a compliance check" wording.
   const DISCLAIMER = {
     en:
-      "Informed by German workplace guidelines (ASR A1.8 traffic routes, ASR A2.3 escape routes, DIN 15185 working aisles) - this is a design aid, NOT a certification, a legal-compliance guarantee, or a Gefaehrdungsbeurteilung (risk assessment). The values shown are published guidance figures, not legally binding limits, and a passing check does NOT mean the layout is compliant. Verify any real design against the current official texts and a qualified professional.",
+      "Informed by German workplace guidelines (ASR A1.8 traffic routes and working-aisle widths, ASR A2.3 escape routes) - this is a design aid, NOT a certification, a legal-compliance guarantee, or a Gefaehrdungsbeurteilung (risk assessment). The values shown are published guidance figures, not legally binding limits, and a passing check does NOT mean the layout is compliant. Verify any real design against the current official texts and a qualified professional.",
     de:
-      "Orientiert an deutschen Arbeitsstaetten-Leitlinien (ASR A1.8 Verkehrswege, ASR A2.3 Fluchtwege, DIN 15185 Arbeitsgaenge) - dies ist eine Planungshilfe, KEINE Zertifizierung, keine Zusicherung der Rechtskonformitaet und keine Gefaehrdungsbeurteilung. Die angezeigten Werte sind veroeffentlichte Richtwerte, keine rechtsverbindlichen Grenzwerte; ein bestandener Check bedeutet NICHT, dass die Anordnung konform ist. Jede reale Planung mit den aktuellen Originaltexten und einer Fachkraft pruefen.",
+      "Orientiert an deutschen Arbeitsstaetten-Leitlinien (ASR A1.8 Verkehrswege und Arbeitsgangbreiten, ASR A2.3 Fluchtwege) - dies ist eine Planungshilfe, KEINE Zertifizierung, keine Zusicherung der Rechtskonformitaet und keine Gefaehrdungsbeurteilung. Die angezeigten Werte sind veroeffentlichte Richtwerte, keine rechtsverbindlichen Grenzwerte; ein bestandener Check bedeutet NICHT, dass die Anordnung konform ist. Jede reale Planung mit den aktuellen Originaltexten und einer Fachkraft pruefen.",
   };
 
   // Aisle-width warn band: at/above the truck-class minimum but with less
@@ -196,7 +196,7 @@
     return {
       ruleId: o.ruleId,
       rule: o.rule,                 // {en, de}
-      guideline: o.guideline,       // e.g. "DIN 15185"
+      guideline: o.guideline,       // e.g. "ASR A1.8"
       status: o.status,             // "pass" | "warn" | "fail"
       informedBy: o.informedBy || null, // {value, unit, label:{en,de}}
       measured: o.measured || null,     // {value, unit, label:{en,de}} | null
@@ -206,12 +206,12 @@
   }
 
   // ==================================================================
-  // RULE 1 - working aisle width (informed by DIN 15185).
+  // RULE 1 - working aisle width (informed by ASR A1.8 Verkehrswege).
   // Reuses the SHARED facing-pair + aisle definition from domain.js.
   // ==================================================================
   function checkAisleWidth(layout, minAisle) {
     const rule = { en: "Working aisle width", de: "Arbeitsgangbreite" };
-    const guideline = "DIN 15185";
+    const guideline = "ASR A1.8";
     const informedBy = {
       value: round1(minAisle), unit: "m",
       label: {
@@ -571,12 +571,15 @@
     return {
       version: REPORT_VERSION,
       disclaimer: DISCLAIMER,
+      // Each row carries the RULE it informs. Two rows share the code ASR A1.8
+      // (it governs both working-aisle width and main traffic routes), so a
+      // consumer must select on ruleId, not on code alone.
       guidelines: [
-        { code: "DIN 15185", topic: { en: "Working aisles", de: "Arbeitsgaenge" },
+        { ruleId: "aisle-width", code: "ASR A1.8", topic: { en: "Working aisles", de: "Arbeitsgangbreiten" },
           value: round1(minAisle) + " m (selected truck class)", note: D.AISLE.note },
-        { code: "ASR A1.8", topic: { en: "Traffic routes", de: "Verkehrswege" },
+        { ruleId: "traffic-route", code: "ASR A1.8", topic: { en: "Traffic routes", de: "Verkehrswege" },
           value: mainRouteMin + " m main route", note: D.COMPLIANCE.mainRouteNote },
-        { code: "ASR A2.3", topic: { en: "Escape routes", de: "Fluchtwege" },
+        { ruleId: "escape-route", code: "ASR A2.3", topic: { en: "Escape routes", de: "Fluchtwege" },
           value: escapeWidth + " m width; <= " + escapeTravel + " m travel",
           note: D.COMPLIANCE.escapeNote },
       ],

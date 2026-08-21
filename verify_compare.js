@@ -296,9 +296,9 @@ check("resolve() resolves current / example / saved to a layout snapshot (same b
 const H = CMP.HONESTY;
 const honestyOk =
   /SYNTHETIC/.test(H) && /NOT a certification/i.test(H) && /NOT measured/i.test(H) &&
-  /ISO 22400/.test(H) && /DIN 15185/.test(H) && /VDI/.test(H) &&
+  /ISO 22400/.test(H) && /ASR A1\.8/.test(H) && !/DIN 15185/.test(H) && /VDI/.test(H) &&
   cmp.honesty === H && m.honesty === H;
-check("honesty: SYNTHETIC / NOT a certification / NOT measured / informed by ISO/DIN/VDI (module + every result)", honestyOk);
+check("honesty: SYNTHETIC / NOT a certification / NOT measured / informed by ISO/ASR/VDI, with no DIN 15185 aisle mis-citation (module + every result)", honestyOk);
 
 /* --------------------------------------------------------------------
  * 15. Better/worse only on unambiguous metrics.

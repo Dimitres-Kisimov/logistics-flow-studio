@@ -170,7 +170,7 @@
     honesty: [
       "Runs fully offline in your browser - nothing is uploaded, there is no cloud and no account.",
       "All data is synthetic and seeded unless you import your own - the example scenarios are illustrative and name no real company, brand or site.",
-      "Informed by public standards (ISO 22400, DIN 15185, ASR, EN, VDI) - it is a design aid, not a certification, and its numbers are modelled, not measured.",
+      "Informed by public standards (ISO 22400, ASR A1.8 / A2.3, EN 15512, EPAL, VDI) - it is a design aid, not a certification, and its numbers are modelled, not measured.",
     ],
     forWho:
       "For warehouse and logistics planners, industrial-engineering students and solution consultants who want to sketch, " +

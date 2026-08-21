@@ -27,7 +27,7 @@
  *      swaps of the process stations and committing the single best
  *      improving swap, to no-improvement. EVERY candidate is validated
  *      against the app's EXISTING legality guards (in-bounds, no overlap,
- *      and never increasing the DIN 15185 aisle-violation count) - an
+ *      and never increasing the ASR A1.8 aisle-violation count) - an
  *      illegal swap is rejected. Reports MHI before/after + the delta%.
  *
  *   2) LINE BALANCING (Ranked Positional Weight, Helgeson-Birnie). takt =

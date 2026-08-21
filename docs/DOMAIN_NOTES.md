@@ -148,9 +148,13 @@ The logical chain is **dock-in → staging → put-away → storage → replenis
 
 ---
 
-## 6. Aisle-width guidance (informed by DIN 15185)
+## 6. Aisle-width guidance (informed by ASR A1.8)
 
-**DIN 15185-1** covers the safety of storage installations and the design of **working aisles**. Different trucks need different aisle widths:
+**ASR A1.8 (Verkehrswege, 2022-03)** is the source for working-aisle **geometry**: a vehicle route must clear the widest transport means or load, plus a lateral safety margin on each side (0.50 m for vehicles only, 0.75 m where pedestrians share the route below 20 km/h) and a meeting allowance of 0.40 m; clear height at least 2.00 m.
+
+> **Correction (v3.25).** Earlier versions of this document and of the app cited **DIN 15185** for aisle widths. That was wrong. DIN 15185 covers **floor tolerances and person protection in guided narrow aisles**, not working-aisle width, and **part 2 is withdrawn**. Every aisle-width citation in the app now reads ASR A1.8.
+
+Different trucks need different aisle widths:
 
 | Truck type | Typical working aisle |
 |------------|-----------------------|
@@ -158,9 +162,9 @@ The logical chain is **dock-in → staging → put-away → storage → replenis
 | Reach truck | ~2.7–3.0 m |
 | VNA (man-up turret, guided) | ~1.5–1.8 m |
 
-WarehouseTwin uses a **single configurable minimum working-aisle gap** between facing racking rows (default **2.9 m**, a reach-truck aisle; presets for VNA and counterbalance are provided). When two storage rows face each other with a positive gap **smaller** than the minimum, the app flags it (a dashed red link + an "aisle too narrow" badge).
+WarehouseTwin uses a **single configurable minimum working-aisle gap** between facing racking rows (default **2.9 m**, a reach-truck aisle; presets for VNA and counterbalance are provided). Applying the ASR A1.8 construction to a ~1.27 m reach-truck envelope gives about **2.67 m** for vehicle-only traffic and **3.17 m** where pedestrians share the route, so the app's 2.9 m default sits **between** the two: it is a truck-class teaching value, **not** a figure derived from the rule, and it is deliberately left unchanged. When two storage rows face each other with a positive gap **smaller** than the minimum, the app flags it (a dashed red link + an "aisle too narrow" badge).
 
-This is a **design aid to keep layouts sane — it is not a compliance check or certification.** The Pass 2 standards panel (ASR A1.8, DIN 15185, EN 15512, EPAL/DIN EN 13698, VDI 2510, VDI 3564, DIN EN 619, DGUV) stays "informed by / aligned to", never "certified".
+This is a **design aid to keep layouts sane — it is not a compliance check or certification.** The Pass 2 standards panel (ASR A1.8, EN 15512, EPAL/DIN EN 13698, DIN 15185 and VDI 2510 as landscape context only, VDI 3564, DIN EN 619, DGUV) stays "informed by / aligned to", never "certified".
 
 ---
 
@@ -170,7 +174,7 @@ The **Compliance Check** reviews a layout against **published German workplace-g
 
 | Check (rule id) | Informed by | Guidance value used | Assumption / derivation |
 |---|---|---|---|
-| Working aisle width (`aisle-width`) | **DIN 15185** | min working aisle for the selected truck class (default 2.9 m; VNA 1.8, reach 2.9, counterbalance 3.8) | reuses the shared facing-pair aisle definition (`facingAislePairs`); a `warn` band of +0.25 m flags aisles that just meet the value |
+| Working aisle width (`aisle-width`) | **ASR A1.8** | min working aisle for the selected truck class (default 2.9 m; VNA 1.8, reach 2.9, counterbalance 3.8) | reuses the shared facing-pair aisle definition (`facingAislePairs`); a `warn` band of +0.25 m flags aisles that just meet the value |
 | Main traffic route (`traffic-route`) | **ASR A1.8** | 2.5 m clear run in front of a dock | transport-means envelope **assumed 1.5 m** + 2 × 0.5 m lateral safety clearances; flow connectors (staging, conveyor, pack, push/pull) count as passable because a dock feeding them *is* the designed material flow |
 | Escape route (`escape-route`) | **ASR A2.3** | 1.20 m clear width; ≤ 35 m travel to an exit | width for **assumed** up to ~200 persons (ASR A2.3 scales 0.875 → 2.40 m with occupancy); a 1 m occupancy grid means the width check flags single-cell pinches |
 | Blocked route (`blocked-route`) | ASR A1.8 / A2.3 | — | a dock door sealed shut by a rack (hard obstruction) |

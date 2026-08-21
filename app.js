@@ -395,7 +395,7 @@
     view.panY = p.panY;
   }
 
-  // Aisle-width guard (informed by DIN 15185). Delegates to the single
+  // Aisle-width guard (informed by ASR A1.8). Delegates to the single
   // shared definition in domain.js (also used by the advisor & optimizer).
   function aisleViolations() {
     return D.aisleViolations(state.elements, state.config.minAisleMetres);
@@ -4625,8 +4625,8 @@
 
   // ---- German-standards panel --------------------------------------
   const STANDARDS = [
-    { code: "ASR A1.8", gov: "Technical Rules for Workplaces — traffic routes and walkways.", app: "Aisle-width guidance keeps truck and pedestrian routes workable." },
-    { code: "DIN 15185", gov: "Safety of storage installations; working-aisle design for industrial trucks.", app: "The live minimum-aisle check flags rack rows placed too close (status below)." },
+    { code: "ASR A1.8", gov: "Technical Rules for Workplaces — traffic routes (2022-03). A vehicle route must clear the widest transport means or load plus a lateral safety margin each side, with a further allowance where vehicles meet; clear height at least 2.00 m.", app: "The live minimum-aisle check flags rack rows placed too close (status below), and the main-route check keeps dock approaches clear." },
+    { code: "DIN 15185", gov: "Storage installations: floor tolerances and person protection in narrow aisles served by guided trucks. It does NOT set working-aisle widths, and part 2 is withdrawn.", app: "Context only: no feature is informed by DIN 15185. Aisle-width guidance comes from ASR A1.8 (above). Listed for completeness of the standards landscape." },
     { code: "EN 15512", gov: "Steel static storage systems — adjustable pallet racking; structural design principles.", app: "Models racking capacity and levels. It does NOT perform structural/load design." },
     { code: "EPAL / DIN EN 13698", gov: "Production specification for the flat wooden Euro (EUR) pallet.", app: "EUR1–EUR6 real dimensions are built into the domain model." },
     { code: "VDI 2510", gov: "VDI guideline for automated guided vehicle (AGV) systems.", app: "Context only: the app models NO AGV systems, so no feature is informed by VDI 2510. Listed for completeness of the standards landscape." },
@@ -4655,10 +4655,10 @@
     const v = aisleViolations();
     if (v.length) {
       const narrow = Math.min.apply(null, v.map((x) => x.gapM));
-      el.textContent = `Live DIN 15185 check: ${v.length} aisle(s) below the ${state.config.minAisleMetres} m minimum (narrowest ${narrow.toFixed(1)} m).`;
+      el.textContent = `Live ASR A1.8 check: ${v.length} aisle(s) below the ${state.config.minAisleMetres} m minimum (narrowest ${narrow.toFixed(1)} m).`;
       el.className = "std-live warn";
     } else {
-      el.textContent = `Live DIN 15185 check: all rack-row aisles meet the ${state.config.minAisleMetres} m minimum.`;
+      el.textContent = `Live ASR A1.8 check: all rack-row aisles meet the ${state.config.minAisleMetres} m minimum.`;
       el.className = "std-live ok";
     }
   }
@@ -7220,7 +7220,7 @@
         ["Flow intensity MHI (Σ flow × distance)", procFmt(p.mhiBefore) + " → " + procFmt(p.mhiAfter) + " (−" + procFmt(p.deltaPct) + "%)"],
         ["Stations moved", String(moved) + " of " + p.elementIds.length + " (equal-footprint swaps)"],
         ["Swaps committed / candidates evaluated", p.swaps + " / " + p.evaluated],
-        ["Aisle violations (DIN 15185-informed)", p.aisleBefore + " → " + p.aisleAfter + " (never increased)"],
+        ["Aisle violations (ASR A1.8-informed)", p.aisleBefore + " → " + p.aisleAfter + " (never increased)"],
       ]) +
       '<p class="proc-basis">CRAFT pairwise-exchange on rectilinear (aisle-following) centroid distances; every candidate passes the app’s in-bounds / overlap / aisle guards.</p>');
 

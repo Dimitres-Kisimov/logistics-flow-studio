@@ -44,7 +44,7 @@
  *
  * HARD HONESTY (mirrored in the UI + README): every figure is a
  * transparent, deterministic HEURISTIC informed by published standards
- * (ISO 22400, DIN 15185, ASR A1.8 / A2.3, EN / VDI). All numbers are
+ * (ISO 22400, ASR A1.8 / A2.3, EN 15512, EPAL / DIN EN 13698, VDI). All numbers are
  * SYNTHETIC teaching estimates unless the user imported their own data.
  * This is NOT a certification, NOT measured. "Better / worse" is shown
  * ONLY for metrics whose direction is unambiguous; capacity / utilisation
@@ -66,7 +66,7 @@
     "SYNTHETIC A/B compare - both sides are DERIVED FROM the same " +
     "consolidated WMS Report the app shows (WT.report.build), a transparent " +
     "deterministic HEURISTIC informed by published standards (ISO 22400, " +
-    "DIN 15185, ASR A1.8 / A2.3, EN / VDI). All numbers are SYNTHETIC " +
+    "ASR A1.8 / A2.3, EN 15512, EPAL / DIN EN 13698, VDI). All numbers are SYNTHETIC " +
     "teaching estimates unless you imported your own data. This is NOT a " +
     "certification and NOT measured. 'Better / worse' is shown ONLY where a " +
     "metric's direction is unambiguous - capacity, utilisation and " +

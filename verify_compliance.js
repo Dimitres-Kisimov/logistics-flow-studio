@@ -6,7 +6,8 @@
  * hand-constructed layouts:
  *
  *   1. An aisle narrower than the informed-by value is flagged FAIL with
- *      the right measured + guideline numbers (DIN 15185).
+ *      the right measured + guideline numbers (ASR A1.8 - corrected in
+ *      v3.25 from DIN 15185, which does not govern working-aisle width).
  *   2. An aisle at/above the value PASSES.
  *   3. A boxed-in rack (no free path to any exit) is a FAIL escape route
  *      (ASR A2.3) - a blocked escape route is detected.
@@ -74,8 +75,8 @@ check("narrow aisle -> exactly one aisle-width FAIL", aFail.length === 1, aFail.
 check("narrow aisle FAIL measured value is 2.0 m",
   aFail.length === 1 && aFail[0].measured && aFail[0].measured.value === 2.0,
   aFail.length ? "measured " + (aFail[0].measured && aFail[0].measured.value) : "n/a");
-check("narrow aisle FAIL informed-by value is 2.9 m (DIN 15185)",
-  aFail.length === 1 && aFail[0].guideline === "DIN 15185" && aFail[0].informedBy.value === 2.9,
+check("narrow aisle FAIL informed-by value is 2.9 m and is attributed to ASR A1.8, not DIN 15185",
+  aFail.length === 1 && aFail[0].guideline === "ASR A1.8" && aFail[0].informedBy.value === 2.9,
   aFail.length ? "informed-by " + aFail[0].informedBy.value : "n/a");
 check("narrow aisle FAIL names both offending rack ids",
   aFail.length === 1 && aFail[0].elements.length === 2 &&
@@ -179,8 +180,9 @@ for (const f of repBoxed.findings) {
 check("every finding is well-formed (status/guideline/DE+EN explain/elements)", shapeOk,
   repBoxed.findings.length + " findings");
 const codes = repNarrow.guidelines.map((g) => g.code);
-check("guidelines list cites ASR A1.8, ASR A2.3 and DIN 15185",
-  ["ASR A1.8", "ASR A2.3", "DIN 15185"].every((c) => codes.indexOf(c) !== -1), codes.join(", "));
+check("guidelines list cites ASR A1.8 + ASR A2.3 and no longer mis-cites DIN 15185 for aisle width",
+  ["ASR A1.8", "ASR A2.3"].every((c) => codes.indexOf(c) !== -1) &&
+  codes.indexOf("DIN 15185") === -1, codes.join(", "));
 const s = repBoxed.summary;
 check("summary counts add up and worst is correct",
   s.pass + s.warn + s.fail === s.total && s.total === repBoxed.findings.length &&

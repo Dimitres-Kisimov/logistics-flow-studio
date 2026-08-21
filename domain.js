@@ -682,14 +682,29 @@
   };
 
   /* ------------------------------------------------------------------
-   * AISLE-WIDTH GUIDANCE (informed by DIN 15185).
-   * DIN 15185-1 addresses the safety of storage installations and
-   * working-aisle design. Different trucks need different aisles:
+   * AISLE-WIDTH GUIDANCE (informed by ASR A1.8 Verkehrswege, 2022-03).
+   * ASR A1.8 is the source for working-aisle GEOMETRY: a vehicle route
+   * must clear the widest transport means or load, plus a lateral safety
+   * margin on each side and a further allowance where vehicles meet.
+   * (Earlier versions of this app cited DIN 15185 here. That was WRONG:
+   * DIN 15185 covers floor tolerances and person protection in guided
+   * narrow aisles - not working-aisle width - and part 2 is withdrawn.)
+   * Different trucks need different aisles:
    *   - Counterbalance truck : ~3.5-4.0 m
    *   - Reach truck          : ~2.7-3.0 m
    *   - VNA (man-up turret)   : ~1.5-1.8 m (wire/rail guided)
    * WarehouseTwin uses a single configurable minimum working-aisle gap
    * between facing racking rows. Default reflects a reach-truck aisle.
+   *
+   * HONEST NOTE on the 2.9 m default. Applying the ASR A1.8 construction
+   * to a reach truck whose widest envelope is ~1.27 m gives roughly
+   * 1.27 + 2 x 0.50 + 0.40 = 2.67 m for vehicle-only traffic and
+   * 1.27 + 2 x 0.75 + 0.40 = 3.17 m where pedestrians share the route.
+   * The app's 2.9 m default sits BETWEEN those two, so it is a truck-
+   * class teaching value, NOT a figure derived from the rule. It is
+   * published and is deliberately left unchanged; a real design must be
+   * worked from the actual truck and load envelope and the traffic mix.
+   *
    * This is design guidance to keep layouts sane - NOT a compliance
    * check or certification.
    * ------------------------------------------------------------------ */
@@ -700,7 +715,7 @@
       { id: "reach", label: "Reach truck", metres: 2.9 },
       { id: "counterbalance", label: "Counterbalance", metres: 3.8 },
     ],
-    note: "Informed by DIN 15185-1 working-aisle guidance. Design aid only, not a compliance check.",
+    note: "Informed by ASR A1.8 (Verkehrswege) working-aisle geometry: widest transport means or load + a lateral safety margin each side + a meeting allowance. The presets are truck-class teaching values, not figures derived from the rule. Design aid only, not a compliance check.",
   };
 
   /* ------------------------------------------------------------------
@@ -777,7 +792,7 @@
   }
 
   /* ------------------------------------------------------------------
-   * Aisle-width guard (informed by DIN 15185). Shared by the canvas
+   * Aisle-width guard (informed by ASR A1.8). Shared by the canvas
    * editor (app.js), the advisor and the optimizer so there is ONE
    * definition of "too narrow". Returns the storage-element pairs whose
    * facing gap is > 0 but < the minimum working aisle. `gap == 0`
