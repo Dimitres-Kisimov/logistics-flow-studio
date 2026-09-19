@@ -32,3 +32,11 @@ Acceptance evidence must include actual pointer drop/move, keyboard nudge, dupli
 [HSE guidance on separating pedestrians and vehicles](https://www.hse.gov.uk/workplacetransport/separating.htm), reviewed 2026-09-19, describes separating routes where possible, protecting crossings, visibility, barriers and preventing trapping. This is British guidance; it is not evidence of German or EU regulatory compliance.
 
 Engineering implication: preserving empty rectangles is only a first layer. A factory model also needs typed pedestrian/vehicle routes, crossings, entrances, visibility and vehicle/load envelopes. Static footprint checks do not establish safe traffic operation. No automatic clearance threshold or legal certification is inferred from this source.
+
+## Follow-up: manual edit guards
+
+Manual place, pointer movement, nudge, duplicate candidate search, property resize and rotation now share placementProblem. Valid draft rules apply immediately; malformed drafts block these edits. Fixed IDs prevent movement, size and rotation changes. Duplicating fixed equipment creates an independent object in permitted space. Positive-area intersection is rejected; edge contact is allowed. Existing conflicts may be moved completely out. Accepted manual geometry edits pause playback.
+
+This does not finish the audit contract: deletion, imports, generation, floor resizing, stale-ID lifecycle and full invalidation of derived reports still require work. There is no separate Apply-rules transaction yet. UI text describes immediate draft enforcement and excluded paths. The validator does not add aisle-width, swept-path or regulatory certification checks.
+
+Verification: 59 Node harnesses and 162 live-browser self-tests pass. New Node checks execute the actual app handlers for placement, nudge, size, rotation and duplicate candidate selection, including half-metre cells, malformed/out-of-floor rules, edge contact, fixed geometry and recovery. New browser test exercises real placement, nudge and rotation handlers. Native pointer interaction with these new constraints is not yet independently verified; prior unrestricted drag/drop testing is not treated as proof of that behavior.

@@ -3212,6 +3212,25 @@
       return {ok:ok,detail:"native drag payload and cleanup"};
     });
 
+    check("manual-placement-respects-reserved-and-fixed-rules", function () {
+      if (!haveApi) return false;
+      var oldRules=$("optConstraints").value, oldElements=API.state.elements, oldSelected=API.state.selectedId;
+      try {
+        var el={id:"placement-test",type:"pack-station",x:2,y:2,w:2,d:1};
+        API.state.elements=[el]; API.state.selectedId=el.id;
+        $("optConstraints").value=JSON.stringify({zones:[{x:4,y:2,w:2,d:2}],fixedIds:[]});
+        API.placement.nudge(1,0);
+        var blocked=el.x===2;
+        API.placement.place("pack-station",4,2);
+        blocked=blocked && API.state.elements.length===1;
+        $("optConstraints").value=JSON.stringify({fixedIds:[el.id]});
+        API.placement.rotate(); API.placement.nudge(-1,0);
+        return blocked && el.x===2 && el.w===2 && el.d===1;
+      } finally {
+        $("optConstraints").value=oldRules; API.state.elements=oldElements; API.state.selectedId=oldSelected; API.render();
+      }
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

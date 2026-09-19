@@ -646,6 +646,7 @@ import path from "node:path";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const HARNESSES = [
+  { name: "Manual placement constraints", args: ["verify_manual_placement.js"] },
   { name: "Route review: physical evidence and fallbacks (verify_route_review.js)", args: ["verify_route_review.js"] },
   { name: "Editable factory capacity planning (verify_capacity_plan.js)", args: ["verify_capacity_plan.js"] },
   { name: "Elapsed-time simulation clock (verify_run_clock.js)", args: ["verify_run_clock.js"] },

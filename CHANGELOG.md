@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-19 — Manual placement constraints
+
+Shared reserved-area and fixed-object checks now guard manual placement, dragging, nudging, duplication, resizing and rotation. Invalid drafts block edits; a conflicting object can move to a permitted location. Accepted edits pause playback. Imports, generation and floor resizing remain outside these guards. Cache wt-v106; local wt-v105 was not published.
+
+
 ## 2026-09-19 — Direct Play and equipment drag-and-drop
 
 The floor now exposes Play/Pause, Reset, speed and elapsed time without opening

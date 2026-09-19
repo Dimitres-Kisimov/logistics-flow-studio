@@ -1041,10 +1041,10 @@
           <label for="constraintObject">Fixed object</label><select id="constraintObject"></select>
           <button id="constraintToggle" class="btn wide" type="button">Toggle fixed position</button>
           <p id="constraintStatus" class="hint" role="status"></p>
-          <p class="hint">Advanced JSON below preserves incomplete drafts. Preview checks conflicts against equipment.</p>
+          <p class="hint">These areas immediately restrict manual placement, movement, size and rotation. Fixed equipment must be unlocked before those edits. Invalid JSON blocks manual edits until corrected.</p>
           <label for="optConstraints">Placement constraints</label>
           <textarea id="optConstraints" rows="5" maxlength="32768" spellcheck="false" aria-describedby="optConstraintLimit">{"fixedIds":[],"zones":[]}</textarea>
-          <p id="optConstraintLimit" class="hint">Rectangles only. No egress connectivity, turning envelopes, utilities or regulatory approval checks. Conflicting starting layouts are rejected.</p>
+          <p id="optConstraintLimit" class="hint">Rectangles only. Existing conflicts can be moved out; optimization rejects them. Imports, generation and floor resizing are not protected by these manual-edit rules. No egress connectivity, turning envelopes, utilities or regulatory approval checks.</p>
         </details>
         <button id="optimizeBtn" class="btn primary wide" type="button">Optimize (preview)</button>
         <div id="optOut" class="opt-out"><p class="empty">Preview shows dashed ghosts on the floor; nothing changes until you Apply.</p></div>

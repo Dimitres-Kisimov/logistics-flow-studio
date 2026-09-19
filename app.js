@@ -3237,7 +3237,10 @@
     const ny = Math.round(cy - state.drag.offsetY);
     if (nx === el.x && ny === el.y) return;
     const cand = { x: nx, y: ny, w: el.w, d: el.d };
-    if (inBounds(cand) && !overlapsAny(cand, el.id)) {
+    const problem = placementProblem(cand, el.id);
+    if (problem) { status(problem); return; }
+    if (state.flow.playing) flowPause();
+    {
       el.x = nx;
       el.y = ny;
       state.drag.moved = true;
@@ -3452,6 +3455,20 @@
     else if (before) toast("Warehouse resized to " + res.gridW + " × " + res.gridH + " m.");
   }
 
+  // One rule path for manual footprint edits. Draft constraints apply immediately;
+  // invalid drafts fail closed, but a conflicting object can move to a free area.
+  function placementProblem(cand, exceptId) {
+    let draft;
+    try { draft = readConstraintDraft(); }
+    catch (error) { return "Correct placement constraints in Analyze before editing: " + error.message; }
+    if (exceptId && draft.fixedIds.includes(exceptId)) return "This equipment is fixed. Unlock it in Analyze before editing.";
+    if (!inBounds(cand)) return "This position goes outside the floor.";
+    if (overlapsAny(cand, exceptId)) return "This position overlaps another element.";
+    const rect = { x:cand.x*CELL_M, y:cand.y*CELL_M, w:cand.w*CELL_M, d:cand.d*CELL_M };
+    const index = draft.zones.findIndex(z => rect.x < z.x+z.w && z.x < rect.x+rect.w && rect.y < z.y+z.d && z.y < rect.y+rect.d);
+    return index < 0 ? "" : "This position occupies reserved area " + (index+1) + ". Move outside its outline.";
+  }
+
   function placeAt(type, cx, cy) {
     const def = ELEMENTS[type];
     if (!def || def.w > GRID_W || def.d > GRID_H) { toast("This equipment is larger than the floor. Resize the floor first.", "warn"); return; }
@@ -3459,10 +3476,12 @@
     // clamp into bounds
     cand.x = Math.max(0, Math.min(GRID_W - cand.w, cand.x));
     cand.y = Math.max(0, Math.min(GRID_H - cand.d, cand.y));
-    if (overlapsAny(cand, null)) {
-      toast("Cannot place here — it would overlap another element.", "warn");
+    const problem = placementProblem(cand, null);
+    if (problem) {
+      toast(problem, "warn");
       return;
     }
+    if (state.flow.playing) flowPause();
     const el = { id: "el-" + ++state.idCounter, type, x: cand.x, y: cand.y, w: def.w, d: def.d };
     state.elements.push(el);
     selectElement(el.id);
@@ -3492,8 +3511,10 @@
   function duplicateSelected() {
     const el = state.elements.find((e) => e.id === state.selectedId);
     if (!el) return;
+    try { readConstraintDraft(); } catch (error) { toast("Correct placement constraints before duplicating: " + error.message, "warn"); return; }
     const spot = findFreeSpotNear(el);
     if (!spot) { toast("No free space on the floor for a copy.", "warn"); return; }
+    if (state.flow.playing) flowPause();
     const copy = { id: "el-" + ++state.idCounter, type: el.type, x: spot.x, y: spot.y, w: el.w, d: el.d };
     state.elements.push(copy);
     selectElement(copy.id);
@@ -3505,7 +3526,7 @@
   function findFreeSpotNear(el) {
     const fits = (x, y) => {
       const cand = { x, y, w: el.w, d: el.d };
-      return inBounds(cand) && !overlapsAny(cand, null) ? cand : null;
+      return !placementProblem(cand, null) ? cand : null;
     };
     const adjacent = [
       [el.x, el.y + el.d], // below (next rack row)
@@ -3532,7 +3553,9 @@
     const el = state.elements.find((e) => e.id === state.selectedId);
     if (!el) return;
     const cand = { x: el.x + dx, y: el.y + dy, w: el.w, d: el.d };
-    if (!inBounds(cand) || overlapsAny(cand, el.id)) return; // silently veto, like drag
+    const problem = placementProblem(cand, el.id);
+    if (problem) { status(problem); return; }
+    if (state.flow.playing) flowPause();
     el.x = cand.x;
     el.y = cand.y;
     scheduleSave();
@@ -4327,8 +4350,9 @@
     const w = Math.max(1, Math.min(GRID_W, Math.round(Number($("pW").value) || el.w)));
     const d = Math.max(1, Math.min(GRID_H, Math.round(Number($("pD").value) || el.d)));
     const cand = { x: el.x, y: el.y, w, d };
-    if (!inBounds(cand)) { toast("New size goes off the floor.", "warn"); renderProps(); return; }
-    if (overlapsAny(cand, el.id)) { toast("New size would overlap another element.", "warn"); renderProps(); return; }
+    const problem = placementProblem(cand, el.id);
+    if (problem) { toast(problem, "warn"); renderProps(); return; }
+    if (state.flow.playing) flowPause();
     el.w = w; el.d = d;
     scheduleSave();
     render();
@@ -4384,7 +4408,9 @@
     const el = state.elements.find((e) => e.id === state.selectedId);
     if (!el) return;
     const cand = { x: el.x, y: el.y, w: el.d, d: el.w };
-    if (!inBounds(cand) || overlapsAny(cand, el.id)) { toast("Not enough room to rotate here.", "warn"); return; }
+    const problem = placementProblem(cand, el.id);
+    if (problem) { toast(problem, "warn"); return; }
+    if (state.flow.playing) flowPause();
     el.w = cand.w; el.d = cand.d;
     // Curved conveyor: rotating also cycles WHICH corner the belt arc wraps, so
     // all four corner orientations are reachable (tr -> br -> bl -> tl -> tr).
@@ -9495,6 +9521,7 @@
       // v2.4 UI-2 hooks: drive selection + the grouped Inspector, and the
       // Simple/Expert density lever, through the SAME functions the UI uses.
       selectElement: selectElement,
+      placement: { problem:placementProblem, nudge:nudgeSelected, place:placeAt, rotate:rotateSelected },
       renderProps: renderProps,
       density: {
         mode: () => document.documentElement.getAttribute("data-density"),
