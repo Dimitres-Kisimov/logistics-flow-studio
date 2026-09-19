@@ -3,9 +3,10 @@
 <body><main>
 <a href="index.html">← Factory planner</a>
 <header><p class="eyebrow">Operations / Transfer evidence</p><h1>Follow a package through its recorded work.</h1><p>Open a SQL ledger export to inspect contents, assigned resources and blocked transfers. Files stay in this browser.</p></header>
-<section class="import"><label for="ledgerFile">Open ledger JSON</label><input id="ledgerFile" type="file" accept=".json,application/json"><p id="ledgerStatus" role="status">Choose an export from transport_store.py. Maximum 5 MB.</p></section>
+<section class="import"><h2>Start with an example or your export</h2><button id="ledgerDemo" type="button">Explore synthetic example</button><p class="view-note">Loads one example order, its floor and a timed route with an operating-window wait. Replaces the current view; your files are not changed.</p><label for="ledgerFile">Open ledger JSON</label><input id="ledgerFile" type="file" accept=".json,application/json"><p id="ledgerStatus" role="status">Choose an export from transport_store.py. Maximum 5 MB.</p></section>
 <section id="ledgerView" hidden>
 <p id="ledgerProvenance" class="note"></p>
+<p><a href="#routeScenario">Jump to route playback ↓</a></p>
 <label for="ledgerPackage">Package</label><select id="ledgerPackage"></select>
 <p id="ledgerContents"></p>
 <div class="cards"><article><span>Recorded state</span><strong id="ledgerState"></strong></article><article><span>Declared location</span><strong id="ledgerLocation"></strong></article><article><span>Assigned resource</span><strong id="ledgerResource"></strong></article></div>
@@ -21,7 +22,7 @@
 <p id="ledgerBindings"></p><p id="ledgerPositionNote"></p>
 <svg id="ledgerFloor" role="img" aria-label="Declared equipment footprint map" hidden></svg>
 </section>
-<section class="mapping"><p class="eyebrow">Scenario / Assumed movement</p><h2>Preview a timed route</h2>
+<section id="routeScenario" class="mapping"><p class="eyebrow">Scenario / Assumed movement</p><h2>Preview a timed route</h2>
 <p>Preview an unbound route or a package scenario exported by package_route.py. Package scenarios must match the selected ledger package and version. Movement uses entered assumptions; it does not replay recorded SQL history or prove travel permissions, traffic safety or compliance.</p>
 <label for="routeFile">Timed route JSON<input id="routeFile" type="file" accept=".json,application/json"></label>
 <p id="routeStatus" role="status">Load a floor, then a timeline from route_plan.py.</p>

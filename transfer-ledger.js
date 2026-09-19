@@ -99,14 +99,7 @@
       $("ledgerRows").append(row);
     });
   }
-  $("ledgerFile").addEventListener("change",async()=>{
-    const request=++token, file=$("ledgerFile").files[0];
-    model=null; clearRoute(); bindings.clear(); bindingRevision++; $("ledgerView").hidden=true;
-    if (!file) { $("ledgerStatus").textContent="No file selected."; return; }
-    try {
-      if (file.size>5*1024*1024) throw new Error("File exceeds 5 MB");
-      const text=await file.text(); if (request!==token) return;
-      model=window.TransferReplay.parse(JSON.parse(text));
+  function populateLedger(){
       $("ledgerPackage").replaceChildren();
       model.packages.forEach((entry,i)=>$("ledgerPackage").append(new Option(entry.manifest.id,String(i))));
       $("ledgerMapLocation").replaceChildren();
@@ -115,6 +108,36 @@
       $("ledgerView").hidden=!model.packages.length;
       $("ledgerStatus").textContent=`Loaded ${model.packages.length} package(s). Histories and resource intervals are consistent within this file; real-world accuracy is unverified.`;
       render();
+  }
+  $("ledgerDemo").addEventListener("click",async()=>{
+    const request=++token,floorRequest=++layoutToken,routeRevision=routeRequest,linksRevision=bindingRevision;
+    $("ledgerStatus").textContent="Loading synthetic example…";
+    try{
+      const response=await fetch("./examples/routes/viewer-demo.json");if(!response.ok)throw new Error("Example file unavailable; serve this app over localhost or use file imports");
+      const raw=await response.json();
+      if(request!==token||floorRequest!==layoutToken||routeRevision!==routeRequest||linksRevision!==bindingRevision){if(request===token)$("ledgerStatus").textContent="Example load cancelled because the current view changed.";return;}
+      if(raw.schema!=="factory-viewer-demo/v1")throw new Error("Unsupported example bundle");
+      const nextModel=window.TransferReplay.parse(raw.ledger),nextLayout=window.TransferReplay.parseLayout(raw.floor);
+      if(nextModel.packages.length!==1)throw new Error("Example requires one package");
+      const nextTimeline=window.RoutePlayback.parse(raw.timeline,raw.floor,nextModel.packages[0].manifest);
+      clearRoute();bindings.clear();bindingRevision++;model=nextModel;layout=nextLayout;rawLayout=raw.floor;
+      ["ledgerFile","ledgerLayoutFile","routeFile","ledgerMapImport"].forEach(id=>{$(id).value="";});
+      populateLedger();$("ledgerMapElement").replaceChildren();layout.elements.forEach(e=>$("ledgerMapElement").append(new Option(`${e.id} · ${e.type}`,e.id)));
+      $("ledgerMapStatus").textContent=`Synthetic floor · ${layout.width} × ${layout.depth} m. Location links remain explicit.`;
+      timeline=nextTimeline;elapsed=0;$("routeSeek").max=String(timeline.playback_duration_s);$("routeSpeed").value="10";$("routeView").hidden=false;
+      $("routeStatus").textContent="Synthetic scenario for PACKAGE-1 · order ORDER-A · pick PICK-1. Use Play scenario to run the example. Recorded history and predicted movement are separate.";
+      $("ledgerStatus").textContent="Synthetic example loaded. Inspect the recorded events, then scroll to Preview a timed route and press Play. No plant data or SQL records were changed.";
+      $("ledgerProvenance").textContent="SYNTHETIC EXAMPLE · Generated from the tested SQL, route and reservation tools. Not measured telemetry.";drawRoute();
+    }catch(error){if(request===token)$("ledgerStatus").textContent="Cannot load example: "+error.message;}
+  });
+  $("ledgerFile").addEventListener("change",async()=>{
+    const request=++token, file=$("ledgerFile").files[0];
+    model=null; clearRoute(); bindings.clear(); bindingRevision++; $("ledgerView").hidden=true;
+    if (!file) { $("ledgerStatus").textContent="No file selected."; return; }
+    try {
+      if (file.size>5*1024*1024) throw new Error("File exceeds 5 MB");
+      const text=await file.text(); if (request!==token) return;
+      model=window.TransferReplay.parse(JSON.parse(text));populateLedger();
     } catch(error) { model=null; $("ledgerStatus").textContent="Cannot open ledger: "+error.message; }
   });
   $("ledgerPackage").addEventListener("change",()=>{clearRoute();$("ledgerPosition").max="10000"; $("ledgerPosition").value="0"; render();});

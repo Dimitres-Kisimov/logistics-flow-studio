@@ -1729,3 +1729,7 @@ Area scheduler supports per-request operating windows, rechecks feasibility afte
 ## 2026-09-19 — Availability-aware route preview
 
 Browser playback now validates operating windows, explains window waits and displays unscheduled work without movement or false completion. Timeline export supports these outcomes. Cachewt-v96;57Node/43Python/159browser checks pass.
+
+## 2026-09-19 — One-click transfer example
+
+Added a labelled synthetic worked example that loads SQL history, floor and package-associated availability route together, plus a jump to playback. It uses normal validators, protects newer imports from stale responses, and is bundled in PWA cachewt-v97.57Node/43Python/159browser checks pass.

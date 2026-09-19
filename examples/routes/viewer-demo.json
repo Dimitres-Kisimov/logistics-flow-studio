@@ -1,0 +1,375 @@
+{
+  "schema": "factory-viewer-demo/v1",
+  "label": "Synthetic worked example; no measured plant data",
+  "ledger": {
+    "schema": "factory-transfer-ledger/v1",
+    "provenance": "Declared ledger data; not independently verified telemetry",
+    "packages": [
+      {
+        "id": "PACKAGE-1",
+        "pick_id": "PICK-1",
+        "source_id": "PICK-FACE",
+        "destination_id": "PACK-BENCH",
+        "location_id": "PACK-BENCH",
+        "resource_id": "WORKER-1",
+        "state": "delivered",
+        "version": 7,
+        "updated_at": "2026-09-19T10:07:00.000000+00:00",
+        "quantity": 4,
+        "item_id": "KIT-A",
+        "order_id": "ORDER-A",
+        "line_id": "LINE-A",
+        "unit": "piece"
+      }
+    ],
+    "events": [
+      {
+        "id": "T0",
+        "package_id": "PACKAGE-1",
+        "version": 0,
+        "state": "waiting",
+        "occurred_at": "2026-09-19T10:00:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:00:00.000000+00:00",
+          "destination": "PACK-BENCH",
+          "kind": "created",
+          "pick": "PICK-1",
+          "source": "PICK-FACE"
+        }
+      },
+      {
+        "id": "T1",
+        "package_id": "PACKAGE-1",
+        "version": 1,
+        "state": "assigned",
+        "occurred_at": "2026-09-19T10:01:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:01:00.000000+00:00",
+          "expected_version": 0,
+          "kind": "transition",
+          "reason": "",
+          "resource": "WORKER-1",
+          "target": "assigned"
+        }
+      },
+      {
+        "id": "T2",
+        "package_id": "PACKAGE-1",
+        "version": 2,
+        "state": "loading",
+        "occurred_at": "2026-09-19T10:02:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:02:00.000000+00:00",
+          "expected_version": 1,
+          "kind": "transition",
+          "reason": "",
+          "resource": null,
+          "target": "loading"
+        }
+      },
+      {
+        "id": "T3",
+        "package_id": "PACKAGE-1",
+        "version": 3,
+        "state": "travelling",
+        "occurred_at": "2026-09-19T10:03:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:03:00.000000+00:00",
+          "expected_version": 2,
+          "kind": "transition",
+          "reason": "",
+          "resource": null,
+          "target": "travelling"
+        }
+      },
+      {
+        "id": "T4",
+        "package_id": "PACKAGE-1",
+        "version": 4,
+        "state": "blocked",
+        "occurred_at": "2026-09-19T10:04:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:04:00.000000+00:00",
+          "expected_version": 3,
+          "kind": "transition",
+          "reason": "Synthetic aisle wait",
+          "resource": null,
+          "target": "blocked"
+        }
+      },
+      {
+        "id": "T5",
+        "package_id": "PACKAGE-1",
+        "version": 5,
+        "state": "travelling",
+        "occurred_at": "2026-09-19T10:05:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:05:00.000000+00:00",
+          "expected_version": 4,
+          "kind": "transition",
+          "reason": "",
+          "resource": null,
+          "target": "travelling"
+        }
+      },
+      {
+        "id": "T6",
+        "package_id": "PACKAGE-1",
+        "version": 6,
+        "state": "unloading",
+        "occurred_at": "2026-09-19T10:06:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:06:00.000000+00:00",
+          "expected_version": 5,
+          "kind": "transition",
+          "reason": "",
+          "resource": null,
+          "target": "unloading"
+        }
+      },
+      {
+        "id": "T7",
+        "package_id": "PACKAGE-1",
+        "version": 7,
+        "state": "delivered",
+        "occurred_at": "2026-09-19T10:07:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:07:00.000000+00:00",
+          "expected_version": 6,
+          "kind": "transition",
+          "reason": "",
+          "resource": null,
+          "target": "delivered"
+        }
+      }
+    ]
+  },
+  "floor": {
+    "version": "wt-1",
+    "gridW": 40,
+    "gridH": 24,
+    "cell": 0.5,
+    "elements": [
+      {
+        "id": "PICK-FACE-ANCHOR",
+        "type": "selective-racking",
+        "x": 4,
+        "y": 6,
+        "w": 8,
+        "d": 2
+      },
+      {
+        "id": "PACK-BENCH-ANCHOR",
+        "type": "pack-station",
+        "x": 28,
+        "y": 16,
+        "w": 4,
+        "d": 2
+      }
+    ],
+    "config": {},
+    "note": "Synthetic teaching layout. Equipment centres are declared anchors, not measured package coordinates."
+  },
+  "timeline": {
+    "schema": "factory-route-timeline/v1",
+    "provenance": "assumed-simulation-not-telemetry",
+    "floor": {
+      "width": 20.0,
+      "depth": 12.0,
+      "elements": [
+        {
+          "id": "PACK-BENCH-ANCHOR",
+          "x": 14.0,
+          "y": 8.0,
+          "w": 2.0,
+          "d": 1.0
+        },
+        {
+          "id": "PICK-FACE-ANCHOR",
+          "x": 2.0,
+          "y": 3.0,
+          "w": 4.0,
+          "d": 1.0
+        }
+      ]
+    },
+    "route": {
+      "schema": "factory-route-proposal/v1",
+      "found": true,
+      "points": [
+        {
+          "id": "PICK-ACCESS",
+          "x": 4.0,
+          "y": 4.8
+        },
+        {
+          "id": "AISLE-A",
+          "x": 4.0,
+          "y": 6.0
+        },
+        {
+          "id": "AISLE-B",
+          "x": 13.0,
+          "y": 6.0
+        },
+        {
+          "id": "PACK-ACCESS",
+          "x": 13.0,
+          "y": 8.5
+        }
+      ],
+      "distance_m": 12.7,
+      "mode": "worker",
+      "clearance_m": 0.3,
+      "floor_digest": "9db740cbbfe623d2797a6fd87d0fd6b936aef5d51298450ebc704350e4dcc1d7",
+      "rejected_edges": [],
+      "reason": "candidate-on-declared-graph",
+      "limitations": "Static rectangular footprint screening only. No turning envelope, traffic conflicts, slopes, doors, utilities, visibility, timing or regulatory approval. Clearance is user supplied, not a prescribed safe value."
+    },
+    "speed_mps": 1.0,
+    "loading_s": 5.0,
+    "unloading_s": 3.0,
+    "segments": [
+      {
+        "source": {
+          "id": "PICK-ACCESS",
+          "x": 4.0,
+          "y": 4.8
+        },
+        "destination": {
+          "id": "AISLE-A",
+          "x": 4.0,
+          "y": 6.0
+        },
+        "start_s": 5.0,
+        "end_s": 6.2
+      },
+      {
+        "source": {
+          "id": "AISLE-A",
+          "x": 4.0,
+          "y": 6.0
+        },
+        "destination": {
+          "id": "AISLE-B",
+          "x": 13.0,
+          "y": 6.0
+        },
+        "start_s": 6.2,
+        "end_s": 15.2
+      },
+      {
+        "source": {
+          "id": "AISLE-B",
+          "x": 13.0,
+          "y": 6.0
+        },
+        "destination": {
+          "id": "PACK-ACCESS",
+          "x": 13.0,
+          "y": 8.5
+        },
+        "start_s": 15.2,
+        "end_s": 17.7
+      }
+    ],
+    "travel_end_s": 17.7,
+    "duration_s": 20.7,
+    "limitations": "Constant speed and instantaneous turns; no acceleration, queues, breaks, collisions or resource availability. Timing is entered assumptions, not measured execution.",
+    "package_snapshot": {
+      "id": "PACKAGE-1",
+      "pick_id": "PICK-1",
+      "source_id": "PICK-FACE",
+      "destination_id": "PACK-BENCH",
+      "order_id": "ORDER-A",
+      "line_id": "LINE-A",
+      "item_id": "KIT-A",
+      "quantity": 4,
+      "unit": "piece",
+      "version": 7,
+      "updated_at": "2026-09-19T10:07:00.000000+00:00"
+    },
+    "location_access": {
+      "PACK-BENCH": "PACK-ACCESS",
+      "PICK-FACE": "PICK-ACCESS"
+    },
+    "association_note": "User-declared location access nodes; not measured motion. Package version is a snapshot, not a reservation or execution command.",
+    "reservation": {
+      "request_id": "PACKAGE-1",
+      "schedule": {
+        "schema": "factory-area-schedule/v1",
+        "provenance": "synthetic-reservation-model",
+        "horizon_s": 60.0,
+        "policy": "release-ascending/priority-descending/id-ascending; atomic nonpreemptive area claims",
+        "areas": [
+          {
+            "id": "DEMO-AISLE",
+            "capacity": 1
+          }
+        ],
+        "requests": [
+          {
+            "id": "PACKAGE-1",
+            "release_s": 8.0,
+            "duration_s": 20.7,
+            "priority": 0,
+            "areas": [
+              "DEMO-AISLE"
+            ],
+            "availability_s": [
+              [
+                0.0,
+                10.0
+              ],
+              [
+                30.0,
+                60.0
+              ]
+            ],
+            "planned_start_s": 30.0,
+            "planned_end_s": 50.7,
+            "planned_wait_s": 22.0,
+            "state_at_horizon": "completed",
+            "observed_wait_s": 22.0,
+            "explanations": [
+              {
+                "candidate_start_s": 8.0,
+                "next_start_s": 30.0,
+                "reason": "availability-window"
+              }
+            ]
+          }
+        ],
+        "events": [
+          {
+            "at_s": 8.0,
+            "kind": "requested",
+            "request_id": "PACKAGE-1",
+            "areas": [
+              "DEMO-AISLE"
+            ]
+          },
+          {
+            "at_s": 30.0,
+            "kind": "granted",
+            "request_id": "PACKAGE-1",
+            "areas": [
+              "DEMO-AISLE"
+            ]
+          },
+          {
+            "at_s": 50.7,
+            "kind": "released",
+            "request_id": "PACKAGE-1",
+            "areas": [
+              "DEMO-AISLE"
+            ]
+          }
+        ],
+        "completed": 1,
+        "unfinished": 0,
+        "limitations": "Declared area durations only. All requested areas held for the full duration; waits occur before entry. Optional request availability is not a workforce calendar; omitted availability assumes unrestricted time. No geometry, body clearance, resources, repositioning, stochastic timing or actual execution. Future starts are plans, not horizon completions."
+      }
+    }
+  }
+}

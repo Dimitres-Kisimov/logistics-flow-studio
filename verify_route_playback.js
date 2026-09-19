@@ -75,4 +75,10 @@ const crosses=structuredClone(available);crosses.reservation.schedule.requests[0
 assert.throws(()=>api.parse(crosses,floor),/unavailable period/);
 const malformed=structuredClone(available);malformed.reservation.schedule.requests[0].availability_s=[[0,10],[9,60]];
 assert.throws(()=>api.parse(malformed,floor),/overlapping/);
+const demo=JSON.parse(fs.readFileSync("examples/routes/viewer-demo.json","utf8"));
+const ledger=require("./transfer-replay.js").parse(demo.ledger);
+const demoModel=api.parse(demo.timeline,demo.floor,ledger.packages[0].manifest);
+assert.equal(demoModel.package_snapshot.id,"PACKAGE-1");
+assert.equal(api.sample(demoModel,10).state,"queued");
+assert.equal(api.sample(demoModel,60).state,"delivered");
 console.log("Route playback: timing, geometry, stale floors, obstacles and boundaries pass");
