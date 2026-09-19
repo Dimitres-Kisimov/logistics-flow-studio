@@ -1697,3 +1697,7 @@ fixtures and primary-source scope notes; no safe-route or real movement claim.
 ## 2026-09-19 — Route exclusion areas
 
 Directed-route screening now enforces saved placement reserved areas, includes them in graph identity, and rejects malformed drafts. Metre units do not depend on equipment cell size. All 27 Python tests pass; browser playback integration remains pending.
+
+## 2026-09-19 — Assumed route timing
+
+Screened routes can produce explicit constant-speed segment timelines with loading and unloading assumptions. Continuous sampling exposes position, heading and stage without inventing locations for unroutable transfers. CLI/library only; browser and SQL integration remain pending. All 30 Python tests pass.

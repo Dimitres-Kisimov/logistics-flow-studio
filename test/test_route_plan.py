@@ -93,6 +93,35 @@ class RoutePlanTests(unittest.TestCase):
         self.floor["placementConstraintDraft"] = json.dumps(dict(zones=zones[::-1]))
         self.assertEqual(digest, route.floor_digest(route.floor_model(self.floor)))
 
+    def test_timed_detour_and_exact_stage_boundaries(self):
+        timeline = route.timed_plan(self.floor, self.graph, "a", "d", "worker", .5, 2, 3, 4)
+        self.assertEqual(timeline["duration_s"], 13)
+        self.assertEqual(route.sample_timeline(timeline, 2)["state"], "loading")
+        middle = route.sample_timeline(timeline, 3.75)
+        self.assertEqual(middle["position"], dict(x=2, y=3.5))
+        self.assertAlmostEqual(middle["heading_rad"], -route.math.pi / 2)
+        corner = route.sample_timeline(timeline, 4.5)
+        self.assertEqual(corner["position"], dict(x=2, y=2))
+        self.assertEqual(corner["heading_rad"], 0)
+        self.assertEqual(route.sample_timeline(timeline, 9)["state"], "unloading")
+        self.assertEqual(route.sample_timeline(timeline, 13)["state"], "delivered")
+        self.assertEqual(route.sample_timeline(timeline, 100)["position"], dict(x=8, y=5))
+        # 100x playback changes elapsed time, never the physical speed assumption.
+        self.assertEqual(route.sample_timeline(timeline, .0375 * 100), middle)
+
+    def test_timed_unroutable_and_stationary_transfer(self):
+        timeline = route.timed_plan(self.floor, self.graph, "d", "a", "worker", .5, 1, 0, 0)
+        self.assertIsNone(timeline["duration_s"])
+        self.assertEqual(route.sample_timeline(timeline, 10)["state"], "unroutable")
+        self.assertIsNone(route.sample_timeline(timeline, 10)["position"])
+        stationary = route.timed_plan(self.floor, self.graph, "a", "a", "worker", .5, 1, 0, 0)
+        self.assertEqual(route.sample_timeline(stationary, 0)["state"], "delivered")
+
+    def test_invalid_timing(self):
+        for values in [(0, 1, 1), (True, 1, 1), (1, -1, 1), (1, 1, float("inf")), (1e-320, 0, 0)]:
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                route.timed_plan(self.floor, self.graph, "a", "d", "worker", .5, *values)
+
 
 if __name__ == "__main__":
     unittest.main()

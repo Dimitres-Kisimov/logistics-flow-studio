@@ -52,3 +52,11 @@ non-unit cell conversion, stale geometry, determinism and nonmutation. All 27 Py
 tests pass. The 12.7 m example JSON and SVG were generated twice with identical hashes.
 SVG browser inspection was blocked by the browser URL policy; rendered visual QA
 is unverified. Geometry and output data checks passed.
+
+## Assumed travel timeline
+
+Add --speed-mps 1 --loading-s 5 --unloading-s 3 to the example command to produce factory-route-timeline/v1. All three inputs are required together; no default industrial speed is implied. The synthetic example takes 20.7 seconds: 5 loading, 12.7 travelling, 3 unloading. These are assumed durations, not observations or safe operating limits.
+
+The timeline contains metre endpoints and simulation-second boundaries for each screened segment. sample_timeline returns continuous position, heading in radians from the positive x axis toward positive y, and loading/travelling/unloading/delivered state. Exact boundaries belong to the next stage. Unroutable transfers have no duration or position. The sampler accepts internally generated timelines; it is not an untrusted-file validator. A future browser importer must validate the full contract and current floor before playback.
+
+Playback multipliers should multiply elapsed simulation time, leaving speed_mps unchanged. Acceleration, deceleration, cornering, congestion, shared resources and measured telemetry remain absent. This CLI model is not yet wired to browser animation or SQL execution. Tests cover hand-computed durations and positions, corners, boundaries, stationary transfers, missing paths and invalid timing. All 30 Python tests pass.

@@ -164,6 +164,53 @@ def plan(raw_floor, graph, start, destination, mode, clearance_m):
                 limitations="Static rectangular footprint screening only. No turning envelope, traffic conflicts, slopes, doors, utilities, visibility, timing or regulatory approval. Clearance is user supplied, not a prescribed safe value.")
 
 
+def timed_plan(raw_floor, graph, start, destination, mode, clearance_m,
+               speed_mps, loading_s, unloading_s):
+    """Generate an assumed constant-speed schedule directly from screened geometry."""
+    speed = number(speed_mps, True)
+    loading, unloading = number(loading_s), number(unloading_s)
+    proposal = plan(raw_floor, graph, start, destination, mode, clearance_m)
+    segments, cursor = [], loading
+    if proposal["found"]:
+        for a, b in zip(proposal["points"], proposal["points"][1:]):
+            duration = math.hypot(b["x"] - a["x"], b["y"] - a["y"]) / speed
+            end = cursor + duration
+            if not math.isfinite(end) or (duration > 0 and end == cursor):
+                raise ValueError("Travel timing exceeds supported numeric precision")
+            segments.append(dict(source=a.copy(), destination=b.copy(), start_s=cursor, end_s=end))
+            cursor = end
+        if not math.isfinite(cursor + unloading):
+            raise ValueError("Total duration is not finite")
+    return dict(schema="factory-route-timeline/v1", provenance="assumed-simulation-not-telemetry",
+                route=proposal, speed_mps=speed, loading_s=loading, unloading_s=unloading,
+                segments=segments, travel_end_s=cursor if proposal["found"] else None,
+                duration_s=cursor + unloading if proposal["found"] else None,
+                limitations="Constant speed and instantaneous turns; no acceleration, queues, breaks, collisions or resource availability. Timing is entered assumptions, not measured execution.")
+
+
+def sample_timeline(timeline, elapsed_s):
+    """Sample an internally generated timeline; elapsed time is simulation seconds."""
+    elapsed = number(elapsed_s)
+    route = timeline["route"]
+    if not route["found"]:
+        return dict(state="unroutable", position=None, heading_rad=None, elapsed_s=elapsed)
+    first, last = route["points"][0], route["points"][-1]
+    state, position, heading = "loading", dict(x=first["x"], y=first["y"]), None
+    if elapsed >= timeline["duration_s"]:
+        state, position = "delivered", dict(x=last["x"], y=last["y"])
+    elif elapsed >= timeline["travel_end_s"]:
+        state, position = "unloading", dict(x=last["x"], y=last["y"])
+    elif elapsed >= timeline["loading_s"]:
+        for segment in timeline["segments"]:
+            if segment["start_s"] <= elapsed < segment["end_s"]:
+                a, b = segment["source"], segment["destination"]
+                fraction = (elapsed - segment["start_s"]) / (segment["end_s"] - segment["start_s"])
+                position = {axis: a[axis] + (b[axis] - a[axis]) * fraction for axis in ("x", "y")}
+                state, heading = "travelling", math.atan2(b["y"] - a["y"], b["x"] - a["x"])
+                break
+    return dict(state=state, position=position, heading_rad=heading, elapsed_s=elapsed)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--floor", type=Path, required=True)
@@ -173,6 +220,9 @@ def main():
     parser.add_argument("--destination")
     parser.add_argument("--mode", choices=["worker", "forklift", "agv"])
     parser.add_argument("--clearance-m", type=float)
+    parser.add_argument("--speed-mps", type=float, help="Enable assumed timed route; also requires both handling times")
+    parser.add_argument("--loading-s", type=float)
+    parser.add_argument("--unloading-s", type=float)
     args = parser.parse_args()
     raw = json.loads(args.floor.read_text(encoding="utf-8-sig"))
     if args.digest:
@@ -181,7 +231,14 @@ def main():
     if args.graph is None or args.start is None or args.destination is None or args.mode is None or args.clearance_m is None:
         parser.error("Graph, start, destination, mode and explicit clearance are required")
     graph = json.loads(args.graph.read_text(encoding="utf-8-sig"))
-    print(json.dumps(plan(raw, graph, args.start, args.destination, args.mode, args.clearance_m), indent=2))
+    timing = (args.speed_mps, args.loading_s, args.unloading_s)
+    if any(value is not None for value in timing):
+        if any(value is None for value in timing):
+            parser.error("Timed routes require explicit speed, loading and unloading times")
+        result = timed_plan(raw, graph, args.start, args.destination, args.mode, args.clearance_m, *timing)
+    else:
+        result = plan(raw, graph, args.start, args.destination, args.mode, args.clearance_m)
+    print(json.dumps(result, indent=2, allow_nan=False))
 
 
 if __name__ == "__main__":
