@@ -3353,6 +3353,20 @@
       $("flowDurationApply").click();
       return { ok: done && stopped, detail: "One-minute horizon caps both flow and further steps; reset restores eight hours" };
     });
+    check("scene-inspector-and-visible-guide", function () {
+      var snap = WT.sceneTracking.snapshot();
+      var finite = snap.workers.concat(snap.packages).every(function (p) {
+        return isFinite(p.x) && isFinite(p.y) && isFinite(p.heading);
+      });
+      if (snap.workers.length) WT.sceneTracking.select(snap.workers[0].id);
+      var selected = WT.sceneTracking.snapshot().selected;
+      $("sceneQuestion").value = "Explain workers";
+      $("sceneChatForm").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      var answered = $("sceneChatLog").textContent.indexOf("not tracked staff") >= 0;
+      WT.sceneTracking.select(null);
+      return { ok: finite && answered && (!snap.workers.length || selected === snap.workers[0].id),
+        detail: "Finite scene poses, shared selection and grounded visible guide" };
+    });
     check("no-errors-after-drive", function () {
       var e = window.__WT_ERRORS__ || [];
       return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" };

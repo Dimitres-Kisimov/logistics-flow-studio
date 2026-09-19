@@ -221,3 +221,14 @@ python -m unittest discover -s test -p "test_*.py" -v
 It is not connected to the browser or a real WMS. See
 [competitive research](docs/COMPETITIVE_FACTORY_RESEARCH.md) for the sourced product
 comparison, safe-placement proposal contract and remaining package-transfer work.
+
+### Visible assistant and scene inspector
+
+The open-by-default Factory assistant answers model questions using local rules;
+no AI model is connected. Select a package or illustrative worker to see its
+position, heading and stage, with a matching marker in 2D and isometric views.
+Coordinates use the rendering model, including package queue offsets. These are
+synthetic positions, not telemetry, safe paths or a staffing schedule. Package
+IDs last for the run; there is no persistent tracking history or SQL order link.
+Close/reopen the panel with Assistant & tracking. Cache wt-v84; verification:
+54 Node harnesses, 157 browser checks, 11 Python tests and the offline guard.

@@ -2342,3 +2342,21 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .capacity-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
 .capacity-file { width: 100%; font-size: 11px; }
 .capacity-scope { color: var(--muted); border-top: 1px solid var(--border); padding-top: 14px; font-size: 11px; line-height: 1.6; }
+.scene-assistant-toggle { position: fixed; right: 22px; bottom: 20px; z-index: 80; box-shadow: 0 5px 18px #0003; }
+.scene-assistant { position: fixed; right: 18px; top: 88px; width: min(350px, calc(100vw - 100px)); max-height: calc(100vh - 165px); overflow: auto; z-index: 79; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 8px; box-shadow: 0 12px 40px #0005; padding: 16px; box-sizing: border-box; }
+.scene-assistant[hidden] { display: none; }
+.scene-assistant header { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.scene-assistant header strong { font-size: 17px; }
+.scene-assistant header p, #sceneCounts { font-size: 11px; color: var(--muted); }
+.scene-chat-log { max-height: 190px; overflow-y: auto; margin: 12px 0; font-size: 12px; line-height: 1.6; }
+.scene-message { padding: 10px; border-left: 2px solid var(--border); }
+.scene-user { border-color: var(--accent); }
+.scene-prompts, #sceneChatForm > div { display: flex; gap: 8px; }
+.scene-prompts .btn { font-size: 11px; }
+#sceneChatForm { margin-top: 15px; }
+#sceneChatForm label, .scene-inspector label { display: block; font-size: 11px; margin-bottom: 7px; }
+#sceneQuestion { min-width: 0; width: 100%; min-height: 40px; background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 8px; box-sizing: border-box; }
+.scene-inspector { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 12px; }
+.scene-inspector h3 { font-size: 13px; margin: 0; }
+#sceneEntity { width: 100%; min-height: 38px; }
+#sceneEntityDetails { font-size: 11px; line-height: 1.6; }

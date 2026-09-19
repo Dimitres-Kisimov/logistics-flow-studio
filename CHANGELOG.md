@@ -6,6 +6,15 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## 2026-09-19 — Visible scene inspector and local guide
+
+Added an initially visible Factory assistant, with grounded rule-based answers
+and explicit disconnected-model status. Package and worker selection marks the
+same display coordinates in both projections and exposes position, heading and
+stage. Worker poses remain illustrative; persistent history, telemetry and SQL
+identity integration remain future work. PWA cache wt-v84. All 54 harnesses,
+157 browser checks and 11 Python tests pass; deterministic PDF output unchanged.
+
 ## v3.26 — Review the equipment behind an order route
 
 The Live material flow panel now shows each recipe as an ordered review, including missing and unsupported operations, shared benches, fallback positions, and both returns outcomes. An empty floor can still resolve the legacy animation, but the review correctly reports equipment gaps. Simulation behaviour and existing numeric baselines are unchanged.

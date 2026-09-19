@@ -1311,7 +1311,16 @@
   <script src="capacity-plan.js"></script>
   <script src="run-clock.js"></script>
   <script src="capacity-panel.js"></script>
+  <button id="sceneAssistantToggle" class="btn scene-assistant-toggle" type="button" aria-expanded="true" aria-controls="sceneAssistant">Assistant &amp; tracking</button>
+  <aside id="sceneAssistant" class="scene-assistant" aria-label="Factory assistant and scene tracking">
+    <header><div><strong>Factory assistant</strong><p>Offline rules · no AI model connected</p></div><button id="sceneAssistantClose" class="btn" type="button" aria-label="Close factory assistant">×</button></header>
+    <div id="sceneChatLog" class="scene-chat-log" role="log" aria-live="polite"></div>
+    <div class="scene-prompts"><button class="btn" type="button" data-question="Track packages">Track packages</button><button class="btn" type="button" data-question="Explain workers">Explain workers</button></div>
+    <form id="sceneChatForm"><label for="sceneQuestion">Ask about this model</label><div><input id="sceneQuestion" type="text" maxlength="500" autocomplete="off" placeholder="Where are the packages?" /><button class="btn" type="submit">Ask</button></div></form>
+    <section class="scene-inspector"><h3>Scene inspector</h3><p id="sceneCounts"></p><label for="sceneEntity">Highlight in 2D / 3D</label><select id="sceneEntity"><option value="">Choose a package or worker</option></select><p id="sceneEntityDetails"></p></section>
+  </aside>
   <script src="app.js"></script>
+  <script src="scene-assistant.js"></script>
   <!-- In-browser E2E self-test. INERT unless the URL carries ?selftest=1;
        a normal load never runs it. Loaded LAST so the app has booted. -->
   <script src="selftest.js"></script>

@@ -731,6 +731,45 @@
   // the 2.5D scene with the same projector, so the two views agree.
   // LOD-gated (culled entirely when a cell reads too small to show a
   // person) and view-culled in the top-down path, so a big hall stays fast.
+  let sceneSelection = null;
+  function sceneMark(id, x, y, z, heading) {
+    if (sceneSelection !== id) return;
+    const p = projPx(x, y, z + 0.1);
+    const q = projPx(x + Math.cos(heading), y + Math.sin(heading), z + 0.1);
+    ctx.save();
+    ctx.strokeStyle = COLORS.text; ctx.fillStyle = COLORS.surface || "#25231f";
+    ctx.lineWidth = 2 / view.scale;
+    ctx.beginPath(); ctx.arc(p.x, p.y, cellPx * 0.8, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+    ctx.font = `${12 / view.scale}px sans-serif`;
+    ctx.fillStyle = COLORS.text; ctx.fillText(id, p.x + cellPx, p.y - cellPx * 0.7);
+    ctx.restore();
+  }
+  WT.sceneTracking = {
+    select(id) { sceneSelection = id || null; render(); },
+    snapshot() {
+      const sim = state.flow.sim;
+      const units = sim && WT.goods ? WT.goods.units(sim, goodsSupport(),
+        WT.shift ? { queueMax: WT.shift.QUEUE_SHOW_MAX } : undefined) : [];
+      const t = workerAnimT(), busy = workerBusyFn();
+      const store = WT.shift && t != null ? _shiftStore : null;
+      const people = workerRoster().map(spec => {
+        const opt = { busy: busy ? busy(spec) : false };
+        if (store) {
+          const st = WT.shift.stationAt(store, spec.anchor.x, spec.anchor.y);
+          if (st) { if (st.starved) opt.busy = false; opt.work = st.eff; }
+        }
+        const p = WT.workers.sample(spec, t, opt);
+        return { id: "worker:" + p.id, x: p.x, y: p.y, z: 0, heading: p.heading,
+          status: p.sub, task: p.task, basis: "Illustrative worker pose, not a measured or scheduled person" };
+      });
+      return { tick: sim ? sim.tick : 0, playing: state.flow.playing, view: state.viewMode,
+        packagesVisible: state.flow.on, completed: sim ? sim.completed : 0,
+        selected: sceneSelection, packages: units.map(p => ({ id: "package:" + p.id,
+          x: p.x, y: p.y, z: p.z, heading: p.heading, status: p.status, task: p.stage,
+          basis: "Synthetic model; coordinates match displayed queue offsets" })), workers: people };
+    }
+  };
   function drawWorkers() {
     if (!WT.workers || !WT.shapes || typeof WT.shapes.detailLevel !== "function") return;
     const onCell = cellPx * view.scale;
@@ -774,6 +813,8 @@
         }
       }
       WT.workers.draw(ctx, WT.workers.sample(spec, t, opt), opts);
+      const pose = WT.workers.sample(spec, t, opt);
+      sceneMark("worker:" + pose.id, pose.x, pose.y, 0, pose.heading);
     }
   }
 
@@ -2106,6 +2147,7 @@
       if (vb && (u.x < vb.minX - 2 || u.x > vb.maxX + 2 || u.y < vb.minY - 2 || u.y > vb.maxY + 2)) continue;
       opts.stageColor = colors[u.stage] || COLORS.flow;
       WT.goods.draw(ctx, u, opts);
+      sceneMark("package:" + u.id, u.x, u.y, u.z, u.heading);
     }
     ctx.restore();
   }
@@ -2289,6 +2331,7 @@
     const shape = activeOrderShape();
     if (shape) { opts.orders = shape.orders; opts.linesPerOrderMax = shape.linesPerOrderMax; }
     state.flow.sim = WT.flowsim.state(layout, opts);
+    sceneSelection = null;
     flowClock = WT.runClock.create(flowDurationMinutes);
     state.flow.sig = flowSignature();
     invalidateWorkers(); // v3.22: a new run starts with an unwoken shift

@@ -1,0 +1,16 @@
+"use strict";
+const assert = require("node:assert/strict");
+global.window = { WT: {} };
+global.document = { getElementById: () => null };
+require("./scene-assistant.js");
+const snap = { packages: [{id: 1}], workers: [{id: 2}], completed: 4, tick: 6, packagesVisible: false };
+const saved = JSON.stringify(snap);
+const answer = window.WT.sceneAssistant.answer;
+assert.match(answer("Track packages", snap), /1 packages.*4 completions at tick 6/);
+assert.match(answer("Track packages", snap), /drawing is hidden/);
+assert.match(answer("Explain workers", snap), /not tracked staff/);
+assert.match(answer("safe placement", snap), /cannot approve a safe layout/);
+assert.match(answer("What about 3D?", snap), /same world coordinates/);
+assert.match(answer("unknown", snap), /no language model is connected/);
+assert.equal(JSON.stringify(snap), saved);
+console.log("PASS scene guide: grounded counts, hidden packages, honest worker/safety/model limits, no mutation");
