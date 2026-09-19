@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "profile": "process-manufacturing",
+  "dataStatus": "synthetic",
+  "source": "Hand-checkable process planning demonstration. Labour input only, no reaction or gas model. One 480-minute shift.",
+  "shift": {"paidMinutes": 480, "breakMinutes": 30, "otherUnavailableMinutes": 30},
+  "orders": [
+    {"id": "BLEND-01", "quantity": 1200, "unit": "kg", "skill": "process-operator", "labourMinutesPerUnit": 0.4, "setupLabourMinutes": 90},
+    {"id": "QC-01", "quantity": 3, "unit": "batch-sample", "skill": "quality", "labourMinutesPerUnit": 25, "setupLabourMinutes": 15}
+  ],
+  "inventory": [
+    {"sku": "FEED-A", "unit": "kg", "opening": 1500, "receipts": 200, "produced": 0, "returns": 0, "adjustment": -10, "issues": 1200, "dispatch": 0, "scrap": 20, "reservedAtClose": 100}
+  ],
+  "electricity": [
+    {"id": "FIRST-HALF", "startMinute": 0, "durationMinutes": 240, "importKWh": 200, "exportKWh": 0, "generationKWh": 20, "batteryDischargeKWh": 10, "batteryChargeKWh": 0, "loadKWh": 225, "lossKWh": 5},
+    {"id": "SECOND-HALF", "startMinute": 240, "durationMinutes": 240, "importKWh": 160, "exportKWh": 5, "generationKWh": 40, "batteryDischargeKWh": 0, "batteryChargeKWh": 10, "loadKWh": 180, "lossKWh": 2}
+  ]
+}

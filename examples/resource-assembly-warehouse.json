@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "profile": "assembly-warehouse",
+  "dataStatus": "synthetic",
+  "source": "Hand-checkable demonstration, no real factory data. One 480-minute shift.",
+  "shift": {"paidMinutes": 480, "breakMinutes": 30, "otherUnavailableMinutes": 30},
+  "orders": [
+    {"id": "ORDER-A", "quantity": 300, "unit": "piece", "skill": "assembly", "labourMinutesPerUnit": 3, "setupLabourMinutes": 60},
+    {"id": "ORDER-B", "quantity": 200, "unit": "order-line", "skill": "picking", "labourMinutesPerUnit": 2, "setupLabourMinutes": 20}
+  ],
+  "inventory": [
+    {"sku": "KIT-A", "unit": "kit", "opening": 250, "receipts": 40, "produced": 0, "returns": 0, "adjustment": 0, "issues": 300, "dispatch": 0, "scrap": 0, "reservedAtClose": 0}
+  ],
+  "electricity": [
+    {"id": "SHIFT", "startMinute": 0, "durationMinutes": 480, "importKWh": 100, "exportKWh": 20, "generationKWh": 40, "batteryDischargeKWh": 0, "batteryChargeKWh": 10, "loadKWh": 105, "lossKWh": 5}
+  ],
+  "picking": {"completedPicks": 200, "definition": "One completed order line; synthetic separate observed-work example, not a forecast from the order list", "productiveLabourHours": 4, "paidLabourHours": 5}
+}

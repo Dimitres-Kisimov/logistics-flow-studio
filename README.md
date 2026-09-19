@@ -156,3 +156,30 @@ A normal load (no flag) is completely unaffected — the self-test code is inert
 ## Licence
 
 © 2026 Dimitres Kisimov — all rights reserved. Published for portfolio review and evaluation only; no permission is granted to use, copy, modify or distribute. See [`LICENSE`](LICENSE).
+
+## Factory resource planning: research prototype
+
+The staged BIM, utility, workforce and assistant roadmap is in
+[docs/FACTORY_PLATFORM_PLAN.md](docs/FACTORY_PLATFORM_PLAN.md), including primary
+standards sources and explicit current limitations. The first calculation layer
+is a standard-library Python tool with **two selectable profiles**:
+
+```sh
+python tools/resource_plan.py --profile assembly-warehouse --out work/assembly
+python tools/resource_plan.py --profile process-manufacturing --out work/process
+python tools/resource_plan.py --input my-scenario.json --out work/my-review
+python -m unittest discover -s test -p test_resource_plan.py -v
+```
+
+Open `resource-plan.html` in the selected output directory. Complete JSON and
+CSV exports retain the underlying values. The examples under `examples/resource-*.json`
+are editable, synthetic input contracts. They cover one shift and one common
+accounting boundary; electricity inputs are interval totals, not cumulative meter
+readings. Every quantity requires a unit and missing inputs are not guessed.
+
+The tool screens labour workload by skill, closing stock, electricity balance
+and picking productivity. **It is not yet wired into the browser simulation.**
+It does not schedule workers, prove due-date feasibility, simulate process chemistry,
+import IFC, size gas/electrical services or certify compliance. An adverse result is
+preserved: the assembly example lacks 10 kits; the process example has 3 kWh
+unreconciled. Existing PWA and simulation baselines are unchanged.
