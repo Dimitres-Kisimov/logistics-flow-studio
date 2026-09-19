@@ -3367,6 +3367,27 @@
       return { ok: finite && answered && (!snap.workers.length || selected === snap.workers[0].id),
         detail: "Finite scene poses, shared selection and grounded visible guide" };
     });
+    check("placement-draft-layout-roundtrip", function () {
+      var saved = API.serializeLayout();
+      try {
+        var draft = '{"zones":[{"x":1,"y":1,"w":2,"d":3}]}';
+        $("optConstraints").value = draft;
+        var exported = API.serializeLayout();
+        $("optConstraints").value = "";
+        API.deserializeLayout(exported);
+        var restored = $("optConstraints").value === draft;
+        var invalid = Object.assign({}, exported, { placementConstraintDraft: [] });
+        var rejected = false;
+        try { API.deserializeLayout(invalid); } catch (_) { rejected = true; }
+        var preserved = $("optConstraints").value === draft;
+        delete exported.placementConstraintDraft;
+        API.deserializeLayout(exported);
+        var cleared = $("optConstraints").value === '{"fixedIds":[],"zones":[]}';
+        $("optConstraints").value = '{incomplete';
+        API.deserializeLayout(API.serializeLayout());
+        return { ok:restored && rejected && preserved && cleared && $("optConstraints").value === '{incomplete', detail:"Draft roundtrip, atomic malformed-field rejection, legacy reset and incomplete-text preservation" };
+      } finally { API.deserializeLayout(saved); }
+    });
     check("no-errors-after-drive", function () {
       var e = window.__WT_ERRORS__ || [];
       return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" };

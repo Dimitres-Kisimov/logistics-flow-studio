@@ -244,3 +244,14 @@ are session-only, not drawn, not exported and not used by the factory CRAFT or A
 optimizer. No regulatory clearance is inferred. This is not egress connectivity,
 vehicle swept-path, utility or engineering approval. Cache wt-v85; 55 harnesses,
 157 browser checks, 11 Python tests, manual conflict/stale-preview checks pass.
+
+### Saved constraint drafts
+
+Placement text now travels as optional `placementConstraintDraft` in the layout
+JSON, local autosave, named saves and the existing share codec. Incomplete text is
+preserved as a draft, not accepted as valid constraints. Preview still validates
+it. Imports reject a non-string or more than32768 characters before changing the
+layout. Legacy layouts clear previous drafts. Editing a draft clears its preview.
+This supersedes the earlier session-only description; drawing and enforcement in
+other optimizers are still absent. Cachewt-v86.55 harnesses,158 browser checks,
+11 Python tests and restart persistence pass.

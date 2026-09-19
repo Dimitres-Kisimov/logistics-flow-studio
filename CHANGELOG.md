@@ -1630,3 +1630,10 @@ optimizer. Invalid or conflicting starting constraints block proposals; rejectio
 counts expose search limitations. Applying an outdated proposal is blocked. Removed
 claims that no local move proves near-optimality or that preserved warning counts
 mean valid aisles. Constraints are currently local to this preview workflow.
+
+## 2026-09-19 — Preserve placement drafts with the layout
+
+Autosave and layout export now retain constraint text, including unfinished drafts.
+Loading legacy layouts clears old constraints. Malformed draft field types/size
+are rejected before mutation, and editing invalidates the preview. Browser tests
+exercise the real serialization/deserialization path and legacy reset.

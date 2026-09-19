@@ -5503,6 +5503,8 @@
       config: Object.assign({}, state.config),
       savedAt: new Date().toISOString(),
     };
+    const constraintDraft = $("optConstraints").value;
+    if (constraintDraft !== '{"fixedIds":[],"zones":[]}') obj.placementConstraintDraft = constraintDraft;
     // Embed the definitions of any USER-DEFINED (library.js) types the layout
     // uses, so a saved / shared layout renders + simulates its custom objects
     // anywhere. embedInto() adds obj.library ONLY when custom types are
@@ -5519,6 +5521,7 @@
 
   function deserialize(obj, source) {
     if (!obj || !Array.isArray(obj.elements)) throw new Error("Invalid layout data");
+    if (obj.placementConstraintDraft !== undefined && (typeof obj.placementConstraintDraft !== "string" || obj.placementConstraintDraft.length > 32768)) throw new Error("Invalid placement constraint draft: expected at most 32768 text characters.");
     // Rebuild any embedded USER-DEFINED type definitions FIRST, so the
     // element loop below (which drops types absent from ELEMENTS) resolves
     // the layout's custom objects. No-op for layouts with no `library` field.
@@ -5560,6 +5563,9 @@
       if (!isNaN(n)) maxId = Math.max(maxId, n);
     }
     state.elements = cleaned;
+    $("optConstraints").value = obj.placementConstraintDraft === undefined ? '{"fixedIds":[],"zones":[]}' : obj.placementConstraintDraft;
+    state.preview = null;
+    $("optOut").textContent = "Layout loaded. Review its constraint draft and generate a fresh preview.";
     state.idCounter = maxId;
     state.selectedId = null;
     if (obj.config && typeof obj.config === "object") {
@@ -8913,6 +8919,11 @@
     if ($("autoOverlayBtn")) $("autoOverlayBtn").addEventListener("click", toggleAutoUtil);
     wireFlowControls();
     $("optimizeBtn").addEventListener("click", runOptimize);
+    $("optConstraints").addEventListener("input", () => {
+      state.preview = null;
+      $("optOut").textContent = "Constraint draft changed. Generate a fresh preview to validate it.";
+      render(); scheduleSave();
+    });
     if ($("procOptBtn")) $("procOptBtn").addEventListener("click", runFactoryOptimise);
     if ($("analyzeBtn")) $("analyzeBtn").addEventListener("click", renderAnalyzePanel); // v3.1 ANALYTICS A1
     $("compareBtn").addEventListener("click", runCompare);
