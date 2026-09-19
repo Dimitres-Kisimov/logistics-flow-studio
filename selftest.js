@@ -3260,6 +3260,18 @@
       }
     });
 
+    check("duplicate-import-identity-preserves-current-layout", function () {
+      if (!haveApi) return false;
+      var before=JSON.stringify(API.currentLayout()), rejected=false;
+      try {
+        API.importLayout({gridW:12,gridH:12,elements:[
+          {id:"duplicate",type:"pack-station",x:1,y:1,w:2,d:1},
+          {id:"duplicate",type:"pack-station",x:5,y:5,w:2,d:1}
+        ]},"self-test");
+      } catch(error) { rejected=/Duplicate equipment ID/.test(error.message); }
+      return rejected && JSON.stringify(API.currentLayout())===before;
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

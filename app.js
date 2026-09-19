@@ -5655,6 +5655,7 @@
 
   function deserialize(obj, source) {
     if (!obj || !Array.isArray(obj.elements)) throw new Error("Invalid layout data");
+    validateImportIdentities(obj.elements);
     if (obj.placementConstraintDraft !== undefined && (typeof obj.placementConstraintDraft !== "string" || obj.placementConstraintDraft.length > 32768)) throw new Error("Invalid placement constraint draft: expected at most 32768 text characters.");
     // Rebuild any embedded USER-DEFINED type definitions FIRST, so the
     // element loop below (which drops types absent from ELEMENTS) resolves
@@ -5737,6 +5738,16 @@
     let n = Math.round(Number(v));
     if (isNaN(n)) n = dflt !== undefined ? dflt : lo;
     return Math.max(lo, Math.min(hi, n));
+  }
+
+  function validateImportIdentities(elements) {
+    const seen = new Set();
+    for (const raw of elements) {
+      if (!raw || typeof raw.id !== "string") continue; // legacy records receive generated IDs below
+      if (!raw.id.trim()) throw new Error("Equipment IDs must not be empty.");
+      if (seen.has(raw.id)) throw new Error("Duplicate equipment ID: " + raw.id + ". Give each item a unique ID before importing.");
+      seen.add(raw.id);
+    }
   }
   function numOr(v, d) { const n = Number(v); return isNaN(n) ? d : n; }
 
@@ -9537,6 +9548,7 @@
       // v2.4 UI-2 hooks: drive selection + the grouped Inspector, and the
       // Simple/Expert density lever, through the SAME functions the UI uses.
       selectElement: selectElement,
+      importLayout: deserialize,
       placement: { problem:placementProblem, nudge:nudgeSelected, place:placeAt, rotate:rotateSelected },
       renderProps: renderProps,
       density: {

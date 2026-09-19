@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-19 — Reject ambiguous imported equipment identities
+
+Layout loading rejects duplicate or blank explicit equipment IDs before modifying custom definitions or the current floor. Legacy records without string IDs retain generated-ID behavior. This is an identity preflight, not complete atomic import validation. Cache wt-v109.
+
+
 ## 2026-09-19 — Rebuild playback after curved conveyor rotation
 
 Playback signatures now include equipment identity and curved-belt orientation. A square conveyor can change direction without changing its bounds; Play/Step now rebuild the model in that case. Existing geometry invalidation and KPI stale markers remain. Cache wt-v108.

@@ -46,3 +46,9 @@ Verification: 59 Node harnesses and 162 live-browser self-tests pass. New Node c
 The explicit floor Resize button now validates the normalized proposed dimensions before changing anything. It rejects equipment footprints or reserved areas outside the new floor, preserves all geometry on rejection, restores the displayed dimensions, and names the obstruction. Successful resizing pauses playback. This applies to the manual button; the internal setFloorSize helper used by creating a new blank factory retains its separate behavior. Imports/generation and deletion remain outside this protection.
 
 Node tests cover fixed equipment at the edge, metre conversion for reserved areas, exact boundary contact, growth and malformed drafts. A browser self-test clicks the actual Resize button and checks the whole layout is unchanged after a rejected shrink.
+
+### Import identity preflight
+
+Layout loading now rejects duplicate and blank explicit string equipment IDs before rebuilding custom library definitions or changing floor geometry. This prevents ambiguous selection/fixed-ID/tracking references. The rejection names the duplicate and leaves the current layout intact. Missing/non-string IDs retain legacy generated-ID behavior; full deterministic ID allocation is not established by this check.
+
+This does not make imports atomic or constraint-safe in general. The loader still normalizes/clamps geometry, drops unknown types and rebuilds custom definitions before later processing. Reserved-area conflicts, process-block failure rollback and generated layouts need further work. Tests cover identity rejection before mutation; they do not establish full import validity.

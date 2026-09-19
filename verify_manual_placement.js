@@ -12,6 +12,7 @@ vm.createContext(context);
 context.V = WT.view;
 names.push("floorResizeProblem");
 names.push("flowSignature");
+names.push("validateImportIdentities");
 for (const name of names) {
   const match = source.match(new RegExp("  function " + name + "\\([^]*?\\n  }"));
   assert.ok(match, name);
@@ -70,3 +71,8 @@ assert.equal(context.flowSignature(),originalSig,"unchanged input is stable");
 context.state.elements[0].id="curve-b";
 assert.notEqual(context.flowSignature(),originalSig,"replacement identity invalidates playback");
 console.log("Playback signature tracks square conveyor orientation and equipment identity.");
+assert.throws(()=>context.validateImportIdentities([{id:"same"},{id:"same"}]),/Duplicate equipment ID/);
+assert.throws(()=>context.validateImportIdentities([{id:"  "}]),/must not be empty/);
+assert.doesNotThrow(()=>context.validateImportIdentities([{id:"a"},{id:"b"},{}]));
+assert.ok(source.indexOf("validateImportIdentities(obj.elements)") < source.indexOf("WT.library.rebuildFrom(obj)"),"preflight before custom library mutation");
+console.log("Import identity preflight rejects duplicates and empty IDs before mutation.");
