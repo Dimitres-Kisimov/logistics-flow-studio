@@ -1686,3 +1686,10 @@ The browser rejects a conflicting import and clears the history display.
 Added explicit location-link export/import with canonical floor geometry matching.
 Changed geometry and malformed links are rejected without overwriting current
 associations. Files remain local; link reuse does not validate real-world identity.
+
+## 2026-09-19 — Directed route screening on declared floor geometry
+
+Added a deterministic shortest-path CLI using explicit access nodes, directed
+mode-permitted edges, floor bounds and buffered equipment footprints. Invalid or
+unreachable routes produce explicit failures/rejected-edge evidence. Added synthetic
+fixtures and primary-source scope notes; no safe-route or real movement claim.

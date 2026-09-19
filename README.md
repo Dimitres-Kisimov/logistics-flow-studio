@@ -368,3 +368,11 @@ real place. Exports are explicit; no new local-storage persistence is added.
 Cachewt-v91;56Node,19Python,159browser checks pass. Actual import and stale rejection
 verified; browser reported export prepared but automation download-event observation
 timed out, so successful file saving was not independently confirmed in that browser.
+
+### Directed route screening prototype
+
+`tools/route_plan.py` plans shortest routes only along declared one-way graph edges,
+filtering travel modes and rectangular footprint/clearance conflicts. It requires
+explicit access nodes and a matching floor geometry digest. This is a CLI/library,
+not connected browser movement. See [route contract and primary-source scope](docs/DIRECTED_ROUTE_SCREENING.md)
+for runnable examples, rejection semantics and substantial remaining limitations.

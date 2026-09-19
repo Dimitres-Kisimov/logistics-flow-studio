@@ -1,0 +1,1 @@
+{"version":"wt-1","gridW":40,"gridH":24,"cell":0.5,"elements":[{"id":"PICK-FACE-ANCHOR","type":"selective-racking","x":4,"y":6,"w":8,"d":2},{"id":"PACK-BENCH-ANCHOR","type":"pack-station","x":28,"y":16,"w":4,"d":2}],"config":{},"note":"Synthetic teaching layout. Equipment centres are declared anchors, not measured package coordinates."}
