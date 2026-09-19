@@ -3243,6 +3243,23 @@
       } finally { $("optConstraints").value=oldRules; }
     });
 
+    check("square-conveyor-rotation-rebuilds-playback", function () {
+      if (!haveApi) return false;
+      var els=API.state.elements, selected=API.state.selectedId, rules=$("optConstraints").value;
+      try {
+        API.state.elements=[{id:"curve-refresh",type:"conveyor-curve",x:2,y:2,w:2,d:2,arc:"tr"}];
+        API.state.selectedId="curve-refresh";
+        $("optConstraints").value='{"zones":[],"fixedIds":[]}';
+        API.flowReset();
+        var oldSim=API.state.flow.sim;
+        API.placement.rotate();
+        API.flowStep();
+        return API.state.elements[0].arc==="br" && API.state.flow.sim!==oldSim;
+      } finally {
+        API.state.elements=els; API.state.selectedId=selected; $("optConstraints").value=rules; API.flowReset(); API.flowPause();
+      }
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

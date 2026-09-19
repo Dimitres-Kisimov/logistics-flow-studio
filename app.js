@@ -2356,7 +2356,9 @@
   // elements or the seed change so the waypoints track the current layout.
   function flowSignature() {
     let sig = GRID_W + "x" + GRID_H + "|s" + state.config.seed + "|";
-    for (const e of state.elements) sig += e.type + e.x + "," + e.y + "," + e.w + "," + e.d + ";";
+    // Identity and curved-belt orientation can change while the footprint
+    // stays identical. Structured tuples also avoid ambiguous concatenation.
+    for (const e of state.elements) sig += JSON.stringify([e.id, e.type, e.x, e.y, e.w, e.d, e.arc || null]) + ";";
     return sig;
   }
 

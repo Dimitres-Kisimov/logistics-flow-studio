@@ -20,3 +20,7 @@ The separate scheduled-resource view offers a custom stop time in seconds, minut
 Browser testing exposed new HTML alongside an older cached script. Service-worker installation now uses reload requests for its app shell, so a cache-version change refreshes scripts and styles as well as markup. The app remains locally cached after installation. Network-disconnected operation and every browser-specific update edge case have not been independently revalidated in this increment.
 
 These controls improve access to the existing simulation. Geometry safety, IFC import, live SQL execution and a connected AI assistant remain separate unfinished requirements.
+
+## Playback after editing
+
+The editor already rebuilds playback when its floor/geometry signature changes and marks WMS KPI results stale through scheduleSave. The signature now also includes equipment identity and curved conveyor orientation, so rotating a square conveyor cannot resume its old route merely because its dimensions stayed the same. This does not establish that every custom-definition or configuration field is covered by the signature; those require further audit.

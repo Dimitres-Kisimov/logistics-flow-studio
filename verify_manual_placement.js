@@ -11,6 +11,7 @@ const context = { GRID_W:20, GRID_H:20, CELL_M:0.5, state:{elements:[], selected
 vm.createContext(context);
 context.V = WT.view;
 names.push("floorResizeProblem");
+names.push("flowSignature");
 for (const name of names) {
   const match = source.match(new RegExp("  function " + name + "\\([^]*?\\n  }"));
   assert.ok(match, name);
@@ -59,3 +60,13 @@ assert.equal(context.floorResizeProblem(20,20),"");
 fields.optConstraints.value="{";
 assert.match(context.floorResizeProblem(30,30),/Correct placement/);
 console.log("Floor resize: equipment preserved, reserved areas bounded, invalid drafts rejected, growth allowed.");
+context.state.config={seed:42};
+context.state.elements=[{id:"curve-a",type:"conveyor-curve",x:2,y:2,w:2,d:2,arc:"tr"}];
+const originalSig=context.flowSignature();
+context.state.elements[0].arc="br";
+assert.notEqual(context.flowSignature(),originalSig,"square conveyor orientation invalidates playback");
+context.state.elements[0].arc="tr";
+assert.equal(context.flowSignature(),originalSig,"unchanged input is stable");
+context.state.elements[0].id="curve-b";
+assert.notEqual(context.flowSignature(),originalSig,"replacement identity invalidates playback");
+console.log("Playback signature tracks square conveyor orientation and equipment identity.");

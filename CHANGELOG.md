@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-19 — Rebuild playback after curved conveyor rotation
+
+Playback signatures now include equipment identity and curved-belt orientation. A square conveyor can change direction without changing its bounds; Play/Step now rebuild the model in that case. Existing geometry invalidation and KPI stale markers remain. Cache wt-v108.
+
+
 ## 2026-09-19 — Preserve geometry when shrinking the floor
 
 The manual Resize control rejects dimensions that would exclude equipment or reserved areas. Rejection leaves the layout intact and explains what must move. Successful resizing pauses playback. Internal blank-factory creation remains a separate path. Cache wt-v107.
