@@ -1643,3 +1643,11 @@ exercise the real serialization/deserialization path and legacy reset.
 Added numeric area fields, removal controls and a fixed-equipment selector backed
 by the saved draft. Both projections show matching labelled amber outlines.
 Browser tests exercise add/remove, adverse dimensions and fixed-ID toggling.
+
+## 2026-09-19 — Persistent package-transfer ledger
+
+Added a local SQLite transfer lifecycle tied to completed picks and order contents.
+Transactional event identities, expected versions, explicit in-transit location
+and exclusive resource assignment prevent duplicate or contradictory updates.
+The browser is not connected to this ledger yet. Tests include two concurrent
+resource assignments, restart, adverse transitions and idempotent retries.

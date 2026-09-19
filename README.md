@@ -267,3 +267,31 @@ or automatic traffic enforcement. No drag editing yet. This supersedes earlier
 notes saying areas are not drawn. At very narrow widths the existing floor legend
 can obscure the small scene; desktop overlays were visually verified.
 Cachewt-v87;55 harnesses,159 browser checks,11 Python tests pass.
+
+### Persistent package-transfer ledger
+
+`tools/transport_store.py` adds an explicit local SQLite transfer prototype on top
+of completed picks. One package represents one completed pick; its manifest links
+order, line, item, quantity and base unit. Declared locations and resources support
+waiting -> assigned -> loading -> travelling -> unloading -> delivered, with a
+blocked/resumed travel branch. A unique active-resource constraint prevents two
+packages using the same worker/resource simultaneously. Every transition checks
+expected version and nondecreasing timezone-aware time, and records an idempotent
+event transactionally. In-transit location is unknown/null, not invented coordinates.
+
+```sh
+python tools/transport_store.py --database work/transfers.sqlite demo
+python tools/transport_store.py --database work/transfers.sqlite manifest
+python tools/transport_store.py --database work/transfers.sqlite events
+python tools/order_store.py --database work/transfers.sqlite query "SELECT * FROM package_manifest"
+```
+
+Demo requires a new path. Existing order databases need an explicit library call to
+`initialize(db)` before using the transfer functions; no implicit migration on read.
+This is separate from browser animation and has no telemetry, route geometry,
+clearance checks, cancellation/reassignment, split/merge, multi-package vehicles,
+location inventory or authentication. Delivery records do not ship the sales order
+or decrement stock again: pick completion already changed aggregate stock. SQL
+writes outside these functions can bypass application invariants. Full production
+hardening and a versioned migration strategy remain necessary.17 Python tests pass,
+including rollback, persistence, time/version guards and concurrent resource use.
