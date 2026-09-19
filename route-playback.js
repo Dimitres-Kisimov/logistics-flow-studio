@@ -74,8 +74,17 @@
       const capacities=new Map(),requests=new Set(),byArea=new Map();
       s.areas.forEach(a=>{requireThat(a&&typeof a.id==="string"&&a.id.trim()&&a.id.length<=200&&!capacities.has(a.id)&&Number.isInteger(a.capacity)&&a.capacity>=1&&a.capacity<=100,"Invalid area capacity");capacities.set(a.id,a.capacity);byArea.set(a.id,[]);});
       s.requests.forEach(q=>{
-        requireThat(q&&typeof q.id==="string"&&q.id.trim()&&q.id.length<=200&&!requests.has(q.id)&&[q.release_s,q.duration_s,q.planned_start_s,q.planned_end_s].every(finite)&&q.duration_s>0&&q.planned_start_s>=q.release_s&&q.planned_end_s>q.planned_start_s&&close(q.planned_end_s-q.planned_start_s,q.duration_s),"Invalid reservation interval");requests.add(q.id);
+        requireThat(q&&typeof q.id==="string"&&q.id.trim()&&q.id.length<=200&&!requests.has(q.id)&&finite(q.release_s)&&finite(q.duration_s)&&q.duration_s>0,"Invalid reservation request");requests.add(q.id);
         requireThat(Array.isArray(q.areas)&&q.areas.length>0&&new Set(q.areas).size===q.areas.length&&q.areas.every(a=>capacities.has(a)),"Unknown reservation area");
+        if(q.availability_s!==undefined){
+          requireThat(Array.isArray(q.availability_s)&&q.availability_s.length<=100,"Invalid availability windows");let prior=-1;
+          q.availability_s.forEach(w=>{requireThat(Array.isArray(w)&&w.length===2&&w.every(finite)&&w[0]<w[1]&&w[0]>=prior&&w[1]<=31536000,"Invalid or overlapping availability windows");prior=w[1];});
+        }
+        if(q.planned_start_s===null){
+          requireThat(q.planned_end_s===null&&q.planned_wait_s===null&&Array.isArray(q.availability_s),"Unscheduled request requires explicit availability and null planned times");return;
+        }
+        requireThat(finite(q.planned_start_s)&&finite(q.planned_end_s)&&q.planned_start_s>=q.release_s&&q.planned_end_s>q.planned_start_s&&close(q.planned_end_s-q.planned_start_s,q.duration_s),"Invalid reservation interval");
+        requireThat(q.availability_s===undefined||q.availability_s.some(w=>q.planned_start_s>=w[0]&&q.planned_end_s<=w[1]),"Transfer crosses an unavailable period");
         q.areas.forEach(a=>byArea.get(a).push(q));
       });
       byArea.forEach((rows,area)=>{
@@ -95,10 +104,12 @@
     if(t.reservation){
       const s=t.reservation.schedule,q=s.requests.find(r=>r.id===t.reservation.request_id);
       tick=Math.min(tick,s.horizon_s);
+      const windows=q.availability_s===undefined?"Availability unrestricted by this input.":`Declared operating windows: ${q.availability_s.map(w=>`${w[0]}–${w[1]} s`).join(", ")||"none"}.`;
+      if(q.planned_start_s===null)return {state:tick<q.release_s?"not-released":"unscheduled",position:position(first),heading:null,wait:`No start allocated by this schedule. ${windows} Work remains unfinished; no movement is inferred.`};
       if(tick<q.planned_start_s){
         const others=s.requests.filter(r=>r.id!==q.id&&r.planned_end_s>tick&&r.planned_start_s<q.planned_start_s&&r.areas.some(a=>q.areas.includes(a)));
         return {state:tick<q.release_s?"not-released":"queued",position:position(first),heading:null,
-          wait:`Planned entry ${q.planned_start_s.toFixed(2)} s · areas ${q.areas.join(", ")}. Other reservations before entry: ${others.map(r=>`${r.id} until ${r.planned_end_s.toFixed(2)} s`).join("; ")||"none"}. Area claim covers the whole transfer.`};
+          wait:`Planned entry ${q.planned_start_s.toFixed(2)} s · areas ${q.areas.join(", ")}. ${windows} Other reservations before entry: ${others.map(r=>`${r.id} until ${r.planned_end_s.toFixed(2)} s`).join("; ")||"none"}. Area claim covers the whole transfer.`};
       }
       tick-=q.planned_start_s;
     }

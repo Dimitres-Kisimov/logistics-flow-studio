@@ -1,0 +1,9 @@
+{
+  "schema": "factory-area-requests/v1",
+  "horizon_s": 60,
+  "areas": [{"id": "SHARED-AISLE", "capacity": 1}],
+  "requests": [
+    {"id": "NEXT-WINDOW", "release_s": 8, "duration_s": 20.7, "areas": ["SHARED-AISLE"], "availability_s": [[0, 10], [30, 60]]},
+    {"id": "NO-FIT", "release_s": 9, "duration_s": 20.7, "areas": ["SHARED-AISLE"], "availability_s": [[0, 10], [30, 40]]}
+  ]
+}

@@ -124,4 +124,12 @@ If no window fits, planned times/wait are null, no grant/release event is emitte
 
 Run tools/traffic_schedule.py --input examples/routes/availability-requests.json. Its6second task releasedat8 runs20–26; its11second task isunscheduled.42Python tests/Ruff pass, including area delay rechecking, exact window-end completion, malformed/overlapping windows and missing capacity grants. Existing no-window scheduling behaviour remains compatible.
 
-Availability-aware schedules currently export for review only. bind_timeline refuses schedules containing availability windows until the browser importer and wait explanation contract support them; do not strip availability metadata to force playback. This is an open integration step, not completion of shift-aware simulation.
+Availability-aware schedules are now supported by the browser contract described below. Physical workforce assignment and calendars remain separate work.
+
+## Availability-aware playback
+
+The timeline binder now accepts both scheduled and unscheduled requests. Browser import checks declared windows for sorted nonoverlap and verifies every allocated transfer lies entirely inside one window. Unscheduled rows require explicit availability and null planned times; they consume no area capacity. Their infeasibility is a scheduler outcome, not independently proven by the browser importer, which does not reproduce scheduling policy.
+
+The selected unscheduled request stays at its declared route start; before release it is not-released and thereafter unscheduled. It never receives fabricated travel or completion. Queue notes list declared windows and planned entry time. These semantics apply in both plan and isometric views.
+
+Generate examples/routes/availability-timeline.json using --input examples/routes/availability-route-requests.json --timeline examples/routes/timeline.json --request NEXT-WINDOW. Select NO-FIT instead to inspect an unscheduled scenario. Browser verified10squeued/30splannedentry,40stravelling7.80/6.00m;NO-FITremained4.00/4.80m at60s.57Node/43Python/Ruff/159browser checks pass. Worker skills, actual staff calendars and measured productivity remain unfinished.

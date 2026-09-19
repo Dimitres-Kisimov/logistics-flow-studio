@@ -119,6 +119,14 @@ class TrafficScheduleTests(unittest.TestCase):
             with self.subTest(windows=windows), self.assertRaises(ValueError):
                 traffic_schedule.schedule(raw)
 
+    def test_bind_available_and_unscheduled_timeline(self):
+        raw = self.fixture()
+        raw["requests"][1]["availability_s"] = []
+        result = traffic_schedule.schedule(raw)
+        timeline = dict(schema="factory-route-timeline/v1", route=dict(found=True), duration_s=3)
+        bound = traffic_schedule.bind_timeline(timeline, result, "B")
+        self.assertIsNone(bound["reservation"]["schedule"]["requests"][1]["planned_start_s"])
+
 
 if __name__ == "__main__":
     unittest.main()

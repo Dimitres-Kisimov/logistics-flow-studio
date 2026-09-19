@@ -141,10 +141,8 @@ def bind_timeline(timeline, result, request_id):
     request = next((r for r in result["requests"] if r["id"] == request_id), None)
     if timeline.get("schema") != "factory-route-timeline/v1" or not timeline.get("route", {}).get("found") or "reservation" in timeline:
         raise ValueError("Use an unreserved, routable timeline")
-    if request is None or request["planned_start_s"] is None or timeline.get("duration_s") != request["duration_s"]:
+    if request is None or timeline.get("duration_s") != request["duration_s"]:
         raise ValueError("Reservation duration must equal the full route timeline duration")
-    if any("availability_s" in r for r in result["requests"]):
-        raise ValueError("Availability-aware schedules require a future playback contract; export the schedule for review instead")
     output = copy.deepcopy(timeline)
     output["reservation"] = dict(request_id=request_id, schedule=copy.deepcopy(result))
     return output
