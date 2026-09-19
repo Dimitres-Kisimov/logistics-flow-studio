@@ -61,7 +61,10 @@ def build(raw, floor, graph):
             reposition = returns[(job["resource_id"], job["reposition_from"], job["source"])]
         assignments.append(dict(job_id=job["id"], work_route=jobs[job["id"]], reposition_route=reposition))
     return dict(schema="factory-resource-motion/v1", plan=plan, assignments=assignments,
-                resources=[dict(id=r["id"], initial_position=anchors[r["id"]], availability_s=r["availability_s"])
+                floor=route_plan.floor_model(floor), mode=raw["mode"], clearance_m=raw["clearance_m"],
+                speed_mps=raw["speed_mps"], location_access=copy.deepcopy(access),
+                resources=[dict(id=r["id"], initial_position=anchors[r["id"]], availability_s=r["availability_s"],
+                                skills=r["skills"], start_location=r["start_location"])
                            for r in request["resources"]],
                 limitations="Planned motion, not telemetry or SQL execution. Shared homogeneous speed and clearance; instantaneous turns. Area claims cover whole assignments and are not inferred from geometry. No body collisions, regulatory certification or optimal staffing.")
 

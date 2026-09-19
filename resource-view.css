@@ -1,0 +1,12 @@
+.motion-toolbar {display:flex;flex-wrap:wrap;gap:12px;align-items:end}
+.motion-toolbar label {display:grid;gap:5px}
+.motion-layout {display:grid;grid-template-columns:minmax(0,2fr) minmax(220px,1fr);gap:24px;align-items:start}
+.motion-map {min-width:0}
+#motionFloor {width:100%;min-height:220px;background:#17221f;border:1px solid #486257;border-radius:12px}
+#motionSeek {width:100%}
+#motionClock {font-variant-numeric:tabular-nums;color:#bcece2}
+.motion-key {display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem;color:#bcece2}
+#motionStates article {border-left:3px solid #83d9cd;padding:10px 14px;margin:12px 0;background:#202c28;border-radius:0 8px 8px 0;overflow-wrap:anywhere}
+#motionStates strong,#motionStates small {display:block}
+#motionStates small {color:#becbc5;margin-top:5px}
+@media(max-width:760px){.motion-layout{grid-template-columns:1fr}.motion-toolbar>*{flex:1}#motionFloor{min-height:180px}}

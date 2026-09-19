@@ -1,0 +1,466 @@
+{
+  "schema": "factory-resource-motion/v1",
+  "plan": {
+    "schema": "factory-resource-plan/v1",
+    "provenance": "assumed-resource-dispatch",
+    "horizon_s": 120.0,
+    "jobs": [
+      {
+        "id": "ORDER-A",
+        "release_s": 0.0,
+        "duration_s": 20.7,
+        "priority": 0,
+        "areas": [],
+        "source": "PICK",
+        "destination": "PACK",
+        "required_skills": [
+          "picking"
+        ],
+        "resource_id": "WORKER-1",
+        "reposition_from": "PICK",
+        "reposition_s": 0.0,
+        "assignment_start_s": 0.0,
+        "task_start_s": 0.0,
+        "end_s": 20.7,
+        "queue_wait_s": 0.0,
+        "state_at_horizon": "completed",
+        "area_waits": [],
+        "rejected_resources": [],
+        "feasible_candidates": [
+          {
+            "resource_id": "WORKER-1",
+            "end_s": 20.7
+          }
+        ]
+      },
+      {
+        "id": "ORDER-B",
+        "release_s": 1.0,
+        "duration_s": 20.7,
+        "priority": 0,
+        "areas": [],
+        "source": "PICK",
+        "destination": "PACK",
+        "required_skills": [
+          "picking"
+        ],
+        "resource_id": "WORKER-1",
+        "reposition_from": "PACK",
+        "reposition_s": 12.7,
+        "assignment_start_s": 60.0,
+        "task_start_s": 72.7,
+        "end_s": 93.4,
+        "queue_wait_s": 59.0,
+        "state_at_horizon": "completed",
+        "area_waits": [],
+        "rejected_resources": [],
+        "feasible_candidates": [
+          {
+            "resource_id": "WORKER-1",
+            "end_s": 93.4
+          }
+        ]
+      }
+    ],
+    "areas": [],
+    "resource_metrics": [
+      {
+        "resource_id": "WORKER-1",
+        "available_s": 90.0,
+        "working_s": 41.400000000000006,
+        "reposition_s": 12.700000000000003,
+        "assigned_s": 54.10000000000001,
+        "idle_available_s": 35.89999999999999,
+        "utilization": 0.6011111111111112,
+        "completed_jobs": 2
+      }
+    ],
+    "completed": 2,
+    "completed_jobs_per_simulated_hour": 60.0,
+    "metric_note": "Jobs are not picks or units. Utilization is working plus repositioning divided by declared available seconds within the horizon. Waiting before assignment is not busy time. Short-horizon rates are extrapolated, not steady-state capacity.",
+    "unfinished": 0,
+    "policy": "Release/priority/ID job order; earliest finish then start/resource ID. Append-only resource assignments.",
+    "limitations": "Greedy, not optimal staffing. One resource per job; durations and directed reposition times are declared. Requested areas are held atomically for the full assignment including repositioning. No geometry-to-area mapping, vehicle body clearance, fatigue, labour-law validation or SQL execution. Resource states are planned, not telemetry."
+  },
+  "assignments": [
+    {
+      "job_id": "ORDER-A",
+      "work_route": {
+        "schema": "factory-route-timeline/v1",
+        "provenance": "assumed-simulation-not-telemetry",
+        "floor": {
+          "width": 20.0,
+          "depth": 12.0,
+          "elements": [
+            {
+              "id": "PACK-BENCH-ANCHOR",
+              "x": 14.0,
+              "y": 8.0,
+              "w": 2.0,
+              "d": 1.0
+            },
+            {
+              "id": "PICK-FACE-ANCHOR",
+              "x": 2.0,
+              "y": 3.0,
+              "w": 4.0,
+              "d": 1.0
+            }
+          ]
+        },
+        "route": {
+          "schema": "factory-route-proposal/v1",
+          "found": true,
+          "points": [
+            {
+              "id": "PICK-ACCESS",
+              "x": 4.0,
+              "y": 4.8
+            },
+            {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            {
+              "id": "PACK-ACCESS",
+              "x": 13.0,
+              "y": 8.5
+            }
+          ],
+          "distance_m": 12.7,
+          "mode": "worker",
+          "clearance_m": 0.2,
+          "floor_digest": "9db740cbbfe623d2797a6fd87d0fd6b936aef5d51298450ebc704350e4dcc1d7",
+          "rejected_edges": [],
+          "reason": "candidate-on-declared-graph",
+          "limitations": "Static rectangular footprint screening only. No turning envelope, traffic conflicts, slopes, doors, utilities, visibility, timing or regulatory approval. Clearance is user supplied, not a prescribed safe value."
+        },
+        "speed_mps": 1.0,
+        "loading_s": 5.0,
+        "unloading_s": 3.0,
+        "segments": [
+          {
+            "source": {
+              "id": "PICK-ACCESS",
+              "x": 4.0,
+              "y": 4.8
+            },
+            "destination": {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            "start_s": 5.0,
+            "end_s": 6.2
+          },
+          {
+            "source": {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            "destination": {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            "start_s": 6.2,
+            "end_s": 15.2
+          },
+          {
+            "source": {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            "destination": {
+              "id": "PACK-ACCESS",
+              "x": 13.0,
+              "y": 8.5
+            },
+            "start_s": 15.2,
+            "end_s": 17.7
+          }
+        ],
+        "travel_end_s": 17.7,
+        "duration_s": 20.7,
+        "limitations": "Constant speed and instantaneous turns; no acceleration, queues, breaks, collisions or resource availability. Timing is entered assumptions, not measured execution."
+      },
+      "reposition_route": null
+    },
+    {
+      "job_id": "ORDER-B",
+      "work_route": {
+        "schema": "factory-route-timeline/v1",
+        "provenance": "assumed-simulation-not-telemetry",
+        "floor": {
+          "width": 20.0,
+          "depth": 12.0,
+          "elements": [
+            {
+              "id": "PACK-BENCH-ANCHOR",
+              "x": 14.0,
+              "y": 8.0,
+              "w": 2.0,
+              "d": 1.0
+            },
+            {
+              "id": "PICK-FACE-ANCHOR",
+              "x": 2.0,
+              "y": 3.0,
+              "w": 4.0,
+              "d": 1.0
+            }
+          ]
+        },
+        "route": {
+          "schema": "factory-route-proposal/v1",
+          "found": true,
+          "points": [
+            {
+              "id": "PICK-ACCESS",
+              "x": 4.0,
+              "y": 4.8
+            },
+            {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            {
+              "id": "PACK-ACCESS",
+              "x": 13.0,
+              "y": 8.5
+            }
+          ],
+          "distance_m": 12.7,
+          "mode": "worker",
+          "clearance_m": 0.2,
+          "floor_digest": "9db740cbbfe623d2797a6fd87d0fd6b936aef5d51298450ebc704350e4dcc1d7",
+          "rejected_edges": [],
+          "reason": "candidate-on-declared-graph",
+          "limitations": "Static rectangular footprint screening only. No turning envelope, traffic conflicts, slopes, doors, utilities, visibility, timing or regulatory approval. Clearance is user supplied, not a prescribed safe value."
+        },
+        "speed_mps": 1.0,
+        "loading_s": 5.0,
+        "unloading_s": 3.0,
+        "segments": [
+          {
+            "source": {
+              "id": "PICK-ACCESS",
+              "x": 4.0,
+              "y": 4.8
+            },
+            "destination": {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            "start_s": 5.0,
+            "end_s": 6.2
+          },
+          {
+            "source": {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            "destination": {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            "start_s": 6.2,
+            "end_s": 15.2
+          },
+          {
+            "source": {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            "destination": {
+              "id": "PACK-ACCESS",
+              "x": 13.0,
+              "y": 8.5
+            },
+            "start_s": 15.2,
+            "end_s": 17.7
+          }
+        ],
+        "travel_end_s": 17.7,
+        "duration_s": 20.7,
+        "limitations": "Constant speed and instantaneous turns; no acceleration, queues, breaks, collisions or resource availability. Timing is entered assumptions, not measured execution."
+      },
+      "reposition_route": {
+        "schema": "factory-route-timeline/v1",
+        "provenance": "assumed-simulation-not-telemetry",
+        "floor": {
+          "width": 20.0,
+          "depth": 12.0,
+          "elements": [
+            {
+              "id": "PACK-BENCH-ANCHOR",
+              "x": 14.0,
+              "y": 8.0,
+              "w": 2.0,
+              "d": 1.0
+            },
+            {
+              "id": "PICK-FACE-ANCHOR",
+              "x": 2.0,
+              "y": 3.0,
+              "w": 4.0,
+              "d": 1.0
+            }
+          ]
+        },
+        "route": {
+          "schema": "factory-route-proposal/v1",
+          "found": true,
+          "points": [
+            {
+              "id": "PACK-ACCESS",
+              "x": 13.0,
+              "y": 8.5
+            },
+            {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            {
+              "id": "PICK-ACCESS",
+              "x": 4.0,
+              "y": 4.8
+            }
+          ],
+          "distance_m": 12.7,
+          "mode": "worker",
+          "clearance_m": 0.2,
+          "floor_digest": "9db740cbbfe623d2797a6fd87d0fd6b936aef5d51298450ebc704350e4dcc1d7",
+          "rejected_edges": [],
+          "reason": "candidate-on-declared-graph",
+          "limitations": "Static rectangular footprint screening only. No turning envelope, traffic conflicts, slopes, doors, utilities, visibility, timing or regulatory approval. Clearance is user supplied, not a prescribed safe value."
+        },
+        "speed_mps": 1.0,
+        "loading_s": 0.0,
+        "unloading_s": 0.0,
+        "segments": [
+          {
+            "source": {
+              "id": "PACK-ACCESS",
+              "x": 13.0,
+              "y": 8.5
+            },
+            "destination": {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            "start_s": 0.0,
+            "end_s": 2.5
+          },
+          {
+            "source": {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            "destination": {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            "start_s": 2.5,
+            "end_s": 11.5
+          },
+          {
+            "source": {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            "destination": {
+              "id": "PICK-ACCESS",
+              "x": 4.0,
+              "y": 4.8
+            },
+            "start_s": 11.5,
+            "end_s": 12.7
+          }
+        ],
+        "travel_end_s": 12.7,
+        "duration_s": 12.7,
+        "limitations": "Constant speed and instantaneous turns; no acceleration, queues, breaks, collisions or resource availability. Timing is entered assumptions, not measured execution."
+      }
+    }
+  ],
+  "floor": {
+    "width": 20.0,
+    "depth": 12.0,
+    "elements": [
+      {
+        "id": "PACK-BENCH-ANCHOR",
+        "x": 14.0,
+        "y": 8.0,
+        "w": 2.0,
+        "d": 1.0
+      },
+      {
+        "id": "PICK-FACE-ANCHOR",
+        "x": 2.0,
+        "y": 3.0,
+        "w": 4.0,
+        "d": 1.0
+      }
+    ]
+  },
+  "mode": "worker",
+  "clearance_m": 0.2,
+  "speed_mps": 1,
+  "location_access": {
+    "PICK": "PICK-ACCESS",
+    "PACK": "PACK-ACCESS"
+  },
+  "resources": [
+    {
+      "id": "WORKER-1",
+      "initial_position": {
+        "x": 4.0,
+        "y": 4.8
+      },
+      "availability_s": [
+        [
+          0,
+          30
+        ],
+        [
+          60,
+          120
+        ]
+      ],
+      "skills": [
+        "picking"
+      ],
+      "start_location": "PICK"
+    }
+  ],
+  "limitations": "Planned motion, not telemetry or SQL execution. Shared homogeneous speed and clearance; instantaneous turns. Area claims cover whole assignments and are not inferred from geometry. No body collisions, regulatory certification or optimal staffing."
+}

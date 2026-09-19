@@ -16,6 +16,16 @@ The scheduler applies skills, contiguous availability and whole-assignment share
 
 Example: the first job ends at 20.7 seconds. The second assignment cannot fit in the remaining first availability window, so it starts at 60 seconds. Its return trip takes 12.7 seconds, work starts at 72.7, and delivery occurs at 93.4. At 61 seconds the worker is at (13, 7.5) metres, returning toward picking, while the second load is still at (4, 4.8).
 
-These are planned load IDs, not SQL package identities or telemetry. No browser integration is included yet. No acceleration, body collision checks, inferred geometric traffic areas, off-duty movement, safety certification or optimal staffing is claimed. Full-assignment area reservations may be conservative. The route geometry and clearance retain the limitations in DIRECTED_ROUTE_SCREENING.md.
+These are planned load IDs, not SQL package identities or telemetry. No acceleration, body collision checks, inferred geometric traffic areas, off-duty movement, safety certification or optimal staffing is claimed. Full-assignment area reservations may be conservative. The route geometry and clearance retain the limitations in DIRECTED_ROUTE_SCREENING.md.
 
 Tests cover hand-calculated outbound/return positions, load/worker separation, exact phase boundaries, calendar waiting, shared-area waiting, absent return declarations, stale or unreachable geometry, input nonmutation and deterministic generation.
+
+## Browser playback
+
+Open `resource-view.html` from the planner's scene inspector or the SQL history viewer. Explore the bundled synthetic example or import an export from the current generator (maximum 5 MB). Older exports without the floor, movement assumptions, skill and initial-location snapshots must be regenerated.
+
+Workers and loads share one scrubber and 1x–100x clock. Plan and isometric views project identical coordinates; cards expose IDs, phase and position, and the assignment table gives planned start and end times. Workers use outlined circles, loads smaller filled squares. Coincident entities retain their real shared position, with separate text cards; markers are not displaced for visual separation. Tab hiding pauses playback.
+
+Import checks each path with the existing geometry/timing validator, then verifies location continuity, return endpoints, skill coverage, exclusive resource intervals, contiguous availability and capacity derived from job area claims. It samples checked jobs and routes rather than imported summary metrics or state labels. Invalid imports clear the old scene. It does not authenticate graph permissions, reconstruct optimal dispatch or prove an unassigned job was infeasible. No live SQL package binding is added.
+
+Validation: 58 Node harnesses, 59 Python tests and Ruff pass. Actual browser checks cover the one-click example, the 61-second return position, matching coordinates after projection changes, 100x completion at exactly 120 seconds, successful file import and rejection of a missing return route. Main-app self-tests pass 159/159. Default desktop rendering was inspected; an attempted viewport override did not change the observed width, so narrow-layout visual validation remains unverified.

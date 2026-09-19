@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-19 — Scheduled workers and loads in the browser
+
+Added resource movement playback linked from the planner and transfer history.
+One clock, scrubber and 1x–100x speeds drive all checked worker/load positions in
+plan or isometric projection. Imports verify geometry, return paths, resource
+ownership, skills, calendars and logical area capacity. Bundled example and new
+viewer assets are in PWA cache wt-v99. Planned scenario IDs remain separate from SQL.
+
 ## 2026-09-19 — Geometry-driven resource motion
 
 Connected directed route timing to resource dispatch and continuous worker/load

@@ -2,6 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Package transfer evidence · Logistics Flow Studio</title><link rel="stylesheet" href="transfer-ledger.css"></head>
 <body><main>
 <a href="index.html">← Factory planner</a>
+<p><a href="resource-view.html">Explore scheduled worker and load movement →</a></p>
 <header><p class="eyebrow">Operations / Transfer evidence</p><h1>Follow a package through its recorded work.</h1><p>Open a SQL ledger export to inspect contents, assigned resources and blocked transfers. Files stay in this browser.</p></header>
 <section class="import"><h2>Start with an example or your export</h2><button id="ledgerDemo" type="button">Explore synthetic example</button><p class="view-note">Loads one example order, its floor and a timed route with an operating-window wait. Replaces the current view; your files are not changed.</p><label for="ledgerFile">Open ledger JSON</label><input id="ledgerFile" type="file" accept=".json,application/json"><p id="ledgerStatus" role="status">Choose an export from transport_store.py. Maximum 5 MB.</p></section>
 <section id="ledgerView" hidden>
