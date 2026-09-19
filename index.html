@@ -554,7 +554,7 @@
           <span class="floor-x" aria-hidden="true">&times;</span>
           <input id="floorHInput" class="floor-num" type="number" min="8" max="800" step="1" value="24" title="Warehouse depth in metres (max 800)" aria-label="Warehouse depth in metres" />
           <span class="floor-unit">m</span>
-          <button id="floorApplyBtn" class="btn small" type="button" title="Resize the warehouse (up to 1200 x 800 m). Existing elements are kept in bounds; anything that no longer fits is removed. Zoom out / Fit frames the whole floor.">Resize</button>
+          <button id="floorApplyBtn" class="btn small" type="button" title="Resize the warehouse (up to 1200 x 800 m). Shrinking is rejected if equipment or reserved areas would no longer fit. Move them first; this control never clips equipment. Zoom out / Fit frames the whole floor.">Resize</button>
         </div>
         <!-- v3.14: an EXPAND-INTO-DETAIL icon. A compact Export icon opens a
              detailed flyout of every export/share path (IFC / WMS report as PDF
@@ -1044,7 +1044,7 @@
           <p class="hint">These areas immediately restrict manual placement, movement, size and rotation. Fixed equipment must be unlocked before those edits. Invalid JSON blocks manual edits until corrected.</p>
           <label for="optConstraints">Placement constraints</label>
           <textarea id="optConstraints" rows="5" maxlength="32768" spellcheck="false" aria-describedby="optConstraintLimit">{"fixedIds":[],"zones":[]}</textarea>
-          <p id="optConstraintLimit" class="hint">Rectangles only. Existing conflicts can be moved out; optimization rejects them. Imports, generation and floor resizing are not protected by these manual-edit rules. No egress connectivity, turning envelopes, utilities or regulatory approval checks.</p>
+          <p id="optConstraintLimit" class="hint">Rectangles only. Existing conflicts can be moved out; optimization rejects them. Floor shrinking preserves equipment and these areas. Imports and generation are not protected by these manual-edit rules. No egress connectivity, turning envelopes, utilities or regulatory approval checks.</p>
         </details>
         <button id="optimizeBtn" class="btn primary wide" type="button">Optimize (preview)</button>
         <div id="optOut" class="opt-out"><p class="empty">Preview shows dashed ghosts on the floor; nothing changes until you Apply.</p></div>

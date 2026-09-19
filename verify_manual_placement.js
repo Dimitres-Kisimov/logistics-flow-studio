@@ -2,11 +2,15 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
+global.window = global;
+require("./view.js");
 const source = fs.readFileSync(require.resolve("./app.js"), "utf8");
 const names = ["rectsOverlap", "readConstraintDraft", "placementProblem", "inBounds", "overlapsAny", "nudgeSelected", "applySize", "rotateSelected", "findFreeSpotNear", "placeAt"];
 const fields = { optConstraints:{value:'{"zones":[],"fixedIds":[]}'}, pW:{value:2}, pD:{value:1} };
 const context = { GRID_W:20, GRID_H:20, CELL_M:0.5, state:{elements:[], selectedId:"a", flow:{playing:false}, idCounter:0}, ELEMENTS:{rack:{w:2,d:1,label:"Rack"}}, $:id=>fields[id], status:()=>{}, toast:()=>{}, scheduleSave:()=>{}, render:()=>{}, renderProps:()=>{}, selectElement:()=>{}, flowPause:()=>{context.state.flow.playing=false;} };
 vm.createContext(context);
+context.V = WT.view;
+names.push("floorResizeProblem");
 for (const name of names) {
   const match = source.match(new RegExp("  function " + name + "\\([^]*?\\n  }"));
   assert.ok(match, name);
@@ -41,3 +45,17 @@ assert.match(context.placementProblem({x:8,y:8,w:2,d:1},null), /Correct placemen
 setRules({zones:[{x:0,y:0,w:11,d:1}]});
 assert.match(context.placementProblem({x:8,y:8,w:2,d:1},null), /Correct placement/);
 console.log("Manual placement: metre conversion, edge contact, reserved areas, fixed edits, recovery and malformed drafts pass.");
+context.state.elements=[{id:"fixed-edge",x:18,y:2,w:2,d:1}];
+setRules({fixedIds:["fixed-edge"],zones:[]});
+const beforeResize=JSON.stringify(context.state.elements);
+assert.match(context.floorResizeProblem(10,20),/fixed-edge/);
+assert.equal(context.floorResizeProblem(20,20),"");
+assert.equal(context.floorResizeProblem(30,30),"");
+assert.equal(JSON.stringify(context.state.elements),beforeResize);
+context.state.elements=[];
+setRules({zones:[{x:9,y:0,w:1,d:1}]});
+assert.match(context.floorResizeProblem(10,20),/Reserved area 1/);
+assert.equal(context.floorResizeProblem(20,20),"");
+fields.optConstraints.value="{";
+assert.match(context.floorResizeProblem(30,30),/Correct placement/);
+console.log("Floor resize: equipment preserved, reserved areas bounded, invalid drafts rejected, growth allowed.");

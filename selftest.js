@@ -3231,6 +3231,18 @@
       }
     });
 
+    check("floor-resize-preserves-equipment-on-rejected-shrink", function () {
+      if (!haveApi) return false;
+      var before=JSON.stringify(API.currentLayout());
+      var oldRules=$("optConstraints").value;
+      try {
+        $("optConstraints").value=JSON.stringify({zones:[],fixedIds:[]});
+        $("floorWInput").value="1"; $("floorHInput").value="1";
+        $("floorApplyBtn").click();
+        return JSON.stringify(API.currentLayout())===before;
+      } finally { $("optConstraints").value=oldRules; }
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

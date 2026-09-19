@@ -40,3 +40,9 @@ Manual place, pointer movement, nudge, duplicate candidate search, property resi
 This does not finish the audit contract: deletion, imports, generation, floor resizing, stale-ID lifecycle and full invalidation of derived reports still require work. There is no separate Apply-rules transaction yet. UI text describes immediate draft enforcement and excluded paths. The validator does not add aisle-width, swept-path or regulatory certification checks.
 
 Verification: 59 Node harnesses and 162 live-browser self-tests pass. New Node checks execute the actual app handlers for placement, nudge, size, rotation and duplicate candidate selection, including half-metre cells, malformed/out-of-floor rules, edge contact, fixed geometry and recovery. New browser test exercises real placement, nudge and rotation handlers. Native pointer interaction with these new constraints is not yet independently verified; prior unrestricted drag/drop testing is not treated as proof of that behavior.
+
+### Floor Resize control
+
+The explicit floor Resize button now validates the normalized proposed dimensions before changing anything. It rejects equipment footprints or reserved areas outside the new floor, preserves all geometry on rejection, restores the displayed dimensions, and names the obstruction. Successful resizing pauses playback. This applies to the manual button; the internal setFloorSize helper used by creating a new blank factory retains its separate behavior. Imports/generation and deletion remain outside this protection.
+
+Node tests cover fixed equipment at the edge, metre conversion for reserved areas, exact boundary contact, growth and malformed drafts. A browser self-test clicks the actual Resize button and checks the whole layout is unchanged after a rejected shrink.

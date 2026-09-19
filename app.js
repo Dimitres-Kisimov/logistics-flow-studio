@@ -3445,6 +3445,9 @@
   function applyFloorSizeFromInputs() {
     const w = Number($("floorWInput") && $("floorWInput").value);
     const h = Number($("floorHInput") && $("floorHInput").value);
+    const problem = floorResizeProblem(w, h);
+    if (problem) { toast(problem, "warn"); status(problem); syncFloorInputs(); return; }
+    if (state.flow.playing) flowPause();
     const before = state.elements.length;
     const res = setFloorSize(w, h);
     const msg = "Warehouse set to " + res.gridW + " × " + res.gridH + " m." +
@@ -3467,6 +3470,17 @@
     const rect = { x:cand.x*CELL_M, y:cand.y*CELL_M, w:cand.w*CELL_M, d:cand.d*CELL_M };
     const index = draft.zones.findIndex(z => rect.x < z.x+z.w && z.x < rect.x+rect.w && rect.y < z.y+z.d && z.y < rect.y+rect.d);
     return index < 0 ? "" : "This position occupies reserved area " + (index+1) + ". Move outside its outline.";
+  }
+
+  function floorResizeProblem(w, h) {
+    const nf = V.normalizeFloor(w, h);
+    let draft;
+    try { draft = readConstraintDraft(); }
+    catch (error) { return "Correct placement constraints before resizing: " + error.message; }
+    const outside = state.elements.find(el => el.x < 0 || el.y < 0 || el.x+el.w > nf.gridW || el.y+el.d > nf.gridH);
+    if (outside) return "Cannot shrink the floor around equipment " + outside.id + ". Move it inside the proposed floor first; fixed equipment must be unlocked.";
+    const area = draft.zones.findIndex(z => z.x+z.w > nf.gridW*CELL_M || z.y+z.d > nf.gridH*CELL_M);
+    return area < 0 ? "" : "Reserved area " + (area+1) + " would be outside the resized floor. Edit that area first.";
   }
 
   function placeAt(type, cx, cy) {
