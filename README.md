@@ -6,7 +6,7 @@
 
 - **What** — draw *or* generate a whole warehouse floor (racks, docks, staging, conveyor, automation), then run the material flow and the standard WMS operation as a living, animated plant-sim.
 - **Why** — clarity over enterprise complexity: a transparent, game-like teaching twin that is standards-*informed* rather than a black-box tool.
-- **Proof** — an **894-element signature plant**, a browser self-test **154/154**, **51 headless logic harnesses** all green, and a **100%-offline** installable PWA.
+- **Review-branch evidence (2026-09-19)** — 161 browser self-tests, 58 Node harnesses and 62 Python tests passed at commit 2ea5619. These checks do not establish plant safety. See [placement enforcement gaps](docs/PLACEMENT_ENFORCEMENT_AUDIT.md). The PWA caches local assets; network-disconnected behavior was not revalidated in this increment.
 
 ### ▶ Live app — <https://dimitres-kisimov.github.io/logistics-flow-studio/>
 
@@ -15,7 +15,7 @@
 **Marquee capabilities**
 
 - **▶ Story Mode** — a one-click **cinematic guided tour** that flies the camera zone-by-zone through the plant.
-- **894-element signature plant** — a dense, fully-automated fulfilment plant (open it directly with `?scenario=mega-automated-fulfilment-plant`) carrying every one of the 29 object types, overlap-free and compliance-safe **by construction**.
+- **894-element signature plant** — a dense, fully-automated fulfilment plant (open it directly with `?scenario=mega-automated-fulfilment-plant`) carrying every one of the 29 object types, generated with non-overlapping footprints; this does not establish regulatory compliance or safe traffic operation.
 - **User-definable object library** — define your **own** object types, *Siemens Plant Simulation UserObjects*–style: derive from a base behaviour class, give it a glyph, size and colour, and it joins the categorised palette **and** the simulation.
 - **2D ⇄ 3D** — **press `P`** (or the "2.5D view" button) to flip the whole floor between the editable top-down plan and a 2.5D isometric presentation.
 - **Animated material flow** — handling units, conveyors, RGV/AGV and AS/RS cranes move in **both** views, while a live KPI cockpit and a bounded order pool update from the same render loop.
