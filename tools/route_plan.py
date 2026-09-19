@@ -39,7 +39,33 @@ def floor_model(raw):
         if not all(math.isfinite(v) for v in (x, y, w, d)) or x + w > width or y + d > depth:
             raise ValueError("Equipment footprint outside floor")
         elements.append(dict(id=key, x=x, y=y, w=w, d=d))
-    return dict(width=width, depth=depth, elements=sorted(elements, key=lambda e: e["id"]))
+    floor = dict(width=width, depth=depth, elements=sorted(elements, key=lambda e: e["id"]))
+    if "placementConstraintDraft" in raw:
+        draft = raw["placementConstraintDraft"]
+        if not isinstance(draft, str) or len(draft) > 32768:
+            raise ValueError("Placement draft must be JSON text of at most 32768 characters")
+        draft = json.loads(draft)
+        if not isinstance(draft, dict) or set(draft) - {"zones", "fixedIds"}:
+            raise ValueError("Unsupported placement draft fields")
+        fixed = draft.get("fixedIds", [])
+        if not isinstance(fixed, list) or any(not isinstance(key, str) or key not in ids for key in fixed):
+            raise ValueError("Fixed equipment IDs must exist on this floor")
+        zones = draft.get("zones", [])
+        if not isinstance(zones, list) or len(zones) > 100:
+            raise ValueError("Expected at most 100 reserved areas")
+        normalized = []
+        for zone in zones:
+            if not isinstance(zone, dict) or set(zone) != {"x", "y", "w", "d"}:
+                raise ValueError("Reserved areas require exactly x, y, w, d")
+            rect = {key: number(zone[key], key in {"w", "d"}) for key in ("x", "y", "w", "d")}
+            if rect["x"] + rect["w"] > width or rect["y"] + rect["d"] > depth:
+                raise ValueError("Reserved area outside floor")
+            normalized.append(rect)
+        # Draft areas are already in metres, independent of the equipment cell size.
+        # Omit an empty list to preserve existing unconstrained graph identities.
+        if normalized:
+            floor["reserved_zones"] = sorted(normalized, key=lambda z: (z["x"], z["y"], z["w"], z["d"]))
+    return floor
 
 
 def floor_digest(floor):
@@ -88,6 +114,9 @@ def plan(raw_floor, graph, start, destination, mode, clearance_m):
         for element in floor["elements"]:
             if intersects(a, b, element, clearance):
                 return "equipment:" + element["id"]
+        for index, zone in enumerate(floor.get("reserved_zones", [])):
+            if intersects(a, b, zone, clearance):
+                return "reserved-area:" + str(index + 1)
         return None
 
     adjacency = {key: [] for key in nodes}

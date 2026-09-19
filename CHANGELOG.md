@@ -1693,3 +1693,7 @@ Added a deterministic shortest-path CLI using explicit access nodes, directed
 mode-permitted edges, floor bounds and buffered equipment footprints. Invalid or
 unreachable routes produce explicit failures/rejected-edge evidence. Added synthetic
 fixtures and primary-source scope notes; no safe-route or real movement claim.
+
+## 2026-09-19 — Route exclusion areas
+
+Directed-route screening now enforces saved placement reserved areas, includes them in graph identity, and rejects malformed drafts. Metre units do not depend on equipment cell size. All 27 Python tests pass; browser playback integration remains pending.

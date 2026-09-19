@@ -11,11 +11,11 @@ python tools/route_plan.py --floor examples/routes/floor.json --graph examples/r
 
 The example produces 12.7 m. The entered 0.3 m is a synthetic test assumption, not a
 recommended or regulatory clearance. The graph must carry the SHA256 digest of
-normalized metre floor dimensions and rectangular equipment footprints. A geometry
+normalized metre floor dimensions, rectangular equipment footprints and reserved areas. A geometry
 change requires a new graph review/digest. This is geometry consistency, not site
 identity, signed approval or a verified survey.
 
-Every declared edge is tested against inflated equipment rectangles and the floor
+Every declared edge is tested against inflated equipment and reserved-area rectangles and the floor
 boundary. Equipment contact is rejected. The entered clearance expands each
 rectangle in both axes: a conservative rectangular buffer, not a vehicle swept
 path. Dijkstra selects the shortest remaining directed route by Euclidean segment
@@ -27,8 +27,7 @@ obstacles; overhead conveyors, walk-through equipment and doors need a richer
 geometry/access model. Rotation, turning radius, pedestrian/vehicle interaction,
 crossing reservations, visibility, slopes, utilities, hazards, travel times and
 regulatory approval are unmodelled. This planner does not change inventory, assign
-a worker or move a package. User-defined reserved-area drafts are not included in
-this CLI's geometry yet and must not be assumed enforced.
+a worker or move a package. Saved placementConstraintDraft areas are enforced in metres; malformed drafts reject planning. Fixed IDs are validated but do not alter routing because every equipment footprint is already an obstacle. Reserved-area rejection numbers refer to canonical coordinate order. Empty drafts preserve existing graph identities.
 
 ## Research and scope
 
@@ -49,7 +48,7 @@ engineering review remain outside this implementation.
 
 Tests cover a hand-computed 12 m detour, a blocked direct edge, reverse one-way travel,
 mode denial, exact obstacle contact, insufficient clearance, access inside equipment,
-non-unit cell conversion, stale geometry, determinism and nonmutation. All 24 Python
+non-unit cell conversion, stale geometry, determinism and nonmutation. All 27 Python
 tests pass. The 12.7 m example JSON and SVG were generated twice with identical hashes.
 SVG browser inspection was blocked by the browser URL policy; rendered visual QA
 is unverified. Geometry and output data checks passed.

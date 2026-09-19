@@ -1,4 +1,5 @@
 import copy
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -61,6 +62,36 @@ class RoutePlanTests(unittest.TestCase):
         self.assertFalse(route.intersects(dict(x=0, y=1), dict(x=6, y=1), box, 0))
         self.assertTrue(route.intersects(dict(x=0, y=1), dict(x=6, y=1), box, 1))
         self.assertFalse(route.intersects(dict(x=0, y=0), dict(x=0, y=6), box, 0))
+
+    def test_reserved_area_invalidates_graph_and_blocks_detour_in_metres(self):
+        self.floor["placementConstraintDraft"] = json.dumps(dict(zones=[dict(x=4, y=1, w=1, d=1)]))
+        with self.assertRaises(ValueError):
+            self.run_plan()
+        self.graph["floor_digest"] = route.floor_digest(route.floor_model(self.floor))
+        result = self.run_plan()
+        self.assertFalse(result["found"])
+        self.assertIn("reserved-area:1", [edge["reason"] for edge in result["rejected_edges"]])
+        self.assertEqual(result["points"], [])
+
+    def test_invalid_reserved_draft_never_silently_ignored(self):
+        for draft in [None, "broken", "[]", '{"zones":null}', '{"unknown":[]}',
+                      '{"zones":[{"x":9,"y":1,"w":2,"d":1}]}',
+                      '{"zones":[{"x":true,"y":1,"w":2,"d":1}]}',
+                      '{"fixedIds":["missing"]}']:
+            with self.subTest(draft=draft):
+                self.floor["placementConstraintDraft"] = draft
+                with self.assertRaises(ValueError):
+                    self.run_plan()
+
+    def test_empty_draft_compatibility_and_area_order_independence(self):
+        original = route.floor_digest(route.floor_model(self.floor))
+        self.floor["placementConstraintDraft"] = '{"fixedIds":["machine"],"zones":[]}'
+        self.assertEqual(original, route.floor_digest(route.floor_model(self.floor)))
+        zones = [dict(x=1, y=1, w=1, d=1), dict(x=8, y=8, w=1, d=1)]
+        self.floor["placementConstraintDraft"] = json.dumps(dict(zones=zones))
+        digest = route.floor_digest(route.floor_model(self.floor))
+        self.floor["placementConstraintDraft"] = json.dumps(dict(zones=zones[::-1]))
+        self.assertEqual(digest, route.floor_digest(route.floor_model(self.floor)))
 
 
 if __name__ == "__main__":
