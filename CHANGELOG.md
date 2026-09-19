@@ -1666,3 +1666,10 @@ Added planner-layout import and explicit ledger-location/equipment bindings in t
 transfer viewer, with metre-based SVG footprints and stationary anchor markers.
 Travelling and blocked states do not fabricate coordinates. Geometry validation
 rejects duplicate IDs and invalid footprints; bindings reset on replacement.
+
+## 2026-09-19 — Reject backdated resource reuse
+
+Fixed a ledger defect where a delivered package freed a worker for a new task with
+an earlier timestamp, creating overlapping historical work. Assignment now checks
+the resource's latest recorded time transactionally. Tests prove rejection leaves
+both package state and event history unchanged and allow exact-boundary reuse.

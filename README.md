@@ -332,3 +332,13 @@ coordination, not physical route replay, surveyed geometry or collision checking
 Duplicate equipment IDs, out-of-floor footprints and invalid dimensions reject the
 floor import.56 harnesses,18 Python tests and159 main browser checks pass; actual
 file-import/mapping and zero travelling markers were manually verified. Cachewt-v89.
+
+### Chronological resource assignment
+
+Transfer assignment now also checks the latest recorded work time for the chosen
+resource inside the same immediate transaction. Example: after delivery at10:05,
+a new assignment at10:02 is rejected even though the resource is currently free.
+Assignment exactly at10:05 is allowed. This append-only prototype requires
+chronological resource use; inserting work into historical gaps, corrections and
+reassignment remain unsupported. It does not validate external JSON histories.
+The regression failed before the fix and passes afterwards;19 Python tests pass.

@@ -102,6 +102,19 @@ class TransportStoreTests(unittest.TestCase):
                 first.close()
                 second.close()
 
+    def test_resource_cannot_be_reassigned_before_previous_delivery(self):
+        self.create()
+        self.create("U2", "P2")
+        for version, state in enumerate(["assigned", "loading", "travelling", "unloading", "delivered"]):
+            transport.transition(self.db, "U1", state, version, f"past-{version}",
+                                 f"2026-09-19T10:{version+1:02}:00Z",
+                                 resource_id="R" if state == "assigned" else None)
+        with self.assertRaises(ValueError):
+            transport.transition(self.db, "U2", "assigned", 0, "overlap", "2026-09-19T10:02:00Z", resource_id="R")
+        self.assertEqual(self.db.execute("SELECT state FROM package WHERE id='U2'").fetchone()[0], "waiting")
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM transport_event WHERE id='overlap'").fetchone()[0], 0)
+        self.assertEqual(transport.transition(self.db, "U2", "assigned", 0, "boundary", "2026-09-19T10:05:00Z", resource_id="R"), "applied")
+
     def test_export_snapshot_does_not_truncate_or_mutate(self):
         self.create()
         before = self.db.total_changes

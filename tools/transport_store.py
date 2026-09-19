@@ -132,6 +132,14 @@ def transition(db, package_id, target, expected_version, event_id, occurred_at, 
             raise ValueError(f"Transition {row['state']} -> {target} is not permitted")
         if at < row["updated_at"]:
             raise ValueError("Event time cannot go backwards")
+        if target == "assigned":
+            # Current occupancy alone misses backdated overlap after delivery.
+            # This append-only prototype requires chronological resource use;
+            # it does not insert assignments into earlier historical gaps.
+            last = db.execute("SELECT MAX(updated_at) FROM package WHERE resource_id=?",
+                              (resource_id,)).fetchone()[0]
+            if last is not None and at < last:
+                raise ValueError("Assignment precedes the resource's latest recorded work")
         resource = resource_id if target == "assigned" else row["resource_id"]
         location = (None if target in {"travelling", "blocked"} else
                     row["destination_id"] if target in {"unloading", "delivered"} else row["source_id"])

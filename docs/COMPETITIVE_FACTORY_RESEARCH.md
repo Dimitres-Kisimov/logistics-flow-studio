@@ -75,3 +75,9 @@ coordination or safe placement approval. Tests cover a separating barrier at a
 non-unit cell size, fixed objects, invalid fields and unchanged inputs. The BAuA
 ASR A1.8 page was requested again for this increment but returned403; no new standard
 text or regulatory clearance was inferred from that unsuccessful retrieval.
+
+## Validation follow-up — 19 September 2026
+
+Re-read [NIST: Validating and Advancement](https://www.nist.gov/digital-twins/validating-and-advancement), updated13February2026. NIST emphasizes continuing validation and manufacturing digital-twin credibility. This is methodological context, not a certification or an endorsement of this implementation.
+
+Our audit found a concrete temporal inconsistency: current resource exclusivity did not prevent a new backdated assignment after an earlier task was marked delivered. A test reproduced the defect, then passed after a transactional chronological-resource check. The prototype now requires append-only chronological assignments; exact release/assignment boundaries are permitted. Historical gap insertion/correction, cross-package validation of external files, shift calendars, travel time between jobs and resource capability checks remain unimplemented. Passing this invariant does not establish a calibrated physical simulation.
