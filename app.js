@@ -5655,7 +5655,7 @@
 
   function deserialize(obj, source) {
     if (!obj || !Array.isArray(obj.elements)) throw new Error("Invalid layout data");
-    validateImportIdentities(obj.elements);
+    const importIds = allocateImportIdentities(obj.elements);
     if (obj.placementConstraintDraft !== undefined && (typeof obj.placementConstraintDraft !== "string" || obj.placementConstraintDraft.length > 32768)) throw new Error("Invalid placement constraint draft: expected at most 32768 text characters.");
     // Rebuild any embedded USER-DEFINED type definitions FIRST, so the
     // element loop below (which drops types absent from ELEMENTS) resolves
@@ -5671,11 +5671,11 @@
     GRID_H = nf.gridH;
     const cleaned = [];
     let maxId = 0;
-    for (const raw of obj.elements) {
+    for (const [rawIndex, raw] of obj.elements.entries()) {
       if (!raw || !ELEMENTS[raw.type]) continue; // drop unknown types
       const def = ELEMENTS[raw.type];
       const el = {
-        id: typeof raw.id === "string" ? raw.id : "el-" + Math.random().toString(36).slice(2),
+        id: importIds[rawIndex],
         type: raw.type,
         x: clampInt(raw.x, 0, GRID_W - 1),
         y: clampInt(raw.y, 0, GRID_H - 1),
@@ -5748,6 +5748,19 @@
       if (seen.has(raw.id)) throw new Error("Duplicate equipment ID: " + raw.id + ". Give each item a unique ID before importing.");
       seen.add(raw.id);
     }
+  }
+
+  function allocateImportIdentities(elements) {
+    validateImportIdentities(elements);
+    const used = new Set(elements.filter(raw => raw && typeof raw.id === "string").map(raw => raw.id));
+    let next = 1;
+    return elements.map(raw => {
+      if (raw && typeof raw.id === "string") return raw.id;
+      let id;
+      do { id = "import-" + next++; } while (used.has(id));
+      used.add(id);
+      return id;
+    });
   }
   function numOr(v, d) { const n = Number(v); return isNaN(n) ? d : n; }
 
@@ -9549,6 +9562,7 @@
       // Simple/Expert density lever, through the SAME functions the UI uses.
       selectElement: selectElement,
       importLayout: deserialize,
+      exportLayout: serialize,
       placement: { problem:placementProblem, nudge:nudgeSelected, place:placeAt, rotate:rotateSelected },
       renderProps: renderProps,
       density: {

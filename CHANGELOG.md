@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-19 — Stable identities for legacy imports
+
+Equipment without string IDs now receives deterministic import-N identities in file order. All explicit IDs are reserved first, including those later in the file, so generated IDs cannot collide with them. Input records are not mutated. Cache wt-v110.
+
+
 ## 2026-09-19 — Reject ambiguous imported equipment identities
 
 Layout loading rejects duplicate or blank explicit equipment IDs before modifying custom definitions or the current floor. Legacy records without string IDs retain generated-ID behavior. This is an identity preflight, not complete atomic import validation. Cache wt-v109.

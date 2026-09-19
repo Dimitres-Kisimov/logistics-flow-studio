@@ -13,6 +13,7 @@ context.V = WT.view;
 names.push("floorResizeProblem");
 names.push("flowSignature");
 names.push("validateImportIdentities");
+names.push("allocateImportIdentities");
 for (const name of names) {
   const match = source.match(new RegExp("  function " + name + "\\([^]*?\\n  }"));
   assert.ok(match, name);
@@ -74,5 +75,11 @@ console.log("Playback signature tracks square conveyor orientation and equipment
 assert.throws(()=>context.validateImportIdentities([{id:"same"},{id:"same"}]),/Duplicate equipment ID/);
 assert.throws(()=>context.validateImportIdentities([{id:"  "}]),/must not be empty/);
 assert.doesNotThrow(()=>context.validateImportIdentities([{id:"a"},{id:"b"},{}]));
-assert.ok(source.indexOf("validateImportIdentities(obj.elements)") < source.indexOf("WT.library.rebuildFrom(obj)"),"preflight before custom library mutation");
+assert.ok(source.indexOf("allocateImportIdentities(obj.elements)") < source.indexOf("WT.library.rebuildFrom(obj)"),"preflight before custom library mutation");
 console.log("Import identity preflight rejects duplicates and empty IDs before mutation.");
+const legacy=[{}, {id:"import-1"}, {id:17}, {id:"keep-me"}, {}];
+const legacyBefore=JSON.stringify(legacy);
+assert.equal(JSON.stringify(context.allocateImportIdentities(legacy)),JSON.stringify(["import-2","import-1","import-3","keep-me","import-4"]));
+assert.equal(JSON.stringify(context.allocateImportIdentities(legacy)),JSON.stringify(context.allocateImportIdentities(legacy)));
+assert.equal(JSON.stringify(legacy),legacyBefore);
+console.log("Legacy import IDs are deterministic, nonmutating and avoid later explicit IDs.");

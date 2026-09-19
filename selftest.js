@@ -3272,6 +3272,21 @@
       return rejected && JSON.stringify(API.currentLayout())===before;
     });
 
+    check("legacy-import-identities-repeat-without-collisions", function () {
+      if (!haveApi) return false;
+      var original=API.exportLayout();
+      var legacy={gridW:40,gridH:24,elements:[
+        {type:"pack-station",x:1,y:1,w:2,d:1},
+        {id:"import-1",type:"pack-station",x:5,y:5,w:2,d:1}
+      ]};
+      try {
+        API.importLayout(legacy);
+        var first=API.state.elements.map(function(e){return e.id;}).join(",");
+        API.importLayout(legacy);
+        return first==="import-2,import-1" && API.state.elements.map(function(e){return e.id;}).join(",")===first && legacy.elements[0].id===undefined;
+      } finally { API.importLayout(original); }
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

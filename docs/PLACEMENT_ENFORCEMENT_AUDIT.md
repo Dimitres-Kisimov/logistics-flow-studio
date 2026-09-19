@@ -52,3 +52,7 @@ Node tests cover fixed equipment at the edge, metre conversion for reserved area
 Layout loading now rejects duplicate and blank explicit string equipment IDs before rebuilding custom library definitions or changing floor geometry. This prevents ambiguous selection/fixed-ID/tracking references. The rejection names the duplicate and leaves the current layout intact. Missing/non-string IDs retain legacy generated-ID behavior; full deterministic ID allocation is not established by this check.
 
 This does not make imports atomic or constraint-safe in general. The loader still normalizes/clamps geometry, drops unknown types and rebuilds custom definitions before later processing. Reserved-area conflicts, process-block failure rollback and generated layouts need further work. Tests cover identity rejection before mutation; they do not establish full import validity.
+
+### Deterministic legacy identity allocation
+
+Legacy records without string IDs now receive import-N IDs in file order rather than random values. Explicit IDs from the entire file are reserved before assignment, including later entries, and remain unchanged. Reimporting identical input yields identical IDs without mutating the input. Reordering legacy records may change generated IDs; these are file-local identities, not global equipment registry identifiers. Unknown records can reserve/consume IDs before the existing loader drops them. Full geometry/constraint validation and atomic rollback remain unfinished.
