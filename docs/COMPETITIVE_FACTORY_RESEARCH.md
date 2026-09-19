@@ -67,8 +67,7 @@ Run a focused competitor/source review at each meaningful design decision and a 
 
 The warehouse golden-zone optimizer now accepts fixed IDs and axis-aligned reserved
 rectangles in metres, with strict field validation and fail-closed baseline conflict
-handling. Candidates report rejection counts. UI constraints affect this preview
-only, are not persisted/exported or drawn, and do not cover other optimizers.
+handling. Candidates report rejection counts. UI constraints are saved/exported as drafts and drawn in both floor projections; they still do not cover every optimizer.
 Stale Apply is blocked when layout, config or constraints change. This implements
 part of the proposal contract, not general polygons, egress, swept paths, utility
 coordination or safe placement approval. Tests cover a separating barrier at a
@@ -80,4 +79,10 @@ text or regulatory clearance was inferred from that unsuccessful retrieval.
 
 Re-read [NIST: Validating and Advancement](https://www.nist.gov/digital-twins/validating-and-advancement), updated13February2026. NIST emphasizes continuing validation and manufacturing digital-twin credibility. This is methodological context, not a certification or an endorsement of this implementation.
 
-Our audit found a concrete temporal inconsistency: current resource exclusivity did not prevent a new backdated assignment after an earlier task was marked delivered. A test reproduced the defect, then passed after a transactional chronological-resource check. The prototype now requires append-only chronological assignments; exact release/assignment boundaries are permitted. Historical gap insertion/correction, cross-package validation of external files, shift calendars, travel time between jobs and resource capability checks remain unimplemented. Passing this invariant does not establish a calibrated physical simulation.
+Our audit found a concrete temporal inconsistency: current resource exclusivity did not prevent a new backdated assignment after an earlier task was marked delivered. A test reproduced the defect, then passed after a transactional chronological-resource check. The prototype now requires append-only chronological assignments; exact release/assignment boundaries are permitted. Cross-package resource interval validation of exported files has since been implemented. Historical gap insertion/correction, shift calendars, travel time between jobs and resource capability checks remain unimplemented. Passing this invariant does not establish a calibrated physical simulation.
+
+## Current traffic-model review — 19 September 2026
+
+See [Shared-route simulation contract](TRAFFIC_MODEL_CONTRACT.md) for newly retrieved primary sources, retrieval limitations, explicit proposed allocation/release semantics and nine hand-checkable future acceptance fixtures. These fixtures are requirements, not implemented tests.
+
+Current code now includes SQL transfer histories, cross-package resource interval audits, saved location bindings, directed footprint/reserved-area route screening, and constant-speed timeline export. Browser playback validates geometry/timing, optionally matches package/order/pick/version, and renders plan/isometric footprint views with follow cameras. It remains a separate assumed scenario, not live SQL execution or interacting traffic. The main planner's minute-bucket movement is unchanged. This checkpoint supersedes older next-step statements in this document.

@@ -146,7 +146,7 @@ Model/provider, deployment location, data-sharing permission and cost limit rema
 | 6 | Utility topology and reviewed safety screening | Typed connections, isolation/access layers, explicit unknowns; specialist evidence before engineering claims |
 | 7 | Connected assistant and measured-data validation | Provider works; tool-grounded answers; memory controls; no unexplained actions; held-out accuracy and rollback |
 
-Every cycle: check relevant primary sources and source revisions, inspect current features, implement one bounded improvement, run regression and conservation tests, compare baseline/candidate, inspect the UI, publish a review branch and log limitations. Weekly standards review is a proposed cadence; the existing hourly programme remains bounded by its current deadline unless extended by the user.
+Every cycle: check relevant primary sources and source revisions, inspect current features, implement one bounded improvement, run regression and conservation tests, compare baseline/candidate, inspect the UI, publish a review branch and log limitations. Weekly standards review is a proposed cadence; the user has extended the existing programme to continue daily until stopped.
 
 ## Current implementation checkpoint
 
@@ -155,3 +155,7 @@ Two selectable operating profiles are required: assembly/warehouse and process m
 Stage 1 now exists as `tools/resource_plan.py`, selected with `--profile assembly-warehouse` or `--profile process-manufacturing`, or supplied with a versioned `--input` JSON file. It exports human-readable HTML, complete JSON and four CSV tables. Synthetic fixtures expose a stock shortage and an unreconciled energy interval. Staffing results are skill-specific workload lower bounds, not an optimal roster. There is no live IFC import, measured tracking, full scheduler or connected AI assistant in this increment.
 
 The next product step is an integrated browser mode selector and editable resource panel using the same validated model contract. The process profile additionally needs batch/continuous selection, recipe and yield versions, vessel capacity, hold/quality-release states, cleaning/changeover time, lot genealogy, utility demand and reviewed process hazards. Assembly/warehouse needs BOM/kit availability, picking/replenishment, takt, skills, handling routes and order dispatch. Both need real data calibration before predictions are described as accurate.
+
+### Route and traffic checkpoint
+
+Route screening, assumed timed playback, SQL package-snapshot association and plan/isometric footprint cameras are implemented. Shared traffic allocation, skills/shifts, repositioning and calibrated vehicle dynamics are not. Use docs/TRAFFIC_MODEL_CONTRACT.md as the next scheduling/traffic acceptance contract; it does not mark Stage4 complete. The seven original delivery stages remain the scope.
