@@ -371,6 +371,10 @@ timed out, so successful file saving was not independently confirmed in that bro
 
 ### Directed route screening prototype
 
+Scheduled resource positions can now be generated from the same screened paths
+that determine assignment times. See [resource motion](docs/RESOURCE_MOTION.md)
+for the runnable example, return-trip handling and remaining browser integration.
+
 `tools/route_plan.py` plans shortest routes only along declared one-way graph edges,
 filtering travel modes and rectangular footprint/clearance conflicts. It requires
 explicit access nodes and a matching floor geometry digest. This is a CLI/library,

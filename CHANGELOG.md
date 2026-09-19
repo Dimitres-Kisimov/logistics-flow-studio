@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-19 — Geometry-driven resource motion
+
+Connected directed route timing to resource dispatch and continuous worker/load
+positions. Explicit return paths determine repositioning time; loads remain at
+their sources until handling begins. Calendar and shared-area waits retain the
+same schedule. This is a CLI/library foundation, not browser or SQL integration.
+
 All notable changes to WarehouseTwin (Logistics Flow Studio) are recorded here.
 Dates are ISO (YYYY-MM-DD). Every figure the app produces is a **synthetic,
 seeded teaching heuristic unless you import your own data** — informed by public

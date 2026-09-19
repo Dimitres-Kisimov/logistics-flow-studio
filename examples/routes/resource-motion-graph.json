@@ -1,0 +1,70 @@
+{
+  "schema": "factory-route-graph/v1",
+  "floor_digest": "9db740cbbfe623d2797a6fd87d0fd6b936aef5d51298450ebc704350e4dcc1d7",
+  "nodes": [
+    {
+      "id": "PICK-ACCESS",
+      "x": 4,
+      "y": 4.8
+    },
+    {
+      "id": "AISLE-A",
+      "x": 4,
+      "y": 6
+    },
+    {
+      "id": "AISLE-B",
+      "x": 13,
+      "y": 6
+    },
+    {
+      "id": "PACK-ACCESS",
+      "x": 13,
+      "y": 8.5
+    }
+  ],
+  "edges": [
+    {
+      "from": "PICK-ACCESS",
+      "to": "AISLE-A",
+      "modes": [
+        "worker"
+      ]
+    },
+    {
+      "from": "AISLE-A",
+      "to": "AISLE-B",
+      "modes": [
+        "worker"
+      ]
+    },
+    {
+      "from": "AISLE-B",
+      "to": "PACK-ACCESS",
+      "modes": [
+        "worker"
+      ]
+    },
+    {
+      "to": "PICK-ACCESS",
+      "from": "AISLE-A",
+      "modes": [
+        "worker"
+      ]
+    },
+    {
+      "to": "AISLE-A",
+      "from": "AISLE-B",
+      "modes": [
+        "worker"
+      ]
+    },
+    {
+      "to": "AISLE-B",
+      "from": "PACK-ACCESS",
+      "modes": [
+        "worker"
+      ]
+    }
+  ]
+}

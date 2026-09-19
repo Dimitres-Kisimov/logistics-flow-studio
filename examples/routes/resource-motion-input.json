@@ -1,0 +1,14 @@
+{
+  "schema": "factory-resource-motion-input/v1",
+  "horizon_s": 120,
+  "mode": "worker",
+  "speed_mps": 1,
+  "clearance_m": 0.2,
+  "location_access": {"PICK": "PICK-ACCESS", "PACK": "PACK-ACCESS"},
+  "resources": [{"id": "WORKER-1", "skills": ["picking"], "start_location": "PICK", "availability_s": [[0,30],[60,120]]}],
+  "reposition": [{"resource_id": "WORKER-1", "from": "PACK", "to": "PICK"}],
+  "jobs": [
+    {"id": "ORDER-A", "release_s": 0, "source": "PICK", "destination": "PACK", "required_skills": ["picking"], "loading_s": 5, "unloading_s": 3},
+    {"id": "ORDER-B", "release_s": 1, "source": "PICK", "destination": "PACK", "required_skills": ["picking"], "loading_s": 5, "unloading_s": 3}
+  ]
+}
