@@ -6,6 +6,12 @@ seeded teaching heuristic unless you import your own data** — informed by publ
 standards (ISO 22400, DIN 15185, ASR, EN, VDI), not a certification and not a
 measurement of a real site.
 
+## v3.26 — Review the equipment behind an order route
+
+The Live material flow panel now shows each recipe as an ordered review, including missing and unsupported operations, shared benches, fallback positions, and both returns outcomes. An empty floor can still resolve the legacy animation, but the review correctly reports equipment gaps. Simulation behaviour and existing numeric baselines are unchanged.
+
+The panel uses the existing router and anchor counts; it does not certify feasibility or switch playback routes. Corrected stale UI copy denying the queues already present in the engine. Added primary-source factory research with explicit future-work boundaries. New route-review harness and real selector exercise; cache wt-v81.
+
 ## v3.25 - EVERY PACKAGE TAKES ITS OWN PATH (order-driven routing, R1: the engine)
 
 **The defect.** `flowsim.js` hardcoded ONE spine - `receiving -> storage -> picking ->

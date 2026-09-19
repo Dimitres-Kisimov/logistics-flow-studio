@@ -3306,6 +3306,21 @@
       return { ok: noMix === legacyMix && oneRoute,
         detail: "identical=" + (noMix === legacyMix) + " singleSpine=" + oneRoute + " on " + lay.elements.length + " elements" };
     });
+    check("route-review-live-selection", function () {
+      var picker = $("routeReviewPick"), body = $("routeReviewBody");
+      if (!picker || !body || !WT.routeReview) return false;
+      picker.value = "piece-pick";
+      picker.dispatchEvent(new Event("change", { bubbles: true }));
+      var unsupported = body.textContent.indexOf("Operation not supported") >= 0 &&
+        body.querySelectorAll("li").length === 8;
+      picker.value = "returns:scrap";
+      picker.dispatchEvent(new Event("change", { bubbles: true }));
+      var scrap = body.querySelectorAll("li").length === 3;
+      picker.value = "cross-dock";
+      picker.dispatchEvent(new Event("change", { bubbles: true }));
+      return { ok: unsupported && scrap && body.querySelectorAll("li").length === 4,
+        detail: "Unsupported each-pick, return scrap outcome and cross-dock all render via the real selector" };
+    });
     check("no-errors-after-drive", function () {
       var e = window.__WT_ERRORS__ || [];
       return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" };

@@ -827,9 +827,17 @@
         <h2 class="card-title">Live material flow</h2>
         <div class="wms-disclaimer">
           <strong>SYNTHETIC animation — a transparent teaching model, NOT a real discrete-event-simulation engine, NOT a measurement and NOT a certification.</strong>
-          Boxes follow <em>straight-segment waypoint routing</em> between zone centroids (there is no queueing, congestion or pathfinding). Spawn/completion rate and travel speed follow the documented <code>wms.js</code> throughput heuristic.
+          Handling units follow waypoint routes with modelled station queues. Movement is schematic: obstacle-aware pathfinding and safe traffic separation are not verified. Rates are modelled, not measured.
         </div>
-        <p class="hint">Watch handling units (MUs) flow through the <strong>current layout</strong> along the spine <strong>receiving → storage → picking → packing → shipping</strong>, using dock, storage, pick-face and pack centroids (and a conveyor/RGV/AGV spine where present) as waypoints. More docks/automation → the bottleneck stage (via WMS) lifts, so units spawn faster and move quicker. Seed comes from the Simulation panel — same layout + seed → identical animation.</p>
+        <p class="hint">Playback follows the default route: <strong>receive → store → pick → pack → ship</strong>. Review other order recipes below. The same layout and seed reproduce the same animation.</p>
+        <section class="route-review" aria-labelledby="routeReviewHeading">
+          <div class="route-review-heading"><span class="route-review-kicker">Before you run</span><h3 id="routeReviewHeading">Can this floor handle the order?</h3></div>
+          <p class="hint">Review each recipe against the equipment on your floor. Both returns outcomes are listed separately.</p>
+          <label for="routeReviewPick">Order route to review</label>
+          <select id="routeReviewPick" aria-describedby="routeReviewScope"></select>
+          <div id="routeReviewBody" aria-live="polite" aria-atomic="true"></div>
+          <p id="routeReviewScope" class="route-review-caption">Review only. Playback below still uses the default teaching route. Equipment presence does not verify capacity, inventory, safe access or compliance.</p>
+        </section>
         <div class="flow-controls" role="group" aria-label="Live material-flow playback">
           <button id="flowPlayBtn" class="btn primary" type="button" aria-label="Play material-flow animation">▶ Play</button>
           <button id="flowPauseBtn" class="btn" type="button" aria-label="Pause material-flow animation">❚❚ Pause</button>
@@ -1250,6 +1258,7 @@
   <script src="automation.js"></script>
   <script src="routing.js"></script>
   <script src="flowsim.js"></script>
+  <script src="route-review.js"></script>
   <script src="flowlinks.js"></script>
   <script src="kpicharts.js"></script>
   <script src="wmsdata.js"></script>

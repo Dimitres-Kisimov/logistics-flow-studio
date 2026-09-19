@@ -815,6 +815,7 @@
   }
 
   function render() {
+    renderRouteReview();
     // v3.8 REDESIGN-1: keep the canvas-hero empty-state in sync with the layout
     // (shown only when there are no elements). Cheap - only touches the DOM when
     // the empty/non-empty state flips - so calling it every frame is fine.
@@ -2294,6 +2295,65 @@
     return true;
   }
 
+  // A route can resolve on fallback geometry. Review that evidence separately
+  // from playback; do not imply that a drawable route is a working facility.
+  let routeReviewSignature = "";
+  let routeReviewModel = null;
+  function renderRouteReview(force) {
+    const picker = $("routeReviewPick"), out = $("routeReviewBody");
+    if (!picker || !out || !WT.routeReview) return;
+    // Definitions can change without moving an object (custom dock direction,
+    // base class or pick-face behaviour), so geometry alone is insufficient.
+    const definitions = Array.from(new Set(state.elements.map((e) => e.type)))
+      .map((type) => [type, WT.domain.ELEMENTS[type]]);
+    const signature = flowSignature() + JSON.stringify(definitions);
+    if (!force && routeReviewSignature === signature) return;
+    routeReviewSignature = signature;
+    routeReviewModel = WT.routeReview.build(currentLayout());
+    if (!picker.options.length) {
+      routeReviewModel.rows.forEach((row) => {
+        const option = document.createElement("option");
+        option.value = row.id;
+        option.textContent = row.label + (row.outcome ? " / " + row.outcome : "");
+        picker.appendChild(option);
+      });
+      picker.value = "cross-dock";
+    }
+    const row = routeReviewModel.rows.find((r) => r.id === picker.value) || routeReviewModel.rows[0];
+    const labels = { unsupported: "Operation not supported", gaps: "Equipment gaps", shared: "Shared equipment", placed: "Equipment found" };
+    const stepLabels = { unsupported: "Not supported", missing: "Missing", fallback: "Fallback", shared: "Shared", placed: "Placed" };
+    out.replaceChildren();
+    const headline = document.createElement("p");
+    headline.className = "route-review-status route-review-" + row.status;
+    headline.textContent = labels[row.status];
+    out.appendChild(headline);
+    const description = document.createElement("p");
+    description.className = "hint";
+    description.textContent = row.description;
+    out.appendChild(description);
+    const list = document.createElement("ol");
+    list.className = "route-review-steps";
+    row.steps.forEach((step) => {
+      const item = document.createElement("li");
+      const name = document.createElement("strong");
+      name.textContent = step.label;
+      const badge = document.createElement("span");
+      badge.className = "route-review-badge route-review-" + step.status;
+      badge.textContent = stepLabels[step.status];
+      const note = document.createElement("p");
+      note.textContent = step.note;
+      item.append(name, badge, note);
+      list.appendChild(item);
+    });
+    out.appendChild(list);
+    const conclusion = document.createElement("p");
+    conclusion.className = "route-review-caption";
+    conclusion.textContent = row.engineResolved
+      ? "The routing engine can draw this recipe. That does not establish operational feasibility."
+      : "The routing engine cannot complete this recipe on the current floor. Missing operations are not skipped.";
+    out.appendChild(conclusion);
+  }
+
   /* ------------------------------------------------------------------
    * v1.3: (re)build the live ORDER POOL alongside the flow sim. The pool
    * shares the flow's seed and its units-per-order convention so the pool's
@@ -2644,6 +2704,8 @@
   }
 
   function wireFlowControls() {
+    const routePicker = $("routeReviewPick");
+    if (routePicker) routePicker.addEventListener("change", () => renderRouteReview(true));
     const on = (id, fn) => { const el = $(id); if (el) el.addEventListener("click", fn); };
     on("flowPlayBtn", flowPlay);
     on("flowPauseBtn", flowPause);
