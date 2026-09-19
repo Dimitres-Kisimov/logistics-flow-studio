@@ -79,6 +79,19 @@
     const a=s.source,b=s.destination,f=(tick-s.start_s)/(s.end_s-s.start_s);
     return {state:"travelling",position:{x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f},heading:Math.atan2(b.y-a.y,b.x-a.x)};
   }
-  const api={parse,sample,geometry};
+  function project(point,view) {
+    requireThat(point&&Number.isFinite(point.x)&&Number.isFinite(point.y)&&["plan","iso"].includes(view),"Invalid projection input");
+    return view==="iso"?{x:(point.x-point.y)*Math.sqrt(3)/2,y:(point.x+point.y)/2}:{x:point.x,y:point.y};
+  }
+  function camera(floor,view,zoom,position) {
+    requireThat([1,2,4].includes(zoom),"Unsupported zoom");
+    const corners=[{x:0,y:0},{x:floor.width,y:0},{x:floor.width,y:floor.depth},{x:0,y:floor.depth}].map(p=>project(p,view));
+    const xs=corners.map(p=>p.x),ys=corners.map(p=>p.y),padding=Math.max(floor.width,floor.depth)*.06;
+    const left=Math.min(...xs)-padding,top=Math.min(...ys)-padding;
+    const width=Math.max(...xs)-left+padding,height=Math.max(...ys)-top+padding;
+    const centre=zoom===1?{x:left+width/2,y:top+height/2}:project(position,view);
+    return {x:centre.x-width/zoom/2,y:centre.y-height/zoom/2,width:width/zoom,height:height/zoom};
+  }
+  const api={parse,sample,geometry,project,camera};
   if(typeof module!=="undefined"&&module.exports)module.exports=api;else window.RoutePlayback=api;
 }());

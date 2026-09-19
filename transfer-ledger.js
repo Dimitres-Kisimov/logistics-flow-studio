@@ -9,15 +9,25 @@
   function drawRoute(){
     if(!timeline)return;
     const frame=window.RoutePlayback.sample(timeline,elapsed),svg=$("routeFloor"),f=timeline.floor;
-    svg.replaceChildren();svg.setAttribute("viewBox",`-1 -1 ${f.width+2} ${f.depth+2}`);
+    const view=$("routeProjection").value,zoom=Number($("routeZoom").value),api=window.RoutePlayback;
+    const project=p=>api.project(p,view),camera=api.camera(f,view,zoom,frame.position);
+    svg.replaceChildren();svg.setAttribute("viewBox",`${camera.x} ${camera.y} ${camera.width} ${camera.height}`);
     const shape=(tag,attrs)=>{const n=document.createElementNS("http://www.w3.org/2000/svg",tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,String(v)));svg.append(n);return n;};
-    shape("rect",{x:0,y:0,width:f.width,height:f.depth,fill:"#1b201d",stroke:"#73877b","stroke-width":.05});
-    f.elements.forEach(e=>shape("rect",{x:e.x,y:e.y,width:e.w,height:e.d,fill:"#405348"}));
-    (f.reserved_zones||[]).forEach(e=>shape("rect",{x:e.x,y:e.y,width:e.w,height:e.d,fill:"#b89134",opacity:.5}));
     const size=Math.max(f.width,f.depth)*.012;
-    shape("polyline",{points:timeline.route.points.map(p=>`${p.x},${p.y}`).join(" "),fill:"none",stroke:"#79dace","stroke-width":size*.45});
-    shape("circle",{cx:frame.position.x,cy:frame.position.y,r:size,fill:"#a7fff0",stroke:"#15241f","stroke-width":size*.2});
-    if(frame.heading!==null)shape("line",{x1:frame.position.x,y1:frame.position.y,x2:frame.position.x+Math.cos(frame.heading)*size*2.5,y2:frame.position.y+Math.sin(frame.heading)*size*2.5,stroke:"#fff","stroke-width":size*.4});
+    const points=ps=>ps.map(project).map(p=>`${p.x},${p.y}`).join(" ");
+    const rectangle=e=>[{x:e.x,y:e.y},{x:e.x+e.w,y:e.y},{x:e.x+e.w,y:e.y+e.d},{x:e.x,y:e.y+e.d}];
+    shape("polygon",{points:points(rectangle({x:0,y:0,w:f.width,d:f.depth})),fill:"#202923",stroke:"#81958a","stroke-width":size*.2});
+    for(let i=1;i<10;i++){
+      shape("polyline",{points:points([{x:f.width*i/10,y:0},{x:f.width*i/10,y:f.depth}]),fill:"none",stroke:"#718277",opacity:.2,"stroke-width":size*.08});
+      shape("polyline",{points:points([{x:0,y:f.depth*i/10},{x:f.width,y:f.depth*i/10}]),fill:"none",stroke:"#718277",opacity:.2,"stroke-width":size*.08});
+    }
+    f.elements.forEach(e=>{const n=shape("polygon",{points:points(rectangle(e)),fill:"#50695b",stroke:"#9cb1a3","stroke-width":size*.15});const title=document.createElementNS(n.namespaceURI,"title");title.textContent=e.id;n.append(title);});
+    (f.reserved_zones||[]).forEach(e=>shape("polygon",{points:points(rectangle(e)),fill:"#b89134",opacity:.5}));
+    shape("polyline",{points:points(timeline.route.points),fill:"none",stroke:"#79dace","stroke-width":size*.45,"stroke-linejoin":"round"});
+    [timeline.route.points[0],timeline.route.points[timeline.route.points.length-1]].forEach((p,i)=>{const q=project(p);shape("circle",{cx:q.x,cy:q.y,r:size*.65,fill:"#202923",stroke:"#79dace","stroke-width":size*.2});const label=shape("text",{x:q.x+size,y:q.y-size,"font-size":size*1.6,fill:"#c7e8dd"});label.textContent=i?"End":"Start";});
+    const pos=project(frame.position);
+    shape("circle",{cx:pos.x,cy:pos.y,r:size,fill:"#a7fff0",stroke:"#15241f","stroke-width":size*.2});
+    if(frame.heading!==null){const end=project({x:frame.position.x+Math.cos(frame.heading)*size*2.5,y:frame.position.y+Math.sin(frame.heading)*size*2.5});shape("line",{x1:pos.x,y1:pos.y,x2:end.x,y2:end.y,stroke:"#fff","stroke-width":size*.4});}
     $("routeSeek").value=String(elapsed);
     $("routeClock").textContent=`${elapsed.toFixed(2)} / ${timeline.duration_s.toFixed(2)} simulated seconds · ${frame.state} · X ${frame.position.x.toFixed(2)} m / Y ${frame.position.y.toFixed(2)} m · Assumed travel ${timeline.speed_mps} m/s`;
   }
@@ -42,6 +52,8 @@
   $("routeReset").addEventListener("click",()=>{pauseRoute();elapsed=0;drawRoute();});
   $("routeSeek").addEventListener("input",()=>{pauseRoute();elapsed=Number($("routeSeek").value);drawRoute();});
   $("routeSpeed").addEventListener("change",()=>{lastTick=null;});
+  $("routeProjection").addEventListener("change",drawRoute);
+  $("routeZoom").addEventListener("change",drawRoute);
   document.addEventListener("visibilitychange",()=>{if(document.hidden)pauseRoute();});
   function drawMap(frame) {
     const svg=$("ledgerFloor"); svg.replaceChildren(); svg.toggleAttribute("hidden",!layout);

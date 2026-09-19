@@ -30,4 +30,17 @@ assert.equal(api.parse(bound,floor,manifest).package_snapshot.id,"P");
 assert.throws(()=>api.parse(bound,floor));
 for(const field of Object.keys(manifest))assert.throws(()=>api.parse(bound,floor,{...manifest,[field]:"changed"}));
 bound.location_access.B="AISLE-B";assert.throws(()=>api.parse(bound,floor,manifest),/access nodes/);
+assert.deepEqual(api.project({x:4,y:6},"plan"),{x:4,y:6});
+assert.deepEqual(api.project({x:4,y:6},"iso"),{x:-Math.sqrt(3),y:5});
+for(const view of ["plan","iso"]){
+  const position=api.sample(model,10).position,camera=api.camera(model.floor,view,4,position),p=api.project(position,view);
+  assert.ok(Math.abs(camera.x+camera.width/2-p.x)<1e-12);
+  assert.ok(Math.abs(camera.y+camera.height/2-p.y)<1e-12);
+  const fit=api.camera(model.floor,view,1,position);
+  for(const corner of [{x:0,y:0},{x:20,y:0},{x:20,y:12},{x:0,y:12}]){
+    const q=api.project(corner,view);assert.ok(q.x>fit.x&&q.y>fit.y&&q.x<fit.x+fit.width&&q.y<fit.y+fit.height);
+  }
+}
+assert.throws(()=>api.project({x:Infinity,y:0},"iso"));
+assert.throws(()=>api.camera(model.floor,"plan",3,{x:0,y:0}));
 console.log("Route playback: timing, geometry, stale floors, obstacles and boundaries pass");

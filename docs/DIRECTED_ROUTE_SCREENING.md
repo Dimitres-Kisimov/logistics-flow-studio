@@ -63,7 +63,7 @@ Playback multipliers should multiply elapsed simulation time, leaving speed_mps 
 
 ## Browser route preview
 
-Open transfer-ledger.html, load a ledger and planner floor, then import examples/routes/timeline.json under Preview a timed route. Play/pause, reset, time scrubbing and 1x/5x/10x/25x/50x/100x playback are available. Hiding the tab pauses playback; a delayed frame advances at most one real second. The scenario is independent of the selected package and does not modify SQL events. It currently renders in 2D only.
+Open transfer-ledger.html, load a ledger and planner floor, then import examples/routes/timeline.json under Preview a timed route. Play/pause, reset, time scrubbing and 1x/5x/10x/25x/50x/100x playback are available. Hiding the tab pauses playback; a delayed frame advances at most one real second. The scenario is independent of the selected package and does not modify SQL events. It renders as a 2D plan or isometric footprint projection; no equipment height or volumetric geometry is inferred.
 
 The importer checks a normalized floor snapshot including reserved areas, obstacle intersections and clearance, segment continuity, entered speed and total timing. Older timeline exports lacking a floor snapshot must be regenerated. Import is bounded at 5 MB, 1000 points and 365 days. Invalid imports hide previous playback; replacing the floor or ledger clears the scenario. It does not authenticate a graph digest, verify directed mode permissions against the original graph, or certify safety. A floor snapshot match is geometry consistency, not a surveyed site identity.
 
@@ -76,3 +76,9 @@ Use tools/package_route.py with --database PATH --package PACKAGE-1 --floor exam
 The timeline carries package_snapshot and location_access. The viewer checks package, pick, order, line, item, quantity, unit, endpoints, version and update time against the selected ledger manifest; stale or unrelated scenarios are rejected. Changing package clears playback. Bound and unbound scenario exports are both supported. This association is a consistency check, not a database identity signature, permission, resource reservation or execution write. Access declarations still require review; simulated delivery never updates the recorded package state.
 
 Evidence: 32 Python tests,57 Node harnesses and159 browser self-tests pass. The database byte hash was unchanged by CLI export; repeated scenario exports match. Browser accepted PACKAGE-1/version7 and rejected version6 with previous playback hidden. All earlier movement assumptions and limits still apply.
+
+## Route camera and projection
+
+Floor view selects a plan or isometric projection of the same metre coordinates. Fit floor includes all floor corners with margin. Follow-load cameras at2x/4x centre on the simulated load and intentionally crop surrounding geometry. A 10-by-10 visual grid divides floor dimensions; it is not a one-metre survey grid. Start/end labels and heading lines share the projection used for obstacles and route segments. Isometric view has no inferred equipment heights, vertical clearances or volumetric collision checking.
+
+Node tests cover known projection coordinates, fit bounds and follow-camera centring in both views. Browser selection at10seconds retained7.80/6.00m, with inspected isometric and follow2x screenshots and no console errors. Full57Node/32Python/Ruff/159browser gates pass.
