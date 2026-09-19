@@ -866,8 +866,15 @@
         </div>
         <div class="field">
           <label for="flowSpeed">Speed <span id="flowSpeedVal" class="hint-inline">1×</span></label>
-          <input id="flowSpeed" type="range" min="0.25" max="4" step="0.25" value="1" aria-label="Animation speed multiplier" />
+          <input id="flowSpeed" type="range" min="1" max="100" step="1" value="1" aria-label="Animation speed multiplier" />
         </div>
+        <div class="capacity-fields">
+          <div><label for="flowDuration">Run duration</label><input id="flowDuration" type="number" min="1" step="1" value="8" /></div>
+          <div><label for="flowDurationUnit">Time unit</label><select id="flowDurationUnit"><option value="minutes">Minutes</option><option value="hours" selected>Hours</option><option value="days">Days</option></select></div>
+        </div>
+        <button id="flowDurationApply" class="btn" type="button">Set duration &amp; reset</button>
+        <p id="flowTimer" class="flow-timer" role="timer" aria-live="off">0d 00:00:00 / 0d 08:00:00</p>
+        <p class="hint">1× = one simulated second per real second; 100× = 100. The existing model resolves movement in one-minute buckets, not continuous physical motion. Step advances up to 8 simulated minutes. Hidden tabs pause; long frame stalls do not trigger unbounded catch-up.</p>
         <div id="flowReadout" class="flow-readout"><p class="empty">Press Play (or Step) to animate boxes moving through the warehouse. Pause returns to the normal edit view.</p></div>
         <!-- v1.3: Live ORDER POOL — the demand side made visible. Orders are
              generated over time into a bounded backlog (SizeOrderPool-style
@@ -1302,6 +1309,7 @@
   <script src="howwecompare.js"></script>
   <script src="palette.js"></script>
   <script src="capacity-plan.js"></script>
+  <script src="run-clock.js"></script>
   <script src="capacity-panel.js"></script>
   <script src="app.js"></script>
   <!-- In-browser E2E self-test. INERT unless the URL carries ?selftest=1;

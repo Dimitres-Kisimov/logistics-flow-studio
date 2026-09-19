@@ -1605,3 +1605,11 @@ Added Plan a shift at the top of Simulate: two factory profiles, live workload,
 stock and electricity findings, grouped editable assumptions, JSON import/export,
 and explicit separation from the floor simulation. Added numerical and browser
 regressions; cache wt-v82. No scheduling or engineering-safety claims.
+
+## v3.28 — Time-based playback and SQL execution prototype
+
+Added 1x–100x speed, minutes/hours/days duration and exact stopping. Replaced
+frame-count advancement with an elapsed-time clock; retained minute-bucket model
+semantics. Added local transactional SQLite order/pick prototype and primary-source
+competitor comparison. Cache wt-v83. No claim of autonomous safety approval or
+real-time physical transport accuracy.

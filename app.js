@@ -2034,7 +2034,8 @@
    * and travel speed from the documented wms.js heuristic. It is NOT a
    * real discrete-event-simulation engine and NOT a measurement.
    * ================================================================== */
-  const FLOW_BASE_DT = 1; // sim ticks advanced per animation frame at speed 1
+  let flowDurationMinutes = 480;
+  let flowClock = WT.runClock.create(flowDurationMinutes);
   const FLOW_STEP_TICKS = 8; // ticks advanced by a single "Step" press
 
   // v3.12: draw the material-flow CONNECTION overlay ("Flow links"). The
@@ -2288,6 +2289,7 @@
     const shape = activeOrderShape();
     if (shape) { opts.orders = shape.orders; opts.linesPerOrderMax = shape.linesPerOrderMax; }
     state.flow.sim = WT.flowsim.state(layout, opts);
+    flowClock = WT.runClock.create(flowDurationMinutes);
     state.flow.sig = flowSignature();
     invalidateWorkers(); // v3.22: a new run starts with an unwoken shift
     resetKpiHistory(); // new sim -> counters restart at 0, so does the chart
@@ -2420,12 +2422,13 @@
 
   function flowStop() {
     state.flow.playing = false;
+    flowClock.previous = null;
     if (state.flow.raf) { cancelAnimationFrame(state.flow.raf); state.flow.raf = null; }
   }
 
   // The requestAnimationFrame loop: advance the model, then reuse the
   // existing render() (no competing draw loop) and refresh the readout.
-  function flowFrame() {
+  function flowFrame(timestamp) {
     if (!state.flow.playing) return;
     // v1.6 a11y: if "reduce motion" turned on mid-play, stop the continuous
     // loop and hold the current frame (never keep auto-animating under it).
@@ -2433,9 +2436,11 @@
     // If the layout changed mid-play (loaded an example, generated, resized,
     // edited an element), rebuild so the boxes track the current floor.
     if (!state.flow.sim || state.flow.sig !== flowSignature()) flowBuild();
-    const flowDt = Math.max(0.05, state.flow.speed) * FLOW_BASE_DT;
-    if (state.flow.sim) WT.flowsim.step(state.flow.sim, flowDt);
-    stepOrderPool(flowDt); // v1.3: advance the pool by the SAME ticks the flow ran
+    const flowDt = WT.runClock.frame(flowClock, timestamp, state.flow.speed);
+    if (state.flow.sim && flowDt > 0) {
+      WT.flowsim.step(state.flow.sim, flowDt);
+      stepOrderPool(flowDt);
+    }
     render();
     updateFlowReadout();
     updatePoolReadout();
@@ -2447,7 +2452,9 @@
       sampleFlowKpis();
       drawFlowKpis();
     }
-    state.flow.raf = requestAnimationFrame(flowFrame);
+    if (flowClock.elapsed >= flowClock.limit) {
+      flowStop(); updateFlowButtons(); status("Run duration reached. Reset or set a new duration to run again.");
+    } else state.flow.raf = requestAnimationFrame(flowFrame);
   }
 
   function flowPlay() {
@@ -2457,14 +2464,15 @@
     if (!hasSimulatableLayout()) { announceNothingToSimulate(); return; }
     if (!flowEnsureFresh()) return;
     state.flow.on = true;
+    if (flowClock.elapsed >= flowClock.limit) { status("Run complete. Reset to start again."); return; }
     // v1.6 a11y: honour "reduce motion". Rather than auto-run the continuous
     // rAF loop, advance ONE bucket and hold a static frame; the boxes are
     // still shown and the app stays fully usable (Step / Reset advance on
     // demand). This also governs the one-click Guided demo (it calls this).
     if (prefersReducedMotion()) {
       flowStop(); // ensure no loop is running
-      WT.flowsim.step(state.flow.sim, FLOW_STEP_TICKS);
-      stepOrderPool(FLOW_STEP_TICKS);
+      const ticks = WT.runClock.advance(flowClock, FLOW_STEP_TICKS);
+      if (ticks > 0) { WT.flowsim.step(state.flow.sim, ticks); stepOrderPool(ticks); }
       updateFlowButtons();
       render();
       updateFlowReadout();
@@ -2500,8 +2508,8 @@
     flowStop();
     if (!flowEnsureFresh()) return;
     state.flow.on = true;
-    WT.flowsim.step(state.flow.sim, FLOW_STEP_TICKS);
-    stepOrderPool(FLOW_STEP_TICKS); // v1.3: keep the pool in lock-step
+    const ticks = WT.runClock.advance(flowClock, FLOW_STEP_TICKS);
+    if (ticks > 0) { WT.flowsim.step(state.flow.sim, ticks); stepOrderPool(ticks); }
     updateFlowButtons();
     render();
     updateFlowReadout();
@@ -2552,6 +2560,9 @@
   }
 
   function updateFlowReadout() {
+    const timer = $("flowTimer");
+    if (timer) timer.textContent = WT.runClock.text(flowClock.elapsed) + " / " + WT.runClock.text(flowClock.limit) +
+      (flowClock.elapsed >= flowClock.limit ? " · Complete" : "");
     const out = $("flowReadout");
     if (!out || !WT.flowsim) return;
     const s = state.flow.sim;
@@ -2711,10 +2722,19 @@
     on("flowPauseBtn", flowPause);
     on("flowStepBtn", flowStep);
     on("flowResetBtn", flowReset);
+    on("flowDurationApply", () => {
+      try {
+        flowDurationMinutes = WT.runClock.duration(Number($("flowDuration").value), $("flowDurationUnit").value);
+        flowReset();
+      } catch (error) { toast(error.message, "warn"); }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && state.flow.playing) { flowStop(); updateFlowButtons(); status("Playback paused while the tab is hidden."); }
+    });
     const sp = $("flowSpeed");
     if (sp) {
       sp.addEventListener("input", () => {
-        state.flow.speed = Math.max(0.25, Number(sp.value) || 1);
+        state.flow.speed = Math.min(100, Math.max(1, Number(sp.value) || 1));
         const v = $("flowSpeedVal");
         if (v) v.textContent = (Number.isInteger(state.flow.speed) ? state.flow.speed.toFixed(0) : String(state.flow.speed)) + "×";
       });

@@ -3340,6 +3340,19 @@
       return { ok: residual && fits && invalid && out.textContent.indexOf("10 kits short") >= 0,
         detail: "Both profiles, live worker edits, invalid-input guard and reset exercised" };
     });
+    check("custom-run-duration-stops-exactly", function () {
+      $("flowDuration").value = "1";
+      $("flowDurationUnit").value = "minutes";
+      $("flowDurationApply").click();
+      $("flowStepBtn").click();
+      var done = $("flowTimer").textContent.indexOf("0d 00:01:00 / 0d 00:01:00") >= 0 && API.state.flow.sim.tick === 1;
+      $("flowStepBtn").click();
+      var stopped = API.state.flow.sim.tick === 1;
+      $("flowDuration").value = "8";
+      $("flowDurationUnit").value = "hours";
+      $("flowDurationApply").click();
+      return { ok: done && stopped, detail: "One-minute horizon caps both flow and further steps; reset restores eight hours" };
+    });
     check("no-errors-after-drive", function () {
       var e = window.__WT_ERRORS__ || [];
       return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" };

@@ -201,3 +201,23 @@ input schema. Its exported JSON is not a Python `--input` file. `capacity-plan.j
 is pure and tested; `capacity-panel.js` renders the controls. Service-worker cache
 is wt-v82. Verification: 52 Node harnesses and 155 live-browser checks, plus the
 existing seven Python resource tests.
+
+### Simulation clock and local SQL order execution
+
+Live flow now has a 1x–100x elapsed-time clock, selectable minutes/hours/days,
+and an exact stop horizon. 1x means simulated real time; the existing model still
+updates packages in one-minute buckets. Hidden tabs pause and stalled frames have
+bounded catch-up. This is a timing correction, not a claim of physical realism.
+
+`tools/order_store.py` provides a separate local SQLite prototype with transactional
+reservation/completion and bounded read-only SQL. Use a new database path:
+
+```sh
+python tools/order_store.py --database work/orders-demo.sqlite demo
+python tools/order_store.py --database work/orders-demo.sqlite query "SELECT * FROM order_progress"
+python -m unittest discover -s test -p "test_*.py" -v
+```
+
+It is not connected to the browser or a real WMS. See
+[competitive research](docs/COMPETITIVE_FACTORY_RESEARCH.md) for the sourced product
+comparison, safe-placement proposal contract and remaining package-transfer work.
