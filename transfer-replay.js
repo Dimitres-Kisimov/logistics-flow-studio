@@ -43,7 +43,24 @@
     });
     return {provenance:typeof raw.provenance === "string"?raw.provenance:"Unverified declared data",packages:Array.from(packages.values())};
   }
-  const api={parse};
+  function parseLayout(raw) {
+    requireThat(raw && raw.version === "wt-1" && [raw.gridW,raw.gridH,raw.cell].every(v=>Number.isFinite(v)&&v>0), "Use a planner layout export with positive dimensions and cell size");
+    requireThat(Array.isArray(raw.elements) && raw.elements.length<=10000, "Invalid or oversized layout");
+    const ids=new Set();
+    const elements=raw.elements.map(e=>{
+      requireThat(e && id(e.id) && !ids.has(e.id) && [e.x,e.y,e.w,e.d].every(Number.isFinite) && e.x>=0 && e.y>=0 && e.w>0 && e.d>0 && e.x+e.w<=raw.gridW && e.y+e.d<=raw.gridH, "Duplicate ID or invalid equipment footprint");
+      ids.add(e.id);
+      return {id:e.id,type:typeof e.type==="string"?e.type:"equipment",x:e.x*raw.cell,y:e.y*raw.cell,w:e.w*raw.cell,d:e.d*raw.cell};
+    });
+    requireThat([raw.gridW*raw.cell,raw.gridH*raw.cell,...elements.flatMap(e=>[e.x,e.y,e.w,e.d])].every(Number.isFinite), "Layout coordinates overflow");
+    return {width:raw.gridW*raw.cell,depth:raw.gridH*raw.cell,elements};
+  }
+  function locate(layout, bindings, frame) {
+    if (!layout || !frame.location) return null;
+    const element=layout.elements.find(e=>e.id===bindings.get(frame.location));
+    return element?{id:element.id,x:element.x+element.w/2,y:element.y+element.d/2}:null;
+  }
+  const api={parse,parseLayout,locate};
   if (typeof module !== "undefined" && module.exports) module.exports=api;
   else window.TransferReplay=api;
 }());

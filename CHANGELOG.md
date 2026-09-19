@@ -1659,3 +1659,10 @@ inspector. Select a package and step through its order-linked event history;
 blocked reasons and unknown in-transit locations stay explicit. Invalid sequences
 are rejected instead of presenting misleading reconstructed states. Separate from
 the floor animation and from browser SQL execution.
+
+## 2026-09-19 — Link transfer locations to declared floor equipment
+
+Added planner-layout import and explicit ledger-location/equipment bindings in the
+transfer viewer, with metre-based SVG footprints and stationary anchor markers.
+Travelling and blocked states do not fabricate coordinates. Geometry validation
+rejects duplicate IDs and invalid footprints; bindings reset on replacement.

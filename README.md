@@ -318,3 +318,17 @@ live floor link. No coordinates are inferred. Cross-package resource consistency
 telemetry accuracy and safety are not validated by this viewer. The SQL functions
 still enforce resource occupancy at write time. Export provenance remains declared,
 not verified telemetry. Cachewt-v88;56 Node harnesses and18 Python tests pass.
+
+### Declare equipment anchors for transfer locations
+
+The transfer viewer can now import a `wt-1` planner layout and explicitly link a
+ledger location to equipment through two selectors. Footprints and equipment
+centres are converted from cells to metres using the exported cell size. The
+current stationary location receives an anchor marker. Travelling/blocked events
+have no marker: the ledger supplies neither coordinates nor a route. Unknown
+location links stay missing, never guessed. Layout/ledger replacement clears
+bindings; bindings are currently tab-local and not exported. This is evidence
+coordination, not physical route replay, surveyed geometry or collision checking.
+Duplicate equipment IDs, out-of-floor footprints and invalid dimensions reject the
+floor import.56 harnesses,18 Python tests and159 main browser checks pass; actual
+file-import/mapping and zero travelling markers were manually verified. Cachewt-v89.
