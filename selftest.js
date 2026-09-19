@@ -3367,6 +3367,30 @@
       return { ok: finite && answered && (!snap.workers.length || selected === snap.workers[0].id),
         detail: "Finite scene poses, shared selection and grounded visible guide" };
     });
+    check("placement-area-controls", function () {
+      var saved = API.serializeLayout();
+      try {
+        $("optConstraints").value = '{"fixedIds":[],"zones":[]}';
+        $("optConstraints").dispatchEvent(new Event("input", {bubbles:true}));
+        ["zoneX","zoneY","zoneW","zoneD"].forEach(function(id,i){ $(id).value=[0,0,2,3][i]; });
+        $("zoneAdd").click();
+        var added = JSON.parse($("optConstraints").value).zones[0];
+        var good = added.w===2 && added.d===3 && $("zoneList").children.length===1;
+        $("zoneW").value="-1"; $("zoneAdd").click();
+        good = good && JSON.parse($("optConstraints").value).zones.length===1;
+        $("zoneList").querySelector("button").click();
+        good = good && JSON.parse($("optConstraints").value).zones.length===0;
+        if ($("constraintObject").options.length>1) {
+          $("constraintObject").selectedIndex=1;
+          var id=$("constraintObject").value;
+          $("constraintToggle").click();
+          good=good && JSON.parse($("optConstraints").value).fixedIds.indexOf(id)>=0;
+          $("constraintToggle").click();
+          good=good && JSON.parse($("optConstraints").value).fixedIds.length===0;
+        }
+        return {ok:good,detail:"Add/remove area, reject negative dimensions and toggle fixed equipment through real controls"};
+      } finally { API.deserializeLayout(saved); $("zoneW").value="2"; }
+    });
     check("placement-draft-layout-roundtrip", function () {
       var saved = API.serializeLayout();
       try {

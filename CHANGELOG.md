@@ -1637,3 +1637,9 @@ Autosave and layout export now retain constraint text, including unfinished draf
 Loading legacy layouts clears old constraints. Malformed draft field types/size
 are rejected before mutation, and editing invalidates the preview. Browser tests
 exercise the real serialization/deserialization path and legacy reset.
+
+## 2026-09-19 — Reserved-area form and shared floor overlay
+
+Added numeric area fields, removal controls and a fixed-equipment selector backed
+by the saved draft. Both projections show matching labelled amber outlines.
+Browser tests exercise add/remove, adverse dimensions and fixed-ID toggling.

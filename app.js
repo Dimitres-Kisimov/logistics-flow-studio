@@ -855,7 +855,52 @@
     ctx.closePath();
   }
 
+  let constraintControlKey = "";
+  function readConstraintDraft() {
+    const value = JSON.parse($("optConstraints").value);
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(k => !["zones","fixedIds"].includes(k))) throw new Error("Correct the advanced JSON before editing areas.");
+    if (value.zones !== undefined && !Array.isArray(value.zones)) throw new Error("zones must be an array.");
+    if (value.fixedIds !== undefined && (!Array.isArray(value.fixedIds) || value.fixedIds.some(id => typeof id !== "string"))) throw new Error("fixedIds must be an array of object IDs.");
+    const zones = value.zones || [];
+    if (zones.length > 100 || zones.some(z => !z || Object.keys(z).some(k => !["x","y","w","d"].includes(k)) || ![z.x,z.y,z.w,z.d].every(Number.isFinite) || z.x < 0 || z.y < 0 || z.w <= 0 || z.d <= 0 || z.x+z.w > GRID_W*CELL_M || z.y+z.d > GRID_H*CELL_M)) throw new Error("Use up to 100 positive rectangular areas inside the floor.");
+    return { fixedIds:value.fixedIds || [], zones };
+  }
+  function writeConstraintDraft(draft) {
+    $("optConstraints").value = JSON.stringify(draft);
+    $("optConstraints").dispatchEvent(new Event("input", {bubbles:true}));
+  }
+  function renderConstraintControls() {
+    const key = $("optConstraints").value + "|" + GRID_W + ":" + GRID_H + "|" + state.elements.map(e=>e.id+":"+e.type).join("|");
+    if (key === constraintControlKey) return;
+    constraintControlKey = key;
+    const pick = $("constraintObject"), previous = pick.value;
+    pick.replaceChildren(new Option("Choose equipment", ""));
+    const list = $("zoneList"); list.replaceChildren();
+    let draft;
+    try { draft = readConstraintDraft(); }
+    catch (error) { $("constraintStatus").textContent = "Draft invalid; overlay hidden. " + error.message; return; }
+    state.elements.forEach(e => pick.append(new Option(`${draft.fixedIds.includes(e.id) ? "Fixed · " : ""}${e.id} · ${(ELEMENTS[e.type] || {}).label || e.type}`,e.id)));
+    if (state.elements.some(e=>e.id===previous)) pick.value=previous;
+    draft.zones.forEach((z,i)=>{
+      const row=document.createElement("div"); row.className="constraint-row";
+      const label=document.createElement("span"); label.textContent=`Area ${i+1}: (${z.x}, ${z.y}) · ${z.w} × ${z.d} m`;
+      const remove=document.createElement("button"); remove.className="btn small"; remove.type="button"; remove.textContent="Remove"; remove.setAttribute("aria-label",`Remove reserved area ${i+1}`);
+      remove.addEventListener("click",()=>{ const current=readConstraintDraft(); current.zones.splice(i,1); writeConstraintDraft(current); });
+      row.append(label,remove); list.append(row);
+    });
+    $("constraintStatus").textContent=`${draft.zones.length} draft areas · ${draft.fixedIds.length} fixed IDs. Preview checks equipment conflicts; outlines do not establish safety.`;
+  }
+  function drawConstraintAreas() {
+    let draft; try { draft=readConstraintDraft(); } catch (_) { return; }
+    ctx.save(); ctx.strokeStyle="#f4b942"; ctx.fillStyle="rgba(244,185,66,0.13)"; ctx.lineWidth=2/view.scale; ctx.setLineDash([6/view.scale,4/view.scale]);
+    draft.zones.forEach((z,i)=>{
+      const points=[[z.x,z.y],[z.x+z.w,z.y],[z.x+z.w,z.y+z.d],[z.x,z.y+z.d]].map(([x,y])=>projPx(x/CELL_M,y/CELL_M,0.04));
+      ctx.beginPath(); points.forEach((p,j)=>j?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.save(); ctx.setLineDash([]); ctx.fillStyle="#f4b942"; ctx.font=`${12/view.scale}px sans-serif`; ctx.fillText(`Reserved ${i+1}`,points[0].x+4/view.scale,points[0].y+14/view.scale); ctx.restore();
+    }); ctx.restore();
+  }
   function render() {
+    renderConstraintControls();
     renderRouteReview();
     // v3.8 REDESIGN-1: keep the canvas-hero empty-state in sync with the layout
     // (shown only when there are no elements). Cheap - only touches the DOM when
@@ -889,6 +934,7 @@
     // iso (they are accurate top-down aids) - stated in the README.
     if (state.viewMode === "iso") {
       renderIsoWorld();
+      drawConstraintAreas();
       ctx.restore();
       if (state.flow && state.flow.on) drawFlowLegend();
       updateBadges(aisleViolations(), D.analyzeChains(state.elements));
@@ -1157,6 +1203,7 @@
 
     // AI Environment Generator: reserved-zone overlays (manual expansion).
     drawGenZones();
+    drawConstraintAreas();
 
     // Compliance Check highlight: a bright ring around the element(s)
     // named by a finding the user clicked in the Compliance panel.
@@ -8919,6 +8966,24 @@
     if ($("autoOverlayBtn")) $("autoOverlayBtn").addEventListener("click", toggleAutoUtil);
     wireFlowControls();
     $("optimizeBtn").addEventListener("click", runOptimize);
+    $("zoneAdd").addEventListener("click",()=>{
+      try {
+        const draft=readConstraintDraft();
+        const values=["zoneX","zoneY","zoneW","zoneD"].map(id=>$(id).value.trim());
+        if (values.some(v=>v==="")) throw new Error("Enter all four dimensions.");
+        const [x,y,w,d]=values.map(Number);
+        if (![x,y,w,d].every(Number.isFinite) || x<0 || y<0 || w<=0 || d<=0 || x+w>GRID_W*CELL_M || y+d>GRID_H*CELL_M || draft.zones.length>=100) throw new Error("Enter a positive area inside the floor (maximum100).");
+        draft.zones.push({x,y,w,d}); writeConstraintDraft(draft);
+      } catch(error) { $("constraintStatus").textContent=error.message; }
+    });
+    $("constraintToggle").addEventListener("click",()=>{
+      try {
+        const draft=readConstraintDraft(), id=$("constraintObject").value;
+        if (!id) throw new Error("Choose equipment first.");
+        draft.fixedIds=draft.fixedIds.includes(id)?draft.fixedIds.filter(v=>v!==id):draft.fixedIds.concat(id);
+        writeConstraintDraft(draft);
+      } catch(error) { $("constraintStatus").textContent=error.message; }
+    });
     $("optConstraints").addEventListener("input", () => {
       state.preview = null;
       $("optOut").textContent = "Constraint draft changed. Generate a fresh preview to validate it.";

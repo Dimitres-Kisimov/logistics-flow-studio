@@ -255,3 +255,15 @@ layout. Legacy layouts clear previous drafts. Editing a draft clears its preview
 This supersedes the earlier session-only description; drawing and enforcement in
 other optimizers are still absent. Cachewt-v86.55 harnesses,158 browser checks,
 11 Python tests and restart persistence pass.
+
+### Visual reserved-area controls
+
+Analyze -> Layout optimizer now includes metre-based area fields, Add/Remove
+controls and an equipment selector to toggle fixed positions. Amber dashed areas
+appear in both top-down and isometric views, from the saved constraint draft.
+Invalid geometry hides the overlay and reports the problem; Preview remains the
+check for equipment conflicts. These are draft overlays, not regulatory approval
+or automatic traffic enforcement. No drag editing yet. This supersedes earlier
+notes saying areas are not drawn. At very narrow widths the existing floor legend
+can obscure the small scene; desktop overlays were visually verified.
+Cachewt-v87;55 harnesses,159 browser checks,11 Python tests pass.
