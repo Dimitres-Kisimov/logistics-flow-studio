@@ -50,6 +50,35 @@ class DispatchTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             resource_dispatch.dispatch(raw)
 
+    def test_shared_area_delays_otherwise_available_resource(self):
+        raw = self.fixture()
+        raw["resources"].append(dict(id="R2", skills=["pick"], start_location="A", availability_s=[[0, 30]]))
+        raw["areas"] = [dict(id="CROSSING", capacity=1)]
+        for job in raw["jobs"]:
+            job["areas"] = ["CROSSING"]
+        result = resource_dispatch.dispatch(raw)
+        b = result["jobs"][1]
+        self.assertEqual((b["resource_id"], b["assignment_start_s"], b["end_s"]), ("R2", 4, 10))
+        self.assertEqual(b["area_waits"][0]["conflicts"][0]["holders"], ["J1"])
+        self.assertEqual(len(result["areas"][0]["reservations"]), 2)
+
+    def test_area_delay_rechecks_resource_calendar_and_capacity_two(self):
+        raw = self.fixture()
+        raw["resources"].append(dict(id="R2", skills=["pick"], start_location="A", availability_s=[[0, 8], [20, 30]]))
+        raw["areas"] = [dict(id="Z", capacity=1)]
+        for job in raw["jobs"]:
+            job["areas"] = ["Z"]
+        result = resource_dispatch.dispatch(raw)
+        self.assertEqual((result["jobs"][1]["resource_id"], result["jobs"][1]["assignment_start_s"]), ("R2", 20))
+        raw["areas"][0]["capacity"] = 2
+        self.assertEqual(resource_dispatch.dispatch(raw)["jobs"][1]["assignment_start_s"], 1)
+
+    def test_reject_unknown_area(self):
+        raw = self.fixture()
+        raw["jobs"][0]["areas"] = ["missing"]
+        with self.assertRaises(ValueError):
+            resource_dispatch.dispatch(raw)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,88 @@
+{
+  "schema": "factory-resource-jobs/v1",
+  "horizon_s": 30,
+  "resources": [
+    {
+      "id": "WORKER-1",
+      "skills": [
+        "picking"
+      ],
+      "start_location": "PICK",
+      "availability_s": [
+        [
+          0,
+          10
+        ],
+        [
+          20,
+          30
+        ]
+      ]
+    },
+    {
+      "id": "WORKER-2",
+      "skills": [
+        "picking"
+      ],
+      "start_location": "PICK",
+      "availability_s": [
+        [
+          0,
+          30
+        ]
+      ]
+    }
+  ],
+  "reposition": [
+    {
+      "resource_id": "WORKER-1",
+      "from": "PACK",
+      "to": "PICK",
+      "seconds": 2
+    }
+  ],
+  "jobs": [
+    {
+      "id": "ORDER-A",
+      "release_s": 0,
+      "duration_s": 4,
+      "source": "PICK",
+      "destination": "PACK",
+      "required_skills": [
+        "picking"
+      ],
+      "areas": [
+        "CROSSING"
+      ]
+    },
+    {
+      "id": "ORDER-B",
+      "release_s": 1,
+      "duration_s": 6,
+      "source": "PICK",
+      "destination": "PACK",
+      "required_skills": [
+        "picking"
+      ],
+      "areas": [
+        "CROSSING"
+      ]
+    },
+    {
+      "id": "ORDER-C",
+      "release_s": 2,
+      "duration_s": 3,
+      "source": "ASSEMBLY",
+      "destination": "ASSEMBLY",
+      "required_skills": [
+        "welding"
+      ]
+    }
+  ],
+  "areas": [
+    {
+      "id": "CROSSING",
+      "capacity": 1
+    }
+  ]
+}

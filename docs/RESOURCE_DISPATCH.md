@@ -27,8 +27,7 @@ inputs are user declarations, not verified certification or measured movement.
 
 Assignments append to each resource's plan. The algorithm does not backfill earlier
 idle gaps after scheduling future work, optimize the entire job set, calculate a
-minimum headcount, or model teams. No task/area reservation coupling is implemented:
-passing this model does not prove the shared-traffic plan is feasible. Route geometry,
+minimum headcount, or model teams. Optional shared-area capacity claims are now checked jointly with resource assignments; their geometry and physical occupancy remain unverified. Route geometry,
 fatigue, labour-law rules, utilities and machine capabilities are outside its scope.
 Do not execute these plans as safety-approved factory instructions.
 
@@ -52,4 +51,12 @@ Tests cover exclusive assignment, repositioning, window fit, missing skills and 
 choice between two resources, deterministic/nonmutating inputs, malformed calendars,
 and horizon state during repositioning. All 47 Python tests and Ruff pass. The actual
 CLI output was generated twice identically. This is synthetic verification, not site
-calibration. Shared-area/resource joint scheduling and browser integration remain next.
+calibration. Browser integration and geometry-aware traffic remain next.
+
+## Joint resource and shared-area claims
+
+Optional top-level areas declare IDs and capacities; jobs name required area IDs. Omitted areas mean no spatial capacity constraints were supplied. Every eligible resource candidate searches for a contiguous calendar interval that also respects already committed area claims. A conflict advances the candidate past a blocking release and then rechecks the calendar. Only the selected candidate commits its resource and all area reservations, so evaluating alternatives consumes no capacity.
+
+Claims cover the full assignment, including repositioning. This deliberately coarse policy may overreserve areas and is not segment-level traffic or vehicle-body collision checking. Areas must be declared to cover all intended conflicts; no geometry inference is performed. Append-only greedy dispatch remains nonoptimal. Output areas include reservations with job/resource IDs and start/end times; selected jobs include candidate wait reasons.
+
+The joint-resource-jobs.json fixture gives ORDER-A to WORKER-1 from0–4 and ORDER-B to WORKER-2 from4–10, despite WORKER-2 being otherwise free earlier; the shared crossing explains the wait. Tests verify capacity1vs2, calendar rechecking after area delay, unknown-area rejection and unchanged earlier cases. All50Python tests and Ruff pass; CLI output repeated identically. No browser worker playback or SQL execution is added.

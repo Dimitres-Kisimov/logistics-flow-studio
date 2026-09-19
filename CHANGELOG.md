@@ -1737,3 +1737,7 @@ Added a labelled synthetic worked example that loads SQL history, floor and pack
 ## 2026-09-19 — Skill-aware resource assignment
 
 Added a deterministic greedy dispatcher with explicit skills, availability and directed reposition times. Reports candidate/rejection reasons and horizon state; does not infer missing travel or claim optimal headcount.47Python tests pass. Shared-area coupling and browser worker playback remain pending.
+
+## 2026-09-19 — Joint resource and area scheduling
+
+Resource candidate evaluation now includes declared shared-area capacities and rechecks availability after area waits. Chosen assignments commit all claims together and export reservations and wait reasons.50Python tests pass; geometric traffic validation and browser worker playback remain pending.

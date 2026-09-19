@@ -52,6 +52,15 @@ def dispatch(raw):
         travel[key] = duration
     if not isinstance(raw.get("jobs"), list) or len(raw["jobs"]) > 1000:
         raise ValueError("Expected at most 1000 jobs")
+    areas = raw.get("areas", [])
+    if not isinstance(areas, list) or len(areas) > 100:
+        raise ValueError("Expected at most 100 shared areas")
+    capacities, reservations = {}, {}
+    for area in areas:
+        key, capacity = identity(area["id"]), area["capacity"]
+        if key in capacities or type(capacity) is not int or not 1 <= capacity <= 100:
+            raise ValueError("Duplicate area or invalid capacity")
+        capacities[key], reservations[key] = capacity, []
     jobs, ids = [], set()
     for job in raw["jobs"]:
         key = identity(job["id"])
@@ -60,7 +69,10 @@ def dispatch(raw):
         if key in ids or max(release, duration) > 31536000 or type(priority) is not int or not -1000 <= priority <= 1000:
             raise ValueError("Invalid or duplicate job")
         ids.add(key)
-        jobs.append(dict(id=key, release_s=release, duration_s=duration, priority=priority,
+        claims = job.get("areas", [])
+        if not isinstance(claims, list) or any(not isinstance(a, str) or a not in capacities for a in claims) or len(set(claims)) != len(claims):
+            raise ValueError("Job areas must be unique declared IDs")
+        jobs.append(dict(id=key, release_s=release, duration_s=duration, priority=priority, areas=sorted(claims),
                          source=identity(job["source"]), destination=identity(job["destination"]),
                          required_skills=sorted(strings(job["required_skills"]))))
     jobs.sort(key=lambda job: (job["release_s"], -job["priority"], job["id"]))
@@ -78,33 +90,56 @@ def dispatch(raw):
                 continue
             earliest = max(job["release_s"], resource["ready"])
             total = reposition + job["duration_s"]
-            start = next((max(earliest, a) for a, b in resource["windows"] if max(earliest, a) + total <= b), None)
+            waits = []
+            while True:
+                start = next((max(earliest, a) for a, b in resource["windows"] if max(earliest, a) + total <= b), None)
+                if start is None:
+                    break
+                conflicts = []
+                for area in job["areas"]:
+                    overlap = [r for r in reservations[area] if r["start_s"] < start + total and r["end_s"] > start]
+                    boundaries = sorted({start, *[r["start_s"] for r in overlap if r["start_s"] >= start]})
+                    for at in boundaries:
+                        active = [r for r in overlap if r["start_s"] <= at < r["end_s"]]
+                        if len(active) >= capacities[area]:
+                            conflicts.append(dict(area=area, at_s=at, release_s=min(r["end_s"] for r in active),
+                                                  holders=sorted(r["job_id"] for r in active)))
+                            break
+                if not conflicts:
+                    break
+                earliest = max(c["release_s"] for c in conflicts)
+                if earliest <= start:
+                    raise RuntimeError("Shared-area candidate did not advance")
+                waits.append(dict(candidate_start_s=start, next_start_s=earliest, conflicts=conflicts))
             if start is None:
-                rejected.append(dict(resource_id=key, reason="no-contiguous-availability"))
+                rejected.append(dict(resource_id=key, reason="no-contiguous-availability", area_waits=waits))
                 continue
             task_start, end = start + reposition, start + total
             if end <= task_start or (reposition > 0 and task_start <= start):
                 raise ValueError("Task duration below supported numeric precision")
-            candidates.append((end, start, key, task_start, reposition))
+            candidates.append((end, start, key, task_start, reposition, waits))
         if not candidates:
             output.append(dict(**job, resource_id=None, state_at_horizon="unscheduled" if job["release_s"] <= horizon else "not-released", rejected_resources=rejected))
             continue
-        end, start, selected, task_start, reposition = min(candidates)
+        end, start, selected, task_start, reposition, waits = min(candidates)
         origin = resources[selected]["location"]
         resources[selected].update(location=job["destination"], ready=end)
+        for area in job["areas"]:
+            reservations[area].append(dict(job_id=job["id"], resource_id=selected, start_s=start, end_s=end))
         state = ("not-released" if job["release_s"] > horizon else "queued" if start > horizon else
                  "repositioning" if task_start > horizon else "working" if end > horizon else "completed")
         output.append(dict(**job, resource_id=selected, reposition_from=origin, reposition_s=reposition,
                            assignment_start_s=start, task_start_s=task_start, end_s=end,
-                           queue_wait_s=start - job["release_s"], state_at_horizon=state,
+                           queue_wait_s=start - job["release_s"], state_at_horizon=state, area_waits=waits,
                            rejected_resources=rejected,
                            feasible_candidates=[dict(resource_id=c[2], end_s=c[0]) for c in sorted(candidates)]))
     return dict(schema="factory-resource-plan/v1", provenance="assumed-resource-dispatch",
                 horizon_s=horizon, jobs=output,
+                areas=[dict(id=key, capacity=capacities[key], reservations=reservations[key]) for key in sorted(capacities)],
                 completed=sum(job["state_at_horizon"] == "completed" for job in output),
                 unfinished=sum(job["state_at_horizon"] not in {"completed", "not-released"} for job in output),
                 policy="Release/priority/ID job order; earliest finish then start/resource ID. Append-only resource assignments.",
-                limitations="Greedy, not optimal staffing. One resource per job; durations and directed reposition times are declared. No area-capacity coupling, route geometry, fatigue, labour-law validation or SQL execution. Resource states are planned, not telemetry.")
+                limitations="Greedy, not optimal staffing. One resource per job; durations and directed reposition times are declared. Requested areas are held atomically for the full assignment including repositioning. No geometry-to-area mapping, vehicle body clearance, fatigue, labour-law validation or SQL execution. Resource states are planned, not telemetry.")
 
 
 def main():
