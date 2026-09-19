@@ -2360,3 +2360,5 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .scene-inspector h3 { font-size: 13px; margin: 0; }
 #sceneEntity { width: 100%; min-height: 38px; }
 #sceneEntityDetails { font-size: 11px; line-height: 1.6; }
+
+#optConstraints { display:block; box-sizing:border-box; width:100%; margin:8px 0; padding:10px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; font:12px/1.5 monospace; resize:vertical; }

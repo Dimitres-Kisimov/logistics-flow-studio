@@ -1019,7 +1019,13 @@
       <!-- P2: spatial-layout optimizer -->
       <section class="card" id="optCard" data-default-collapsed>
         <h2 class="card-title">Layout optimizer</h2>
-        <p class="hint">Golden-zone heuristic: pulls storage toward the outbound dock, keeping aisles valid. Previews the change and the predicted KPIs before you apply it.</p>
+        <p class="hint">Golden-zone heuristic: proposes storage moves toward the outbound dock without increasing the aisle-warning count. Existing warnings can remain.</p>
+        <details><summary>Fixed objects &amp; reserved areas</summary>
+          <p class="hint">Optional JSON constraints for this preview only. fixedIds contains element IDs from a layout export. zones contains rectangles {"x":0,"y":0,"w":2,"d":2} in metres from the floor origin. Enter reviewed reserved areas, including any required clearance. Touching boundaries is allowed. These constraints are not saved, drawn, or used by other optimizers.</p>
+          <label for="optConstraints">Placement constraints</label>
+          <textarea id="optConstraints" rows="5" spellcheck="false" aria-describedby="optConstraintLimit">{"fixedIds":[],"zones":[]}</textarea>
+          <p id="optConstraintLimit" class="hint">Rectangles only. No egress connectivity, turning envelopes, utilities or regulatory approval checks. Conflicting starting layouts are rejected.</p>
+        </details>
         <button id="optimizeBtn" class="btn primary wide" type="button">Optimize (preview)</button>
         <div id="optOut" class="opt-out"><p class="empty">Preview shows dashed ghosts on the floor; nothing changes until you Apply.</p></div>
       </section>

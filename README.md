@@ -232,3 +232,15 @@ synthetic positions, not telemetry, safe paths or a staffing schedule. Package
 IDs last for the run; there is no persistent tracking history or SQL order link.
 Close/reopen the panel with Assistant & tracking. Cache wt-v84; verification:
 54 Node harnesses, 157 browser checks, 11 Python tests and the offline guard.
+
+### Fixed objects and reserved rectangles
+
+Analyze -> Layout optimizer accepts optional JSON fixedIds and zones. Zone x/y/w/d
+are in metres, axis-aligned and inside the floor. The optimizer does not move fixed
+objects and rejects candidate footprints intersecting a zone. A baseline conflict
+or malformed constraints blocks the proposal. Rejection counts explain the search;
+changed layout/configuration/constraint text invalidates Apply. These constraints
+are session-only, not drawn, not exported and not used by the factory CRAFT or A/B
+optimizer. No regulatory clearance is inferred. This is not egress connectivity,
+vehicle swept-path, utility or engineering approval. Cache wt-v85; 55 harnesses,
+157 browser checks, 11 Python tests, manual conflict/stale-preview checks pass.

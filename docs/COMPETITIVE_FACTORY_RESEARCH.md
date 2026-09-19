@@ -62,3 +62,16 @@ Use one planner journey: facility → constraints → orders/resources → propo
 Each increment requires numerical invariants, adverse inputs, deterministic runs, browser interactions and regression testing. Timing: compare 30/60/144 Hz, pause/resume, speed changes, exact horizon, reset, reduced motion and background tabs. SQL: double reservation, overpick, missing relationships, rollback, duplicate completion and read-only enforcement. Placement: infeasible layouts and missing evidence. Performance and multi-user scale remain unverified until benchmarked.
 
 Run a focused competitor/source review at each meaningful design decision and a broader weekly comparison. Keep an evidence log of what changed, what was tested and which user problem it solves. Do not claim all competitor functionality has been implemented.
+
+## Placement implementation evidence — 19 September 2026
+
+The warehouse golden-zone optimizer now accepts fixed IDs and axis-aligned reserved
+rectangles in metres, with strict field validation and fail-closed baseline conflict
+handling. Candidates report rejection counts. UI constraints affect this preview
+only, are not persisted/exported or drawn, and do not cover other optimizers.
+Stale Apply is blocked when layout, config or constraints change. This implements
+part of the proposal contract, not general polygons, egress, swept paths, utility
+coordination or safe placement approval. Tests cover a separating barrier at a
+non-unit cell size, fixed objects, invalid fields and unchanged inputs. The BAuA
+ASR A1.8 page was requested again for this increment but returned403; no new standard
+text or regulatory clearance was inferred from that unsuccessful retrieval.

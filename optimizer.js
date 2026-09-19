@@ -36,6 +36,26 @@
     // Work on clones so we never touch the caller's objects.
     const els = layout.elements.map((e) => Object.assign({}, e));
     const original = layout.elements.map((e) => ({ id: e.id, x: e.x, y: e.y }));
+    const audit = { errors: [], rejected: {}, fixedIds: [], zones: [] };
+    const reject = code => { audit.rejected[code] = (audit.rejected[code] || 0) + 1; };
+    const raw = config.placementConstraints;
+    const intersects = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.d && b.y < a.y + a.d;
+    if (raw !== undefined) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).some(k => !["fixedIds", "zones"].includes(k))) audit.errors.push("Use an object containing only fixedIds and zones.");
+      else {
+        const ids = raw.fixedIds === undefined ? [] : raw.fixedIds;
+        const zones = raw.zones === undefined ? [] : raw.zones;
+        if (!Array.isArray(ids) || ids.some(id => typeof id !== "string" || !els.some(e => e.id === id))) audit.errors.push("Every fixed ID must name an existing element.");
+        else audit.fixedIds = [...new Set(ids)];
+        if (!Array.isArray(zones) || zones.length > 100) audit.errors.push("Zones must be an array with at most 100 rectangles.");
+        else zones.forEach((z, i) => {
+          if (!z || typeof z !== "object" || Object.keys(z).some(k => !["x", "y", "w", "d"].includes(k)) || ![z.x,z.y,z.w,z.d].every(Number.isFinite) || z.x < 0 || z.y < 0 || z.w <= 0 || z.d <= 0 || z.x + z.w > gridW * cell || z.y + z.d > gridH * cell) audit.errors.push(`Zone ${i + 1} must be a positive rectangle inside the floor, in metres.`);
+          else audit.zones.push({ x:z.x/cell, y:z.y/cell, w:z.w/cell, d:z.d/cell });
+        });
+        els.forEach(e => audit.zones.forEach((z, i) => { if (intersects(e,z)) audit.errors.push(`Element ${e.id} occupies reserved zone ${i + 1}. Resolve the baseline conflict before optimization.`); }));
+      }
+    }
+    if (audit.errors.length) return { ok:false, proposedElements:els, before, after:before, movedCount:0, moves:[], improved:false, travelDeltaPct:0, audit };
 
     const io = WT.sim.ioPointOf(els, gridW, gridH, cell);
 
@@ -50,7 +70,7 @@
     const distM = (e) => Math.hypot((e.x + e.w / 2) * cell - io.x, (e.y + e.d / 2) * cell - io.y);
 
     const storageIdx = [];
-    els.forEach((e, i) => { if (isStorage(e)) storageIdx.push(i); });
+    els.forEach((e, i) => { if (isStorage(e) && !audit.fixedIds.includes(e.id)) storageIdx.push(i); });
 
     let curViol = D.aisleViolations(els, config.minAisleMetres).length;
     // P3: never trade away material-flow chain coverage - a storage
@@ -81,7 +101,9 @@
         if (stepX) tries.push({ x: e.x + stepX, y: e.y });
         for (const t of tries) {
           const cand = { x: t.x, y: t.y, w: e.w, d: e.d };
-          if (!inB(cand) || overlaps(cand, i)) continue;
+          if (!inB(cand)) { reject("outside-floor"); continue; }
+          if (overlaps(cand, i)) { reject("occupied-footprint"); continue; }
+          if (audit.zones.some(z => intersects(cand,z))) { reject("reserved-zone"); continue; }
           const ox = e.x, oy = e.y;
           e.x = cand.x; e.y = cand.y;
           const newViol = D.aisleViolations(els, config.minAisleMetres).length;
@@ -92,6 +114,9 @@
             anyMove = true;
             break; // accept; move to next element
           }
+          if (newViol > curViol) reject("aisle-warning-increase");
+          if (newCovered < curCovered) reject("flow-coverage-loss");
+          if (distM(e) >= before0 - 1e-9) reject("no-distance-improvement");
           e.x = ox; e.y = oy; // revert
         }
       }
@@ -127,6 +152,7 @@
       travelDeltaPct,
       improved: after.avgPickTravelM < before.avgPickTravelM - 1e-6,
       aisleViolations: curViol,
+      audit,
     };
   }
 

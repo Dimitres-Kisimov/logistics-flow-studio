@@ -1622,3 +1622,11 @@ frame-count advancement with an elapsed-time clock; retained minute-bucket model
 semantics. Added local transactional SQLite order/pick prototype and primary-source
 competitor comparison. Cache wt-v83. No claim of autonomous safety approval or
 real-time physical transport accuracy.
+
+## 2026-09-19 — Placement constraints and stale-preview protection
+
+Added fixed element IDs and reserved rectangles in metres to the warehouse layout
+optimizer. Invalid or conflicting starting constraints block proposals; rejection
+counts expose search limitations. Applying an outdated proposal is blocked. Removed
+claims that no local move proves near-optimality or that preserved warning counts
+mean valid aisles. Constraints are currently local to this preview workflow.

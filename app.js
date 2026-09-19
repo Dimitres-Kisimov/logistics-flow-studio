@@ -4626,16 +4626,23 @@
 
   function runOptimize() {
     readConfigFromUI();
-    const opt = WT.optimizer.optimize(currentLayout(), simConfig());
     const out = $("optOut");
+    const source = JSON.stringify({ layout:currentLayout(), config:simConfig(), constraints:$("optConstraints").value });
+    let constraints;
+    try { constraints = JSON.parse($("optConstraints").value); }
+    catch (_) { out.textContent = "Invalid constraints JSON. Correct it before previewing."; state.preview = null; render(); return; }
+    const opt = WT.optimizer.optimize(currentLayout(), simConfig({ placementConstraints:constraints }));
+    opt.source = source;
+    const auditText = opt.audit.errors.length ? opt.audit.errors.join(" ") : `Fixed objects: ${opt.audit.fixedIds.length}. Reserved areas: ${opt.audit.zones.length}. Rejected candidate reasons (a candidate may have several): ${Object.entries(opt.audit.rejected).map(([k,v]) => k + ": " + v).join(", ") || "none"}.`;
+    const auditHtml = `<p class="hint">${esc(auditText)}</p>`;
     if (!opt.ok) {
-      out.innerHTML = '<p class="empty">Add storage and an outbound dock, then optimize.</p>';
+      out.innerHTML = auditHtml + '<p class="empty">No applicable proposal. Resolve constraints and check storage/outbound equipment.</p>';
       state.preview = null;
       render();
       return;
     }
     if (opt.movedCount === 0 || !opt.improved) {
-      out.innerHTML = `<p class="opt-none">Already near-optimal for the golden zone — no beneficial move found (travel ${opt.before.avgPickTravelM.toFixed(1)} m/order).</p>`;
+      out.innerHTML = auditHtml + `<p class="opt-none">No beneficial move found by this local search (travel ${opt.before.avgPickTravelM.toFixed(1)} m/order). This does not prove optimality.</p>`;
       state.preview = null;
       render();
       return;
@@ -4643,12 +4650,12 @@
     state.preview = opt.proposedElements;
     render();
     out.innerHTML =
-      '<div class="opt-delta">' +
+      auditHtml + '<div class="opt-delta">' +
       deltaRow("Avg pick travel", opt.before.avgPickTravelM, opt.after.avgPickTravelM, "m/order", true) +
       deltaRow("Throughput", opt.before.throughputOrdersPerHour, opt.after.throughputOrdersPerHour, "orders/hr", false) +
       deltaRow("Storage fill", opt.before.storageFillPct, opt.after.storageFillPct, "%", null) +
       "</div>" +
-      `<p class="hint">Dashed ghosts = ${opt.movedCount} storage element(s) proposed to move toward the dock (~${opt.travelDeltaPct.toFixed(0)}% less travel). Aisles kept valid.</p>` +
+      `<p class="hint">Dashed ghosts = ${opt.movedCount} storage element(s) proposed to move toward the dock (~${opt.travelDeltaPct.toFixed(0)}% less travel). Aisle-warning count did not increase; this is not a safety approval.</p>` +
       '<div class="prop-actions"><button id="optApply" class="btn primary" type="button">Apply</button><button id="optDiscard" class="btn" type="button">Discard</button></div>';
     $("optApply").addEventListener("click", () => applyOptimize(opt));
     $("optDiscard").addEventListener("click", discardOptimize);
@@ -4656,6 +4663,12 @@
   }
 
   function applyOptimize(opt) {
+    readConfigFromUI();
+    if (opt.source !== JSON.stringify({ layout:currentLayout(), config:simConfig(), constraints:$("optConstraints").value })) {
+      state.preview = null; render();
+      $("optOut").textContent = "The layout, configuration or constraints changed. Generate a fresh preview before applying.";
+      return;
+    }
     for (const g of opt.proposedElements) {
       const e = state.elements.find((x) => x.id === g.id);
       if (e) { e.x = g.x; e.y = g.y; }
