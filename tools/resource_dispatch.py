@@ -145,8 +145,13 @@ def dispatch(raw):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True)
+    parser.add_argument("--report-dir", type=Path, help="Write an HTML review and CSV tables alongside JSON")
     args = parser.parse_args()
-    print(json.dumps(dispatch(json.loads(args.input.read_text(encoding="utf-8-sig"))), indent=2, allow_nan=False))
+    result = dispatch(json.loads(args.input.read_text(encoding="utf-8-sig")))
+    if args.report_dir:
+        from resource_report import write_report
+        write_report(result, args.report_dir)
+    print(json.dumps(result, indent=2, allow_nan=False))
 
 
 if __name__ == "__main__":

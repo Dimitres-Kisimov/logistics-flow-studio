@@ -1741,3 +1741,7 @@ Added a deterministic greedy dispatcher with explicit skills, availability and d
 ## 2026-09-19 — Joint resource and area scheduling
 
 Resource candidate evaluation now includes declared shared-area capacities and rechecks availability after area waits. Chosen assignments commit all claims together and export reservations and wait reasons.50Python tests pass; geometric traffic validation and browser worker playback remain pending.
+
+## 2026-09-19 — Resource review exports
+
+Resource dispatcher can export a static HTML timing report plus assignments, rejections and area-claim CSVs alongside full JSON. Escaped HTML and formula-safe CSV identifiers tested;51Python tests pass. Visual rendering remains unverified because local browser preview was blocked by URL policy.

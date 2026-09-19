@@ -60,3 +60,11 @@ Optional top-level areas declare IDs and capacities; jobs name required area IDs
 Claims cover the full assignment, including repositioning. This deliberately coarse policy may overreserve areas and is not segment-level traffic or vehicle-body collision checking. Areas must be declared to cover all intended conflicts; no geometry inference is performed. Append-only greedy dispatch remains nonoptimal. Output areas include reservations with job/resource IDs and start/end times; selected jobs include candidate wait reasons.
 
 The joint-resource-jobs.json fixture gives ORDER-A to WORKER-1 from0–4 and ORDER-B to WORKER-2 from4–10, despite WORKER-2 being otherwise free earlier; the shared crossing explains the wait. Tests verify capacity1vs2, calendar rechecking after area delay, unknown-area rejection and unchanged earlier cases. All50Python tests and Ruff pass; CLI output repeated identically. No browser worker playback or SQL execution is added.
+
+## HTML and CSV review exports
+
+Add --report-dir PATH to write index.html, plan.json, assignments.csv, rejections.csv and area-claims.csv. The report distinguishes queue, repositioning and work with a shared horizon scale, preserves future planned times as text, and explains area waits and rejected candidates. It is a static review artifact, not browser editing or worker tracking. Re-running overwrites those five named report files in the requested directory.
+
+HTML values are escaped and spreadsheet-dangerous CSV text is apostrophe-prefixed; exact identifiers remain in JSON. Tests verify JSON fidelity, HTML escaping, inert formula-like identifiers, expected CSV assignments and repeatable bytes. All51Python tests and Ruff pass. The CLI generated allfivefiles twice identically.
+
+Rendered visual review was blocked by the browser URL policy for the local report HTML. No alternate-access workaround was attempted; visual QA is unverified. Existing app browser results do not validate this new report layout.
