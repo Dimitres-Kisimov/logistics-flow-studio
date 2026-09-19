@@ -155,10 +155,29 @@ def demo(db):
                    reason="Synthetic aisle wait" if state == "blocked" else "")
 
 
+def export_ledger(db):
+    """One consistent read snapshot. Fail instead of silently truncating history."""
+    db.execute("BEGIN")
+    try:
+        packages = [dict(row) for row in db.execute("SELECT * FROM package_manifest ORDER BY id LIMIT 1001")]
+        events = [dict(row) for row in db.execute("SELECT * FROM transport_event ORDER BY package_id,version LIMIT 10001")]
+        if len(packages) > 1000 or len(events) > 10000:
+            raise ValueError("Viewer export limit exceeded: 1000 packages / 10000 events")
+        for event in events:
+            event["payload"] = json.loads(event["payload"])
+        result = {"schema": "factory-transfer-ledger/v1", "provenance": "Declared ledger data; not independently verified telemetry",
+                  "packages": packages, "events": events}
+        db.commit()
+        return result
+    except Exception:
+        db.rollback()
+        raise
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, required=True)
-    parser.add_argument("command", choices=["demo", "manifest", "events"])
+    parser.add_argument("command", choices=["demo", "manifest", "events", "export"])
     args = parser.parse_args()
     if args.command == "demo" and args.database.exists():
         parser.error("Demo requires a NEW database path")
@@ -169,6 +188,9 @@ def main():
     try:
         if args.command == "demo":
             demo(db)
+        if args.command == "export":
+            print(json.dumps(export_ledger(db), indent=2))
+            return
         sql = ("SELECT * FROM transport_event ORDER BY package_id,version" if args.command == "events"
                else "SELECT * FROM package_manifest ORDER BY id")
         print(json.dumps(order_store.query(db, sql), indent=2))

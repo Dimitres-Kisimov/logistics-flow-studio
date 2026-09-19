@@ -295,3 +295,26 @@ or decrement stock again: pick completion already changed aggregate stock. SQL
 writes outside these functions can bypass application invariants. Full production
 hardening and a versioned migration strategy remain necessary.17 Python tests pass,
 including rollback, persistence, time/version guards and concurrent resource use.
+
+### SQL transfer history in the browser
+
+Open **SQL transfer history** from the assistant/scene inspector, or open
+`transfer-ledger.html`. Export with:
+
+```sh
+python tools/transport_store.py --database work/transfers.sqlite export > work/transfers.json
+```
+
+Choose the JSON file locally, select a package and step through recorded events.
+The versioned factory-transfer-ledger/v1 export reads one consistent SQLite
+snapshot and fails above1000 packages/10000 events instead of truncating. The
+viewer accepts up to5MB and validates each package's identity, complete version
+sequence, allowed transitions, timestamps and final manifest. It rejects malformed
+histories and clears the previous display. Microsecond timestamp text is retained;
+stepping is by event version, not physical time interpolation.
+
+This is offline evidence inspection, not SQL execution inside the browser or a
+live floor link. No coordinates are inferred. Cross-package resource consistency,
+telemetry accuracy and safety are not validated by this viewer. The SQL functions
+still enforce resource occupancy at write time. Export provenance remains declared,
+not verified telemetry. Cachewt-v88;56 Node harnesses and18 Python tests pass.

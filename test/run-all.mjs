@@ -651,6 +651,7 @@ const HARNESSES = [
   { name: "Elapsed-time simulation clock (verify_run_clock.js)", args: ["verify_run_clock.js"] },
   { name: "Visible scene guide (verify_scene_assistant.js)", args: ["verify_scene_assistant.js"] },
   { name: "Placement constraints (verify_placement_constraints.js)", args: ["verify_placement_constraints.js"] },
+  { name: "SQL transfer replay (verify_transfer_replay.js)", args: ["verify_transfer_replay.js"] },
   { name: "optimizer measurement (measure_optimizer.js)", args: ["measure_optimizer.js"] },
   { name: "heatmap conservation + KPI baselines (verify_heatmap.js)", args: ["verify_heatmap.js"] },
   { name: "LSP Planner engine gates (lsp/verify.js)", args: [path.join("lsp", "verify.js")] },

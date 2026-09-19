@@ -1,0 +1,143 @@
+{
+  "schema": "factory-transfer-ledger/v1",
+  "provenance": "Declared ledger data; not independently verified telemetry",
+  "packages": [
+    {
+      "id": "PACKAGE-1",
+      "pick_id": "PICK-1",
+      "source_id": "PICK-FACE",
+      "destination_id": "PACK-BENCH",
+      "location_id": "PACK-BENCH",
+      "resource_id": "WORKER-1",
+      "state": "delivered",
+      "version": 7,
+      "updated_at": "2026-09-19T10:07:00.000000+00:00",
+      "quantity": 4,
+      "item_id": "KIT-A",
+      "order_id": "ORDER-A",
+      "line_id": "LINE-A",
+      "unit": "piece"
+    }
+  ],
+  "events": [
+    {
+      "id": "T0",
+      "package_id": "PACKAGE-1",
+      "version": 0,
+      "state": "waiting",
+      "occurred_at": "2026-09-19T10:00:00.000000+00:00",
+      "payload": {
+        "at": "2026-09-19T10:00:00.000000+00:00",
+        "destination": "PACK-BENCH",
+        "kind": "created",
+        "pick": "PICK-1",
+        "source": "PICK-FACE"
+      }
+    },
+    {
+      "id": "T1",
+      "package_id": "PACKAGE-1",
+      "version": 1,
+      "state": "assigned",
+      "occurred_at": "2026-09-19T10:01:00.000000+00:00",
+      "payload": {
+        "at": "2026-09-19T10:01:00.000000+00:00",
+        "expected_version": 0,
+        "kind": "transition",
+        "reason": "",
+        "resource": "WORKER-1",
+        "target": "assigned"
+      }
+    },
+    {
+      "id": "T2",
+      "package_id": "PACKAGE-1",
+      "version": 2,
+      "state": "loading",
+      "occurred_at": "2026-09-19T10:02:00.000000+00:00",
+      "payload": {
+        "at": "2026-09-19T10:02:00.000000+00:00",
+        "expected_version": 1,
+        "kind": "transition",
+        "reason": "",
+        "resource": null,
+        "target": "loading"
+      }
+    },
+    {
+      "id": "T3",
+      "package_id": "PACKAGE-1",
+      "version": 3,
+      "state": "travelling",
+      "occurred_at": "2026-09-19T10:03:00.000000+00:00",
+      "payload": {
+        "at": "2026-09-19T10:03:00.000000+00:00",
+        "expected_version": 2,
+        "kind": "transition",
+        "reason": "",
+        "resource": null,
+        "target": "travelling"
+      }
+    },
+    {
+      "id": "T4",
+      "package_id": "PACKAGE-1",
+      "version": 4,
+      "state": "blocked",
+      "occurred_at": "2026-09-19T10:04:00.000000+00:00",
+      "payload": {
+        "at": "2026-09-19T10:04:00.000000+00:00",
+        "expected_version": 3,
+        "kind": "transition",
+        "reason": "Synthetic aisle wait",
+        "resource": null,
+        "target": "blocked"
+      }
+    },
+    {
+      "id": "T5",
+      "package_id": "PACKAGE-1",
+      "version": 5,
+      "state": "travelling",
+      "occurred_at": "2026-09-19T10:05:00.000000+00:00",
+      "payload": {
+        "at": "2026-09-19T10:05:00.000000+00:00",
+        "expected_version": 4,
+        "kind": "transition",
+        "reason": "",
+        "resource": null,
+        "target": "travelling"
+      }
+    },
+    {
+      "id": "T6",
+      "package_id": "PACKAGE-1",
+      "version": 6,
+      "state": "unloading",
+      "occurred_at": "2026-09-19T10:06:00.000000+00:00",
+      "payload": {
+        "at": "2026-09-19T10:06:00.000000+00:00",
+        "expected_version": 5,
+        "kind": "transition",
+        "reason": "",
+        "resource": null,
+        "target": "unloading"
+      }
+    },
+    {
+      "id": "T7",
+      "package_id": "PACKAGE-1",
+      "version": 7,
+      "state": "delivered",
+      "occurred_at": "2026-09-19T10:07:00.000000+00:00",
+      "payload": {
+        "at": "2026-09-19T10:07:00.000000+00:00",
+        "expected_version": 6,
+        "kind": "transition",
+        "reason": "",
+        "resource": null,
+        "target": "delivered"
+      }
+    }
+  ]
+}

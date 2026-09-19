@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Package transfer evidence · Logistics Flow Studio</title><link rel="stylesheet" href="transfer-ledger.css"></head>
+<body><main>
+<a href="index.html">← Factory planner</a>
+<header><p class="eyebrow">Operations / Transfer evidence</p><h1>Follow a package through its recorded work.</h1><p>Open a SQL ledger export to inspect contents, assigned resources and blocked transfers. Files stay in this browser.</p></header>
+<section class="import"><label for="ledgerFile">Open ledger JSON</label><input id="ledgerFile" type="file" accept=".json,application/json"><p id="ledgerStatus" role="status">Choose an export from transport_store.py. Maximum 5 MB.</p></section>
+<section id="ledgerView" hidden>
+<p id="ledgerProvenance" class="note"></p>
+<label for="ledgerPackage">Package</label><select id="ledgerPackage"></select>
+<p id="ledgerContents"></p>
+<div class="cards"><article><span>Recorded state</span><strong id="ledgerState"></strong></article><article><span>Declared location</span><strong id="ledgerLocation"></strong></article><article><span>Assigned resource</span><strong id="ledgerResource"></strong></article></div>
+<p id="ledgerRoute"></p><p id="ledgerReason" class="note"></p>
+<div class="replay"><button id="ledgerPrevious" type="button">Previous event</button><label for="ledgerPosition">Event position<input id="ledgerPosition" type="range" min="0" max="0" value="0"></label><button id="ledgerNext" type="button">Next event</button></div>
+<p id="ledgerTime"></p>
+<div class="table-wrap"><table><caption>Recorded events for this package</caption><thead><tr><th>Version</th><th>Time (UTC)</th><th>State</th><th>Reason</th></tr></thead><tbody id="ledgerRows"></tbody></table></div>
+</section>
+<footer>This viewer checks each package’s event sequence against its manifest. It does not verify telemetry, resource conflicts across packages, route geometry, travel duration or safety. “In transit” deliberately has no invented coordinates. This is separate from the planner’s synthetic animation.</footer>
+</main><script src="transfer-replay.js"></script><script src="transfer-ledger.js"></script></body></html>

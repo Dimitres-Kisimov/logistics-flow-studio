@@ -1651,3 +1651,11 @@ Transactional event identities, expected versions, explicit in-transit location
 and exclusive resource assignment prevent duplicate or contradictory updates.
 The browser is not connected to this ledger yet. Tests include two concurrent
 resource assignments, restart, adverse transitions and idempotent retries.
+
+## 2026-09-19 — Inspect exported SQL package histories offline
+
+Added a consistent, bounded JSON export and a browser viewer linked from the scene
+inspector. Select a package and step through its order-linked event history;
+blocked reasons and unknown in-transit locations stay explicit. Invalid sequences
+are rejected instead of presenting misleading reconstructed states. Separate from
+the floor animation and from browser SQL execution.

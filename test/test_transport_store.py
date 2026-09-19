@@ -102,6 +102,17 @@ class TransportStoreTests(unittest.TestCase):
                 first.close()
                 second.close()
 
+    def test_export_snapshot_does_not_truncate_or_mutate(self):
+        self.create()
+        before = self.db.total_changes
+        first = transport.export_ledger(self.db)
+        self.assertEqual(first, transport.export_ledger(self.db))
+        self.assertEqual(first["schema"], "factory-transfer-ledger/v1")
+        self.assertEqual(first["packages"][0]["id"], "U1")
+        self.assertEqual(first["events"][0]["payload"]["kind"], "created")
+        self.assertEqual(self.db.total_changes, before)
+        self.assertFalse(self.db.in_transaction)
+
     def test_concurrent_assignment_has_only_one_winner(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "race.sqlite"
