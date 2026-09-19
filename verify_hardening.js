@@ -27,7 +27,7 @@
  *   7.  app.js exposes window.__WT_TEST_API__ ONLY under the ?selftest=1
  *       guard (never on a normal load).
  *   8.  sw.js precaches errors.js + selftest.js and the cache is bumped to
- *       wt-v100 (v3.25 every package takes its own path: order-driven
+ *       wt-v104 (v3.25 every package takes its own path: order-driven
  *       per-unit routing - each order archetype declares the operations
  *       it needs and a station the floor lacks is REPORTED, never routed
  *       around; previously wt-v79, v3.24 the plant reads like a shift).
@@ -233,9 +233,9 @@ check(
   "both in APP_SHELL"
 );
 check(
-  "sw.js cache bumped to wt-v100 (and no longer wt-v79)",
-  /CACHE_VERSION\s*=\s*"wt-v100"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v79"/.test(swJs),
-  "CACHE_VERSION = wt-v100"
+  "sw.js cache bumped to wt-v104 (and no longer wt-v79)",
+  /CACHE_VERSION\s*=\s*"wt-v104"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v79"/.test(swJs),
+  "CACHE_VERSION = wt-v104"
 );
 
 // ---- 9. the two new files reference no external hosts -------------------

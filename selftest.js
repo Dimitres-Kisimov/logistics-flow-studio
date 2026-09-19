@@ -3188,6 +3188,30 @@
         detail: n + " shift functions scanned; clock=" + hasClock + " rng=" + hasRng };
     });
 
+    check("floor-play-and-speed-controls-use-live-simulation", function () {
+      if (!haveApi) return false;
+      API.flowReset();
+      var speed = $("floorSpeed"), previous = API.state.flow.speed;
+      speed.value = "75"; speed.dispatchEvent(new Event("input", {bubbles:true}));
+      var synced = API.state.flow.speed === 75 && $("flowSpeed").value === "75";
+      $("floorPlayBtn").click();
+      var started = API.state.flow.playing || (API.state.flow.on && API.state.flow.sim.tick > 0);
+      API.flowPause();
+      speed.value = String(previous); speed.dispatchEvent(new Event("input", {bubbles:true}));
+      return {ok:synced && started && $("floorPlayBtn").getAttribute("aria-pressed") === "false", detail:"direct start="+started+", speed sync="+synced};
+    });
+    check("equipment-library-starts-native-drag-with-typed-payload", function () {
+      if (!haveApi) return false;
+      API.library.setSearch("pack");
+      var item = document.querySelector('#palette .pal-item[data-type="pack-station"]');
+      var data = new DataTransfer();
+      item.dispatchEvent(new DragEvent("dragstart", {bubbles:true, cancelable:true, dataTransfer:data}));
+      var ok = item.draggable && data.getData("application/x-warehousetwin-equipment") === "pack-station";
+      item.dispatchEvent(new DragEvent("dragend", {bubbles:true, dataTransfer:data}));
+      API.library.setSearch("");
+      return {ok:ok,detail:"native drag payload and cleanup"};
+    });
+
     // ---- Restore the app to a normal, usable state ---------------------
     try {
       if (haveApi) {

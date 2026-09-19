@@ -1,5 +1,10 @@
 .motion-toolbar {display:flex;flex-wrap:wrap;gap:12px;align-items:end}
 .motion-toolbar label {display:grid;gap:5px}
+.motion-timer {padding:14px 18px;border:1px solid #486257;border-radius:10px;margin:16px 0 24px;background:#202923}
+.motion-timer summary {cursor:pointer;font-weight:600;color:#bcece2}
+.motion-timer .motion-toolbar {margin-top:16px}
+.motion-timer input {width:100%;min-width:0;max-width:220px;padding:9px;border:1px solid #63776a;border-radius:6px}
+.motion-timer label {min-width:0}
 .motion-layout {display:grid;grid-template-columns:minmax(0,2fr) minmax(220px,1fr);gap:24px;align-items:start}
 .motion-map {min-width:0}
 #motionFloor {width:100%;min-height:220px;background:#17221f;border:1px solid #486257;border-radius:12px}

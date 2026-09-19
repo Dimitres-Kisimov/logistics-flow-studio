@@ -294,7 +294,7 @@
 
       <section class="card" id="paletteCard">
         <h2 class="card-title">Class Library</h2>
-        <p class="hint">Click an item, then click the floor to place it. Drag to move. Select to edit — arrow keys nudge 1 m, Ctrl+D (or the Duplicate button) copies.</p>
+        <p class="hint">Drag equipment from this library onto the floor. You can also click an item, then click the floor. Drag placed equipment to move it.</p>
         <div class="pal-actions">
           <button id="defineObjectBtn" class="btn wide primary" type="button" title="Define your OWN object type (like Siemens Plant Simulation UserObjects) — derived from a base MaterialFlow behaviour class, organised into the categorised tree. The built-ins are editable seeds.">＋ Define Object</button>
           <div class="btn-grid" style="margin-top:6px">
@@ -611,6 +611,14 @@
           <div id="addMenu" class="tb-menu tb-menu-add" role="menu" aria-label="Add a component" hidden><!-- filled by app.js buildAddMenu() from WT.library.paletteTree() --></div>
         </div>
       </div>
+      <div class="floor-runbar" role="group" aria-label="Build and play the factory">
+        <button id="floorLibraryBtn" class="btn" type="button">＋ Add equipment</button>
+        <button id="floorPlayBtn" class="btn primary" type="button" aria-pressed="false">▶ Play simulation</button>
+        <button id="floorResetBtn" class="btn" type="button">Reset</button>
+        <label for="floorSpeed">Speed <strong id="floorSpeedVal">60×</strong><input id="floorSpeed" type="range" min="1" max="100" step="1" value="60" /></label>
+        <span id="floorPlaybackState" role="timer" aria-live="off">Ready · drag equipment onto the floor, then Play</span>
+      </div>
+      <p class="floor-build-hint">1. Add equipment or choose an example → 2. Drag items into position → 3. Play. Preview starts at 60×; 1× advances this model once per minute.</p>
       <div class="canvas-wrap" id="canvasWrap">
         <!-- v1.6 a11y: a <canvas> is opaque to assistive tech, so it carries an
              aria-label AND points (aria-describedby) at an offscreen text
@@ -865,8 +873,8 @@
           <button id="flowResetBtn" class="btn" type="button">Reset</button>
         </div>
         <div class="field">
-          <label for="flowSpeed">Speed <span id="flowSpeedVal" class="hint-inline">1×</span></label>
-          <input id="flowSpeed" type="range" min="1" max="100" step="1" value="1" aria-label="Animation speed multiplier" />
+          <label for="flowSpeed">Speed <span id="flowSpeedVal" class="hint-inline">60×</span></label>
+          <input id="flowSpeed" type="range" min="1" max="100" step="1" value="60" aria-label="Animation speed multiplier" />
         </div>
         <div class="capacity-fields">
           <div><label for="flowDuration">Run duration</label><input id="flowDuration" type="number" min="1" step="1" value="8" /></div>

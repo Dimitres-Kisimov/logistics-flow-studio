@@ -47,6 +47,23 @@ assert.throws(()=>api.parse(shared),/capacity/);
 shared.plan.areas[0].capacity=2;
 assert.equal(api.sample(api.parse(shared),10).resources.filter(r=>r.state==="travelling").length,2);
 assert.throws(()=>api.sample(model,-1));
+assert.equal(api.reviewSeconds(.5,"minutes",120),30);
+assert.equal(api.reviewSeconds(.01,"hours",120),36);
+assert.equal(api.reviewSeconds(.001,"days",120),86.4);
+assert.equal(api.reviewSeconds(365,"days",31536000),31536000);
+assert.equal(api.reviewSeconds(0,"seconds",120,true),0);
+for(const args of [[0,"minutes",120],[-1,"seconds",120],[1,"hours",120],[1,"weeks",120],[Infinity,"seconds",120],[NaN,"seconds",120],[1,"seconds",Infinity]])
+  assert.throws(()=>api.reviewSeconds(...args));
+assert.equal(api.advanceReview(29.5,.1,100,30),30);
+assert.equal(api.advanceReview(0,100,1,120),1); // Suspended frames cannot skip an unseen interval.
+assert.equal(api.advanceReview(30,0,100,30),30);
+assert.throws(()=>api.advanceReview(31,.1,10,30));
+assert.throws(()=>api.advanceReview(0,.1,101,30));
+assert.equal(api.clockText(90061.9),"1d 01:01:01");
+const reviewEnd=api.sample(model,api.reviewSeconds(.5,"minutes",120));
+assert.equal(reviewEnd.loads[0].state,"delivered");
+assert.equal(reviewEnd.loads[1].state,"waiting");
+assert.equal(model.plan.horizon_s,120);
 const linked=JSON.parse(fs.readFileSync("examples/routes/package-resource-motion.json","utf8"));
 const linkedModel=api.parse(linked);
 assert.equal(linkedModel.package_bindings[0].package_snapshot.pick_id,"PICK-1");

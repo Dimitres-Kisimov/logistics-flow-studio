@@ -1,10 +1,14 @@
 (function () {
   "use strict";
   const $=id=>document.getElementById(id),api=window.ResourcePlayback,route=window.RoutePlayback;
-  let scenario=null,time=0,playing=false,raf=null,last=null,revision=0;
+  let scenario=null,time=0,stop=0,playing=false,raf=null,last=null,revision=0;
   function pause(){if(raf!==null)cancelAnimationFrame(raf);raf=null;last=null;playing=false;$("motionPlay").textContent="Play";}
   function begin(){pause();scenario=null;$("motionView").hidden=true;return ++revision;}
-  function accept(raw,request){if(request!==revision)return;scenario=api.parse(raw);time=0;$("motionSeek").max=String(scenario.plan.horizon_s);$("motionView").hidden=false;$("motionStatus").textContent="Checked planned scenario · assumed motion, not SQL history or telemetry.";table();draw();}
+  function accept(raw,request){if(request!==revision)return;scenario=api.parse(raw);time=0;stop=scenario.plan.horizon_s;$("motionStopUnit").value="seconds";$("motionStop").value=String(stop);$("motionJump").value="0";timerStatus();$("motionView").hidden=false;$("motionStatus").textContent="Checked planned scenario · assumed motion, not SQL history or telemetry.";table();draw();}
+  function timerStatus(){
+    $("motionSeek").max=String(stop);$("motionJump").max=String(stop);
+    $("motionTimerStatus").textContent=`Review stop: ${api.clockText(stop)} (${stop.toFixed(2)} s). Loaded plan: ${api.clockText(scenario.plan.horizon_s)} (${scenario.plan.horizon_s.toFixed(2)} s).`;
+  }
   function fail(error,request){if(request===revision){scenario=null;$("motionView").hidden=true;$("motionStatus").textContent="Cannot open scenario: "+error.message;}}
   function table(){
     $("motionJobs").replaceChildren();
@@ -34,20 +38,31 @@
     }));
     frame.resources.forEach(r=>{const p=project(r.position);shape("circle",{cx:p.x,cy:p.y,r:size,fill:"none",stroke:"#c3fff0","stroke-width":size*.25},`${r.resource_id}: ${r.state}`);if(r.heading!==null){const q=project({x:r.position.x+Math.cos(r.heading)*size*2,y:r.position.y+Math.sin(r.heading)*size*2});shape("line",{x1:p.x,y1:p.y,x2:q.x,y2:q.y,stroke:"#fff","stroke-width":size*.2});}});
     frame.loads.filter(l=>l.state!=="not-released").forEach(l=>{const p=project(l.position);shape("rect",{x:p.x-size*.42,y:p.y-size*.42,width:size*.84,height:size*.84,fill:l.state==="delivered"?"#a5c99b":"#efc786",stroke:"#18241f","stroke-width":size*.12},`${l.job_id}: ${l.state}`);});
-    $("motionClock").textContent=`${time.toFixed(2)} / ${scenario.plan.horizon_s.toFixed(2)} simulated seconds · ${frame.loads.filter(l=>l.state==="delivered").length} / ${frame.loads.length} loads delivered`;
+    $("motionClock").textContent=`${time.toFixed(2)} / ${stop.toFixed(2)} simulated seconds · ${api.clockText(time)} elapsed · ${api.clockText(Math.max(0,stop-time))} remaining · ${frame.loads.filter(l=>l.state==="delivered").length} / ${frame.loads.length} loads delivered`;
     $("motionSeek").value=String(time);$("motionStates").replaceChildren();
     [...frame.resources.map(r=>({name:r.resource_id,detail:r.job_id?`Assigned to ${r.job_id}`:"No active assignment",...r})),...frame.loads.map(l=>({name:l.job_id,detail:l.resource_id?`Resource ${l.resource_id}`:"No resource assigned",...l}))].forEach(item=>{
       const card=document.createElement("article"),name=document.createElement("strong"),detail=document.createElement("small"),position=document.createElement("small");name.textContent=`${item.name} · ${item.state}`;detail.textContent=item.detail;position.textContent=`X ${item.position.x.toFixed(2)} m / Y ${item.position.y.toFixed(2)} m`;card.append(name,detail,position);$("motionStates").append(card);
     });
   }
-  function tick(now){if(!playing||!scenario)return;if(last!==null)time=Math.min(scenario.plan.horizon_s,time+Math.min(1,(now-last)/1000)*Number($("motionSpeed").value));last=now;draw();if(time>=scenario.plan.horizon_s)pause();else raf=requestAnimationFrame(tick);}
+  function tick(now){if(!playing||!scenario)return;if(last!==null)time=api.advanceReview(time,Math.max(0,(now-last)/1000),Number($("motionSpeed").value),stop);last=now;draw();if(time>=stop)pause();else raf=requestAnimationFrame(tick);}
   $("motionDemo").addEventListener("click",async()=>{const request=begin();$("motionStatus").textContent="Loading synthetic scenario…";try{const response=await fetch("examples/routes/resource-motion.json");if(!response.ok)throw new Error("Example could not be loaded");const raw=await response.json();if(request===revision)$("motionFile").value="";accept(raw,request);}catch(error){fail(error,request);}});
   $("motionPackageDemo").addEventListener("click",async()=>{const request=begin();$("motionStatus").textContent="Loading SQL-linked synthetic scenario…";try{const response=await fetch("examples/routes/package-resource-motion.json");if(!response.ok)throw new Error("Example could not be loaded");const raw=await response.json();if(request===revision)$("motionFile").value="";accept(raw,request);}catch(error){fail(error,request);}});
   $("motionFile").addEventListener("change",async()=>{const request=begin(),file=$("motionFile").files[0];if(!file){$("motionStatus").textContent="Choose a scenario or explore the example.";return;}try{if(file.size>5*1024*1024)throw new Error("Scenario exceeds 5 MB");accept(JSON.parse(await file.text()),request);}catch(error){fail(error,request);}});
-  $("motionPlay").addEventListener("click",()=>{if(!scenario)return;if(playing){pause();return;}if(time>=scenario.plan.horizon_s)time=0;playing=true;last=null;$("motionPlay").textContent="Pause";raf=requestAnimationFrame(tick);});
+  $("motionPlay").addEventListener("click",()=>{if(!scenario)return;if(playing){pause();return;}if(time>=stop)time=0;playing=true;last=null;$("motionPlay").textContent="Pause";raf=requestAnimationFrame(tick);});
   $("motionReset").addEventListener("click",()=>{pause();time=0;draw();});
   $("motionSeek").addEventListener("input",()=>{pause();time=Number($("motionSeek").value);draw();});
   $("motionSpeed").addEventListener("change",()=>{last=null;});
   $("motionProjection").addEventListener("change",draw);
+  $("motionApplyStop").addEventListener("click",()=>{
+    if(!scenario)return;
+    try{const next=api.reviewSeconds($("motionStop").value.trim()?Number($("motionStop").value):NaN,$("motionStopUnit").value,scenario.plan.horizon_s);pause();stop=next;time=Math.min(time,stop);timerStatus();draw();}
+    catch(error){$("motionTimerStatus").textContent=error.message+` Current stop remains ${stop.toFixed(2)} s.`;}
+  });
+  $("motionFullPlan").addEventListener("click",()=>{if(!scenario)return;pause();stop=scenario.plan.horizon_s;$("motionStopUnit").value="seconds";$("motionStop").value=String(stop);timerStatus();draw();});
+  $("motionJumpApply").addEventListener("click",()=>{
+    if(!scenario)return;
+    try{const next=api.reviewSeconds($("motionJump").value.trim()?Number($("motionJump").value):NaN,"seconds",stop,true);pause();time=next;timerStatus();draw();}
+    catch(error){$("motionTimerStatus").textContent=error.message+" Current time is unchanged.";}
+  });
   document.addEventListener("visibilitychange",()=>{if(document.hidden)pause();});
 }());

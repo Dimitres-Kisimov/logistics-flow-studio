@@ -121,6 +121,22 @@
     });
     return {elapsed_s:time,resources,loads};
   }
-  const api={parse,sample};
+  function reviewSeconds(value,unit,horizon,allowZero=false){
+    const scales={seconds:1,minutes:60,hours:3600,days:86400};
+    check(Number.isFinite(value)&&Object.hasOwn(scales,unit)&&number(horizon)&&horizon>0,"Enter a finite time and a supported unit");
+    const seconds=value*scales[unit];
+    check(Number.isFinite(seconds)&&seconds>=(allowZero?0:.01)&&seconds<=horizon,"Time must fit within the loaded plan (minimum stop: 0.01 seconds)");
+    return seconds;
+  }
+  function advanceReview(time,delta,speed,stop){
+    check(number(time)&&number(stop)&&stop>0&&time<=stop&&Number.isFinite(delta)&&delta>=0&&Number.isFinite(speed)&&speed>=1&&speed<=100,"Invalid playback clock");
+    return Math.min(stop,time+Math.min(1,delta)*speed);
+  }
+  function clockText(seconds){
+    check(number(seconds),"Invalid displayed time");
+    const total=Math.floor(seconds),days=Math.floor(total/86400);
+    return `${days}d ${String(Math.floor(total/3600)%24).padStart(2,"0")}:${String(Math.floor(total/60)%60).padStart(2,"0")}:${String(total%60).padStart(2,"0")}`;
+  }
+  const api={parse,sample,reviewSeconds,advanceReview,clockText};
   if(typeof module!=="undefined"&&module.exports)module.exports=api;else window.ResourcePlayback=api;
 }());

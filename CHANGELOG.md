@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-19 — Direct Play and equipment drag-and-drop
+
+The floor now exposes Play/Pause, Reset, speed and elapsed time without opening
+a simulation menu. Default preview speed is 60x so the minute-bucket model visibly
+advances each second. Library and Add-menu equipment can be dragged onto the floor;
+existing placement bounds, overlap and tier checks remain in force. Starting a drag
+from isometric switches to editable 2D. Added resource-view stop times in seconds,
+minutes, hours and days, plus exact seeking. Offline precaching now requests fresh
+assets on a version upgrade to avoid mixed HTML/script versions. Cache wt-v104.
+
 ## 2026-09-19 — SQL package snapshots in resource playback
 
 Resource scenarios can now derive endpoints and package contents from a read-only

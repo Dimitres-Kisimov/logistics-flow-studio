@@ -159,7 +159,7 @@
     // ring for the sparkline; `poolDemandFactor` sets the synthetic arrival
     // (order-generation) rate as a multiple of the modelled pick capacity so a
     // live backlog is visible (honest what-if, documented in the readout).
-    flow: { on: false, playing: false, speed: 1, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15 },
+    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15 },
   };
 
   // ---------------- DOM refs ----------------
@@ -2626,6 +2626,8 @@
     const play = $("flowPlayBtn"), pause = $("flowPauseBtn");
     if (play) play.classList.toggle("active", state.flow.playing);
     if (pause) pause.disabled = !state.flow.playing;
+    const direct = $("floorPlayBtn");
+    if (direct) { direct.textContent = state.flow.playing ? "❚❚ Pause simulation" : flowClock.elapsed >= flowClock.limit ? "↻ Replay simulation" : "▶ Play simulation"; direct.setAttribute("aria-pressed", String(state.flow.playing)); }
   }
 
   /* v3.24 THE ANDON READ. The three states a real plant signal shows,
@@ -2651,6 +2653,8 @@
 
   function updateFlowReadout() {
     const timer = $("flowTimer");
+    const floorTimer = $("floorPlaybackState");
+    if (floorTimer) floorTimer.textContent = (state.flow.playing ? "Running" : flowClock.elapsed >= flowClock.limit ? "Complete" : "Paused") + " · " + WT.runClock.text(flowClock.elapsed) + " / " + WT.runClock.text(flowClock.limit);
     if (timer) timer.textContent = WT.runClock.text(flowClock.elapsed) + " / " + WT.runClock.text(flowClock.limit) +
       (flowClock.elapsed >= flowClock.limit ? " · Complete" : "");
     const out = $("flowReadout");
@@ -2812,6 +2816,17 @@
     on("flowPauseBtn", flowPause);
     on("flowStepBtn", flowStep);
     on("flowResetBtn", flowReset);
+    on("floorPlayBtn", () => { if (state.flow.playing) flowPause(); else { if (flowClock.elapsed >= flowClock.limit) flowReset(); flowPlay(); } });
+    on("floorResetBtn", flowReset);
+    on("floorLibraryBtn", () => { openDrawer("library"); const search = $("paletteSearch"); if (search) search.focus(); });
+    function setPlaybackSpeed(value) {
+      state.flow.speed = Math.min(100, Math.max(1, Number(value) || 1));
+      $("flowSpeed").value = String(state.flow.speed);
+      $("floorSpeed").value = String(state.flow.speed);
+      $("flowSpeedVal").textContent = state.flow.speed + "×";
+      $("floorSpeedVal").textContent = state.flow.speed + "×";
+    }
+    $("floorSpeed").addEventListener("input", e => setPlaybackSpeed(e.target.value));
     on("flowDurationApply", () => {
       try {
         flowDurationMinutes = WT.runClock.duration(Number($("flowDuration").value), $("flowDurationUnit").value);
@@ -2824,9 +2839,7 @@
     const sp = $("flowSpeed");
     if (sp) {
       sp.addEventListener("input", () => {
-        state.flow.speed = Math.min(100, Math.max(1, Number(sp.value) || 1));
-        const v = $("flowSpeedVal");
-        if (v) v.textContent = (Number.isInteger(state.flow.speed) ? state.flow.speed.toFixed(0) : String(state.flow.speed)) + "×";
+        setPlaybackSpeed(sp.value);
       });
     }
     updateFlowButtons();
@@ -3121,6 +3134,35 @@
   let uDrag = null; // underlay align-drag: {mx0, my0, offMx0, offMy0}
   let panDrag = null; // view pan-drag: {sx0, sy0, panX0, panY0}
   let spaceHeld = false; // Space = temporary hand/pan mode
+  let paletteDragType = null;
+  function wireEquipmentDrag(button, type) {
+    button.draggable = true;
+    button.addEventListener("dragstart", e => {
+      if (!ELEMENTS[type] || (!ELEMENTS[type].custom && !WT.tiers.caps().paletteAllowed(type))) { e.preventDefault(); return; }
+      paletteDragType = type;
+      e.dataTransfer.setData("application/x-warehousetwin-equipment", type);
+      e.dataTransfer.effectAllowed = "copy";
+      if (state.viewMode === "iso") setViewMode("top");
+      status("Drag " + ELEMENTS[type].label + " onto the floor. Placement uses the 2D plan.");
+    });
+    button.addEventListener("dragend", () => { paletteDragType = null; canvas.classList.remove("equipment-drop-target"); });
+  }
+  canvas.addEventListener("dragover", e => {
+    if (!paletteDragType) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = "copy"; canvas.classList.add("equipment-drop-target");
+  });
+  canvas.addEventListener("dragleave", () => canvas.classList.remove("equipment-drop-target"));
+  canvas.addEventListener("drop", e => {
+    if (!paletteDragType) return;
+    e.preventDefault();
+    const type = paletteDragType;
+    paletteDragType = null; canvas.classList.remove("equipment-drop-target");
+    if (e.dataTransfer.getData("application/x-warehousetwin-equipment") !== type || !ELEMENTS[type] || (!ELEMENTS[type].custom && !WT.tiers.caps().paletteAllowed(type))) return;
+    if (state.flow.playing) flowPause();
+    const point = pointerCell(e);
+    setTool(null);
+    placeAt(type, Math.floor(point.cx), Math.floor(point.cy));
+  });
 
   // Is this pointerdown a PAN gesture rather than an element edit? Middle
   // mouse button, held Space, or the toolbar Pan toggle. Chosen so normal
@@ -3412,6 +3454,7 @@
 
   function placeAt(type, cx, cy) {
     const def = ELEMENTS[type];
+    if (!def || def.w > GRID_W || def.d > GRID_H) { toast("This equipment is larger than the floor. Resize the floor first.", "warn"); return; }
     const cand = { x: cx, y: cy, w: def.w, d: def.d };
     // clamp into bounds
     cand.x = Math.max(0, Math.min(GRID_W - cand.w, cand.x));
@@ -3425,7 +3468,7 @@
     selectElement(el.id);
     scheduleSave();
     render();
-    status(`Placed ${def.label}. Keep placing, or press Esc to select/move.`);
+    status(`Placed ${def.label}. Drag it to move, or press Play simulation to preview the flow.`);
   }
 
   function selectElement(id) {
@@ -3725,6 +3768,7 @@
         it.className = "tb-menu-item";
         it.setAttribute("role", "menuitem");
         it.setAttribute("data-proxy-type", type); // resolves to #palette .pal-item[data-type]
+        if (def.custom || WT.tiers.caps().paletteAllowed(type)) wireEquipmentDrag(it, type);
         const sw = document.createElement("span");
         sw.className = "pal-swatch pal-glyph tb-add-glyph";
         const name = document.createElement("span");
@@ -3840,6 +3884,7 @@
       attachTooltip(btn, "Full version: " + def.desc);
     } else {
       if (state.activeTool === type) btn.classList.add("active");
+      wireEquipmentDrag(btn, type);
       btn.addEventListener("click", () => setTool(state.activeTool === type ? null : type));
       attachTooltip(btn, def.desc);
     }
