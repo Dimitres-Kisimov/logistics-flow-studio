@@ -1,0 +1,118 @@
+"""Greedy resource assignment with explicit skills, calendars and reposition times."""
+import argparse
+import json
+from pathlib import Path
+
+from route_plan import identity, number
+
+
+def strings(values):
+    if not isinstance(values, list) or len(values) > 100:
+        raise ValueError("Expected at most 100 skill IDs")
+    result = [identity(value) for value in values]
+    if len(set(result)) != len(result):
+        raise ValueError("Duplicate skill")
+    return set(result)
+
+
+def dispatch(raw):
+    if raw.get("schema") != "factory-resource-jobs/v1":
+        raise ValueError("Unsupported resource job schema")
+    horizon = number(raw["horizon_s"], True)
+    if horizon > 31536000:
+        raise ValueError("Maximum horizon is 365 days")
+    if not isinstance(raw.get("resources"), list) or len(raw["resources"]) > 100:
+        raise ValueError("Expected at most 100 resources")
+    resources = {}
+    for resource in raw["resources"]:
+        key = identity(resource["id"])
+        if key in resources:
+            raise ValueError("Duplicate resource")
+        windows, previous = [], -1
+        if not isinstance(resource.get("availability_s"), list) or len(resource["availability_s"]) > 100:
+            raise ValueError("Resource requires explicit availability windows")
+        for pair in resource["availability_s"]:
+            if not isinstance(pair, list) or len(pair) != 2:
+                raise ValueError("Window must be [start,end]")
+            start, end = number(pair[0]), number(pair[1], True)
+            if start >= end or start < previous or end > 31536000:
+                raise ValueError("Availability must be ordered and nonoverlapping")
+            windows.append((start, end))
+            previous = end
+        resources[key] = dict(skills=strings(resource["skills"]), windows=windows,
+                              location=identity(resource["start_location"]), ready=0.0)
+    travel = {}
+    if not isinstance(raw.get("reposition"), list) or len(raw["reposition"]) > 10000:
+        raise ValueError("Expected at most 10000 explicit reposition times")
+    for leg in raw["reposition"]:
+        key = (identity(leg["resource_id"]), identity(leg["from"]), identity(leg["to"]))
+        duration = number(leg["seconds"], True)
+        if key[0] not in resources or key[1] == key[2] or key in travel or duration > 31536000:
+            raise ValueError("Unknown resource, duplicate or invalid reposition leg")
+        travel[key] = duration
+    if not isinstance(raw.get("jobs"), list) or len(raw["jobs"]) > 1000:
+        raise ValueError("Expected at most 1000 jobs")
+    jobs, ids = [], set()
+    for job in raw["jobs"]:
+        key = identity(job["id"])
+        release, duration = number(job["release_s"]), number(job["duration_s"], True)
+        priority = job.get("priority", 0)
+        if key in ids or max(release, duration) > 31536000 or type(priority) is not int or not -1000 <= priority <= 1000:
+            raise ValueError("Invalid or duplicate job")
+        ids.add(key)
+        jobs.append(dict(id=key, release_s=release, duration_s=duration, priority=priority,
+                         source=identity(job["source"]), destination=identity(job["destination"]),
+                         required_skills=sorted(strings(job["required_skills"]))))
+    jobs.sort(key=lambda job: (job["release_s"], -job["priority"], job["id"]))
+    output = []
+    for job in jobs:
+        candidates, rejected = [], []
+        for key, resource in sorted(resources.items()):
+            missing = sorted(set(job["required_skills"]) - resource["skills"])
+            if missing:
+                rejected.append(dict(resource_id=key, reason="missing-skills", skills=missing))
+                continue
+            reposition = 0.0 if resource["location"] == job["source"] else travel.get((key, resource["location"], job["source"]))
+            if reposition is None:
+                rejected.append(dict(resource_id=key, reason="missing-reposition-time", source=resource["location"], destination=job["source"]))
+                continue
+            earliest = max(job["release_s"], resource["ready"])
+            total = reposition + job["duration_s"]
+            start = next((max(earliest, a) for a, b in resource["windows"] if max(earliest, a) + total <= b), None)
+            if start is None:
+                rejected.append(dict(resource_id=key, reason="no-contiguous-availability"))
+                continue
+            task_start, end = start + reposition, start + total
+            if end <= task_start or (reposition > 0 and task_start <= start):
+                raise ValueError("Task duration below supported numeric precision")
+            candidates.append((end, start, key, task_start, reposition))
+        if not candidates:
+            output.append(dict(**job, resource_id=None, state_at_horizon="unscheduled" if job["release_s"] <= horizon else "not-released", rejected_resources=rejected))
+            continue
+        end, start, selected, task_start, reposition = min(candidates)
+        origin = resources[selected]["location"]
+        resources[selected].update(location=job["destination"], ready=end)
+        state = ("not-released" if job["release_s"] > horizon else "queued" if start > horizon else
+                 "repositioning" if task_start > horizon else "working" if end > horizon else "completed")
+        output.append(dict(**job, resource_id=selected, reposition_from=origin, reposition_s=reposition,
+                           assignment_start_s=start, task_start_s=task_start, end_s=end,
+                           queue_wait_s=start - job["release_s"], state_at_horizon=state,
+                           rejected_resources=rejected,
+                           feasible_candidates=[dict(resource_id=c[2], end_s=c[0]) for c in sorted(candidates)]))
+    return dict(schema="factory-resource-plan/v1", provenance="assumed-resource-dispatch",
+                horizon_s=horizon, jobs=output,
+                completed=sum(job["state_at_horizon"] == "completed" for job in output),
+                unfinished=sum(job["state_at_horizon"] not in {"completed", "not-released"} for job in output),
+                policy="Release/priority/ID job order; earliest finish then start/resource ID. Append-only resource assignments.",
+                limitations="Greedy, not optimal staffing. One resource per job; durations and directed reposition times are declared. No area-capacity coupling, route geometry, fatigue, labour-law validation or SQL execution. Resource states are planned, not telemetry.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", type=Path, required=True)
+    args = parser.parse_args()
+    print(json.dumps(dispatch(json.loads(args.input.read_text(encoding="utf-8-sig"))), indent=2, allow_nan=False))
+
+
+if __name__ == "__main__":
+    main()

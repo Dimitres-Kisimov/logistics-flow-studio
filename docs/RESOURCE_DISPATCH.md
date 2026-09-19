@@ -1,0 +1,55 @@
+# Resource assignment with skills and repositioning
+
+The local `tools/resource_dispatch.py` prototype assigns one declared resource per
+job. It is a greedy planning model, not an optimal staffing calculation or a live
+workforce management connection.
+
+```sh
+python tools/resource_dispatch.py --input examples/routes/resource-jobs.json
+```
+
+The input specifies resource IDs, skill IDs, initial locations, explicit availability
+windows, directed reposition times and jobs with duration, endpoints, release time,
+priority and required skills. Units are simulation seconds; the fixture is synthetic.
+The output lists assignments, competing feasible candidates and rejection reasons.
+
+Jobs are considered by release time, descending priority and ID. Eligible resources
+must have every required skill. Remaining candidates are ranked by earliest finish,
+then assignment start and resource ID. Repositioning and the whole job must fit in
+one availability window. No work is split across breaks. Repositioning begins no
+earlier than job release; anticipatory repositioning is not modelled.
+
+A resource's next task cannot begin before its previous assignment ends. Its planned
+location becomes that job's destination. If the next source differs, a resource-specific
+directed travel time must exist; no reverse edge or zero-time jump is inferred. A
+resource already at the source needs zero reposition time. Qualification and travel
+inputs are user declarations, not verified certification or measured movement.
+
+Assignments append to each resource's plan. The algorithm does not backfill earlier
+idle gaps after scheduling future work, optimize the entire job set, calculate a
+minimum headcount, or model teams. No task/area reservation coupling is implemented:
+passing this model does not prove the shared-traffic plan is feasible. Route geometry,
+fatigue, labour-law rules, utilities and machine capabilities are outside its scope.
+Do not execute these plans as safety-approved factory instructions.
+
+The horizon classifies released jobs as queued, repositioning, working, completed or
+unscheduled. Not-yet-released jobs are separate. Future planned completions are not
+counted as completed at the horizon. No SQL execution record is written, and no worker
+marker is currently driven by these assignments in the browser.
+
+Limits: 100 resources, 1000 jobs, 100 availability windows/skills per resource and
+10000 directed reposition entries. Timing inputs and windows are bounded to 365 days.
+No performance guarantee has been measured at those limits.
+
+## Verified example and tests
+
+One picking resource completes ORDER-A at second 4 at PACK. ORDER-B needs six seconds
+plus two seconds to return to PICK; the remaining first window cannot fit both. Its
+assignment starts at 20, repositioning ends at 22 and work ends at 28. ORDER-C requires
+welding, which the resource lacks, and remains unscheduled with a missing-skill reason.
+
+Tests cover exclusive assignment, repositioning, window fit, missing skills and travel,
+choice between two resources, deterministic/nonmutating inputs, malformed calendars,
+and horizon state during repositioning. All 47 Python tests and Ruff pass. The actual
+CLI output was generated twice identically. This is synthetic verification, not site
+calibration. Shared-area/resource joint scheduling and browser integration remain next.

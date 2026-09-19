@@ -1733,3 +1733,7 @@ Browser playback now validates operating windows, explains window waits and disp
 ## 2026-09-19 — One-click transfer example
 
 Added a labelled synthetic worked example that loads SQL history, floor and package-associated availability route together, plus a jump to playback. It uses normal validators, protects newer imports from stale responses, and is bundled in PWA cachewt-v97.57Node/43Python/159browser checks pass.
+
+## 2026-09-19 — Skill-aware resource assignment
+
+Added a deterministic greedy dispatcher with explicit skills, availability and directed reposition times. Reports candidate/rejection reasons and horizon state; does not infer missing travel or claim optimal headcount.47Python tests pass. Shared-area coupling and browser worker playback remain pending.
