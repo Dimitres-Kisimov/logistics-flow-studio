@@ -43,4 +43,19 @@ for(const view of ["plan","iso"]){
 }
 assert.throws(()=>api.project({x:Infinity,y:0},"iso"));
 assert.throws(()=>api.camera(model.floor,"plan",3,{x:0,y:0}));
+const reserved=JSON.parse(fs.readFileSync("examples/routes/reserved-timeline.json","utf8"));
+const queued=api.parse(reserved,floor);
+assert.equal(queued.playback_duration_s,40);
+assert.equal(api.sample(queued,0).state,"not-released");
+assert.equal(api.sample(queued,10).state,"queued");
+assert.deepEqual(api.sample(queued,10).position,{x:4,y:4.8});
+assert.match(api.sample(queued,10).wait,/TRANSFER-A/);
+assert.equal(api.sample(queued,20.7).state,"loading");
+assert.equal(api.sample(queued,30).state,"travelling");
+assert.equal(api.sample(queued,40).state,"unloading");
+assert.equal(api.sample(queued,100).state,"unloading");
+const overlap=structuredClone(reserved);overlap.reservation.schedule.requests[1].planned_start_s=1;overlap.reservation.schedule.requests[1].planned_end_s=21.7;
+assert.throws(()=>api.parse(overlap,floor),/capacity exceeded/);
+const mismatch=structuredClone(reserved);mismatch.reservation.request_id="missing";
+assert.throws(()=>api.parse(mismatch,floor),/does not match/);
 console.log("Route playback: timing, geometry, stale floors, obstacles and boundaries pass");

@@ -81,6 +81,16 @@ class TrafficScheduleTests(unittest.TestCase):
         self.assertEqual(result["completed"], 80)
         self.assertEqual(result["unfinished"], 0)
 
+    def test_timeline_binding_requires_matching_duration_and_unbound_route(self):
+        result = traffic_schedule.schedule(self.fixture())
+        timeline = dict(schema="factory-route-timeline/v1", route=dict(found=True), duration_s=3)
+        bound = traffic_schedule.bind_timeline(timeline, result, "B")
+        self.assertEqual(bound["reservation"]["request_id"], "B")
+        self.assertNotIn("reservation", timeline)
+        for source, key in [(timeline, "A"), (timeline, "missing"), (bound, "B")]:
+            with self.assertRaises(ValueError):
+                traffic_schedule.bind_timeline(source, result, key)
+
 
 if __name__ == "__main__":
     unittest.main()

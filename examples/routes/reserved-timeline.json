@@ -1,0 +1,214 @@
+{
+  "schema": "factory-route-timeline/v1",
+  "provenance": "assumed-simulation-not-telemetry",
+  "floor": {
+    "width": 20.0,
+    "depth": 12.0,
+    "elements": [
+      {
+        "id": "PACK-BENCH-ANCHOR",
+        "x": 14.0,
+        "y": 8.0,
+        "w": 2.0,
+        "d": 1.0
+      },
+      {
+        "id": "PICK-FACE-ANCHOR",
+        "x": 2.0,
+        "y": 3.0,
+        "w": 4.0,
+        "d": 1.0
+      }
+    ]
+  },
+  "route": {
+    "schema": "factory-route-proposal/v1",
+    "found": true,
+    "points": [
+      {
+        "id": "PICK-ACCESS",
+        "x": 4.0,
+        "y": 4.8
+      },
+      {
+        "id": "AISLE-A",
+        "x": 4.0,
+        "y": 6.0
+      },
+      {
+        "id": "AISLE-B",
+        "x": 13.0,
+        "y": 6.0
+      },
+      {
+        "id": "PACK-ACCESS",
+        "x": 13.0,
+        "y": 8.5
+      }
+    ],
+    "distance_m": 12.7,
+    "mode": "worker",
+    "clearance_m": 0.3,
+    "floor_digest": "9db740cbbfe623d2797a6fd87d0fd6b936aef5d51298450ebc704350e4dcc1d7",
+    "rejected_edges": [],
+    "reason": "candidate-on-declared-graph",
+    "limitations": "Static rectangular footprint screening only. No turning envelope, traffic conflicts, slopes, doors, utilities, visibility, timing or regulatory approval. Clearance is user supplied, not a prescribed safe value."
+  },
+  "speed_mps": 1.0,
+  "loading_s": 5.0,
+  "unloading_s": 3.0,
+  "segments": [
+    {
+      "source": {
+        "id": "PICK-ACCESS",
+        "x": 4.0,
+        "y": 4.8
+      },
+      "destination": {
+        "id": "AISLE-A",
+        "x": 4.0,
+        "y": 6.0
+      },
+      "start_s": 5.0,
+      "end_s": 6.2
+    },
+    {
+      "source": {
+        "id": "AISLE-A",
+        "x": 4.0,
+        "y": 6.0
+      },
+      "destination": {
+        "id": "AISLE-B",
+        "x": 13.0,
+        "y": 6.0
+      },
+      "start_s": 6.2,
+      "end_s": 15.2
+    },
+    {
+      "source": {
+        "id": "AISLE-B",
+        "x": 13.0,
+        "y": 6.0
+      },
+      "destination": {
+        "id": "PACK-ACCESS",
+        "x": 13.0,
+        "y": 8.5
+      },
+      "start_s": 15.2,
+      "end_s": 17.7
+    }
+  ],
+  "travel_end_s": 17.7,
+  "duration_s": 20.7,
+  "limitations": "Constant speed and instantaneous turns; no acceleration, queues, breaks, collisions or resource availability. Timing is entered assumptions, not measured execution.",
+  "reservation": {
+    "request_id": "TRANSFER-B",
+    "schedule": {
+      "schema": "factory-area-schedule/v1",
+      "provenance": "synthetic-reservation-model",
+      "horizon_s": 40.0,
+      "policy": "release-ascending/priority-descending/id-ascending; atomic nonpreemptive area claims",
+      "areas": [
+        {
+          "id": "SHARED-AISLE",
+          "capacity": 1
+        }
+      ],
+      "requests": [
+        {
+          "id": "TRANSFER-A",
+          "release_s": 0.0,
+          "duration_s": 20.7,
+          "priority": 0,
+          "areas": [
+            "SHARED-AISLE"
+          ],
+          "planned_start_s": 0.0,
+          "planned_end_s": 20.7,
+          "planned_wait_s": 0.0,
+          "state_at_horizon": "completed",
+          "observed_wait_s": 0.0,
+          "explanations": []
+        },
+        {
+          "id": "TRANSFER-B",
+          "release_s": 1.0,
+          "duration_s": 20.7,
+          "priority": 0,
+          "areas": [
+            "SHARED-AISLE"
+          ],
+          "planned_start_s": 20.7,
+          "planned_end_s": 41.4,
+          "planned_wait_s": 19.7,
+          "state_at_horizon": "occupying",
+          "observed_wait_s": 19.7,
+          "explanations": [
+            {
+              "candidate_start_s": 1.0,
+              "next_start_s": 20.7,
+              "conflicts": [
+                {
+                  "area": "SHARED-AISLE",
+                  "at_s": 1.0,
+                  "release_s": 20.7,
+                  "holders": [
+                    "TRANSFER-A"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "at_s": 0.0,
+          "kind": "requested",
+          "request_id": "TRANSFER-A",
+          "areas": [
+            "SHARED-AISLE"
+          ]
+        },
+        {
+          "at_s": 0.0,
+          "kind": "granted",
+          "request_id": "TRANSFER-A",
+          "areas": [
+            "SHARED-AISLE"
+          ]
+        },
+        {
+          "at_s": 1.0,
+          "kind": "requested",
+          "request_id": "TRANSFER-B",
+          "areas": [
+            "SHARED-AISLE"
+          ]
+        },
+        {
+          "at_s": 20.7,
+          "kind": "released",
+          "request_id": "TRANSFER-A",
+          "areas": [
+            "SHARED-AISLE"
+          ]
+        },
+        {
+          "at_s": 20.7,
+          "kind": "granted",
+          "request_id": "TRANSFER-B",
+          "areas": [
+            "SHARED-AISLE"
+          ]
+        }
+      ],
+      "completed": 1,
+      "unfinished": 1,
+      "limitations": "Declared area durations only. All requested areas held for the full duration; waits occur before entry. No geometry, body clearance, resources, shifts, repositioning, stochastic timing or actual execution. Future starts are plans, not horizon completions."
+    }
+  }
+}

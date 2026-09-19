@@ -27,7 +27,7 @@
 <p id="routeStatus" role="status">Load a floor, then a timeline from route_plan.py.</p>
 <div id="routeView" hidden><div class="mapping-controls"><button id="routePlay" type="button">Play scenario</button><button id="routeReset" type="button">Reset</button><label>Playback speed<select id="routeSpeed"><option value="1">1×</option><option value="5">5×</option><option value="10">10×</option><option value="25">25×</option><option value="50">50×</option><option value="100">100×</option></select></label></div>
 <label for="routeSeek">Simulation time<input id="routeSeek" type="range" min="0" max="1" step="0.01" value="0"></label>
-<p id="routeClock"></p><svg id="routeFloor" role="img" aria-label="Simulated movement along declared route"></svg>
+<p id="routeClock"></p><p id="routeWait" class="note"></p><svg id="routeFloor" role="img" aria-label="Simulated movement along declared route"></svg>
 <div class="mapping-controls"><label>Floor view<select id="routeProjection"><option value="plan">2D plan</option><option value="iso">Isometric footprint view</option></select></label><label>Camera<select id="routeZoom"><option value="1">Fit floor</option><option value="2">Follow load · 2×</option><option value="4">Follow load · 4×</option></select></label></div>
 <p class="view-note">Isometric view projects the same floor coordinates; equipment heights are unavailable. Follow mode zooms around the load and crops the surrounding floor.</p>
 <p class="note">Cyan: assumed route and moving load. Amber: reserved areas. Turns are instantaneous; acceleration, queues and worker availability are not modelled. Playback pauses when this tab is hidden.</p></div></section>

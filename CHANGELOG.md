@@ -1704,16 +1704,20 @@ Screened routes can produce explicit constant-speed segment timelines with loadi
 
 ## 2026-09-19 — Browser route scenario playback
 
-Transfer viewer now previews validated timed route exports with continuous 2D load motion, direction, time scrub and 1x–100x playback. Floor/obstacle and timing checks reject incompatible exports. Recorded SQL history remains separate from the assumed scenario. Cache wt-v94; 57 Node harnesses, 30 Python tests and 159 browser self-tests pass.
+Transfer viewer now previews validated timed route exports with continuous 2D load motion, direction, time scrub and 1x–100x playback. Floor/obstacle and timing checks reject incompatible exports. Recorded SQL history remains separate from the assumed scenario. Cache wt-v95; 57 Node harnesses, 30 Python tests and 159 browser self-tests pass.
 
 ## 2026-09-19 — Package-specific route scenarios
 
-Read-only SQL scenario export now carries package/order/pick identity and explicit location-to-access-node declarations. Viewer rejects mismatched or stale package snapshots and clears playback on package changes. This does not execute transfers. Cachewt-v94;32Python/57Node/159browser checks pass.
+Read-only SQL scenario export now carries package/order/pick identity and explicit location-to-access-node declarations. Viewer rejects mismatched or stale package snapshots and clears playback on package changes. This does not execute transfers. Cachewt-v95;32Python/57Node/159browser checks pass.
 
 ## 2026-09-19 — Route view and follow camera
 
-Added plan/isometric footprint views, fit/2x/4x follow-load cameras, floor grid, endpoint labels and projected headings to route playback. No heights are invented. Both views use the same time and coordinates. Cachewt-v94;57Node/32Python/159browser tests pass.
+Added plan/isometric footprint views, fit/2x/4x follow-load cameras, floor grid, endpoint labels and projected headings to route playback. No heights are invented. Both views use the same time and coordinates. Cachewt-v95;57Node/32Python/159browser tests pass.
 
 ## 2026-09-19 — Shared-area reservation model
 
 Added deterministic capacity-limited area scheduling with atomic multi-area claims, exact boundary reuse, blocking explanations and horizon-aware events/work-in-progress. CLI/library only; geometry, shifts, physical resources and browser traffic playback remain separate work.38Python tests pass.
+
+## 2026-09-19 — Reservation-driven route playback
+
+Shared-area schedules can now delay a route preview until its planned allocation, show queue context, and preserve unfinished state at the horizon. Imports validate all area capacities and intervals. Claims cover the whole transfer and are not physical collision checks. Cachewt-v95;57Node/39Python/159browser tests pass.

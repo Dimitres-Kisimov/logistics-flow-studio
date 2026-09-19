@@ -1,5 +1,6 @@
 """Deterministic shared-area reservations; simulated point occupancy, not safety control."""
 import argparse
+import copy
 import json
 from pathlib import Path
 
@@ -83,6 +84,7 @@ def schedule(raw):
     completed = sum(r["state_at_horizon"] == "completed" for r in results)
     return dict(schema="factory-area-schedule/v1", provenance="synthetic-reservation-model",
                 horizon_s=horizon, policy="release-ascending/priority-descending/id-ascending; atomic nonpreemptive area claims",
+                areas=[dict(id=key, capacity=value) for key, value in sorted(capacities.items())],
                 requests=results, events=events, completed=completed,
                 unfinished=sum(r["state_at_horizon"] in {"queued", "occupying"} for r in results),
                 limitations="Declared area durations only. All requested areas held for the full duration; waits occur before entry. No geometry, body clearance, resources, shifts, repositioning, stochastic timing or actual execution. Future starts are plans, not horizon completions.")
@@ -91,8 +93,26 @@ def schedule(raw):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True)
+    parser.add_argument("--timeline", type=Path, help="Attach this schedule to a route timeline")
+    parser.add_argument("--request", help="Reservation request ID associated with that route")
     args = parser.parse_args()
-    print(json.dumps(schedule(json.loads(args.input.read_text(encoding="utf-8-sig"))), indent=2, allow_nan=False))
+    if (args.timeline is None) != (args.request is None):
+        parser.error("Supply both --timeline and --request")
+    result = schedule(json.loads(args.input.read_text(encoding="utf-8-sig")))
+    if args.timeline is not None:
+        result = bind_timeline(json.loads(args.timeline.read_text(encoding="utf-8-sig")), result, args.request)
+    print(json.dumps(result, indent=2, allow_nan=False))
+
+
+def bind_timeline(timeline, result, request_id):
+    request = next((r for r in result["requests"] if r["id"] == request_id), None)
+    if timeline.get("schema") != "factory-route-timeline/v1" or not timeline.get("route", {}).get("found") or "reservation" in timeline:
+        raise ValueError("Use an unreserved, routable timeline")
+    if request is None or timeline.get("duration_s") != request["duration_s"]:
+        raise ValueError("Reservation duration must equal the full route timeline duration")
+    output = copy.deepcopy(timeline)
+    output["reservation"] = dict(request_id=request_id, schedule=copy.deepcopy(result))
+    return output
 
 
 if __name__ == "__main__":

@@ -105,3 +105,13 @@ Half-open occupancy permits exact boundary reuse. Explanations list failed candi
 Acceptance status: exclusive crossing, exact release boundary, capacity-two and horizon conservation now have passing tests. Atomic multi-area acquisition, future-reservation overlap, priority ties, determinism/nonmutation, invalid inputs and an80-request seeded capacity invariant are also tested. Same-resource repositioning, shifts, body-aware release, browser traffic playback and calibrated measurements remain unimplemented. This does not complete the original traffic contract.
 
 All38Python tests and Ruff pass. CLI sample horizon6s completesA but leavesB occupying until planned7s;Bwait3s is explained byA/CROSSING-A. No SQL writes or browser integration are added in this increment.
+
+## Reservation-driven route preview
+
+The scheduling CLI accepts --timeline examples/routes/timeline.json --request TRANSFER-B together with --input examples/routes/route-area-requests.json. It attaches the full schedule to the chosen timeline only when the request duration equals the full loading/travel/unloading duration. Existing reservation attachments are rejected. Example output is examples/routes/reserved-timeline.json; it remains an unbound synthetic scenario, although package-associated timelines can also carry this attachment.
+
+The browser checks area IDs/capacities, every request interval and half-open simultaneous occupancy before using the selected reservation. It verifies the selected duration against the geometry-derived timeline. It does not independently reproduce the scheduler policy, trust imported explanation strings, authenticate the schedule, or verify which geometric segments cross the named areas. All areas are conservatively held for the whole transfer. These are declared logical claims, not physical collision checks.
+
+Playback uses the schedule horizon as its clock limit. Before release it reports not-released, then queued at the declared route start until planned grant, then plays loading/travel/unloading with that time offset. The queue note identifies other shared-area reservations before entry; those may be future reservations rather than current occupants. At the horizon it preserves unfinished state. One selected load is drawn; other requests are explained but not animated.
+
+Tests cover timeline binding, overlapping capacity rejection, unknown requests, stationary queue positions and horizon clamping. Browser imports showed queued at10s, travelling at30s and still unloading at40s.57Node/39Python/Ruff/159browser tests pass. Generated JSON repeats identically. This completes a limited reservation-to-visual connection, not the full resource/shift/body/traffic model.

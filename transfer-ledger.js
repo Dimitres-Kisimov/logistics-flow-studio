@@ -29,12 +29,13 @@
     shape("circle",{cx:pos.x,cy:pos.y,r:size,fill:"#a7fff0",stroke:"#15241f","stroke-width":size*.2});
     if(frame.heading!==null){const end=project({x:frame.position.x+Math.cos(frame.heading)*size*2.5,y:frame.position.y+Math.sin(frame.heading)*size*2.5});shape("line",{x1:pos.x,y1:pos.y,x2:end.x,y2:end.y,stroke:"#fff","stroke-width":size*.4});}
     $("routeSeek").value=String(elapsed);
-    $("routeClock").textContent=`${elapsed.toFixed(2)} / ${timeline.duration_s.toFixed(2)} simulated seconds · ${frame.state} · X ${frame.position.x.toFixed(2)} m / Y ${frame.position.y.toFixed(2)} m · Assumed travel ${timeline.speed_mps} m/s`;
+    $("routeClock").textContent=`${elapsed.toFixed(2)} / ${timeline.playback_duration_s.toFixed(2)} simulated seconds · ${frame.state} · X ${frame.position.x.toFixed(2)} m / Y ${frame.position.y.toFixed(2)} m · Assumed travel ${timeline.speed_mps} m/s`;
+    $("routeWait").textContent=frame.wait||(timeline.reservation?"Reservation scenario: declared areas are held for the whole transfer. Capacity checked; geometry-to-area association is not verified.":"");
   }
   function animateRoute(now){
     if(!playing||!timeline)return;
-    if(lastTick!==null)elapsed=Math.min(timeline.duration_s,elapsed+Math.min(1,(now-lastTick)/1000)*Number($("routeSpeed").value));
-    lastTick=now;drawRoute();if(elapsed>=timeline.duration_s)pauseRoute();else animationId=requestAnimationFrame(animateRoute);
+    if(lastTick!==null)elapsed=Math.min(timeline.playback_duration_s,elapsed+Math.min(1,(now-lastTick)/1000)*Number($("routeSpeed").value));
+    lastTick=now;drawRoute();if(elapsed>=timeline.playback_duration_s)pauseRoute();else animationId=requestAnimationFrame(animateRoute);
   }
   $("routeFile").addEventListener("change",async()=>{
     clearRoute();const request=routeRequest,currentFloor=rawLayout,file=$("routeFile").files[0];if(!file)return;
@@ -43,12 +44,12 @@
       const text=await file.text();if(request!==routeRequest||currentFloor!==rawLayout)return;
       const manifest=model&&model.packages[Number($("ledgerPackage").value)].manifest;
       timeline=window.RoutePlayback.parse(JSON.parse(text),currentFloor,manifest);elapsed=0;
-      $("routeSeek").max=String(timeline.duration_s);$("routeView").hidden=false;
+      $("routeSeek").max=String(timeline.playback_duration_s);$("routeView").hidden=false;
       const association=timeline.package_snapshot?`Scenario for ${manifest.id} · order ${manifest.order_id} · pick ${manifest.pick_id} · ledger version ${manifest.version}. Access nodes are user-declared; not execution history.`:"Unbound scenario; not linked to a SQL package.";
       $("routeStatus").textContent=`Checked geometry and timing · ${timeline.route.distance_m.toFixed(2)} m · ${timeline.route.mode}. ${association}`;drawRoute();
     }catch(error){$("routeStatus").textContent="Cannot preview route: "+error.message;}
   });
-  $("routePlay").addEventListener("click",()=>{if(!timeline)return;if(playing){pauseRoute();return;}if(elapsed>=timeline.duration_s)elapsed=0;playing=true;lastTick=null;$("routePlay").textContent="Pause scenario";animationId=requestAnimationFrame(animateRoute);});
+  $("routePlay").addEventListener("click",()=>{if(!timeline)return;if(playing){pauseRoute();return;}if(elapsed>=timeline.playback_duration_s)elapsed=0;playing=true;lastTick=null;$("routePlay").textContent="Pause scenario";animationId=requestAnimationFrame(animateRoute);});
   $("routeReset").addEventListener("click",()=>{pauseRoute();elapsed=0;drawRoute();});
   $("routeSeek").addEventListener("input",()=>{pauseRoute();elapsed=Number($("routeSeek").value);drawRoute();});
   $("routeSpeed").addEventListener("change",()=>{lastTick=null;});

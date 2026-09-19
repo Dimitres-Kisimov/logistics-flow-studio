@@ -1,0 +1,9 @@
+{
+  "schema": "factory-area-requests/v1",
+  "horizon_s": 40,
+  "areas": [{"id": "SHARED-AISLE", "capacity": 1}],
+  "requests": [
+    {"id": "TRANSFER-A", "release_s": 0, "duration_s": 20.7, "areas": ["SHARED-AISLE"]},
+    {"id": "TRANSFER-B", "release_s": 1, "duration_s": 20.7, "areas": ["SHARED-AISLE"]}
+  ]
+}

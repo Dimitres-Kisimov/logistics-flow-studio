@@ -65,12 +65,43 @@
     // Rebuild times from checked geometry so tolerated floating-point differences cannot create gaps.
     const result=JSON.parse(JSON.stringify(raw));cursor=result.loading_s;
     result.segments.forEach(s=>{s.start_s=cursor;cursor+=Math.hypot(s.destination.x-s.source.x,s.destination.y-s.source.y)/result.speed_mps;s.end_s=cursor;});
-    result.travel_end_s=cursor;result.duration_s=cursor+result.unloading_s;return result;
+    result.travel_end_s=cursor;result.duration_s=cursor+result.unloading_s;
+    result.playback_duration_s=result.duration_s;
+    if(result.reservation!==undefined){
+      const reservation=result.reservation,s=reservation&&reservation.schedule;
+      requireThat(s&&s.schema==="factory-area-schedule/v1"&&s.provenance==="synthetic-reservation-model"&&finite(s.horizon_s)&&s.horizon_s>0&&s.horizon_s<=31536000,"Invalid reservation schedule");
+      requireThat(Array.isArray(s.areas)&&s.areas.length<=100&&Array.isArray(s.requests)&&s.requests.length<=1000,"Oversized reservation schedule");
+      const capacities=new Map(),requests=new Set(),byArea=new Map();
+      s.areas.forEach(a=>{requireThat(a&&typeof a.id==="string"&&a.id.trim()&&a.id.length<=200&&!capacities.has(a.id)&&Number.isInteger(a.capacity)&&a.capacity>=1&&a.capacity<=100,"Invalid area capacity");capacities.set(a.id,a.capacity);byArea.set(a.id,[]);});
+      s.requests.forEach(q=>{
+        requireThat(q&&typeof q.id==="string"&&q.id.trim()&&q.id.length<=200&&!requests.has(q.id)&&[q.release_s,q.duration_s,q.planned_start_s,q.planned_end_s].every(finite)&&q.duration_s>0&&q.planned_start_s>=q.release_s&&q.planned_end_s>q.planned_start_s&&close(q.planned_end_s-q.planned_start_s,q.duration_s),"Invalid reservation interval");requests.add(q.id);
+        requireThat(Array.isArray(q.areas)&&q.areas.length>0&&new Set(q.areas).size===q.areas.length&&q.areas.every(a=>capacities.has(a)),"Unknown reservation area");
+        q.areas.forEach(a=>byArea.get(a).push(q));
+      });
+      byArea.forEach((rows,area)=>{
+        const changes=rows.flatMap(q=>[{at:q.planned_start_s,delta:1},{at:q.planned_end_s,delta:-1}]).sort((a,b)=>a.at-b.at||a.delta-b.delta);
+        let occupied=0;changes.forEach(e=>{occupied+=e.delta;requireThat(occupied<=capacities.get(area),"Shared area capacity exceeded");});
+      });
+      const selected=s.requests.find(q=>q.id===reservation.request_id);
+      requireThat(selected&&close(selected.duration_s,result.duration_s),"Reservation does not match this route duration");
+      result.playback_duration_s=s.horizon_s;
+    }
+    return result;
   }
   function sample(t,tick) {
     requireThat(finite(tick),"Invalid elapsed time");
     const first=t.route.points[0],last=t.route.points[t.route.points.length-1];
     const position=p=>({x:p.x,y:p.y});
+    if(t.reservation){
+      const s=t.reservation.schedule,q=s.requests.find(r=>r.id===t.reservation.request_id);
+      tick=Math.min(tick,s.horizon_s);
+      if(tick<q.planned_start_s){
+        const others=s.requests.filter(r=>r.id!==q.id&&r.planned_end_s>tick&&r.planned_start_s<q.planned_start_s&&r.areas.some(a=>q.areas.includes(a)));
+        return {state:tick<q.release_s?"not-released":"queued",position:position(first),heading:null,
+          wait:`Planned entry ${q.planned_start_s.toFixed(2)} s · areas ${q.areas.join(", ")}. Other reservations before entry: ${others.map(r=>`${r.id} until ${r.planned_end_s.toFixed(2)} s`).join("; ")||"none"}. Area claim covers the whole transfer.`};
+      }
+      tick-=q.planned_start_s;
+    }
     if(tick>=t.duration_s)return {state:"delivered",position:position(last),heading:null};
     if(tick>=t.travel_end_s)return {state:"unloading",position:position(last),heading:null};
     if(tick<t.loading_s)return {state:"loading",position:position(first),heading:null};
