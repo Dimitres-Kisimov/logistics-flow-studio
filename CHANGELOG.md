@@ -1713,3 +1713,7 @@ Read-only SQL scenario export now carries package/order/pick identity and explic
 ## 2026-09-19 — Route view and follow camera
 
 Added plan/isometric footprint views, fit/2x/4x follow-load cameras, floor grid, endpoint labels and projected headings to route playback. No heights are invented. Both views use the same time and coordinates. Cachewt-v94;57Node/32Python/159browser tests pass.
+
+## 2026-09-19 — Shared-area reservation model
+
+Added deterministic capacity-limited area scheduling with atomic multi-area claims, exact boundary reuse, blocking explanations and horizon-aware events/work-in-progress. CLI/library only; geometry, shifts, physical resources and browser traffic playback remain separate work.38Python tests pass.

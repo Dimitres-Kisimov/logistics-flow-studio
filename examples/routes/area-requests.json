@@ -1,0 +1,9 @@
+{
+  "schema": "factory-area-requests/v1",
+  "horizon_s": 6,
+  "areas": [{"id": "CROSSING-A", "capacity": 1}],
+  "requests": [
+    {"id": "TRANSFER-A", "release_s": 0, "duration_s": 4, "areas": ["CROSSING-A"]},
+    {"id": "TRANSFER-B", "release_s": 1, "duration_s": 3, "areas": ["CROSSING-A"]}
+  ]
+}

@@ -93,3 +93,15 @@ Visual Components. Transparent assumptions, simple imports and explainable waiti
 are design objectives, not proven missing features of those products. Compare the
 same fixtures, editions, hardware and modelling effort before publishing performance
 or usability claims. Genuine 3D, calibrated traffic and IFC import remain open work.
+
+## Implemented area-reservation prototype
+
+Run python tools/traffic_schedule.py --input examples/routes/area-requests.json. The CLI/library accepts factory-area-requests/v1 and exports factory-area-schedule/v1. Areas have integer capacity1–100; each request has unique ID, explicit nonnegative release seconds, positive duration seconds, area IDs and optional integer priority. Limits:100areas/1000requests/365day horizon and individual timing input bounds. No large-scale performance claim has been measured.
+
+Release time ascending, then priority descending, then ID determines reservation order. This is deterministic reservation scheduling, not globally optimal dispatch or an online priority queue. Earlier requests can reserve a future interval; later requests may use a gap only when the entire requested duration fits. All requested areas are acquired together and held for the full duration; there are no partial holdings or intermediate acquisitions. This prevents hold-and-wait cycles in this limited model, but is not a general deadlock detector. Unreviewed geometric crossings are not inferred.
+
+Half-open occupancy permits exact boundary reuse. Explanations list failed candidate starts, blocking area/holder IDs and the next candidate start. A conflict later in a proposed interval can block the whole reservation, so these explanations are search decisions rather than an observed continuous wait trace. Events at equal times order release before request before grant. Events beyond the horizon are excluded; future start/end times remain labelled plans. Not-yet-released requests do not count as unfinished work. Horizon state includes events exactly at the boundary.
+
+Acceptance status: exclusive crossing, exact release boundary, capacity-two and horizon conservation now have passing tests. Atomic multi-area acquisition, future-reservation overlap, priority ties, determinism/nonmutation, invalid inputs and an80-request seeded capacity invariant are also tested. Same-resource repositioning, shifts, body-aware release, browser traffic playback and calibrated measurements remain unimplemented. This does not complete the original traffic contract.
+
+All38Python tests and Ruff pass. CLI sample horizon6s completesA but leavesB occupying until planned7s;Bwait3s is explained byA/CROSSING-A. No SQL writes or browser integration are added in this increment.
