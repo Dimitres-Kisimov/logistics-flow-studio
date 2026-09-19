@@ -1673,3 +1673,10 @@ Fixed a ledger defect where a delivered package freed a worker for a new task wi
 an earlier timestamp, creating overlapping historical work. Assignment now checks
 the resource's latest recorded time transactionally. Tests prove rejection leaves
 both package state and event history unchanged and allow exact-boundary reuse.
+
+## 2026-09-19 — Reject conflicting imported resource histories
+
+Transfer imports now check resource intervals across packages and unique pick
+ownership, while retaining microsecond time precision. Tests cover overlaps,
+unfinished work, exact boundaries, distinct resources and zero-duration events.
+The browser rejects a conflicting import and clears the history display.

@@ -22,5 +22,5 @@
 </section>
 <div class="table-wrap"><table><caption>Recorded events for this package</caption><thead><tr><th>Version</th><th>Time (UTC)</th><th>State</th><th>Reason</th></tr></thead><tbody id="ledgerRows"></tbody></table></div>
 </section>
-<footer>This viewer checks each package’s event sequence against its manifest. It does not verify telemetry, resource conflicts across packages, route geometry, travel duration or safety. “In transit” deliberately has no invented coordinates. This is separate from the planner’s synthetic animation.</footer>
+<footer>This viewer checks event sequences, unique pick ownership and overlapping assignments for each resource within the imported file. Assignment-to-delivery intervals include blocked time; unfinished work keeps its resource occupied. Exact release/assignment boundaries are allowed. It does not verify missing records, telemetry, shift availability, travel between jobs, route geometry or safety. “In transit” deliberately has no invented coordinates. This is separate from the planner’s synthetic animation.</footer>
 </main><script src="transfer-replay.js"></script><script src="transfer-ledger.js"></script></body></html>

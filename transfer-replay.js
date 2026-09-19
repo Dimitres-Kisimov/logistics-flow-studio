@@ -6,10 +6,11 @@
   function parse(raw) {
     requireThat(raw && raw.schema === "factory-transfer-ledger/v1", "Unsupported ledger schema");
     requireThat(Array.isArray(raw.packages) && raw.packages.length <= 1000 && Array.isArray(raw.events) && raw.events.length <= 10000, "Invalid or oversized ledger");
-    const packages = new Map(), ids = new Set();
+    const packages = new Map(), ids = new Set(), picks = new Set();
     raw.packages.forEach(p => {
       requireThat(p && [p.id,p.pick_id,p.order_id,p.line_id,p.item_id,p.unit,p.source_id,p.destination_id].every(id), "Missing package identity or contents");
       requireThat(!packages.has(p.id) && Number.isSafeInteger(p.quantity) && p.quantity > 0 && Number.isSafeInteger(p.version) && p.version >= 0, "Duplicate package or invalid quantity/version");
+      requireThat(!picks.has(p.pick_id), "A completed pick cannot belong to two packages"); picks.add(p.pick_id);
       requireThat(p.source_id !== p.destination_id, "Transfer endpoints must differ");
       packages.set(p.id, {manifest:{...p}, events:[], frames:[]});
     });
@@ -40,6 +41,25 @@
       });
       const last=entry.frames[entry.frames.length-1];
       requireThat(last && last.state===p.state && last.location===p.location_id && last.resource===p.resource_id && last.at===p.updated_at, "Manifest does not match event history");
+    });
+    const occupancy=new Map();
+    packages.forEach(entry=>{
+      const start=entry.frames.find(f=>f.state==="assigned");
+      if(!start)return;
+      const last=entry.frames[entry.frames.length-1];
+      const end=last.state==="delivered"?last.at:null;
+      // Half-open intervals: a release and next assignment may share a time.
+      // Fixed-width UTC strings preserve all six fractional digits.
+      if(!occupancy.has(start.resource))occupancy.set(start.resource,[]);
+      occupancy.get(start.resource).push({start:start.at,end,packageId:entry.manifest.id});
+    });
+    occupancy.forEach((intervals,resource)=>{
+      intervals.sort((a,b)=>a.start<b.start?-1:a.start>b.start?1:(a.end || "~")<(b.end || "~")?-1:(a.end || "~")>(b.end || "~")?1:0);
+      let previous=null;
+      intervals.forEach(current=>{
+        requireThat(!previous || (previous.end!==null && current.start>=previous.end), `Overlapping transfers for resource ${resource}`);
+        previous=current;
+      });
     });
     return {provenance:typeof raw.provenance === "string"?raw.provenance:"Unverified declared data",packages:Array.from(packages.values())};
   }

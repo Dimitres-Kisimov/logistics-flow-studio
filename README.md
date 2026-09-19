@@ -342,3 +342,14 @@ Assignment exactly at10:05 is allowed. This append-only prototype requires
 chronological resource use; inserting work into historical gaps, corrections and
 reassignment remain unsupported. It does not validate external JSON histories.
 The regression failed before the fix and passes afterwards;19 Python tests pass.
+
+### Cross-package resource checks in imported histories
+
+The viewer now checks assignment-to-delivery intervals across packages in the
+imported file, including blocked time and unfinished transfers. One resource may
+be handed over at the exact delivery timestamp; a1-microsecond overlap is rejected.
+Zero-duration recorded work cannot be placed inside another occupied interval.
+Duplicate ownership of a completed pick is also rejected. These checks do not
+prove missing records are absent, travel time between jobs, shift availability,
+resource capability or physical accuracy. This supersedes the earlier note that
+cross-package resource intervals were not checked. Cachewt-v90.

@@ -34,3 +34,32 @@ for(const change of [x=>x.cell=0,x=>x.elements.push(x.elements[0]),x=>x.elements
   const invalid=JSON.parse(JSON.stringify(floor));change(invalid);assert.throws(()=>parseLayout(invalid));
 }
 console.log("Layout mapping: metre conversion, explicit anchors, unknown moving positions and adverse geometry pass.");
+function twoPackages(shiftMinutes) {
+  const joined=JSON.parse(original), other=JSON.parse(original);
+  const shift=time=>new Date(Date.parse(time)+shiftMinutes*60000).toISOString().replace(".000Z",".000000+00:00");
+  other.packages[0].id="PACKAGE-2"; other.packages[0].pick_id="PICK-2";
+  other.packages[0].updated_at=shift(other.packages[0].updated_at);
+  other.events.forEach(e=>{e.id="second-"+e.id;e.package_id="PACKAGE-2";e.occurred_at=shift(e.occurred_at);e.payload.at=e.occurred_at;if(e.version===0)e.payload.pick="PICK-2";});
+  joined.packages.push(other.packages[0]);joined.events.push(...other.events);return joined;
+}
+assert.throws(()=>parse(twoPackages(0)),/Overlapping transfers/);
+assert.equal(parse(twoPackages(6)).packages.length,2);
+const micro=twoPackages(6), microEvent=micro.events.find(e=>e.id==="second-T1");
+microEvent.occurred_at=microEvent.payload.at="2026-09-19T10:06:59.999999+00:00";
+assert.throws(()=>parse(micro),/Overlapping transfers/);
+const ongoing=twoPackages(6);
+ongoing.events=ongoing.events.filter(e=>e.id!=="T7");
+Object.assign(ongoing.packages[0],{version:6,state:"unloading",updated_at:ongoing.events.find(e=>e.id==="T6").occurred_at});
+assert.throws(()=>parse(ongoing),/Overlapping transfers/);
+const distinct=twoPackages(0);distinct.packages[1].resource_id="WORKER-2";distinct.events.find(e=>e.id==="second-T1").payload.resource="WORKER-2";
+assert.equal(parse(distinct).packages.length,2);
+const duplicatePick=twoPackages(6);duplicatePick.packages[1].pick_id="PICK-1";
+assert.throws(()=>parse(duplicatePick),/completed pick/);
+const instant=twoPackages(0);
+instant.events.filter(e=>e.package_id==="PACKAGE-2").forEach(e=>{e.occurred_at=e.payload.at="2026-09-19T10:03:00.000000+00:00";});
+instant.packages[1].updated_at="2026-09-19T10:03:00.000000+00:00";
+assert.throws(()=>parse(instant),/Overlapping transfers/);
+instant.events.filter(e=>e.package_id==="PACKAGE-2").forEach(e=>{e.occurred_at=e.payload.at="2026-09-19T10:01:00.000000+00:00";});
+instant.packages[1].updated_at="2026-09-19T10:01:00.000000+00:00";
+assert.equal(parse(instant).packages.length,2);
+console.log("Cross-package integrity: conflicts, boundary reuse, microseconds, unfinished work and pick ownership pass.");

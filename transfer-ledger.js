@@ -60,7 +60,7 @@
       [...new Set(model.packages.flatMap(entry=>[entry.manifest.source_id,entry.manifest.destination_id]))].sort().forEach(id=>$("ledgerMapLocation").append(new Option(id,id)));
       $("ledgerPosition").value="0"; $("ledgerProvenance").textContent=model.provenance;
       $("ledgerView").hidden=!model.packages.length;
-      $("ledgerStatus").textContent=`Loaded ${model.packages.length} package(s). Event sequences match their manifests; real-world accuracy is unverified.`;
+      $("ledgerStatus").textContent=`Loaded ${model.packages.length} package(s). Histories and resource intervals are consistent within this file; real-world accuracy is unverified.`;
       render();
     } catch(error) { model=null; $("ledgerStatus").textContent="Cannot open ledger: "+error.message; }
   });
