@@ -91,6 +91,34 @@ class TrafficScheduleTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 traffic_schedule.bind_timeline(source, result, key)
 
+    def test_nonpreemptive_availability_and_infeasible_request(self):
+        raw = self.fixture(horizon=30)
+        raw["requests"] = [dict(id="A", release_s=8, duration_s=6, areas=["Z"], availability_s=[[0, 10], [20, 30]]),
+                           dict(id="B", release_s=9, duration_s=11, areas=["Z"], availability_s=[[0, 10], [20, 30]])]
+        a, b = traffic_schedule.schedule(raw)["requests"]
+        self.assertEqual((a["planned_start_s"], a["planned_end_s"]), (20, 26))
+        self.assertEqual(b["state_at_horizon"], "unscheduled")
+        self.assertIsNone(b["planned_start_s"])
+
+    def test_area_delay_rechecks_window_and_exact_shift_end(self):
+        raw = self.fixture(horizon=30)
+        raw["requests"][0]["duration_s"] = 8
+        raw["requests"][1].update(duration_s=4, availability_s=[[0, 10], [20, 24]])
+        result = traffic_schedule.schedule(raw)
+        self.assertEqual((result["requests"][1]["planned_start_s"], result["requests"][1]["planned_end_s"]), (20, 24))
+        self.assertEqual(result["completed"], 2)
+        raw["requests"][1]["availability_s"] = []
+        result = traffic_schedule.schedule(raw)
+        self.assertEqual((result["completed"], result["unfinished"]), (1, 1))
+        self.assertFalse(any(e["kind"] == "granted" and e["request_id"] == "B" for e in result["events"]))
+
+    def test_reject_malformed_availability(self):
+        for windows in [None, [[4, 3]], [[0, 4], [3, 8]], [[True, 4]], [[0, float("inf")]], "always"]:
+            raw = self.fixture()
+            raw["requests"][0]["availability_s"] = windows
+            with self.subTest(windows=windows), self.assertRaises(ValueError):
+                traffic_schedule.schedule(raw)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -115,3 +115,13 @@ The browser checks area IDs/capacities, every request interval and half-open sim
 Playback uses the schedule horizon as its clock limit. Before release it reports not-released, then queued at the declared route start until planned grant, then plays loading/travel/unloading with that time offset. The queue note identifies other shared-area reservations before entry; those may be future reservations rather than current occupants. At the horizon it preserves unfinished state. One selected load is drawn; other requests are explained but not animated.
 
 Tests cover timeline binding, overlapping capacity rejection, unknown requests, stationary queue positions and horizon clamping. Browser imports showed queued at10s, travelling at30s and still unloading at40s.57Node/39Python/Ruff/159browser tests pass. Generated JSON repeats identically. This completes a limited reservation-to-visual connection, not the full resource/shift/body/traffic model.
+
+## Availability-window screening
+
+Requests may now carry availability_s as up to100 sorted nonoverlapping [start,end] simulation-second windows. The nonpreemptive transfer must fit wholly within one window, including an exact finish at the window end. Adjacent windows are not merged automatically. Area contention triggers another window feasibility check before reserving anything. An empty list means no availability; omission preserves the explicitly unrestricted-time baseline.
+
+If no window fits, planned times/wait are null, no grant/release event is emitted and released work counts as unfinished/unscheduled. Future unreleased work remains not-released. Other requests continue scheduling. These are per-request declared availability constraints, not worker identity, skills, labour law compliance, a resource calendar or an optimal roster.
+
+Run tools/traffic_schedule.py --input examples/routes/availability-requests.json. Its6second task releasedat8 runs20–26; its11second task isunscheduled.42Python tests/Ruff pass, including area delay rechecking, exact window-end completion, malformed/overlapping windows and missing capacity grants. Existing no-window scheduling behaviour remains compatible.
+
+Availability-aware schedules currently export for review only. bind_timeline refuses schedules containing availability windows until the browser importer and wait explanation contract support them; do not strip availability metadata to force playback. This is an open integration step, not completion of shift-aware simulation.

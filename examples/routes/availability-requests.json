@@ -1,0 +1,9 @@
+{
+  "schema": "factory-area-requests/v1",
+  "horizon_s": 30,
+  "areas": [{"id": "CROSSING", "capacity": 1}],
+  "requests": [
+    {"id": "FITS-NEXT-WINDOW", "release_s": 8, "duration_s": 6, "areas": ["CROSSING"], "availability_s": [[0, 10], [20, 30]]},
+    {"id": "TOO-LONG", "release_s": 9, "duration_s": 11, "areas": ["CROSSING"], "availability_s": [[0, 10], [20, 30]]}
+  ]
+}

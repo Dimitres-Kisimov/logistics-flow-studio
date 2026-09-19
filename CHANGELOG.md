@@ -1721,3 +1721,7 @@ Added deterministic capacity-limited area scheduling with atomic multi-area clai
 ## 2026-09-19 — Reservation-driven route playback
 
 Shared-area schedules can now delay a route preview until its planned allocation, show queue context, and preserve unfinished state at the horizon. Imports validate all area capacities and intervals. Claims cover the whole transfer and are not physical collision checks. Cachewt-v95;57Node/39Python/159browser tests pass.
+
+## 2026-09-19 — Explicit availability windows
+
+Area scheduler supports per-request operating windows, rechecks feasibility after area waits, and reports unscheduled work when a full nonpreemptive transfer cannot fit.42Python tests pass. Availability-aware playback and physical workforce assignment remain pending.

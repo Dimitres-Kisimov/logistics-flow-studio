@@ -35,8 +35,23 @@ def schedule(raw):
             raise ValueError("Requests require unique known areas")
         if release > 31536000 or duration > 31536000 or release + duration == release:
             raise ValueError("Unsupported request timing")
+        windows = request.get("availability_s")
+        if "availability_s" in request:
+            if not isinstance(windows, list) or len(windows) > 100:
+                raise ValueError("Availability requires at most 100 explicit windows")
+            checked, prior = [], -1
+            for window in windows:
+                if not isinstance(window, list) or len(window) != 2:
+                    raise ValueError("Availability windows require [start,end]")
+                a, b = number(window[0]), number(window[1], True)
+                if a >= b or a < prior or b > 31536000:
+                    raise ValueError("Availability windows must be sorted, nonoverlapping and within 365 days")
+                checked.append([a, b])
+                prior = b
+            windows = checked
         ids.add(key)
-        requests.append(dict(id=key, release_s=release, duration_s=duration, priority=priority, areas=sorted(areas)))
+        requests.append(dict(id=key, release_s=release, duration_s=duration, priority=priority, areas=sorted(areas),
+                             **({"availability_s": windows} if windows is not None else {})))
     # Earlier release first. Larger priority breaks ties; ID makes remaining ties reproducible.
     requests.sort(key=lambda r: (r["release_s"], -r["priority"], r["id"]))
     reservations = {key: [] for key in capacities}
@@ -56,6 +71,15 @@ def schedule(raw):
         start, explanations = request["release_s"], []
         # Each failed candidate advances past at least one finite existing reservation.
         while True:
+            if "availability_s" in request:
+                feasible = next((max(start, a) for a, b in request["availability_s"]
+                                 if max(start, a) + request["duration_s"] <= b), None)
+                if feasible is None:
+                    start = None
+                    break
+                if feasible != start:
+                    explanations.append(dict(candidate_start_s=start, next_start_s=feasible, reason="availability-window"))
+                    start = feasible
             if start + request["duration_s"] == start:
                 raise ValueError("Scheduled duration is below numeric precision")
             conflicts = [c for area in request["areas"]
@@ -67,6 +91,15 @@ def schedule(raw):
                 raise RuntimeError("Reservation search did not advance")
             explanations.append(dict(candidate_start_s=start, next_start_s=next_start, conflicts=conflicts))
             start = next_start
+        if start is None:
+            results.append(dict(**request, planned_start_s=None, planned_end_s=None, planned_wait_s=None,
+                                state_at_horizon="unscheduled" if request["release_s"] <= horizon else "not-released",
+                                observed_wait_s=max(0.0, horizon - request["release_s"]),
+                                reason="No declared availability window can fit the transfer after existing reservations",
+                                explanations=explanations))
+            if request["release_s"] <= horizon:
+                events.append(dict(at_s=request["release_s"], kind="requested", request_id=request["id"], areas=request["areas"]))
+            continue
         end = start + request["duration_s"]
         for area in request["areas"]:
             reservations[area].append(dict(id=request["id"], start_s=start, end_s=end))
@@ -86,8 +119,8 @@ def schedule(raw):
                 horizon_s=horizon, policy="release-ascending/priority-descending/id-ascending; atomic nonpreemptive area claims",
                 areas=[dict(id=key, capacity=value) for key, value in sorted(capacities.items())],
                 requests=results, events=events, completed=completed,
-                unfinished=sum(r["state_at_horizon"] in {"queued", "occupying"} for r in results),
-                limitations="Declared area durations only. All requested areas held for the full duration; waits occur before entry. No geometry, body clearance, resources, shifts, repositioning, stochastic timing or actual execution. Future starts are plans, not horizon completions.")
+                unfinished=sum(r["state_at_horizon"] in {"queued", "occupying", "unscheduled"} for r in results),
+                limitations="Declared area durations only. All requested areas held for the full duration; waits occur before entry. Optional request availability is not a workforce calendar; omitted availability assumes unrestricted time. No geometry, body clearance, resources, repositioning, stochastic timing or actual execution. Future starts are plans, not horizon completions.")
 
 
 def main():
@@ -108,8 +141,10 @@ def bind_timeline(timeline, result, request_id):
     request = next((r for r in result["requests"] if r["id"] == request_id), None)
     if timeline.get("schema") != "factory-route-timeline/v1" or not timeline.get("route", {}).get("found") or "reservation" in timeline:
         raise ValueError("Use an unreserved, routable timeline")
-    if request is None or timeline.get("duration_s") != request["duration_s"]:
+    if request is None or request["planned_start_s"] is None or timeline.get("duration_s") != request["duration_s"]:
         raise ValueError("Reservation duration must equal the full route timeline duration")
+    if any("availability_s" in r for r in result["requests"]):
+        raise ValueError("Availability-aware schedules require a future playback contract; export the schedule for review instead")
     output = copy.deepcopy(timeline)
     output["reservation"] = dict(request_id=request_id, schedule=copy.deepcopy(result))
     return output
