@@ -42,7 +42,7 @@ jobs:
         run: node tools/offline-guard.mjs
 
   verify-python:
-    name: Ruff + deliverables one-pager
+    name: Python invariants + Ruff + deliverables one-pager
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +56,9 @@ jobs:
 
       - name: Ruff lint
         run: python -m ruff check .
+
+      - name: Run SQL, routing and resource-planning tests
+        run: python -m unittest discover -s test -p 'test_*.py' -v
 
       - name: Build the one-pager PDF and check its size
         run: |
