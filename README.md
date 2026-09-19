@@ -365,7 +365,7 @@ race with changed floor/ledger/links are rejected. Raw layout element ordering d
 not define identity. This is geometry consistency, not surveyed revision control,
 a site identifier, route validation or proof that equal location IDs mean the same
 real place. Exports are explicit; no new local-storage persistence is added.
-Cachewt-v99;56Node,19Python,159browser checks pass. Actual import and stale rejection
+Cachewt-v100;56Node,19Python,159browser checks pass. Actual import and stale rejection
 verified; browser reported export prepared but automation download-event observation
 timed out, so successful file saving was not independently confirmed in that browser.
 
@@ -374,7 +374,9 @@ timed out, so successful file saving was not independently confirmed in that bro
 Scheduled resource positions can now be generated from the same screened paths
 that determine assignment times and viewed in `resource-view.html`. See
 [resource motion](docs/RESOURCE_MOTION.md) for the runnable example, return trips,
-browser import checks and remaining SQL identity integration.
+and browser import checks. [SQL-linked resource scenarios](docs/PACKAGE_RESOURCE_MOTION.md)
+derive package identity and endpoints from a read-only ledger snapshot; recorded
+state is shown separately from the what-if animation. Live execution remains separate.
 
 `tools/route_plan.py` plans shortest routes only along declared one-way graph edges,
 filtering travel modes and rectangular footprint/clearance conflicts. It requires

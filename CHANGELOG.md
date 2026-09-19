@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-19 — SQL package snapshots in resource playback
+
+Resource scenarios can now derive endpoints and package contents from a read-only
+SQLite snapshot. Expected versions and one-package-per-job associations are checked.
+The viewer validates embedded event history and displays recorded package state
+separately from planned movement. Added a SQL-linked synthetic example; cache wt-v100.
+This does not execute work or reserve current database resources.
+
 ## 2026-09-19 — Scheduled workers and loads in the browser
 
 Added resource movement playback linked from the planner and transfer history.

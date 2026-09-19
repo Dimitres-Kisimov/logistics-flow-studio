@@ -1,5 +1,8 @@
 # Scheduled resource motion
 
+This page describes the base, unbound scenario. For optional SQL package identity
+and version-checked snapshots, see [SQL-linked scenarios](PACKAGE_RESOURCE_MOTION.md).
+
 `tools/resource_motion.py` joins directed, footprint-screened geometry to resource dispatch. Previously dispatch accepted travel durations independently of visual route geometry. This adapter derives work and return durations from the same paths used to sample positions.
 
 Run from the repository root:

@@ -8,6 +8,13 @@
   function fail(error,request){if(request===revision){scenario=null;$("motionView").hidden=true;$("motionStatus").textContent="Cannot open scenario: "+error.message;}}
   function table(){
     $("motionJobs").replaceChildren();
+    const bindings=scenario.package_bindings||[];
+    $("motionPackageRows").replaceChildren();$("motionPackageTable").hidden=!bindings.length;
+    $("motionAssociation").textContent=bindings.length?"SQL-linked what-if plan. Recorded versions and event history match this imported snapshot. Planning does not reserve resources, execute orders or confirm the database is still current.":"Unbound scenario: these job IDs are not linked to SQL packages.";
+    bindings.forEach(b=>{
+      const p=b.package_snapshot,manifest=scenario.source_ledger.packages.find(m=>m.id===p.id),row=document.createElement("tr");
+      [b.job_id,`${p.id} / ${p.order_id} / ${p.pick_id}`,`${p.quantity} ${p.unit} · ${p.item_id}`,manifest.state,`${p.version} · ${p.updated_at}`].forEach(value=>{const td=document.createElement("td");td.textContent=value;row.append(td);});$("motionPackageRows").append(row);
+    });
     scenario.plan.jobs.forEach(j=>{const row=document.createElement("tr");[j.id,j.resource_id||"Unassigned",j.assignment_start_s,j.task_start_s,j.end_s].forEach(v=>{const td=document.createElement("td");td.textContent=typeof v==="number"?v.toFixed(2):v===undefined?"—":v;row.append(td);});$("motionJobs").append(row);});
   }
   function draw(){
@@ -35,6 +42,7 @@
   }
   function tick(now){if(!playing||!scenario)return;if(last!==null)time=Math.min(scenario.plan.horizon_s,time+Math.min(1,(now-last)/1000)*Number($("motionSpeed").value));last=now;draw();if(time>=scenario.plan.horizon_s)pause();else raf=requestAnimationFrame(tick);}
   $("motionDemo").addEventListener("click",async()=>{const request=begin();$("motionStatus").textContent="Loading synthetic scenario…";try{const response=await fetch("examples/routes/resource-motion.json");if(!response.ok)throw new Error("Example could not be loaded");const raw=await response.json();if(request===revision)$("motionFile").value="";accept(raw,request);}catch(error){fail(error,request);}});
+  $("motionPackageDemo").addEventListener("click",async()=>{const request=begin();$("motionStatus").textContent="Loading SQL-linked synthetic scenario…";try{const response=await fetch("examples/routes/package-resource-motion.json");if(!response.ok)throw new Error("Example could not be loaded");const raw=await response.json();if(request===revision)$("motionFile").value="";accept(raw,request);}catch(error){fail(error,request);}});
   $("motionFile").addEventListener("change",async()=>{const request=begin(),file=$("motionFile").files[0];if(!file){$("motionStatus").textContent="Choose a scenario or explore the example.";return;}try{if(file.size>5*1024*1024)throw new Error("Scenario exceeds 5 MB");accept(JSON.parse(await file.text()),request);}catch(error){fail(error,request);}});
   $("motionPlay").addEventListener("click",()=>{if(!scenario)return;if(playing){pause();return;}if(time>=scenario.plan.horizon_s)time=0;playing=true;last=null;$("motionPlay").textContent="Pause";raf=requestAnimationFrame(tick);});
   $("motionReset").addEventListener("click",()=>{pause();time=0;draw();});

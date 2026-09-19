@@ -47,6 +47,21 @@ assert.throws(()=>api.parse(shared),/capacity/);
 shared.plan.areas[0].capacity=2;
 assert.equal(api.sample(api.parse(shared),10).resources.filter(r=>r.state==="travelling").length,2);
 assert.throws(()=>api.sample(model,-1));
+const linked=JSON.parse(fs.readFileSync("examples/routes/package-resource-motion.json","utf8"));
+const linkedModel=api.parse(linked);
+assert.equal(linkedModel.package_bindings[0].package_snapshot.pick_id,"PICK-1");
+assert.equal(linkedModel.source_ledger.packages[0].state,"delivered");
+assert.equal(api.sample(linkedModel,0).loads[0].state,"not-released");
+assert.equal(api.sample(linkedModel,6).loads[0].state,"loading");
+for(const change of [t=>t.package_bindings[0].package_snapshot.version--,
+  t=>t.package_bindings[0].package_snapshot.quantity++,
+  t=>t.package_bindings[0].job_id="missing",
+  t=>delete t.source_ledger,
+  t=>t.source_ledger.events.pop(),
+  t=>t.package_bindings=[],
+  t=>t.source_ledger.packages[0].state="waiting"]){
+  const copy=structuredClone(linked);change(copy);assert.throws(()=>api.parse(copy));
+}
 const html=fs.readFileSync("resource-view.html","utf8"),sw=fs.readFileSync("sw.js","utf8");
 for(const asset of ["resource-view.html","resource-view.css","resource-view.js","resource-playback.js","examples/routes/resource-motion.json"])assert.ok(sw.includes('"./'+asset+'"'));
 assert.ok(html.includes('value="100"'));

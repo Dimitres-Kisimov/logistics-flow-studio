@@ -1,6 +1,7 @@
 (function () {
   "use strict";
   const route=typeof module!=="undefined"&&module.exports?require("./route-playback.js"):window.RoutePlayback;
+  const ledger=typeof module!=="undefined"&&module.exports?require("./transfer-replay.js"):window.TransferReplay;
   const check=(ok,message)=>{if(!ok)throw new Error(message);};
   const number=v=>Number.isFinite(v)&&v>=0&&v<=31536000;
   const id=v=>typeof v==="string"&&v.trim()&&v.length<=200;
@@ -79,6 +80,19 @@
       const events=a.claims.flatMap(c=>[{t:c.start,d:1},{t:c.end,d:-1}]).sort((x,y)=>x.t-y.t||x.d-y.d);
       let count=0;events.forEach(e=>{count+=e.d;check(count<=a.capacity,"Shared area capacity exceeded");});
     });
+    if(out.package_bindings!==undefined||out.source_ledger!==undefined){
+      check(Array.isArray(out.package_bindings)&&out.package_bindings.length===p.jobs.length&&out.package_bindings.length>0,"Bind exactly one SQL package per job");
+      const source=ledger.parse(out.source_ledger),packages=new Map(source.packages.map(e=>[e.manifest.id,e.manifest]));
+      const boundJobs=new Set(),boundPackages=new Set(),fields=["id","pick_id","source_id","destination_id","order_id","line_id","item_id","quantity","unit","version","updated_at"];
+      out.package_bindings.forEach(b=>{
+        check(b&&jobs.has(b.job_id)&&!boundJobs.has(b.job_id)&&b.package_snapshot,"Invalid or duplicate package binding");
+        const snapshot=b.package_snapshot,manifest=packages.get(snapshot.id),job=p.jobs.find(j=>j.id===b.job_id);
+        check(manifest&&!boundPackages.has(snapshot.id)&&fields.every(k=>Object.hasOwn(snapshot,k)&&snapshot[k]===manifest[k]),"Package snapshot differs from ledger identity or version");
+        check(job.source===manifest.source_id&&job.destination===manifest.destination_id,"Job endpoints differ from SQL package");
+        boundJobs.add(b.job_id);boundPackages.add(snapshot.id);
+      });
+      check(boundPackages.size===packages.size,"Ledger includes unrelated packages");
+    }
     // Display samples use checked jobs/routes, not imported summary metrics or state labels.
     return out;
   }

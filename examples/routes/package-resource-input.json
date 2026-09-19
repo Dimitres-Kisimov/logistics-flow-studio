@@ -1,0 +1,8 @@
+{
+  "schema": "factory-package-resource-input/v1", "horizon_s": 60,
+  "mode": "worker", "speed_mps": 1, "clearance_m": 0.3,
+  "location_access": {"PICK-FACE": "PICK-ACCESS", "PACK-BENCH": "PACK-ACCESS"},
+  "resources": [{"id": "PLANNED-WORKER", "skills": ["picking"], "start_location": "PICK-FACE", "availability_s": [[0,60]]}],
+  "reposition": [],
+  "jobs": [{"id": "WHAT-IF-1", "package_id": "PACKAGE-1", "expected_version": 7, "release_s": 5, "required_skills": ["picking"], "loading_s": 5, "unloading_s": 3}]
+}

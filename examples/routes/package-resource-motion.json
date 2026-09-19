@@ -1,0 +1,379 @@
+{
+  "schema": "factory-resource-motion/v1",
+  "plan": {
+    "schema": "factory-resource-plan/v1",
+    "provenance": "assumed-resource-dispatch",
+    "horizon_s": 60.0,
+    "jobs": [
+      {
+        "id": "WHAT-IF-1",
+        "release_s": 5.0,
+        "duration_s": 20.7,
+        "priority": 0,
+        "areas": [],
+        "source": "PICK-FACE",
+        "destination": "PACK-BENCH",
+        "required_skills": [
+          "picking"
+        ],
+        "resource_id": "PLANNED-WORKER",
+        "reposition_from": "PICK-FACE",
+        "reposition_s": 0.0,
+        "assignment_start_s": 5.0,
+        "task_start_s": 5.0,
+        "end_s": 25.7,
+        "queue_wait_s": 0.0,
+        "state_at_horizon": "completed",
+        "area_waits": [],
+        "rejected_resources": [],
+        "feasible_candidates": [
+          {
+            "resource_id": "PLANNED-WORKER",
+            "end_s": 25.7
+          }
+        ]
+      }
+    ],
+    "areas": [],
+    "resource_metrics": [
+      {
+        "resource_id": "PLANNED-WORKER",
+        "available_s": 60.0,
+        "working_s": 20.7,
+        "reposition_s": 0.0,
+        "assigned_s": 20.7,
+        "idle_available_s": 39.3,
+        "utilization": 0.345,
+        "completed_jobs": 1
+      }
+    ],
+    "completed": 1,
+    "completed_jobs_per_simulated_hour": 60.0,
+    "metric_note": "Jobs are not picks or units. Utilization is working plus repositioning divided by declared available seconds within the horizon. Waiting before assignment is not busy time. Short-horizon rates are extrapolated, not steady-state capacity.",
+    "unfinished": 0,
+    "policy": "Release/priority/ID job order; earliest finish then start/resource ID. Append-only resource assignments.",
+    "limitations": "Greedy, not optimal staffing. One resource per job; durations and directed reposition times are declared. Requested areas are held atomically for the full assignment including repositioning. No geometry-to-area mapping, vehicle body clearance, fatigue, labour-law validation or SQL execution. Resource states are planned, not telemetry."
+  },
+  "assignments": [
+    {
+      "job_id": "WHAT-IF-1",
+      "work_route": {
+        "schema": "factory-route-timeline/v1",
+        "provenance": "assumed-simulation-not-telemetry",
+        "floor": {
+          "width": 20.0,
+          "depth": 12.0,
+          "elements": [
+            {
+              "id": "PACK-BENCH-ANCHOR",
+              "x": 14.0,
+              "y": 8.0,
+              "w": 2.0,
+              "d": 1.0
+            },
+            {
+              "id": "PICK-FACE-ANCHOR",
+              "x": 2.0,
+              "y": 3.0,
+              "w": 4.0,
+              "d": 1.0
+            }
+          ]
+        },
+        "route": {
+          "schema": "factory-route-proposal/v1",
+          "found": true,
+          "points": [
+            {
+              "id": "PICK-ACCESS",
+              "x": 4.0,
+              "y": 4.8
+            },
+            {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            {
+              "id": "PACK-ACCESS",
+              "x": 13.0,
+              "y": 8.5
+            }
+          ],
+          "distance_m": 12.7,
+          "mode": "worker",
+          "clearance_m": 0.3,
+          "floor_digest": "9db740cbbfe623d2797a6fd87d0fd6b936aef5d51298450ebc704350e4dcc1d7",
+          "rejected_edges": [],
+          "reason": "candidate-on-declared-graph",
+          "limitations": "Static rectangular footprint screening only. No turning envelope, traffic conflicts, slopes, doors, utilities, visibility, timing or regulatory approval. Clearance is user supplied, not a prescribed safe value."
+        },
+        "speed_mps": 1.0,
+        "loading_s": 5.0,
+        "unloading_s": 3.0,
+        "segments": [
+          {
+            "source": {
+              "id": "PICK-ACCESS",
+              "x": 4.0,
+              "y": 4.8
+            },
+            "destination": {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            "start_s": 5.0,
+            "end_s": 6.2
+          },
+          {
+            "source": {
+              "id": "AISLE-A",
+              "x": 4.0,
+              "y": 6.0
+            },
+            "destination": {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            "start_s": 6.2,
+            "end_s": 15.2
+          },
+          {
+            "source": {
+              "id": "AISLE-B",
+              "x": 13.0,
+              "y": 6.0
+            },
+            "destination": {
+              "id": "PACK-ACCESS",
+              "x": 13.0,
+              "y": 8.5
+            },
+            "start_s": 15.2,
+            "end_s": 17.7
+          }
+        ],
+        "travel_end_s": 17.7,
+        "duration_s": 20.7,
+        "limitations": "Constant speed and instantaneous turns; no acceleration, queues, breaks, collisions or resource availability. Timing is entered assumptions, not measured execution."
+      },
+      "reposition_route": null
+    }
+  ],
+  "floor": {
+    "width": 20.0,
+    "depth": 12.0,
+    "elements": [
+      {
+        "id": "PACK-BENCH-ANCHOR",
+        "x": 14.0,
+        "y": 8.0,
+        "w": 2.0,
+        "d": 1.0
+      },
+      {
+        "id": "PICK-FACE-ANCHOR",
+        "x": 2.0,
+        "y": 3.0,
+        "w": 4.0,
+        "d": 1.0
+      }
+    ]
+  },
+  "mode": "worker",
+  "clearance_m": 0.3,
+  "speed_mps": 1,
+  "location_access": {
+    "PICK-FACE": "PICK-ACCESS",
+    "PACK-BENCH": "PACK-ACCESS"
+  },
+  "resources": [
+    {
+      "id": "PLANNED-WORKER",
+      "initial_position": {
+        "x": 4.0,
+        "y": 4.8
+      },
+      "availability_s": [
+        [
+          0,
+          60
+        ]
+      ],
+      "skills": [
+        "picking"
+      ],
+      "start_location": "PICK-FACE"
+    }
+  ],
+  "limitations": "Planned motion, not telemetry or SQL execution. Shared homogeneous speed and clearance; instantaneous turns. Area claims cover whole assignments and are not inferred from geometry. No body collisions, regulatory certification or optimal staffing.",
+  "source_ledger": {
+    "schema": "factory-transfer-ledger/v1",
+    "provenance": "Declared ledger data; not independently verified telemetry",
+    "packages": [
+      {
+        "id": "PACKAGE-1",
+        "pick_id": "PICK-1",
+        "source_id": "PICK-FACE",
+        "destination_id": "PACK-BENCH",
+        "location_id": "PACK-BENCH",
+        "resource_id": "WORKER-1",
+        "state": "delivered",
+        "version": 7,
+        "updated_at": "2026-09-19T10:07:00.000000+00:00",
+        "quantity": 4,
+        "item_id": "KIT-A",
+        "order_id": "ORDER-A",
+        "line_id": "LINE-A",
+        "unit": "piece"
+      }
+    ],
+    "events": [
+      {
+        "id": "T0",
+        "package_id": "PACKAGE-1",
+        "version": 0,
+        "state": "waiting",
+        "occurred_at": "2026-09-19T10:00:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:00:00.000000+00:00",
+          "destination": "PACK-BENCH",
+          "kind": "created",
+          "pick": "PICK-1",
+          "source": "PICK-FACE"
+        }
+      },
+      {
+        "id": "T1",
+        "package_id": "PACKAGE-1",
+        "version": 1,
+        "state": "assigned",
+        "occurred_at": "2026-09-19T10:01:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:01:00.000000+00:00",
+          "expected_version": 0,
+          "kind": "transition",
+          "reason": "",
+          "resource": "WORKER-1",
+          "target": "assigned"
+        }
+      },
+      {
+        "id": "T2",
+        "package_id": "PACKAGE-1",
+        "version": 2,
+        "state": "loading",
+        "occurred_at": "2026-09-19T10:02:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:02:00.000000+00:00",
+          "expected_version": 1,
+          "kind": "transition",
+          "reason": "",
+          "resource": null,
+          "target": "loading"
+        }
+      },
+      {
+        "id": "T3",
+        "package_id": "PACKAGE-1",
+        "version": 3,
+        "state": "travelling",
+        "occurred_at": "2026-09-19T10:03:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:03:00.000000+00:00",
+          "expected_version": 2,
+          "kind": "transition",
+          "reason": "",
+          "resource": null,
+          "target": "travelling"
+        }
+      },
+      {
+        "id": "T4",
+        "package_id": "PACKAGE-1",
+        "version": 4,
+        "state": "blocked",
+        "occurred_at": "2026-09-19T10:04:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:04:00.000000+00:00",
+          "expected_version": 3,
+          "kind": "transition",
+          "reason": "Synthetic aisle wait",
+          "resource": null,
+          "target": "blocked"
+        }
+      },
+      {
+        "id": "T5",
+        "package_id": "PACKAGE-1",
+        "version": 5,
+        "state": "travelling",
+        "occurred_at": "2026-09-19T10:05:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:05:00.000000+00:00",
+          "expected_version": 4,
+          "kind": "transition",
+          "reason": "",
+          "resource": null,
+          "target": "travelling"
+        }
+      },
+      {
+        "id": "T6",
+        "package_id": "PACKAGE-1",
+        "version": 6,
+        "state": "unloading",
+        "occurred_at": "2026-09-19T10:06:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:06:00.000000+00:00",
+          "expected_version": 5,
+          "kind": "transition",
+          "reason": "",
+          "resource": null,
+          "target": "unloading"
+        }
+      },
+      {
+        "id": "T7",
+        "package_id": "PACKAGE-1",
+        "version": 7,
+        "state": "delivered",
+        "occurred_at": "2026-09-19T10:07:00.000000+00:00",
+        "payload": {
+          "at": "2026-09-19T10:07:00.000000+00:00",
+          "expected_version": 6,
+          "kind": "transition",
+          "reason": "",
+          "resource": null,
+          "target": "delivered"
+        }
+      }
+    ]
+  },
+  "package_bindings": [
+    {
+      "job_id": "WHAT-IF-1",
+      "package_snapshot": {
+        "id": "PACKAGE-1",
+        "pick_id": "PICK-1",
+        "source_id": "PICK-FACE",
+        "destination_id": "PACK-BENCH",
+        "order_id": "ORDER-A",
+        "line_id": "LINE-A",
+        "item_id": "KIT-A",
+        "quantity": 4,
+        "unit": "piece",
+        "version": 7,
+        "updated_at": "2026-09-19T10:07:00.000000+00:00"
+      }
+    }
+  ],
+  "association_note": "What-if movement for package snapshots. Recorded state and planned time are separate. No reservation, execution event, stock change or live database freshness check."
+}
