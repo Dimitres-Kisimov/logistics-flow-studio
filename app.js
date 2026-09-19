@@ -9512,7 +9512,7 @@
     { name: "library",   title: "Class Library",       cards: ["paletteCard"] },
     { name: "generate",  title: "Generate environment",cards: ["genCard"] },
     { name: "examples",  title: "Example scenarios",   cards: ["examplesCard"] },
-    { name: "simulate",  title: "Simulate & operations", cards: ["simCard", "histCard", "wmsCard", "autoCard", "storageCard", "flowCard", "procCard"] },
+    { name: "simulate",  title: "Simulate & operations", cards: ["capacityCard", "simCard", "histCard", "wmsCard", "autoCard", "storageCard", "flowCard", "procCard"] },
     { name: "analyze",   title: "Analyze",             cards: ["analyzeCard", "catalogCard", "advisorCard", "optCard", "abCard", "complCard"] },
     { name: "report",    title: "Report & export",     cards: ["layoutCard"] },
     { name: "saveshare", title: "Save & share",        cards: ["scenariosCard", "compareCard"] },

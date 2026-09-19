@@ -823,6 +823,26 @@
            units moving through the warehouse over time. Pure model lives
            in flowsim.js; the boxes are drawn on the canvas inside the same
            world transform as every other overlay (zoom/pan/Fit all apply). -->
+      <section class="card capacity-workbench" id="capacityCard">
+        <h2 class="card-title">Plan a shift</h2>
+        <p class="capacity-eyebrow">Factory operations / Planning worksheet</p>
+        <p class="capacity-intro">Can the order fit the people, material and energy available?</p>
+        <label for="capacityProfile">Factory type</label>
+        <select id="capacityProfile">
+          <option value="assembly-warehouse">Assembly &amp; warehouse</option>
+          <option value="process-manufacturing">Process manufacturing</option>
+        </select>
+        <p id="capacityNotice" class="hint"></p>
+        <div id="capacityResults" aria-live="polite" aria-atomic="true"></div>
+        <div id="capacityInputs"></div>
+        <div class="capacity-actions">
+          <button class="btn" id="capacityExport" type="button">Export plan</button>
+          <label class="btn" for="capacityImport">Import plan</label>
+          <input id="capacityImport" type="file" accept=".json,application/json" class="capacity-file" />
+          <button class="btn" id="capacityReset" type="button">Reset example</button>
+        </div>
+        <p class="capacity-scope">Workload bounds, not an ideal roster or a feasible schedule. Assumes interchangeable workers for one order. No machine constraints, movement, receipt timing, process physics or safety assessment. These worksheet inputs do not change the floor model.</p>
+      </section>
       <section class="card" id="flowCard" data-default-collapsed>
         <h2 class="card-title">Live material flow</h2>
         <div class="wms-disclaimer">
@@ -1281,6 +1301,8 @@
   <script src="analytics.js"></script>
   <script src="howwecompare.js"></script>
   <script src="palette.js"></script>
+  <script src="capacity-plan.js"></script>
+  <script src="capacity-panel.js"></script>
   <script src="app.js"></script>
   <!-- In-browser E2E self-test. INERT unless the URL carries ?selftest=1;
        a normal load never runs it. Loaded LAST so the app has booted. -->

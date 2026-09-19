@@ -3321,6 +3321,25 @@
       return { ok: unsupported && scrap && body.querySelectorAll("li").length === 4,
         detail: "Unsupported each-pick, return scrap outcome and cross-dock all render via the real selector" };
     });
+    check("capacity-workbench-live-edit", function () {
+      var picker = $("capacityProfile"), out = $("capacityResults");
+      if (!picker || !out) return false;
+      picker.value = "process-manufacturing";
+      picker.dispatchEvent(new Event("change", { bubbles: true }));
+      var residual = out.textContent.indexOf("3 kWh unexplained") >= 0;
+      var workers = $("capacity-workers");
+      workers.value = "2";
+      workers.dispatchEvent(new Event("input", { bubbles: true }));
+      var fits = out.textContent.indexOf("Workload fits") >= 0;
+      workers.value = "";
+      workers.dispatchEvent(new Event("input", { bubbles: true }));
+      var invalid = $("capacityExport").disabled && out.textContent.indexOf("must be") >= 0;
+      $("capacityReset").click();
+      picker.value = "assembly-warehouse";
+      picker.dispatchEvent(new Event("change", { bubbles: true }));
+      return { ok: residual && fits && invalid && out.textContent.indexOf("10 kits short") >= 0,
+        detail: "Both profiles, live worker edits, invalid-input guard and reset exercised" };
+    });
     check("no-errors-after-drive", function () {
       var e = window.__WT_ERRORS__ || [];
       return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" };

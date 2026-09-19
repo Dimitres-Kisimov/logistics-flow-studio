@@ -647,6 +647,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const HARNESSES = [
   { name: "Route review: physical evidence and fallbacks (verify_route_review.js)", args: ["verify_route_review.js"] },
+  { name: "Editable factory capacity planning (verify_capacity_plan.js)", args: ["verify_capacity_plan.js"] },
   { name: "optimizer measurement (measure_optimizer.js)", args: ["measure_optimizer.js"] },
   { name: "heatmap conservation + KPI baselines (verify_heatmap.js)", args: ["verify_heatmap.js"] },
   { name: "LSP Planner engine gates (lsp/verify.js)", args: [path.join("lsp", "verify.js")] },

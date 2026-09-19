@@ -183,3 +183,21 @@ It does not schedule workers, prove due-date feasibility, simulate process chemi
 import IFC, size gas/electrical services or certify compliance. An adverse result is
 preserved: the assembly example lacks 10 kits; the process example has 3 kWh
 unreconciled. Existing PWA and simulation baselines are unchanged.
+
+### Editable shift workbench
+
+Open **Simulate → Plan a shift** for a browser-native worksheet. Select assembly/
+warehouse or process manufacturing, edit a single order's labour assumptions,
+worker availability, stock and electricity totals, and inspect live findings.
+Four summary tiles and expandable input groups keep the calculation readable next
+to the floor. Each profile retains its edits while the tab remains open. Export
+and import versioned JSON to keep a plan across reloads; invalid imports are not
+applied. The worksheet does not alter the floor simulation or claim scheduling,
+chemistry, gas, electrical-design or safety validation.
+
+This single-order browser worksheet uses the same person-minute and conservation
+conventions as the separate multi-order Python screening tool, but has a smaller
+input schema. Its exported JSON is not a Python `--input` file. `capacity-plan.js`
+is pure and tested; `capacity-panel.js` renders the controls. Service-worker cache
+is wt-v82. Verification: 52 Node harnesses and 155 live-browser checks, plus the
+existing seven Python resource tests.

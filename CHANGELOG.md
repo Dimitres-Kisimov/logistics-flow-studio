@@ -1598,3 +1598,10 @@ server.
 - 23 headless verification harnesses via `node test/run-all.mjs`; deterministic,
   ASCII-only, with an offline guard asserting the app references no external
   assets. Service-worker cache bumped to `wt-v29`.
+
+## v3.27 — Editable shift workbench
+
+Added Plan a shift at the top of Simulate: two factory profiles, live workload,
+stock and electricity findings, grouped editable assumptions, JSON import/export,
+and explicit separation from the floor simulation. Added numerical and browser
+regressions; cache wt-v82. No scheduling or engineering-safety claims.
