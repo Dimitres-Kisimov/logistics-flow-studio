@@ -365,7 +365,7 @@ race with changed floor/ledger/links are rejected. Raw layout element ordering d
 not define identity. This is geometry consistency, not surveyed revision control,
 a site identifier, route validation or proof that equal location IDs mean the same
 real place. Exports are explicit; no new local-storage persistence is added.
-Cachewt-v91;56Node,19Python,159browser checks pass. Actual import and stale rejection
+Cachewt-v92;56Node,19Python,159browser checks pass. Actual import and stale rejection
 verified; browser reported export prepared but automation download-event observation
 timed out, so successful file saving was not independently confirmed in that browser.
 

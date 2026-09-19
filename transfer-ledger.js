@@ -3,6 +3,44 @@
   const $=id=>document.getElementById(id);
   let model=null, token=0, layout=null, layoutToken=0, bindingRevision=0, bindingRequest=0;
   const bindings=new Map();
+  let rawLayout=null, timeline=null, routeRequest=0, elapsed=0, playing=false, lastTick=null, animationId=null;
+  function pauseRoute(){if(animationId!==null)cancelAnimationFrame(animationId);animationId=null;playing=false;lastTick=null;$("routePlay").textContent="Play scenario";}
+  function clearRoute(){pauseRoute();timeline=null;routeRequest++;$("routeView").hidden=true;$("routeStatus").textContent="Load a floor, then a timeline from route_plan.py.";}
+  function drawRoute(){
+    if(!timeline)return;
+    const frame=window.RoutePlayback.sample(timeline,elapsed),svg=$("routeFloor"),f=timeline.floor;
+    svg.replaceChildren();svg.setAttribute("viewBox",`-1 -1 ${f.width+2} ${f.depth+2}`);
+    const shape=(tag,attrs)=>{const n=document.createElementNS("http://www.w3.org/2000/svg",tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,String(v)));svg.append(n);return n;};
+    shape("rect",{x:0,y:0,width:f.width,height:f.depth,fill:"#1b201d",stroke:"#73877b","stroke-width":.05});
+    f.elements.forEach(e=>shape("rect",{x:e.x,y:e.y,width:e.w,height:e.d,fill:"#405348"}));
+    (f.reserved_zones||[]).forEach(e=>shape("rect",{x:e.x,y:e.y,width:e.w,height:e.d,fill:"#b89134",opacity:.5}));
+    const size=Math.max(f.width,f.depth)*.012;
+    shape("polyline",{points:timeline.route.points.map(p=>`${p.x},${p.y}`).join(" "),fill:"none",stroke:"#79dace","stroke-width":size*.45});
+    shape("circle",{cx:frame.position.x,cy:frame.position.y,r:size,fill:"#a7fff0",stroke:"#15241f","stroke-width":size*.2});
+    if(frame.heading!==null)shape("line",{x1:frame.position.x,y1:frame.position.y,x2:frame.position.x+Math.cos(frame.heading)*size*2.5,y2:frame.position.y+Math.sin(frame.heading)*size*2.5,stroke:"#fff","stroke-width":size*.4});
+    $("routeSeek").value=String(elapsed);
+    $("routeClock").textContent=`${elapsed.toFixed(2)} / ${timeline.duration_s.toFixed(2)} simulated seconds · ${frame.state} · X ${frame.position.x.toFixed(2)} m / Y ${frame.position.y.toFixed(2)} m · Assumed travel ${timeline.speed_mps} m/s`;
+  }
+  function animateRoute(now){
+    if(!playing||!timeline)return;
+    if(lastTick!==null)elapsed=Math.min(timeline.duration_s,elapsed+Math.min(1,(now-lastTick)/1000)*Number($("routeSpeed").value));
+    lastTick=now;drawRoute();if(elapsed>=timeline.duration_s)pauseRoute();else animationId=requestAnimationFrame(animateRoute);
+  }
+  $("routeFile").addEventListener("change",async()=>{
+    clearRoute();const request=routeRequest,currentFloor=rawLayout,file=$("routeFile").files[0];if(!file)return;
+    try{
+      if(!currentFloor)throw new Error("Load a floor first");if(file.size>5*1024*1024)throw new Error("Timeline exceeds 5 MB");
+      const text=await file.text();if(request!==routeRequest||currentFloor!==rawLayout)return;
+      timeline=window.RoutePlayback.parse(JSON.parse(text),currentFloor);elapsed=0;
+      $("routeSeek").max=String(timeline.duration_s);$("routeView").hidden=false;
+      $("routeStatus").textContent=`Checked geometry and timing · ${timeline.route.distance_m.toFixed(2)} m · ${timeline.route.mode}. Scenario only; not linked to SQL package execution.`;drawRoute();
+    }catch(error){$("routeStatus").textContent="Cannot preview route: "+error.message;}
+  });
+  $("routePlay").addEventListener("click",()=>{if(!timeline)return;if(playing){pauseRoute();return;}if(elapsed>=timeline.duration_s)elapsed=0;playing=true;lastTick=null;$("routePlay").textContent="Pause scenario";animationId=requestAnimationFrame(animateRoute);});
+  $("routeReset").addEventListener("click",()=>{pauseRoute();elapsed=0;drawRoute();});
+  $("routeSeek").addEventListener("input",()=>{pauseRoute();elapsed=Number($("routeSeek").value);drawRoute();});
+  $("routeSpeed").addEventListener("change",()=>{lastTick=null;});
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)pauseRoute();});
   function drawMap(frame) {
     const svg=$("ledgerFloor"); svg.replaceChildren(); svg.toggleAttribute("hidden",!layout);
     $("ledgerBindings").textContent=Array.from(bindings,([location,equipment])=>`${location} → ${equipment}`).join(" · ") || "No locations linked.";
@@ -48,7 +86,7 @@
   }
   $("ledgerFile").addEventListener("change",async()=>{
     const request=++token, file=$("ledgerFile").files[0];
-    model=null; bindings.clear(); bindingRevision++; $("ledgerView").hidden=true;
+    model=null; clearRoute(); bindings.clear(); bindingRevision++; $("ledgerView").hidden=true;
     if (!file) { $("ledgerStatus").textContent="No file selected."; return; }
     try {
       if (file.size>5*1024*1024) throw new Error("File exceeds 5 MB");
@@ -67,12 +105,12 @@
   $("ledgerPackage").addEventListener("change",()=>{$("ledgerPosition").max="10000"; $("ledgerPosition").value="0"; render();});
   $("ledgerLayoutFile").addEventListener("change",async()=>{
     const request=++layoutToken,file=$("ledgerLayoutFile").files[0];
-    layout=null; bindings.clear(); bindingRevision++; $("ledgerMapElement").replaceChildren(); render();
+    layout=null;rawLayout=null;clearRoute(); bindings.clear(); bindingRevision++; $("ledgerMapElement").replaceChildren(); render();
     if(!file){$("ledgerMapStatus").textContent="No floor loaded.";return;}
     try {
       if(file.size>5*1024*1024) throw new Error("Layout exceeds 5 MB");
       const text=await file.text(); if(request!==layoutToken)return;
-      layout=window.TransferReplay.parseLayout(JSON.parse(text));
+      const candidate=JSON.parse(text);layout=window.TransferReplay.parseLayout(candidate);rawLayout=candidate;
       layout.elements.forEach(e=>$("ledgerMapElement").append(new Option(`${e.id} · ${e.type}`,e.id)));
       $("ledgerMapStatus").textContent=`${layout.width} × ${layout.depth} m · ${layout.elements.length} equipment footprints. Source geometry is user-declared.`;render();
     } catch(error){$("ledgerMapStatus").textContent="Cannot open floor: "+error.message;render();}

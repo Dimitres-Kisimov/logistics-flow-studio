@@ -1701,3 +1701,7 @@ Directed-route screening now enforces saved placement reserved areas, includes t
 ## 2026-09-19 — Assumed route timing
 
 Screened routes can produce explicit constant-speed segment timelines with loading and unloading assumptions. Continuous sampling exposes position, heading and stage without inventing locations for unroutable transfers. CLI/library only; browser and SQL integration remain pending. All 30 Python tests pass.
+
+## 2026-09-19 — Browser route scenario playback
+
+Transfer viewer now previews validated timed route exports with continuous 2D load motion, direction, time scrub and 1x–100x playback. Floor/obstacle and timing checks reject incompatible exports. Recorded SQL history remains separate from the assumed scenario. Cache wt-v92; 57 Node harnesses, 30 Python tests and 159 browser self-tests pass.

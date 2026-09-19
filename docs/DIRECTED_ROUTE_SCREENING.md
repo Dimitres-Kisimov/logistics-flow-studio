@@ -1,6 +1,6 @@
 # Directed route screening
 
-The current route planner is a local CLI/library, not connected to browser playback.
+The route planner is a local CLI/library. Its timed export can now be previewed in the transfer viewer as a separate assumed scenario.
 It uses explicit access nodes outside machinery, declared one-way edges and permitted
 modes (worker, forklift, agv). No path is inferred through an equipment centre.
 
@@ -59,4 +59,12 @@ Add --speed-mps 1 --loading-s 5 --unloading-s 3 to the example command to produc
 
 The timeline contains metre endpoints and simulation-second boundaries for each screened segment. sample_timeline returns continuous position, heading in radians from the positive x axis toward positive y, and loading/travelling/unloading/delivered state. Exact boundaries belong to the next stage. Unroutable transfers have no duration or position. The sampler accepts internally generated timelines; it is not an untrusted-file validator. A future browser importer must validate the full contract and current floor before playback.
 
-Playback multipliers should multiply elapsed simulation time, leaving speed_mps unchanged. Acceleration, deceleration, cornering, congestion, shared resources and measured telemetry remain absent. This CLI model is not yet wired to browser animation or SQL execution. Tests cover hand-computed durations and positions, corners, boundaries, stationary transfers, missing paths and invalid timing. All 30 Python tests pass.
+Playback multipliers should multiply elapsed simulation time, leaving speed_mps unchanged. Acceleration, deceleration, cornering, congestion, shared resources and measured telemetry remain absent. The timed model can be previewed in the browser; SQL execution is not connected. Tests cover hand-computed durations and positions, corners, boundaries, stationary transfers, missing paths and invalid timing. All 30 Python tests pass.
+
+## Browser route preview
+
+Open transfer-ledger.html, load a ledger and planner floor, then import examples/routes/timeline.json under Preview a timed route. Play/pause, reset, time scrubbing and 1x/5x/10x/25x/50x/100x playback are available. Hiding the tab pauses playback; a delayed frame advances at most one real second. The scenario is independent of the selected package and does not modify SQL events. It currently renders in 2D only.
+
+The importer checks a normalized floor snapshot including reserved areas, obstacle intersections and clearance, segment continuity, entered speed and total timing. Older timeline exports lacking a floor snapshot must be regenerated. Import is bounded at 5 MB, 1000 points and 365 days. Invalid imports hide previous playback; replacing the floor or ledger clears the scenario. It does not authenticate a graph digest, verify directed mode permissions against the original graph, or certify safety. A floor snapshot match is geometry consistency, not a surveyed site identity.
+
+Verification: 57 Node harnesses, 30 Python tests, Ruff and 159 browser self-tests pass. Browser file imports showed 10.00 seconds at (7.80, 6.00) m; 100x playback stopped exactly at 20.70 seconds and (13.00, 8.50) m. Corrupt segment timing was rejected with the preview hidden. Narrow viewport inspected; the map remains small and full 3D integration is pending.

@@ -701,6 +701,7 @@ const HARNESSES = [
   { name: "Physical goods: pallets/cartons/totes riding the plant (verify_goods.js)", args: ["verify_goods.js"] },
   { name: "The working shift: hauling trucks, non-strobing congestion, docks (verify_shift.js)", args: ["verify_shift.js"] },
   { name: "Order-driven routing: archetypes, the router, per-MU routes (verify_routing.js)", args: ["verify_routing.js"] },
+  { name: "Timed route playback", args: ["verify_route_playback.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

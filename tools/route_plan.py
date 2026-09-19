@@ -182,7 +182,7 @@ def timed_plan(raw_floor, graph, start, destination, mode, clearance_m,
         if not math.isfinite(cursor + unloading):
             raise ValueError("Total duration is not finite")
     return dict(schema="factory-route-timeline/v1", provenance="assumed-simulation-not-telemetry",
-                route=proposal, speed_mps=speed, loading_s=loading, unloading_s=unloading,
+                floor=floor_model(raw_floor), route=proposal, speed_mps=speed, loading_s=loading, unloading_s=unloading,
                 segments=segments, travel_end_s=cursor if proposal["found"] else None,
                 duration_s=cursor + unloading if proposal["found"] else None,
                 limitations="Constant speed and instantaneous turns; no acceleration, queues, breaks, collisions or resource availability. Timing is entered assumptions, not measured execution.")

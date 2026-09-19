@@ -1,0 +1,107 @@
+{
+  "schema": "factory-route-timeline/v1",
+  "provenance": "assumed-simulation-not-telemetry",
+  "floor": {
+    "width": 20.0,
+    "depth": 12.0,
+    "elements": [
+      {
+        "id": "PACK-BENCH-ANCHOR",
+        "x": 14.0,
+        "y": 8.0,
+        "w": 2.0,
+        "d": 1.0
+      },
+      {
+        "id": "PICK-FACE-ANCHOR",
+        "x": 2.0,
+        "y": 3.0,
+        "w": 4.0,
+        "d": 1.0
+      }
+    ]
+  },
+  "route": {
+    "schema": "factory-route-proposal/v1",
+    "found": true,
+    "points": [
+      {
+        "id": "PICK-ACCESS",
+        "x": 4.0,
+        "y": 4.8
+      },
+      {
+        "id": "AISLE-A",
+        "x": 4.0,
+        "y": 6.0
+      },
+      {
+        "id": "AISLE-B",
+        "x": 13.0,
+        "y": 6.0
+      },
+      {
+        "id": "PACK-ACCESS",
+        "x": 13.0,
+        "y": 8.5
+      }
+    ],
+    "distance_m": 12.7,
+    "mode": "worker",
+    "clearance_m": 0.3,
+    "floor_digest": "9db740cbbfe623d2797a6fd87d0fd6b936aef5d51298450ebc704350e4dcc1d7",
+    "rejected_edges": [],
+    "reason": "candidate-on-declared-graph",
+    "limitations": "Static rectangular footprint screening only. No turning envelope, traffic conflicts, slopes, doors, utilities, visibility, timing or regulatory approval. Clearance is user supplied, not a prescribed safe value."
+  },
+  "speed_mps": 1.0,
+  "loading_s": 5.0,
+  "unloading_s": 3.0,
+  "segments": [
+    {
+      "source": {
+        "id": "PICK-ACCESS",
+        "x": 4.0,
+        "y": 4.8
+      },
+      "destination": {
+        "id": "AISLE-A",
+        "x": 4.0,
+        "y": 6.0
+      },
+      "start_s": 5.0,
+      "end_s": 6.2
+    },
+    {
+      "source": {
+        "id": "AISLE-A",
+        "x": 4.0,
+        "y": 6.0
+      },
+      "destination": {
+        "id": "AISLE-B",
+        "x": 13.0,
+        "y": 6.0
+      },
+      "start_s": 6.2,
+      "end_s": 15.2
+    },
+    {
+      "source": {
+        "id": "AISLE-B",
+        "x": 13.0,
+        "y": 6.0
+      },
+      "destination": {
+        "id": "PACK-ACCESS",
+        "x": 13.0,
+        "y": 8.5
+      },
+      "start_s": 15.2,
+      "end_s": 17.7
+    }
+  ],
+  "travel_end_s": 17.7,
+  "duration_s": 20.7,
+  "limitations": "Constant speed and instantaneous turns; no acceleration, queues, breaks, collisions or resource availability. Timing is entered assumptions, not measured execution."
+}

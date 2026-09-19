@@ -21,7 +21,15 @@
 <p id="ledgerBindings"></p><p id="ledgerPositionNote"></p>
 <svg id="ledgerFloor" role="img" aria-label="Declared equipment footprint map" hidden></svg>
 </section>
+<section class="mapping"><p class="eyebrow">Scenario / Assumed movement</p><h2>Preview a timed route</h2>
+<p>This separate scenario uses the loaded floor and entered travel assumptions. It does not replay the selected package’s SQL history or prove travel permissions, traffic safety or compliance.</p>
+<label for="routeFile">Timed route JSON<input id="routeFile" type="file" accept=".json,application/json"></label>
+<p id="routeStatus" role="status">Load a floor, then a timeline from route_plan.py.</p>
+<div id="routeView" hidden><div class="mapping-controls"><button id="routePlay" type="button">Play scenario</button><button id="routeReset" type="button">Reset</button><label>Playback speed<select id="routeSpeed"><option value="1">1×</option><option value="5">5×</option><option value="10">10×</option><option value="25">25×</option><option value="50">50×</option><option value="100">100×</option></select></label></div>
+<label for="routeSeek">Simulation time<input id="routeSeek" type="range" min="0" max="1" step="0.01" value="0"></label>
+<p id="routeClock"></p><svg id="routeFloor" role="img" aria-label="Simulated movement along declared route"></svg>
+<p class="note">Cyan: assumed route and moving load. Amber: reserved areas. Turns are instantaneous; acceleration, queues and worker availability are not modelled. Playback pauses when this tab is hidden.</p></div></section>
 <div class="table-wrap"><table><caption>Recorded events for this package</caption><thead><tr><th>Version</th><th>Time (UTC)</th><th>State</th><th>Reason</th></tr></thead><tbody id="ledgerRows"></tbody></table></div>
 </section>
 <footer>This viewer checks event sequences, unique pick ownership and overlapping assignments for each resource within the imported file. Assignment-to-delivery intervals include blocked time; unfinished work keeps its resource occupied. Exact release/assignment boundaries are allowed. It does not verify missing records, telemetry, shift availability, travel between jobs, route geometry or safety. “In transit” deliberately has no invented coordinates. This is separate from the planner’s synthetic animation.</footer>
-</main><script src="transfer-replay.js"></script><script src="transfer-ledger.js"></script></body></html>
+</main><script src="transfer-replay.js"></script><script src="route-playback.js"></script><script src="transfer-ledger.js"></script></body></html>
