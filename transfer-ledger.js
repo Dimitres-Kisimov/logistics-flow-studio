@@ -31,9 +31,11 @@
     try{
       if(!currentFloor)throw new Error("Load a floor first");if(file.size>5*1024*1024)throw new Error("Timeline exceeds 5 MB");
       const text=await file.text();if(request!==routeRequest||currentFloor!==rawLayout)return;
-      timeline=window.RoutePlayback.parse(JSON.parse(text),currentFloor);elapsed=0;
+      const manifest=model&&model.packages[Number($("ledgerPackage").value)].manifest;
+      timeline=window.RoutePlayback.parse(JSON.parse(text),currentFloor,manifest);elapsed=0;
       $("routeSeek").max=String(timeline.duration_s);$("routeView").hidden=false;
-      $("routeStatus").textContent=`Checked geometry and timing · ${timeline.route.distance_m.toFixed(2)} m · ${timeline.route.mode}. Scenario only; not linked to SQL package execution.`;drawRoute();
+      const association=timeline.package_snapshot?`Scenario for ${manifest.id} · order ${manifest.order_id} · pick ${manifest.pick_id} · ledger version ${manifest.version}. Access nodes are user-declared; not execution history.`:"Unbound scenario; not linked to a SQL package.";
+      $("routeStatus").textContent=`Checked geometry and timing · ${timeline.route.distance_m.toFixed(2)} m · ${timeline.route.mode}. ${association}`;drawRoute();
     }catch(error){$("routeStatus").textContent="Cannot preview route: "+error.message;}
   });
   $("routePlay").addEventListener("click",()=>{if(!timeline)return;if(playing){pauseRoute();return;}if(elapsed>=timeline.duration_s)elapsed=0;playing=true;lastTick=null;$("routePlay").textContent="Pause scenario";animationId=requestAnimationFrame(animateRoute);});
@@ -102,7 +104,7 @@
       render();
     } catch(error) { model=null; $("ledgerStatus").textContent="Cannot open ledger: "+error.message; }
   });
-  $("ledgerPackage").addEventListener("change",()=>{$("ledgerPosition").max="10000"; $("ledgerPosition").value="0"; render();});
+  $("ledgerPackage").addEventListener("change",()=>{clearRoute();$("ledgerPosition").max="10000"; $("ledgerPosition").value="0"; render();});
   $("ledgerLayoutFile").addEventListener("change",async()=>{
     const request=++layoutToken,file=$("ledgerLayoutFile").files[0];
     layout=null;rawLayout=null;clearRoute(); bindings.clear(); bindingRevision++; $("ledgerMapElement").replaceChildren(); render();

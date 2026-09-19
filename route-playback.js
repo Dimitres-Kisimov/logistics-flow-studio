@@ -35,7 +35,7 @@
       else {const t=[(low-a[axis])/delta,(high-a[axis])/delta].sort((x,y)=>x-y);lo=Math.max(lo,t[0]);hi=Math.min(hi,t[1]);if(lo>hi)return false;}
     }return true;
   }
-  function parse(raw,rawFloor) {
+  function parse(raw,rawFloor,manifest) {
     requireThat(raw&&raw.schema==="factory-route-timeline/v1"&&raw.provenance==="assumed-simulation-not-telemetry","Use an assumed route timeline export");
     const floor=geometry(rawFloor);
     requireThat(raw.floor,"Timeline lacks floor snapshot; regenerate it with the current CLI");
@@ -44,6 +44,11 @@
     const r=raw.route,c=r&&r.clearance_m;
     requireThat(r&&r.schema==="factory-route-proposal/v1"&&r.found===true&&["worker","forklift","agv"].includes(r.mode)&&finite(c),"Timeline has no usable screened route");
     requireThat(Array.isArray(r.points)&&r.points.length>0&&r.points.length<=1000&&Array.isArray(raw.segments)&&raw.segments.length===r.points.length-1,"Invalid route points or segments");
+    if(raw.package_snapshot!==undefined||raw.location_access!==undefined){
+      const p=raw.package_snapshot,access=raw.location_access;
+      requireThat(p&&manifest&&["id","pick_id","source_id","destination_id","order_id","line_id","item_id","quantity","unit","version","updated_at"].every(k=>Object.hasOwn(p,k)&&p[k]===manifest[k]),"Scenario package identity or version differs from the selected ledger package");
+      requireThat(access&&typeof access==="object"&&!Array.isArray(access)&&Object.keys(access).length===2&&p.source_id!==p.destination_id&&Object.hasOwn(access,p.source_id)&&Object.hasOwn(access,p.destination_id)&&access[p.source_id]===r.points[0].id&&access[p.destination_id]===r.points[r.points.length-1].id&&access[p.source_id]!==access[p.destination_id],"Package locations do not match declared route access nodes");
+    }
     const ids=new Set();
     r.points.forEach(p=>{requireThat(p&&typeof p.id==="string"&&p.id.trim()&&p.id.length<=200&&!ids.has(p.id)&&finite(p.x)&&finite(p.y),"Invalid route point");ids.add(p.id);requireThat(p.x>=c&&p.y>=c&&p.x<=floor.width-c&&p.y<=floor.depth-c,"Route violates floor clearance");});
     requireThat(finite(raw.speed_mps)&&raw.speed_mps>0&&finite(raw.loading_s)&&finite(raw.unloading_s),"Invalid timing assumptions");

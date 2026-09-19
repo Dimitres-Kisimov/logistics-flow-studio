@@ -22,7 +22,7 @@
 <svg id="ledgerFloor" role="img" aria-label="Declared equipment footprint map" hidden></svg>
 </section>
 <section class="mapping"><p class="eyebrow">Scenario / Assumed movement</p><h2>Preview a timed route</h2>
-<p>This separate scenario uses the loaded floor and entered travel assumptions. It does not replay the selected package’s SQL history or prove travel permissions, traffic safety or compliance.</p>
+<p>Preview an unbound route or a package scenario exported by package_route.py. Package scenarios must match the selected ledger package and version. Movement uses entered assumptions; it does not replay recorded SQL history or prove travel permissions, traffic safety or compliance.</p>
 <label for="routeFile">Timed route JSON<input id="routeFile" type="file" accept=".json,application/json"></label>
 <p id="routeStatus" role="status">Load a floor, then a timeline from route_plan.py.</p>
 <div id="routeView" hidden><div class="mapping-controls"><button id="routePlay" type="button">Play scenario</button><button id="routeReset" type="button">Reset</button><label>Playback speed<select id="routeSpeed"><option value="1">1×</option><option value="5">5×</option><option value="10">10×</option><option value="25">25×</option><option value="50">50×</option><option value="100">100×</option></select></label></div>
