@@ -133,10 +133,27 @@ def dispatch(raw):
                            queue_wait_s=start - job["release_s"], state_at_horizon=state, area_waits=waits,
                            rejected_resources=rejected,
                            feasible_candidates=[dict(resource_id=c[2], end_s=c[0]) for c in sorted(candidates)]))
+    def clipped(start, end):
+        return max(0.0, min(horizon, end) - min(horizon, start))
+
+    metrics = []
+    for key, resource in sorted(resources.items()):
+        available = sum(clipped(a, b) for a, b in resource["windows"])
+        assigned = [job for job in output if job["resource_id"] == key]
+        work = sum(clipped(job["task_start_s"], job["end_s"]) for job in assigned)
+        reposition = sum(clipped(job["assignment_start_s"], job["task_start_s"]) for job in assigned)
+        busy = work + reposition
+        metrics.append(dict(resource_id=key, available_s=available, working_s=work, reposition_s=reposition,
+                            assigned_s=busy, idle_available_s=max(0.0, available - busy),
+                            utilization=busy / available if available else None,
+                            completed_jobs=sum(job["state_at_horizon"] == "completed" for job in assigned)))
+    completed = sum(job["state_at_horizon"] == "completed" for job in output)
     return dict(schema="factory-resource-plan/v1", provenance="assumed-resource-dispatch",
                 horizon_s=horizon, jobs=output,
                 areas=[dict(id=key, capacity=capacities[key], reservations=reservations[key]) for key in sorted(capacities)],
-                completed=sum(job["state_at_horizon"] == "completed" for job in output),
+                resource_metrics=metrics, completed=completed,
+                completed_jobs_per_simulated_hour=completed * 3600 / horizon,
+                metric_note="Jobs are not picks or units. Utilization is working plus repositioning divided by declared available seconds within the horizon. Waiting before assignment is not busy time. Short-horizon rates are extrapolated, not steady-state capacity.",
                 unfinished=sum(job["state_at_horizon"] not in {"completed", "not-released"} for job in output),
                 policy="Release/priority/ID job order; earliest finish then start/resource ID. Append-only resource assignments.",
                 limitations="Greedy, not optimal staffing. One resource per job; durations and directed reposition times are declared. Requested areas are held atomically for the full assignment including repositioning. No geometry-to-area mapping, vehicle body clearance, fatigue, labour-law validation or SQL execution. Resource states are planned, not telemetry.")

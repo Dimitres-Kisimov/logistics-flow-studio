@@ -79,6 +79,24 @@ class DispatchTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             resource_dispatch.dispatch(raw)
 
+    def test_resource_use_denominator_and_conservation(self):
+        result = resource_dispatch.dispatch(self.fixture())
+        metric = result["resource_metrics"][0]
+        self.assertEqual((metric["available_s"], metric["working_s"], metric["reposition_s"], metric["idle_available_s"]), (20, 10, 2, 8))
+        self.assertEqual(metric["utilization"], .6)
+        self.assertEqual(result["completed_jobs_per_simulated_hour"], 240)
+        self.assertEqual(metric["available_s"], metric["assigned_s"] + metric["idle_available_s"])
+
+    def test_resource_use_clips_horizon_and_zero_availability(self):
+        raw = self.fixture()
+        raw["horizon_s"] = 21
+        result = resource_dispatch.dispatch(raw)
+        metric = result["resource_metrics"][0]
+        self.assertEqual((metric["available_s"], metric["working_s"], metric["reposition_s"]), (11, 4, 1))
+        self.assertEqual(metric["completed_jobs"], 1)
+        raw["resources"][0]["availability_s"] = []
+        self.assertIsNone(resource_dispatch.dispatch(raw)["resource_metrics"][0]["utilization"])
+
 
 if __name__ == "__main__":
     unittest.main()

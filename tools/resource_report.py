@@ -31,9 +31,13 @@ def write_report(plan, directory):
     csv_table(directory / "rejections.csv", ["job_id", "resource_id", "reason", "details"], rejections)
     claims = [dict(area_id=area["id"], capacity=area["capacity"], **r) for area in plan["areas"] for r in area["reservations"]]
     csv_table(directory / "area-claims.csv", ["area_id", "capacity", "job_id", "resource_id", "start_s", "end_s"], claims)
+    metrics = plan.get("resource_metrics", [])
+    csv_table(directory / "resource-use.csv", ["resource_id", "available_s", "working_s", "reposition_s", "assigned_s", "idle_available_s", "utilization", "completed_jobs"], metrics)
     def esc(value):
         return html.escape(str(value))
     horizon = plan["horizon_s"]
+    metric_rows = "".join(f'<tr><th>{esc(row["resource_id"])}</th><td>{row["available_s"]:g}</td><td>{row["working_s"]:g}</td><td>{row["reposition_s"]:g}</td><td>{row["idle_available_s"]:g}</td><td>{format(row["utilization"] * 100, ".1f") + "%" if row["utilization"] is not None else "Unavailable"}</td></tr>' for row in metrics)
+    resource_table = f'<section><h2>Resource use within the horizon</h2><p>{esc(plan.get("metric_note", ""))}</p><div style="overflow:auto"><table><thead><tr><th>Resource</th><th>Available s</th><th>Work s</th><th>Reposition s</th><th>Idle available s</th><th>Utilization</th></tr></thead><tbody>{metric_rows}</tbody></table></div></section>'
 
     def bar(start, end, color):
         left, right = min(horizon, max(0, start)), min(horizon, max(0, end))
@@ -54,4 +58,7 @@ def write_report(plan, directory):
     document = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resource assignment review</title><style>
 :root{{font:16px/1.55 system-ui,sans-serif;color:#e9ede9;background:#171c19}}*{{box-sizing:border-box}}body{{margin:0}}main{{max-width:980px;margin:auto;padding:36px 22px}}h1{{font-size:clamp(28px,5vw,44px);line-height:1.15}}.eyebrow{{letter-spacing:.12em;text-transform:uppercase;color:#9eb3a5;font-size:12px}}.summary{{display:flex;gap:12px;flex-wrap:wrap}}.metric,article{{background:#232d27;border:1px solid #405548;border-radius:10px;padding:18px}}.metric{{flex:1;min-width:160px}}.metric strong{{display:block;font-size:30px}}.jobhead{{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}}h2{{font-size:20px;margin:0;overflow-wrap:anywhere}}.status{{font-size:12px;border:1px solid #8a9e90;padding:4px 8px;border-radius:20px}}article{{margin:16px 0}}p{{overflow-wrap:anywhere}}svg{{display:block;width:100%;height:28px}}.reason,.note{{color:#d7c797}}a{{color:#a4dec9}}.legend{{font-size:14px}}a:focus-visible{{outline:3px solid #a4dec9}}footer{{font-size:13px;color:#adbbae;margin-top:30px}}
 </style></head><body><main><p class="eyebrow">Operations / Resource plan</p><h1>Review who works, when, and why work waits.</h1><p class="note">Assumed planning data. This greedy schedule is not an optimal roster, live tracking or safety approval.</p><div class="summary"><div class="metric">Completed at horizon<strong>{plan["completed"]}</strong></div><div class="metric">Released unfinished<strong>{plan["unfinished"]}</strong></div><div class="metric">Simulation horizon<strong>{horizon:g} s</strong></div></div><p class="legend">Bars share the 0–{horizon:g} s scale: <span style="color:#d5b26d">queue wait</span> · <span style="color:#8cafe1">repositioning</span> · <span style="color:#76d7bd">work</span>. Bars stop at the horizon; text retains planned future times. Unassigned rows have no bar.</p><p><a href="assignments.csv">Assignments CSV</a> · <a href="rejections.csv">Rejections CSV</a> · <a href="area-claims.csv">Area claims CSV</a> · <a href="plan.json">Full JSON</a></p>{"".join(rows)}<footer>{esc(plan["policy"])}<br>{esc(plan["limitations"])}</footer></main></body></html>'''
+    document = document.replace('<a href="plan.json">Full JSON</a>', '<a href="resource-use.csv">Resource use CSV</a> · <a href="plan.json">Full JSON</a>')
+    document = document.replace("<footer>", resource_table + "<footer>")
+    document = document.replace("</style>", "table{border-collapse:collapse;min-width:640px;width:100%;text-align:left}th,td{padding:10px;border-bottom:1px solid #405548}</style>")
     (directory / "index.html").write_text(document, encoding="utf-8")

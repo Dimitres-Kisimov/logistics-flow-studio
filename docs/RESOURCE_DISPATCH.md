@@ -68,3 +68,11 @@ Add --report-dir PATH to write index.html, plan.json, assignments.csv, rejection
 HTML values are escaped and spreadsheet-dangerous CSV text is apostrophe-prefixed; exact identifiers remain in JSON. Tests verify JSON fidelity, HTML escaping, inert formula-like identifiers, expected CSV assignments and repeatable bytes. All51Python tests and Ruff pass. The CLI generated allfivefiles twice identically.
 
 Rendered visual review was blocked by the browser URL policy for the local report HTML. No alternate-access workaround was attempted; visual QA is unverified. Existing app browser results do not validate this new report layout.
+
+## Resource-use metrics
+
+Exports now include resource_metrics and completed_jobs_per_simulated_hour. Per resource, available seconds come from declared windows clipped to the simulation horizon. Assigned time equals clipped work plus repositioning; idle available time is the remainder. Utilization divides assigned by available time, returning null when availability is zero. Queue time before assignment is excluded from busy time. Completed jobs are counted only when their end lies within the horizon.
+
+Job throughput is completed jobs divided by horizon hours. It is not picks/hour, units/hour, labour productivity or proven steady-state capacity; short horizons extrapolate strongly. The renderer adds a resource-use table and resource-use.csv, bringing report output to six named files. Exact JSON IDs and inert CSV handling remain unchanged.
+
+Hand-check:20available seconds with10work and2reposition yields8idle and60percent utilization. Horizon21clips availabilityto11,workto4,repositionto1;onejobcomplete. Zeroavailabilityyieldsnullutilization. All53Python tests and Ruff pass. Report visual QA remains blocked/unverified under the previously reported browser URL policy; no alternate rendering access was attempted.

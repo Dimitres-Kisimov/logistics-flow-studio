@@ -1745,3 +1745,7 @@ Resource candidate evaluation now includes declared shared-area capacities and r
 ## 2026-09-19 — Resource review exports
 
 Resource dispatcher can export a static HTML timing report plus assignments, rejections and area-claim CSVs alongside full JSON. Escaped HTML and formula-safe CSV identifiers tested;51Python tests pass. Visual rendering remains unverified because local browser preview was blocked by URL policy.
+
+## 2026-09-19 — Resource-use metrics
+
+Resource plans now export horizon-clipped work, repositioning, idle availability and utilization, plus completed jobs per simulated hour. Added resource-use CSV/table; jobs are explicitly not picks or units.53Python tests pass; generated report rendering remains unverified.
