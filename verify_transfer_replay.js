@@ -1,6 +1,6 @@
 "use strict";
 const assert=require("node:assert/strict"), fs=require("node:fs");
-const {parse,parseLayout,locate}=require("./transfer-replay.js");
+const {parse,parseLayout,locate,exportBindings,importBindings}=require("./transfer-replay.js");
 const raw=JSON.parse(fs.readFileSync("test/fixtures/transfer-ledger.json","utf8"));
 const original=JSON.stringify(raw), result=parse(raw), entry=result.packages[0];
 assert.equal(entry.frames.length,8);
@@ -63,3 +63,14 @@ instant.events.filter(e=>e.package_id==="PACKAGE-2").forEach(e=>{e.occurred_at=e
 instant.packages[1].updated_at="2026-09-19T10:01:00.000000+00:00";
 assert.equal(parse(instant).packages.length,2);
 console.log("Cross-package integrity: conflicts, boundary reuse, microseconds, unfinished work and pick ownership pass.");
+const savedLinks=exportBindings(geometry,bindings,["PICK-FACE","PACK-BENCH"]);
+assert.deepEqual(Array.from(importBindings(savedLinks,geometry,["PICK-FACE","PACK-BENCH"])),Array.from(bindings));
+assert.deepEqual(exportBindings(geometry,bindings,["PACK-BENCH"]),savedLinks);
+const moved=JSON.parse(JSON.stringify(geometry));moved.elements[0].x+=.1;
+assert.throws(()=>importBindings(savedLinks,moved,["PACK-BENCH"]),/geometry/);
+for(const mutate of [x=>x.floor.width+=1,x=>x.bindings.push(x.bindings[0]),x=>x.bindings[0][0]="unknown",x=>x.bindings[0][1]="missing",x=>x.schema="unknown"]){
+  const invalid=JSON.parse(JSON.stringify(savedLinks));mutate(invalid);assert.throws(()=>importBindings(invalid,geometry,["PACK-BENCH"]));
+}
+assert.equal(importBindings({...savedLinks,bindings:[]},geometry,[]).size,0);
+assert.equal(bindings.get("PACK-BENCH"),"bench");
+console.log("Saved location links: geometry-bound roundtrip, stale floor rejection and adverse IDs pass.");

@@ -353,3 +353,18 @@ Duplicate ownership of a completed pick is also rejected. These checks do not
 prove missing records are absent, travel time between jobs, shift availability,
 resource capability or physical accuracy. This supersedes the earlier note that
 cross-package resource intervals were not checked. Cachewt-v90.
+
+### Reusable location links tied to floor geometry
+
+Export/import location links uses `factory-transfer-map/v1`, carrying a canonical
+metre-based floor snapshot and explicit location/equipment pairs. Import requires
+matching floor dimensions, IDs, types and footprints; moved equipment or changed
+geometry requires manual relinking. Unknown locations/equipment and duplicate
+location entries reject the entire import, preserving current links. Imports that
+race with changed floor/ledger/links are rejected. Raw layout element ordering does
+not define identity. This is geometry consistency, not surveyed revision control,
+a site identifier, route validation or proof that equal location IDs mean the same
+real place. Exports are explicit; no new local-storage persistence is added.
+Cachewt-v91;56Node,19Python,159browser checks pass. Actual import and stale rejection
+verified; browser reported export prepared but automation download-event observation
+timed out, so successful file saving was not independently confirmed in that browser.

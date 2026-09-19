@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   const $=id=>document.getElementById(id);
-  let model=null, token=0, layout=null, layoutToken=0;
+  let model=null, token=0, layout=null, layoutToken=0, bindingRevision=0, bindingRequest=0;
   const bindings=new Map();
   function drawMap(frame) {
     const svg=$("ledgerFloor"); svg.replaceChildren(); svg.toggleAttribute("hidden",!layout);
@@ -48,7 +48,7 @@
   }
   $("ledgerFile").addEventListener("change",async()=>{
     const request=++token, file=$("ledgerFile").files[0];
-    model=null; bindings.clear(); $("ledgerView").hidden=true;
+    model=null; bindings.clear(); bindingRevision++; $("ledgerView").hidden=true;
     if (!file) { $("ledgerStatus").textContent="No file selected."; return; }
     try {
       if (file.size>5*1024*1024) throw new Error("File exceeds 5 MB");
@@ -67,7 +67,7 @@
   $("ledgerPackage").addEventListener("change",()=>{$("ledgerPosition").max="10000"; $("ledgerPosition").value="0"; render();});
   $("ledgerLayoutFile").addEventListener("change",async()=>{
     const request=++layoutToken,file=$("ledgerLayoutFile").files[0];
-    layout=null; bindings.clear(); $("ledgerMapElement").replaceChildren(); render();
+    layout=null; bindings.clear(); bindingRevision++; $("ledgerMapElement").replaceChildren(); render();
     if(!file){$("ledgerMapStatus").textContent="No floor loaded.";return;}
     try {
       if(file.size>5*1024*1024) throw new Error("Layout exceeds 5 MB");
@@ -80,9 +80,30 @@
   $("ledgerBind").addEventListener("click",()=>{
     const location=$("ledgerMapLocation").value,equipment=$("ledgerMapElement").value;
     if(!layout || !location || !layout.elements.some(e=>e.id===equipment)){$("ledgerMapStatus").textContent="Load a floor and choose a location and equipment.";return;}
-    bindings.set(location,equipment);render();
+    bindings.set(location,equipment);bindingRevision++;render();
   });
-  $("ledgerUnbind").addEventListener("click",()=>{bindings.delete($("ledgerMapLocation").value);render();});
+  $("ledgerUnbind").addEventListener("click",()=>{bindings.delete($("ledgerMapLocation").value);bindingRevision++;render();});
+  function locationIds() { if(!model)throw new Error("Load a ledger first");return model.packages.flatMap(e=>[e.manifest.source_id,e.manifest.destination_id]); }
+  $("ledgerMapExport").addEventListener("click",()=>{
+    try {
+      const snapshot=window.TransferReplay.exportBindings(layout,bindings,locationIds());
+      const url=URL.createObjectURL(new Blob([JSON.stringify(snapshot,null,2)],{type:"application/json"}));
+      const link=document.createElement("a");link.href=url;link.download="factory-location-links.json";document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      $("ledgerMapStatus").textContent="Location-link download prepared with its floor geometry snapshot.";
+    } catch(error){$("ledgerMapStatus").textContent="Cannot export links: "+error.message;}
+  });
+  $("ledgerMapImport").addEventListener("change",async()=>{
+    const request=++bindingRequest, revision=bindingRevision, currentLayout=layout, currentModel=model, file=$("ledgerMapImport").files[0];
+    if(!file)return;
+    try {
+      if(file.size>5*1024*1024)throw new Error("Location links exceed 5 MB");
+      const text=await file.text();if(request!==bindingRequest)return;
+      if(revision!==bindingRevision || currentLayout!==layout || currentModel!==model)throw new Error("Floor, ledger or links changed during import; choose the file again");
+      const imported=window.TransferReplay.importBindings(JSON.parse(text),layout,locationIds());
+      bindings.clear();imported.forEach((equipment,location)=>bindings.set(location,equipment));bindingRevision++;render();
+      $("ledgerMapStatus").textContent=`Imported ${bindings.size} links matching this floor. Declared associations still require review.`;
+    } catch(error){$("ledgerMapStatus").textContent="Cannot import links: "+error.message;}
+  });
   $("ledgerPosition").addEventListener("input",render);
   $("ledgerPrevious").addEventListener("click",()=>{$("ledgerPosition").value=String(Number($("ledgerPosition").value)-1);render();});
   $("ledgerNext").addEventListener("click",()=>{$("ledgerPosition").value=String(Number($("ledgerPosition").value)+1);render();});

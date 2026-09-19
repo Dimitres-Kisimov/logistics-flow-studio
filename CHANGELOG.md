@@ -1680,3 +1680,9 @@ Transfer imports now check resource intervals across packages and unique pick
 ownership, while retaining microsecond time precision. Tests cover overlaps,
 unfinished work, exact boundaries, distinct resources and zero-duration events.
 The browser rejects a conflicting import and clears the history display.
+
+## 2026-09-19 — Save and restore geometry-bound location links
+
+Added explicit location-link export/import with canonical floor geometry matching.
+Changed geometry and malformed links are rejected without overwriting current
+associations. Files remain local; link reuse does not validate real-world identity.

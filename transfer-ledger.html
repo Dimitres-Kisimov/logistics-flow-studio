@@ -13,10 +13,11 @@
 <div class="replay"><button id="ledgerPrevious" type="button">Previous event</button><label for="ledgerPosition">Event position<input id="ledgerPosition" type="range" min="0" max="0" value="0"></label><button id="ledgerNext" type="button">Next event</button></div>
 <p id="ledgerTime"></p>
 <section class="mapping"><h2>Place declared locations on a floor</h2>
-<p>Import a planner layout, then link each ledger location to equipment. Markers use the equipment centre as a declared anchor—not the measured package position. Bindings stay in this tab.</p>
+<p>Import a planner layout, then link each ledger location to equipment. Markers use the equipment centre as a declared anchor—not the measured package position. Export links to reuse them; import checks the floor geometry and location IDs before replacing current links.</p>
 <label for="ledgerLayoutFile">Planner layout JSON</label><input id="ledgerLayoutFile" type="file" accept=".json,application/json">
 <p id="ledgerMapStatus" role="status">No floor loaded.</p>
 <div class="mapping-controls"><label>Ledger location<select id="ledgerMapLocation"></select></label><label>Equipment anchor<select id="ledgerMapElement"></select></label><button id="ledgerBind" type="button">Link location</button><button id="ledgerUnbind" type="button">Remove link</button></div>
+<div class="mapping-controls"><button id="ledgerMapExport" type="button">Export location links</button><label for="ledgerMapImport">Import location links<input id="ledgerMapImport" type="file" accept=".json,application/json"></label></div>
 <p id="ledgerBindings"></p><p id="ledgerPositionNote"></p>
 <svg id="ledgerFloor" role="img" aria-label="Declared equipment footprint map" hidden></svg>
 </section>

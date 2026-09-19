@@ -80,7 +80,28 @@
     const element=layout.elements.find(e=>e.id===bindings.get(frame.location));
     return element?{id:element.id,x:element.x+element.w/2,y:element.y+element.d/2}:null;
   }
-  const api={parse,parseLayout,locate};
+  function floorSnapshot(layout) {
+    requireThat(layout, "Load a floor first");
+    return {width:layout.width,depth:layout.depth,elements:layout.elements.map(e=>({id:e.id,type:e.type,x:e.x,y:e.y,w:e.w,d:e.d})).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0)};
+  }
+  function importBindings(raw, layout, locations) {
+    requireThat(raw && raw.schema === "factory-transfer-map/v1" && raw.floor, "Unsupported location-link format");
+    const checked=parseLayout({version:"wt-1",gridW:raw.floor.width,gridH:raw.floor.depth,cell:1,elements:raw.floor.elements});
+    requireThat(JSON.stringify(floorSnapshot(checked)) === JSON.stringify(floorSnapshot(layout)), "Floor geometry or equipment identity changed; review and relink locations");
+    requireThat(Array.isArray(raw.bindings) && raw.bindings.length<=2000, "Invalid or oversized location links");
+    const result=new Map(), knownLocations=new Set(locations), equipment=new Set(layout.elements.map(e=>e.id));
+    raw.bindings.forEach(pair=>{
+      requireThat(Array.isArray(pair) && pair.length===2 && pair.every(id) && knownLocations.has(pair[0]) && equipment.has(pair[1]) && !result.has(pair[0]), "Unknown, duplicate or malformed location link");
+      result.set(pair[0],pair[1]);
+    });
+    return result;
+  }
+  function exportBindings(layout, bindings, locations) {
+    const result={schema:"factory-transfer-map/v1",floor:floorSnapshot(layout),bindings:Array.from(bindings).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0)};
+    importBindings(result,layout,locations);
+    return result;
+  }
+  const api={parse,parseLayout,locate,exportBindings,importBindings};
   if (typeof module !== "undefined" && module.exports) module.exports=api;
   else window.TransferReplay=api;
 }());
