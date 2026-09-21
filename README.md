@@ -6,7 +6,7 @@
 
 - **What** — draw *or* generate a whole warehouse floor (racks, docks, staging, conveyor, automation), then run the material flow and the standard WMS operation as a living, animated plant-sim.
 - **Why** — clarity over enterprise complexity: a transparent, game-like teaching twin that is standards-*informed* rather than a black-box tool.
-- **Review-branch evidence (2026-09-19)** — 161 browser self-tests, 58 Node harnesses and 62 Python tests passed at commit 2ea5619. These checks do not establish plant safety. See [placement enforcement gaps](docs/PLACEMENT_ENFORCEMENT_AUDIT.md). The PWA caches local assets; network-disconnected behavior was not revalidated in this increment.
+- **Verified at the current commit (2026-09-21)** — `node test/run-all.mjs`: **59 headless harnesses** green; `python -m pytest test`: **62 Python tests** green; `index.html?selftest=1` in headless Chromium: **WT-SELFTEST PASS 166/166**; service-worker cache `wt-v110`. These checks do not establish plant safety. See [placement enforcement gaps](docs/PLACEMENT_ENFORCEMENT_AUDIT.md). The PWA caches local assets; network-disconnected behavior was not revalidated in this increment.
 
 ### ▶ Live app — <https://dimitres-kisimov.github.io/logistics-flow-studio/>
 
@@ -134,20 +134,20 @@ Every documented behaviour is backed by a headless harness (no stubs). Run them 
 node test/run-all.mjs
 ```
 
-**51 harnesses** cover the simulation baselines, the order-driven routing engine (8 order archetypes each declaring the OPERATION SEQUENCE they need rather than a fixed stage list - full pallet out, case pick, each/piece pick, cross-dock, customer returns with a real restock-or-scrap outcome split, value-add and export/fragile; a router that resolves those operations against the anchors the current layout actually has, with hand-computed waypoint expectations asserted coordinate by coordinate; the cross-dock invariant that a unit never enters the racking, proven statically and over a live run; unfulfillable order types reported with a friendly message that names the element to place, and not one unit of such a type ever spawned; conservation and per-order-type conservation at every tick of a mixed run; two order types contending for one physical FIFO queue; determinism plus a hand-checked largest-remaining-quota dispatch sequence; and the byte-identical legacy collapse - the generic route builder fed the legacy operation list reproducing `buildWaypoints` exactly, and a 250-tick loop run plus a 400-tick pool run identical with and without the legacy mix, across all 31 example, generated and preset layouts), the living workforce (the pure pose + gait model behind the people on the floor: the roster staffs pick faces, benches, staging pads and dock doors and leaves transport and bulk racking unstaffed; every joint of every pose over a full cycle is finite and inside a human bounding box; the legs alternate, the arms counter-swing and the stride cadence is driven by *travel* rather than the clock; the cycle is continuous, with no pose pop at any step boundary or at the wrap; the pose matches the station — a picker folds to its own face height, a packer works two-handed over the bench and one-handed to tape, a put-away worker carries at chest height, a dock worker raises a handheld; the load really is in the hands; reduced motion freezes to a legible standing pose; a mock-context draw smoke through *both* projectors, themes and LOD tiers; one skeleton driving both views; and no `Date`/`Math.random` in either the source or the live functions), the factory process model + line sim, the multi-way proportional-flow routing (hand-computed split/merge flows, node-by-node conservation, byte-identical collapse to the legacy chain sim on plain-chain lines, and friendly ratio validation), the fluids steady-state continuous-flow model (hand-computed steady states — the demo's 40+40 m³/h supplies blending to 80, buffering behind a 30 m³/h pipe and filling the tank in exactly 96 min; mixer ratio conservation; capacity curtailment; branch water-filling; the starved/overflow/no-supply friendly messages; node-by-node verified volume conservation; and collapse to the static base case with every example scenario staying fluids-inactive and byte-identical), the generated multi-way network + balance-on-effective-loads (the `machining-qa-split` baseline emits a validated 60/40 split + merge straight from the generator with hand-computed resolved flows; RPW packs on the resolved per-finished-unit loads with a full hand-written pin proving the pure-chain output is byte-identical to the legacy balancer, over-takt efficiency bounded to [0,1], and an optimizer that is never illegal or worse on multi-way inputs), the CRAFT-on-resolved-flows placement + fluid-override persistence (the CRAFT flow matrix F reads the resolved network flows — the 60/40 QA split arcs weigh 72/48 parts/hr even when the stored from-to rates are stale — with a full hand-written pin proving every plain-chain craft report stays byte-identical to the pre-v3.20 optimizer, an invalid network falling back to stored rates, and the per-element fluid rate overrides round-tripping through the serializer: the demo pipe's 30 m³/h cap survives save→load with the tank full in 96 min, where the v3.19 serializer reverted it to the 40 m³/h default and 120 min), the share-link codec, CSV import, IFC export, the Compliance Check, the generator, the example library, the WMS/automation/flow/KPI/storage/report layers, the standards knowledge base, the guided-demo plan, the collapsible-cards helper, the saved-scenarios store, the Scenario A/B compare (with cross-consistency assertions proving a compared side equals the report/WMS/storage/automation/compliance modules), the live order pool (determinism, count conservation, the cap + honest overflow, the starving/saturating flags and the selection-rate tie to the WMS/flow throughput), the per-type 2D + 3D shape registry (a mock-context smoke test drawing every object type in both 2D and 3D, in light and dark, at small and large scale, asserting no non-finite coordinate and no throw — the practical way to verify a pure-draw feature that can't be pixel-tested headlessly — plus exact domain-type coverage and the height-driven 3D forms), the production hardening (the global error boundary installs and records without swallowing, the strict offline Content-Security-Policy meta is present with no `unsafe-eval`, no `eval(`/inline handlers anywhere, and the in-browser self-test is inert without its flag yet carries ≥ 25 wiring assertions), the accessibility + large-layout performance pass (the `#floor` canvas has an aria-label + an offscreen `aria-describedby` summary, the named toolbar controls have accessible names, a `prefers-reduced-motion` rule exists and the flow loop reads the flag so the animation never auto-runs under it, a `:focus-visible` outline + an `.sr-only` helper are present, and the pure `WT.view.cullToView` render-culling helper drops fully-off-screen elements, keeps inside/overlapping ones, never mutates its input and is deterministic), the scenario deep-link parser (the pure, DOM-free `WT.deeplink.parse` returns the id for `?scenario=<id>` and `?example=<id>` with onboarding suppressed, `?onboarding=0` suppresses the modal on its own, an empty query and `?selftest=1` are a clean no-op, an unknown id is returned raw for the app to validate, a real library id round-trips, and it reads no DOM, mutates nothing and is deterministic), the living-plant animation (`equipmentPhase` bounded in `[0,1)`/deterministic/periodic; a mock-context smoke drawing every animatable type in 2D and 3D across phases + themes with no throw and all-finite coords; a distinct phase visibly moving the part while a non-animatable type ignores it and the static path stays byte-identical; the 2D animation LOD-skipped when tiny; no input mutation; `WT.iso.project` mapping an MU position to finite coords; and the shipped wiring — the `p`/`P` keydown → view toggle input- + modifier-guarded, flow-in-3D via `projPx`, the tick-seeded/playing-gated anim threaded into `draw2D` + `drawScene`), the realistic-floor rendering geometry (the pure, DOM-free `WT.floor` helpers: `rulerTicks` returning correct/ordered/labelled metre ticks that close on the true floor edge; the grid tiers + minor-grid LOD threshold; `dimensionLabel` giving the right `w × d m` text; `perimeter`, `dockApproach` and `aisleGuides` returning finite, in-bounds geometry without mutating their inputs; `zoneTints` yielding tints only when zone-bearing elements exist; the honesty label; and the shipped wiring — `floor.js` loaded + precached at `wt-v41`, the `measureBtn` toggle present and wired), and an offline guard that asserts the app references no external assets. Everything is deterministic and ASCII-only; exit code 0 means all green.
+**59 harnesses** cover the simulation baselines, the order-driven routing engine (8 order archetypes each declaring the OPERATION SEQUENCE they need rather than a fixed stage list - full pallet out, case pick, each/piece pick, cross-dock, customer returns with a real restock-or-scrap outcome split, value-add and export/fragile; a router that resolves those operations against the anchors the current layout actually has, with hand-computed waypoint expectations asserted coordinate by coordinate; the cross-dock invariant that a unit never enters the racking, proven statically and over a live run; unfulfillable order types reported with a friendly message that names the element to place, and not one unit of such a type ever spawned; conservation and per-order-type conservation at every tick of a mixed run; two order types contending for one physical FIFO queue; determinism plus a hand-checked largest-remaining-quota dispatch sequence; and the byte-identical legacy collapse - the generic route builder fed the legacy operation list reproducing `buildWaypoints` exactly, and a 250-tick loop run plus a 400-tick pool run identical with and without the legacy mix, across all 31 example, generated and preset layouts), the living workforce (the pure pose + gait model behind the people on the floor: the roster staffs pick faces, benches, staging pads and dock doors and leaves transport and bulk racking unstaffed; every joint of every pose over a full cycle is finite and inside a human bounding box; the legs alternate, the arms counter-swing and the stride cadence is driven by *travel* rather than the clock; the cycle is continuous, with no pose pop at any step boundary or at the wrap; the pose matches the station — a picker folds to its own face height, a packer works two-handed over the bench and one-handed to tape, a put-away worker carries at chest height, a dock worker raises a handheld; the load really is in the hands; reduced motion freezes to a legible standing pose; a mock-context draw smoke through *both* projectors, themes and LOD tiers; one skeleton driving both views; and no `Date`/`Math.random` in either the source or the live functions), the factory process model + line sim, the multi-way proportional-flow routing (hand-computed split/merge flows, node-by-node conservation, byte-identical collapse to the legacy chain sim on plain-chain lines, and friendly ratio validation), the fluids steady-state continuous-flow model (hand-computed steady states — the demo's 40+40 m³/h supplies blending to 80, buffering behind a 30 m³/h pipe and filling the tank in exactly 96 min; mixer ratio conservation; capacity curtailment; branch water-filling; the starved/overflow/no-supply friendly messages; node-by-node verified volume conservation; and collapse to the static base case with every example scenario staying fluids-inactive and byte-identical), the generated multi-way network + balance-on-effective-loads (the `machining-qa-split` baseline emits a validated 60/40 split + merge straight from the generator with hand-computed resolved flows; RPW packs on the resolved per-finished-unit loads with a full hand-written pin proving the pure-chain output is byte-identical to the legacy balancer, over-takt efficiency bounded to [0,1], and an optimizer that is never illegal or worse on multi-way inputs), the CRAFT-on-resolved-flows placement + fluid-override persistence (the CRAFT flow matrix F reads the resolved network flows — the 60/40 QA split arcs weigh 72/48 parts/hr even when the stored from-to rates are stale — with a full hand-written pin proving every plain-chain craft report stays byte-identical to the pre-v3.20 optimizer, an invalid network falling back to stored rates, and the per-element fluid rate overrides round-tripping through the serializer: the demo pipe's 30 m³/h cap survives save→load with the tank full in 96 min, where the v3.19 serializer reverted it to the 40 m³/h default and 120 min), the share-link codec, CSV import, IFC export, the Compliance Check, the generator, the example library, the WMS/automation/flow/KPI/storage/report layers, the standards knowledge base, the guided-demo plan, the collapsible-cards helper, the saved-scenarios store, the Scenario A/B compare (with cross-consistency assertions proving a compared side equals the report/WMS/storage/automation/compliance modules), the live order pool (determinism, count conservation, the cap + honest overflow, the starving/saturating flags and the selection-rate tie to the WMS/flow throughput), the per-type 2D + 3D shape registry (a mock-context smoke test drawing every object type in both 2D and 3D, in light and dark, at small and large scale, asserting no non-finite coordinate and no throw — the practical way to verify a pure-draw feature that can't be pixel-tested headlessly — plus exact domain-type coverage and the height-driven 3D forms), the production hardening (the global error boundary installs and records without swallowing, the strict offline Content-Security-Policy meta is present with no `unsafe-eval`, no `eval(`/inline handlers anywhere, and the in-browser self-test is inert without its flag yet carries ≥ 25 wiring assertions), the accessibility + large-layout performance pass (the `#floor` canvas has an aria-label + an offscreen `aria-describedby` summary, the named toolbar controls have accessible names, a `prefers-reduced-motion` rule exists and the flow loop reads the flag so the animation never auto-runs under it, a `:focus-visible` outline + an `.sr-only` helper are present, and the pure `WT.view.cullToView` render-culling helper drops fully-off-screen elements, keeps inside/overlapping ones, never mutates its input and is deterministic), the scenario deep-link parser (the pure, DOM-free `WT.deeplink.parse` returns the id for `?scenario=<id>` and `?example=<id>` with onboarding suppressed, `?onboarding=0` suppresses the modal on its own, an empty query and `?selftest=1` are a clean no-op, an unknown id is returned raw for the app to validate, a real library id round-trips, and it reads no DOM, mutates nothing and is deterministic), the living-plant animation (`equipmentPhase` bounded in `[0,1)`/deterministic/periodic; a mock-context smoke drawing every animatable type in 2D and 3D across phases + themes with no throw and all-finite coords; a distinct phase visibly moving the part while a non-animatable type ignores it and the static path stays byte-identical; the 2D animation LOD-skipped when tiny; no input mutation; `WT.iso.project` mapping an MU position to finite coords; and the shipped wiring — the `p`/`P` keydown → view toggle input- + modifier-guarded, flow-in-3D via `projPx`, the tick-seeded/playing-gated anim threaded into `draw2D` + `drawScene`), the realistic-floor rendering geometry (the pure, DOM-free `WT.floor` helpers: `rulerTicks` returning correct/ordered/labelled metre ticks that close on the true floor edge; the grid tiers + minor-grid LOD threshold; `dimensionLabel` giving the right `w × d m` text; `perimeter`, `dockApproach` and `aisleGuides` returning finite, in-bounds geometry without mutating their inputs; `zoneTints` yielding tints only when zone-bearing elements exist; the honesty label; and the shipped wiring — `floor.js` loaded + precached at `wt-v41`, the `measureBtn` toggle present and wired), and an offline guard that asserts the app references no external assets. Everything is deterministic and ASCII-only; exit code 0 means all green.
 
 ### In-browser self-test
 
-The 51 harnesses above cover the **pure logic** in Node. The **DOM/UI** is covered by a **real in-browser end-to-end self-test** that drives the live app through the same handlers the UI uses. Serve the app over `http(s)`/localhost, then open:
+The 59 harnesses above cover the **pure logic** in Node. The **DOM/UI** is covered by a **real in-browser end-to-end self-test** that drives the live app through the same handlers the UI uses. Serve the app over `http(s)`/localhost, then open:
 
 ```
 index.html?selftest=1
 ```
 
-After boot it runs 154 checks against the live app (every `WT.*` module present and correctly shaped, a clean error-free boot, the scenario deep-link parser returning a real library id with onboarding suppressed, the key panels/buttons in the DOM, loading an example, running WMS ops, stepping/playing the flow, the 2.5D toggle being a layout no-op, **a real `KeyboardEvent` for `P` toggling the view mode `top → iso → top`**, building the report, opening About/KB, the zoom controls, plus the v1.6 a11y/perf checks — canvas aria-label + offscreen summary, toolbar accessible names, the reduced-motion flag, the pure `cullToView` culling, and the v3.20.1 craft-pass gates — design tokens present, tabular KPI numerals, live-computed WCAG AA contrast on the ink text tokens, and both reduced-motion guards in the shipped stylesheet, plus the v3.25 order-routing gates - the routing model loaded and closed in the browser, the router reporting an unfulfillable order type by name instead of re-routing around the gap, a cross-docked unit never entering the racking over a live run, and the legacy collapse byte-identical on the live layout) and writes a machine-readable line into the `#wt-selftest` element and the console:
+After boot it runs 166 checks against the live app (every `WT.*` module present and correctly shaped, a clean error-free boot, the scenario deep-link parser returning a real library id with onboarding suppressed, the key panels/buttons in the DOM, loading an example, running WMS ops, stepping/playing the flow, the 2.5D toggle being a layout no-op, **a real `KeyboardEvent` for `P` toggling the view mode `top → iso → top`**, building the report, opening About/KB, the zoom controls, plus the v1.6 a11y/perf checks — canvas aria-label + offscreen summary, toolbar accessible names, the reduced-motion flag, the pure `cullToView` culling, and the v3.20.1 craft-pass gates — design tokens present, tabular KPI numerals, live-computed WCAG AA contrast on the ink text tokens, and both reduced-motion guards in the shipped stylesheet, plus the v3.25 order-routing gates - the routing model loaded and closed in the browser, the router reporting an unfulfillable order type by name instead of re-routing around the gap, a cross-docked unit never entering the racking over a live run, and the legacy collapse byte-identical on the live layout) and writes a machine-readable line into the `#wt-selftest` element and the console:
 
 ```
-WT-SELFTEST: PASS 154/154
+WT-SELFTEST: PASS 166/166
 WT-SELFTEST: FAIL 96/133 :: <failed check names>
 ```
 
@@ -198,9 +198,7 @@ chemistry, gas, electrical-design or safety validation.
 This single-order browser worksheet uses the same person-minute and conservation
 conventions as the separate multi-order Python screening tool, but has a smaller
 input schema. Its exported JSON is not a Python `--input` file. `capacity-plan.js`
-is pure and tested; `capacity-panel.js` renders the controls. Service-worker cache
-is wt-v82. Verification: 52 Node harnesses and 155 live-browser checks, plus the
-existing seven Python resource tests.
+is pure and tested; `capacity-panel.js` renders the controls. Verification counts for the whole app are kept in one place, at the top of this README.
 
 ### Simulation clock and local SQL order execution
 
@@ -230,8 +228,7 @@ position, heading and stage, with a matching marker in 2D and isometric views.
 Coordinates use the rendering model, including package queue offsets. These are
 synthetic positions, not telemetry, safe paths or a staffing schedule. Package
 IDs last for the run; there is no persistent tracking history or SQL order link.
-Close/reopen the panel with Assistant & tracking. Cache wt-v84; verification:
-54 Node harnesses, 157 browser checks, 11 Python tests and the offline guard.
+Close/reopen the panel with Assistant & tracking. Verification counts for the whole app are kept in one place, at the top of this README.
 
 ### Fixed objects and reserved rectangles
 
@@ -242,19 +239,18 @@ or malformed constraints blocks the proposal. Rejection counts explain the searc
 changed layout/configuration/constraint text invalidates Apply. These constraints
 are session-only, not drawn, not exported and not used by the factory CRAFT or A/B
 optimizer. No regulatory clearance is inferred. This is not egress connectivity,
-vehicle swept-path, utility or engineering approval. Cache wt-v85; 55 harnesses,
-157 browser checks, 11 Python tests, manual conflict/stale-preview checks pass.
+vehicle swept-path, utility or engineering approval. Manual conflict and
+stale-preview checks were exercised by hand when this landed.
 
 ### Saved constraint drafts
 
 Placement text now travels as optional `placementConstraintDraft` in the layout
 JSON, local autosave, named saves and the existing share codec. Incomplete text is
 preserved as a draft, not accepted as valid constraints. Preview still validates
-it. Imports reject a non-string or more than32768 characters before changing the
+it. Imports reject a non-string or more than 32768 characters before changing the
 layout. Legacy layouts clear previous drafts. Editing a draft clears its preview.
 This supersedes the earlier session-only description; drawing and enforcement in
-other optimizers are still absent. Cachewt-v86.55 harnesses,158 browser checks,
-11 Python tests and restart persistence pass.
+other optimizers are still absent. Restart persistence is covered by the harnesses.
 
 ### Visual reserved-area controls
 
@@ -266,7 +262,6 @@ check for equipment conflicts. These are draft overlays, not regulatory approval
 or automatic traffic enforcement. No drag editing yet. This supersedes earlier
 notes saying areas are not drawn. At very narrow widths the existing floor legend
 can obscure the small scene; desktop overlays were visually verified.
-Cachewt-v87;55 harnesses,159 browser checks,11 Python tests pass.
 
 ### Persistent package-transfer ledger
 
@@ -293,8 +288,8 @@ clearance checks, cancellation/reassignment, split/merge, multi-package vehicles
 location inventory or authentication. Delivery records do not ship the sales order
 or decrement stock again: pick completion already changed aggregate stock. SQL
 writes outside these functions can bypass application invariants. Full production
-hardening and a versioned migration strategy remain necessary.17 Python tests pass,
-including rollback, persistence, time/version guards and concurrent resource use.
+hardening and a versioned migration strategy remain necessary. The Python tests
+cover rollback, persistence, time/version guards and concurrent resource use.
 
 ### SQL transfer history in the browser
 
@@ -307,8 +302,8 @@ python tools/transport_store.py --database work/transfers.sqlite export > work/t
 
 Choose the JSON file locally, select a package and step through recorded events.
 The versioned factory-transfer-ledger/v1 export reads one consistent SQLite
-snapshot and fails above1000 packages/10000 events instead of truncating. The
-viewer accepts up to5MB and validates each package's identity, complete version
+snapshot and fails above 1000 packages / 10000 events instead of truncating. The
+viewer accepts up to 5 MB and validates each package's identity, complete version
 sequence, allowed transitions, timestamps and final manifest. It rejects malformed
 histories and clears the previous display. Microsecond timestamp text is retained;
 stepping is by event version, not physical time interpolation.
@@ -317,7 +312,7 @@ This is offline evidence inspection, not SQL execution inside the browser or a
 live floor link. No coordinates are inferred. Cross-package resource consistency,
 telemetry accuracy and safety are not validated by this viewer. The SQL functions
 still enforce resource occupancy at write time. Export provenance remains declared,
-not verified telemetry. Cachewt-v88;56 Node harnesses and18 Python tests pass.
+not verified telemetry.
 
 ### Declare equipment anchors for transfer locations
 
@@ -330,29 +325,29 @@ location links stay missing, never guessed. Layout/ledger replacement clears
 bindings; bindings are currently tab-local and not exported. This is evidence
 coordination, not physical route replay, surveyed geometry or collision checking.
 Duplicate equipment IDs, out-of-floor footprints and invalid dimensions reject the
-floor import.56 harnesses,18 Python tests and159 main browser checks pass; actual
-file-import/mapping and zero travelling markers were manually verified. Cachewt-v89.
+floor import. Actual file-import/mapping and zero travelling markers were
+manually verified when this landed.
 
 ### Chronological resource assignment
 
 Transfer assignment now also checks the latest recorded work time for the chosen
-resource inside the same immediate transaction. Example: after delivery at10:05,
-a new assignment at10:02 is rejected even though the resource is currently free.
-Assignment exactly at10:05 is allowed. This append-only prototype requires
+resource inside the same immediate transaction. Example: after delivery at 10:05,
+a new assignment at 10:02 is rejected even though the resource is currently free.
+Assignment exactly at 10:05 is allowed. This append-only prototype requires
 chronological resource use; inserting work into historical gaps, corrections and
 reassignment remain unsupported. It does not validate external JSON histories.
-The regression failed before the fix and passes afterwards;19 Python tests pass.
+The regression failed before the fix and passes afterwards.
 
 ### Cross-package resource checks in imported histories
 
 The viewer now checks assignment-to-delivery intervals across packages in the
 imported file, including blocked time and unfinished transfers. One resource may
-be handed over at the exact delivery timestamp; a1-microsecond overlap is rejected.
+be handed over at the exact delivery timestamp; a 1-microsecond overlap is rejected.
 Zero-duration recorded work cannot be placed inside another occupied interval.
 Duplicate ownership of a completed pick is also rejected. These checks do not
 prove missing records are absent, travel time between jobs, shift availability,
 resource capability or physical accuracy. This supersedes the earlier note that
-cross-package resource intervals were not checked. Cachewt-v90.
+cross-package resource intervals were not checked.
 
 ### Reusable location links tied to floor geometry
 
@@ -365,7 +360,7 @@ race with changed floor/ledger/links are rejected. Raw layout element ordering d
 not define identity. This is geometry consistency, not surveyed revision control,
 a site identifier, route validation or proof that equal location IDs mean the same
 real place. Exports are explicit; no new local-storage persistence is added.
-Cachewt-v110;56Node,19Python,159browser checks pass. Actual import and stale rejection
+Actual import and stale rejection were
 verified; browser reported export prepared but automation download-event observation
 timed out, so successful file saving was not independently confirmed in that browser.
 

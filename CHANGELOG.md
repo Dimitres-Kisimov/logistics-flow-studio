@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-21 — Docs reconciled against the merged Codex review branch
+
+Merged the 2026-09-19 review branch (PR #1, 40 commits) into main. The README's
+per-feature notes had accumulated the harness, browser-check, Python-test and cache
+counts of the moment each feature landed; they now point to one measured block at
+the top of the README. Measured on this commit: 59 headless harnesses,
+62 Python tests, WT-SELFTEST PASS 166/166 in headless Chromium, cache wt-v110.
+Entries below keep the counts that were true when they were written. Moved the
+v3.27 and v3.28 entries, which had been appended after v3.1, to their place above
+v3.26. Fixed run-together words in the README (Cachewt-v86, above1000, at10:05).
+No code changed.
+
 ## 2026-09-19 — Stable identities for legacy imports
 
 Equipment without string IDs now receives deterministic import-N identities in file order. All explicit IDs are reserved first, including those later in the file, so generated IDs cannot collide with them. Input records are not mutated. Cache wt-v110.
@@ -72,6 +84,21 @@ same display coordinates in both projections and exposes position, heading and
 stage. Worker poses remain illustrative; persistent history, telemetry and SQL
 identity integration remain future work. PWA cache wt-v84. All 54 harnesses,
 157 browser checks and 11 Python tests pass; deterministic PDF output unchanged.
+
+## v3.28 — Time-based playback and SQL execution prototype
+
+Added 1x–100x speed, minutes/hours/days duration and exact stopping. Replaced
+frame-count advancement with an elapsed-time clock; retained minute-bucket model
+semantics. Added local transactional SQLite order/pick prototype and primary-source
+competitor comparison. Cache wt-v83. No claim of autonomous safety approval or
+real-time physical transport accuracy.
+
+## v3.27 — Editable shift workbench
+
+Added Plan a shift at the top of Simulate: two factory profiles, live workload,
+stock and electricity findings, grouped editable assumptions, JSON import/export,
+and explicit separation from the floor simulation. Added numerical and browser
+regressions; cache wt-v82. No scheduling or engineering-safety claims.
 
 ## v3.26 — Review the equipment behind an order route
 
@@ -1665,21 +1692,6 @@ server.
 - 23 headless verification harnesses via `node test/run-all.mjs`; deterministic,
   ASCII-only, with an offline guard asserting the app references no external
   assets. Service-worker cache bumped to `wt-v29`.
-
-## v3.27 — Editable shift workbench
-
-Added Plan a shift at the top of Simulate: two factory profiles, live workload,
-stock and electricity findings, grouped editable assumptions, JSON import/export,
-and explicit separation from the floor simulation. Added numerical and browser
-regressions; cache wt-v82. No scheduling or engineering-safety claims.
-
-## v3.28 — Time-based playback and SQL execution prototype
-
-Added 1x–100x speed, minutes/hours/days duration and exact stopping. Replaced
-frame-count advancement with an elapsed-time clock; retained minute-bucket model
-semantics. Added local transactional SQLite order/pick prototype and primary-source
-competitor comparison. Cache wt-v83. No claim of autonomous safety approval or
-real-time physical transport accuracy.
 
 ## 2026-09-19 — Placement constraints and stale-preview protection
 
