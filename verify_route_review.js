@@ -9,8 +9,8 @@ const legacy = review.rows.find((r) => r.legacy);
 assert.equal(legacy.engineResolved, true, "the legacy animation still resolves on an empty floor");
 assert.equal(legacy.status, "gaps", "fallback geometry must not imply placed equipment");
 assert.deepEqual(legacy.steps.map((s) => s.status), ["fallback", "fallback", "fallback", "fallback", "fallback"]);
-assert.equal(review.rows.find((r) => r.archetype === "piece-pick").status, "unsupported");
-assert.equal(review.rows.find((r) => r.archetype === "vas").status, "unsupported");
+assert.equal(review.rows.find((r) => r.archetype === "piece-pick").status, "missing");
+assert.equal(review.rows.find((r) => r.archetype === "vas").status, "missing");
 assert.equal(review.rows.filter((r) => r.archetype === "returns").length, 2, "both return outcomes must be visible");
 const floor = { gridW: 40, gridH: 24, elements: [
   { id: "in", type: "dock-in", x: 2, y: 0, w: 2, d: 1 },
@@ -32,4 +32,4 @@ floor.elements.push(JSON.parse(fullBefore).elements[1]);
 const snap = JSON.stringify(floor);
 assert.equal(JSON.stringify(WT.routeReview.build(floor)), JSON.stringify(WT.routeReview.build(floor)));
 assert.equal(JSON.stringify(floor), snap);
-console.log("PASS route review: empty-floor fallbacks, unsupported operations, both returns outcomes, shared QC, missing outbound dock, deterministic and non-mutating");
+console.log("PASS route review: empty-floor fallbacks, missing R2 stations, both returns outcomes, shared QC, missing outbound dock, deterministic and non-mutating");

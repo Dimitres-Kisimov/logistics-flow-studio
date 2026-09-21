@@ -1656,6 +1656,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   white-space: nowrap;
 }
 .flow-chip strong { font-variant-numeric: tabular-nums; }
+/* v3.29 R4: the order-mix picker + readout block. */
+.flow-mix-pick { display: grid; gap: 4px; margin: 6px 0 10px; }
+.flow-mix-pick select { max-width: 100%; }
+.flow-mix { margin: 4px 0 8px; font-size: 0.78rem; }
+.flow-mix-title { font-weight: 700; margin-right: 6px; }
+.flow-mix-rows { display: grid; gap: 3px; margin-top: 4px; }
+.flow-mix-row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
+.flow-mix-row strong { font-variant-numeric: tabular-nums; }
+.flow-mix-row.is-unfulfillable { border-style: dashed; }
+.flow-mix-badge { font-size: 0.66rem; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+.flow-mix-note { margin: 4px 0 0; font-size: 0.74rem; opacity: .88; }
 .flow-chip.flow-receiving { border-color: color-mix(in srgb, #2563eb 55%, var(--border)); }
 .flow-chip.flow-storage { border-color: color-mix(in srgb, #9333ea 55%, var(--border)); }
 .flow-chip.flow-picking { border-color: color-mix(in srgb, #d97706 55%, var(--border)); }

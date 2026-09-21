@@ -2362,6 +2362,72 @@
     return sig;
   }
 
+  // ---- v3.29 R4: THE ORDER MIX ------------------------------------------
+  // A layout may DECLARE a mix (every library scenario does; a keyword-
+  // generated or hand-drawn floor does not). Only recognised order types
+  // survive sanitising and an empty result is `undefined`, so a layout
+  // without a mix serializes byte-identically to before.
+  function sanitizeOrderMix(raw) {
+    if (!raw || typeof raw !== "object" || !WT.routing || typeof WT.routing.normalizeMix !== "function") return undefined;
+    const norm = WT.routing.normalizeMix(raw);
+    if (!norm || !norm.ok) return undefined;
+    const out = {};
+    for (const e of norm.entries) {
+      const v = Array.isArray(raw) ? NaN : Number(raw[e.id]);
+      out[e.id] = isFinite(v) && v > 0 ? v : e.share;
+    }
+    return out;
+  }
+  // "auto" = the layout's declared mix (else the standard spine); "day" = every
+  // order type at its documented illustrative share; "legacy" = the v3.24 spine.
+  function activeOrderMix(layout) {
+    const mode = state.flow.mixMode || "auto";
+    if (mode === "legacy" || !WT.routing) return null;
+    if (mode === "day") return WT.routing.defaultMix();
+    const declared = layout && layout.config && layout.config.orderMix;
+    return declared && Object.keys(declared).length ? declared : null;
+  }
+  function syncMixSelectLabel() {
+    const sel = $("flowMixSelect");
+    if (!sel || !sel.options.length) return;
+    const declared = state.config.orderMix;
+    const n = declared ? Object.keys(declared).length : 0;
+    sel.options[0].textContent = n
+      ? "This layout's declared mix (" + n + " order type" + (n === 1 ? "" : "s") + ")"
+      : "This layout declares no mix - standard spine";
+  }
+  // The readout block: each order type in the running mix with its share and
+  // live counts, and the types this floor CANNOT serve, with the reason.
+  function orderMixHtml(s) {
+    const plan = s && s.plan;
+    if (!plan) return "";
+    const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    if (!plan.mix) {
+      return '<p class="flow-mix"><span class="flow-mix-title">Order mix</span>standard spine - no mix declared, every unit walks receive → store → pick → pack → ship</p>';
+    }
+    const byId = {};
+    for (const m of plan.mix) {
+      const r = plan.routes[m.routeIndex] || {};
+      const pa = (s.perArchetype && s.perArchetype[m.routeId]) || {};
+      const row = byId[m.id] || (byId[m.id] = { id: m.id, label: r.short || r.label || m.id, share: 0, ok: true, spawned: 0, completed: 0, inflight: 0 });
+      row.share += m.share;
+      row.ok = row.ok && m.ok;
+      row.spawned += pa.spawned || 0; row.completed += pa.completed || 0; row.inflight += pa.inflight || 0;
+    }
+    const rows = Object.keys(byId).map((k) => byId[k]);
+    const html = rows.map((r) =>
+      '<div class="flow-mix-row' + (r.ok ? "" : " is-unfulfillable") + '"><span>' + esc(r.label) + "</span>" +
+      "<span>share <strong>" + (r.share * 100).toFixed(0) + "%</strong></span>" +
+      (r.ok
+        ? "<span>spawned <strong>" + r.spawned + "</strong> · in-flight <strong>" + r.inflight + "</strong> · done <strong>" + r.completed + "</strong></span>"
+        : '<span class="flow-mix-badge">unfulfillable - not spawned</span>') + "</div>").join("");
+    const notes = (plan.routingMessages || []).map((m) => '<p class="flow-mix-note">' + esc(m) + "</p>").join("");
+    const nUn = (plan.unfulfillable || []).length;
+    return '<div class="flow-mix"><span class="flow-mix-title">Order mix</span>' + rows.length + " order type" + (rows.length === 1 ? "" : "s") +
+      (nUn ? " · <strong>" + nUn + "</strong> route" + (nUn === 1 ? "" : "s") + " this floor cannot serve" : " · all routable on this floor") +
+      '<div class="flow-mix-rows">' + html + "</div>" + notes + "</div>";
+  }
+
   function flowBuild() {
     if (!WT.flowsim) return false;
     readConfigFromUI();
@@ -2375,6 +2441,9 @@
       layout.storageAssignment = state.storageAssignment;
     }
     const opts = { seed: seed, loop: true };
+    // v3.29 R4: the ORDER MIX drives per-unit routing (see activeOrderMix).
+    const mix = activeOrderMix(layout);
+    if (mix) opts.mix = mix;
     // Real-data layer: feed the animation the loaded pool's real size + line
     // shape. With nothing loaded, opts is unchanged -> identical to before.
     const shape = activeOrderShape();
@@ -2383,6 +2452,7 @@
     sceneSelection = null;
     flowClock = WT.runClock.create(flowDurationMinutes);
     state.flow.sig = flowSignature();
+    syncMixSelectLabel(); // v3.29 R4
     invalidateWorkers(); // v3.22: a new run starts with an unwoken shift
     resetKpiHistory(); // new sim -> counters restart at 0, so does the chart
     buildOrderPool(seed, shape); // v1.3: the visible demand-side pool
@@ -2396,6 +2466,7 @@
   function renderRouteReview(force) {
     const picker = $("routeReviewPick"), out = $("routeReviewBody");
     if (!picker || !out || !WT.routeReview) return;
+    syncMixSelectLabel(); // v3.29 R4: the picker names the layout's declared mix
     // Definitions can change without moving an object (custom dock direction,
     // base class or pick-face behaviour), so geometry alone is insufficient.
     const definitions = Array.from(new Set(state.elements.map((e) => e.type)))
@@ -2680,7 +2751,7 @@
     // it tells you with SHAPE as well as colour. Off the SMOOTHED bands, so
     // the lamp cannot flicker either; the counts beside it stay raw.
     out.innerHTML = andonHtml(s) +
-      '<div class="flow-chips">' + chips + "</div>" +
+      '<div class="flow-chips">' + chips + "</div>" + orderMixHtml(s) +
       '<p class="flow-stats">In-flight <strong>' + s.inflight + "</strong> · Shipped <strong>" + s.completed +
       "</strong> · tick " + s.tick + " · bottleneck throughput ~" + s.plan.lineThroughput.toFixed(0) + " units/hr" +
       queueTxt + (state.flow.playing ? "" : " · paused") + "</p>";
@@ -2815,6 +2886,23 @@
     if (routePicker) routePicker.addEventListener("change", () => renderRouteReview(true));
     const on = (id, fn) => { const el = $(id); if (el) el.addEventListener("click", fn); };
     on("flowPlayBtn", flowPlay);
+    // v3.29 R4: the order-mix picker. Remembered on this device; a change
+    // rebuilds the run from tick 0 (a different mix is a different day).
+    (function wireMix() {
+      const sel = $("flowMixSelect");
+      if (!sel) return;
+      let saved = "auto";
+      try { saved = localStorage.getItem("wt-flow-mix") || "auto"; } catch (_) { /* private mode */ }
+      state.flow.mixMode = saved === "day" || saved === "legacy" ? saved : "auto";
+      sel.value = state.flow.mixMode;
+      syncMixSelectLabel();
+      sel.addEventListener("change", () => {
+        state.flow.mixMode = sel.value === "day" || sel.value === "legacy" ? sel.value : "auto";
+        try { localStorage.setItem("wt-flow-mix", state.flow.mixMode); } catch (_) { /* ignore */ }
+        state.flow.sig = null;
+        if (state.flow.sim) flowReset();
+      });
+    })();
     on("flowPauseBtn", flowPause);
     on("flowStepBtn", flowStep);
     on("flowResetBtn", flowReset);
@@ -5697,6 +5785,7 @@
       const n = parseInt(String(el.id).replace(/\D/g, ""), 10);
       if (!isNaN(n)) maxId = Math.max(maxId, n);
     }
+    state.config.orderMix = undefined; // v3.29 R4: a loaded layout brings its own mix, or none
     state.elements = cleaned;
     $("optConstraints").value = obj.placementConstraintDraft === undefined ? '{"fixedIds":[],"zones":[]}' : obj.placementConstraintDraft;
     state.preview = null;
@@ -5706,6 +5795,7 @@
     if (obj.config && typeof obj.config === "object") {
       state.config = Object.assign(state.config, {
         seed: numOr(obj.config.seed, state.config.seed),
+        orderMix: sanitizeOrderMix(obj.config.orderMix), // v3.29 R4
         // Tier gate: strategies outside the current tier fall back to ABC.
         strategy: WT.tiers.coerceStrategy(D.STRATEGIES[obj.config.strategy] ? obj.config.strategy : state.config.strategy),
         orders: numOr(obj.config.orders, state.config.orders),
@@ -6404,6 +6494,7 @@
   // DEMO LAYOUT (first-run starter so the sim works immediately)
   // ================================================================
   function demoLayout() {
+    state.config.orderMix = undefined; // v3.29 R4: the demo floor declares no mix
     state.idCounter = 0;
     GRID_W = V.FLOOR_DEFAULT_W; // the starter uses the classic 40 x 24 floor
     GRID_H = V.FLOOR_DEFAULT_H;
@@ -6759,6 +6850,7 @@
   // the zone tags (so later NL commands can target "the picking sector").
   function applyGeneratedLayout(gen, source) {
     state.genLayout = gen;
+    state.config.orderMix = undefined; // v3.29 R4: a generated / example layout brings its own mix, or none
     state.idCounter = 0;
     // Respect a generated/example layout's own floor size when it carries
     // one (generator already builds against the current floor; examples
@@ -6780,6 +6872,7 @@
     if (gen.config) {
       state.config = Object.assign(state.config, {
         seed: numOr(gen.config.seed, state.config.seed),
+        orderMix: sanitizeOrderMix(gen.config.orderMix), // v3.29 R4
         strategy: WT.tiers.coerceStrategy(D.STRATEGIES[gen.config.strategy] ? gen.config.strategy : state.config.strategy),
         orders: numOr(gen.config.orders, state.config.orders),
         skuCount: numOr(gen.config.skuCount, state.config.skuCount),

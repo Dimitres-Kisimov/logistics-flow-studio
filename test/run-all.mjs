@@ -702,6 +702,8 @@ const HARNESSES = [
   { name: "Physical goods: pallets/cartons/totes riding the plant (verify_goods.js)", args: ["verify_goods.js"] },
   { name: "The working shift: hauling trucks, non-strobing congestion, docks (verify_shift.js)", args: ["verify_shift.js"] },
   { name: "Order-driven routing: archetypes, the router, per-MU routes (verify_routing.js)", args: ["verify_routing.js"] },
+  { name: "R2 - the missing stations: QC bench, depalletiser, VAS bench (verify_stations.js)", args: ["verify_stations.js"] },
+  { name: "R4 - the order mix: every scenario declares a mix its floor can serve (verify_ordermix.js)", args: ["verify_ordermix.js"] },
   { name: "Timed route playback", args: ["verify_route_playback.js"] },
   { name: "Scheduled resource playback", args: ["verify_resource_playback.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },

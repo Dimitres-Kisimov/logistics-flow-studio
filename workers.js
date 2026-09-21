@@ -316,6 +316,7 @@
     const def = defOf(type);
     if (type === "staging") return "put";
     if (type === "pack-station" || type === "returns-station" ||
+        type === "qc-bench" || type === "vas-station" || // v3.29 R2 benches are manned
         type === "push-station" || type === "pull-station") return "pack";
     if (type === "dock-in" || type === "dock-out" || type === "gate") return "scan";
     if (def && (def.pickFace || def.goodsToPerson)) return "pick";

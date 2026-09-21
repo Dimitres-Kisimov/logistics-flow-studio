@@ -857,14 +857,23 @@
           <strong>SYNTHETIC animation — a transparent teaching model, NOT a real discrete-event-simulation engine, NOT a measurement and NOT a certification.</strong>
           Handling units follow waypoint routes with modelled station queues. Movement is schematic: obstacle-aware pathfinding and safe traffic separation are not verified. Rates are modelled, not measured.
         </div>
-        <p class="hint">Playback follows the default route: <strong>receive → store → pick → pack → ship</strong>. Review other order recipes below. The same layout and seed reproduce the same animation.</p>
+        <p class="hint">Playback follows the <strong>order mix</strong> chosen here. A library scenario declares a realistic mix of order types and every unit walks its own recipe — a cross-dock unit never enters storage, a full pallet is never packed, a return runs counter-flow to restock or scrap. A floor with no declared mix runs the standard spine <strong>receive → store → pick → pack → ship</strong>. Order types this floor cannot serve are listed in the readout, never re-routed. The same layout, seed and mix reproduce the same animation.</p>
+        <div class="flow-mix-pick">
+          <label for="flowMixSelect">Order mix</label>
+          <select id="flowMixSelect" aria-describedby="flowMixHint">
+            <option value="auto">This layout's declared mix (standard spine if none)</option>
+            <option value="day">A realistic day — every order type at its documented share</option>
+            <option value="legacy">Standard spine only (the v3.24 route)</option>
+          </select>
+          <p id="flowMixHint" class="hint">Synthetic teaching shares, not a forecast. Your choice is remembered on this device.</p>
+        </div>
         <section class="route-review" aria-labelledby="routeReviewHeading">
           <div class="route-review-heading"><span class="route-review-kicker">Before you run</span><h3 id="routeReviewHeading">Can this floor handle the order?</h3></div>
           <p class="hint">Review each recipe against the equipment on your floor. Both returns outcomes are listed separately.</p>
           <label for="routeReviewPick">Order route to review</label>
           <select id="routeReviewPick" aria-describedby="routeReviewScope"></select>
           <div id="routeReviewBody" aria-live="polite" aria-atomic="true"></div>
-          <p id="routeReviewScope" class="route-review-caption">Review only. Playback below still uses the default teaching route. Equipment presence does not verify capacity, inventory, safe access or compliance.</p>
+          <p id="routeReviewScope" class="route-review-caption">Review only. Playback below follows the Order mix selected above; a recipe listed here with missing equipment is reported unfulfillable in the readout and never re-routed. Equipment presence does not verify capacity, inventory, safe access or compliance.</p>
         </section>
         <div class="flow-controls" role="group" aria-label="Live material-flow playback">
           <button id="flowPlayBtn" class="btn primary" type="button" aria-label="Play material-flow animation">▶ Play</button>

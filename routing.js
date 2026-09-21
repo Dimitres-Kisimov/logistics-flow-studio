@@ -169,13 +169,14 @@
       note: "Marshalling buffer - the cross-dock transfer lane and the outbound consolidation floor.",
     },
     qc: {
-      id: "qc", label: "Quality-control bench", element: "returns-station",
+      id: "qc", label: "Quality-control bench", element: "qc-bench",
       legacy: false, strict: true,
       sharedWith: "returns-station",
       sharedNote:
-        "Quality control currently borrows the Returns / QA station (whose documented job is grade + inspect). " +
-        "R2 adds a DEDICATED goods-in QC bench so inbound checking and returns grading stop sharing one bench.",
-      note: "Goods-in sampling and outbound / export checking.",
+        "With no Goods-in QC bench placed, quality control borrows the Returns / QA station (whose documented job " +
+        "is grade + inspect) and the step is reported SHARED. R2 (v3.29) added the dedicated qc-bench so inbound " +
+        "checking and returns grading no longer have to share one bench - place one and this step stops being shared.",
+      note: "Goods-in sampling and outbound / export checking. Resolves to a Goods-in QC bench, else borrows the Returns / QA station.",
     },
     returns: {
       id: "returns", label: "Returns / QA station", element: "returns-station",
@@ -192,19 +193,20 @@
       legacy: false, strict: true,
       sharedWith: "stretch-wrap",
       sharedNote:
-        "Palletising currently borrows the Stretch-wrap / palletiser element (its own label names both jobs). " +
-        "R2 splits build-the-pallet from wrap-the-pallet into separate stations.",
+        "Palletising borrows the Stretch-wrap / palletiser element (its own label names both jobs). " +
+        "R2 (v3.29) kept build-the-pallet and wrap-the-pallet on that one station; a separate palletiser is a " +
+        "documented gap, not a hidden one.",
       note: "Building the outbound pallet before it is wrapped.",
     },
     depalletise: {
-      id: "depalletise", label: "Depalletiser", element: null,
-      legacy: false, strict: true, pending: "R2",
-      note: "Breaking an inbound pallet down into cases. NO element type exists in v3.25 - R2 adds it.",
+      id: "depalletise", label: "Depalletiser", element: "depalletiser",
+      legacy: false, strict: true,
+      note: "Breaking an inbound pallet down into cases. Resolves to a Depalletiser (the element R2 added in v3.29).",
     },
     vas: {
-      id: "vas", label: "Value-add / kitting bench", element: null,
-      legacy: false, strict: true, pending: "R2",
-      note: "Kitting, labelling, bundling, gift-wrap. NO element type exists in v3.25 - R2 adds it.",
+      id: "vas", label: "Value-add / kitting bench", element: "vas-station",
+      legacy: false, strict: true,
+      note: "Kitting, labelling, bundling, gift-wrap. Resolves to a Value-add / kitting bench (the element R2 added in v3.29).",
     },
   };
 
@@ -568,8 +570,9 @@
         return '"' + m.label + '" needs a ' + a.label +
           ", which this version has no element for yet (it arrives in R2)";
       }
+      const alt = a.sharedWith ? " (or a " + a.sharedWith + ", which the router borrows)" : "";
       return '"' + m.label + '" needs a ' + a.label +
-        " - place a " + (a.element || a.label) + " on the floor";
+        " - place a " + (a.element || a.label) + alt + " on the floor";
     });
     return "Orders of type '" + arch.label + "' cannot be fulfilled by this layout: " +
       parts.join("; ") + ". Nothing has been re-routed around the gap - the order type is simply " +
@@ -610,7 +613,9 @@
         x: pt.x, y: pt.y,
         source: pt.source || "element",
       };
-      if (anc.sharedWith) {
+      // A borrowed binding is disclosed ONLY when the borrowing actually
+      // happened on this floor (the anchor index marks it `shared`).
+      if (anc.sharedWith && pt.shared) {
         step.sharedWith = anc.sharedWith;
         step.sharedNote = anc.sharedNote;
         shared.push({ op: op.id, label: op.label, anchor: op.anchor, sharedWith: anc.sharedWith, note: anc.sharedNote });

@@ -24,8 +24,8 @@
         const resolved = route.steps.find((s) => s.op === id);
         const missing = route.missing.find((s) => s.op === id);
         const fallback = !!resolved && !(point && point.count > 0);
-        const equipment = anchor.sharedWith === "returns-station"
-          ? "a Returns / QA station (shared with goods-in QC)" : anchor.label;
+        const equipment = op.anchor === "qc"
+          ? "a Goods-in QC bench (or a Returns / QA station, which the router borrows)" : "a " + anchor.label;
         const status = missing ? (missing.pending ? "unsupported" : "missing") :
           fallback ? "fallback" : resolved && resolved.sharedWith ? "shared" : "placed";
         return {
@@ -38,13 +38,14 @@
         };
       });
       const unsupported = steps.some((s) => s.status === "unsupported");
-      const gaps = steps.some((s) => s.status === "missing" || s.status === "fallback");
+      const missingAny = steps.some((s) => s.status === "missing"); // unroutable: a station is absent
+      const gaps = steps.some((s) => s.status === "fallback");        // routable on fallback geometry
       const shared = steps.some((s) => s.status === "shared");
       return {
         id: route.routeId, archetype: route.id, label: route.short,
         outcome: route.outcomeLabel, legacy: route.legacy,
         description: PURPOSE[route.id], engineResolved: route.ok,
-        status: unsupported ? "unsupported" : gaps ? "gaps" : shared ? "shared" : "placed",
+        status: unsupported ? "unsupported" : missingAny ? "missing" : gaps ? "gaps" : shared ? "shared" : "placed",
         steps: steps,
       };
     });

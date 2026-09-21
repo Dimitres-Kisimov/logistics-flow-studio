@@ -45,7 +45,7 @@
  *  10.  NO INPUT MUTATION: resolving, planning and stepping never touch
  *       the caller's layout, mix or opts.
  *  11.  SHIPPED WIRING: routing.js is loaded by index.html before
- *       flowsim.js, precached by sw.js at the bumped wt-v110 cache, and
+ *       flowsim.js, precached by sw.js at the bumped wt-v111 cache, and
  *       listed by test/run-all.mjs.
  *
  * Deterministic + ASCII-only. Exit code 0 = all green.
@@ -247,9 +247,9 @@ const BARE = bareFloor();
   check("2b. the STRICT anchors resolve onto their real elements",
     eq(gotAdded, added.map(([k, p]) => [k, p.x, p.y])), JSON.stringify(gotAdded));
 
-  check("2c. depalletise + value-add have NO element in v3.25 and are honestly absent (R2)",
-    A.depalletise.present === false && A.depalletise.pending === "R2" &&
-    A.vas.present === false && A.vas.pending === "R2");
+  check("2c. depalletise + value-add are STRICT on their R2 stations - absent here because none is placed, and no longer 'pending'",
+    A.depalletise.present === false && !A.depalletise.pending && A.depalletise.count === 0 &&
+    A.vas.present === false && !A.vas.pending && A.vas.count === 0);
 
   const B = F.anchors(BARE);
   check("2d. removing the returns bench + wrapper makes those anchors ABSENT - no fallback, no guess",
@@ -430,8 +430,8 @@ const BARE = bareFloor();
     msg.slice(0, 96) + "...");
 
   const pend = b["piece-pick"].missing.find((m) => m.op === "depalletise");
-  check("6c. an operation with no element type AT ALL says so and points at R2",
-    !!pend && pend.pending === "R2" && /R2/.test(b["piece-pick"].message),
+  check("6c. an operation whose R2 station is not placed NAMES that station (nothing is 'pending' any more)",
+    !!pend && !pend.pending && pend.element === "depalletiser" && /depalletiser/.test(b["piece-pick"].message),
     b["piece-pick"].message.slice(0, 96) + "...");
 
   // Mixed fulfillable + unfulfillable: the good type still runs, the bad type
@@ -691,9 +691,9 @@ const BARE = bareFloor();
   const iApp = INDEX_SRC.indexOf('<script src="app.js">');
   check("11a. index.html loads routing.js BEFORE flowsim.js and before app.js",
     iRouting > 0 && iFlow > iRouting && iApp > iFlow);
-  check("11b. sw.js precaches ./routing.js at the bumped wt-v110 cache (trail preserved: previously wt-v79)",
-    /["']\.\/routing\.js["']/.test(SW_SRC) && /CACHE_VERSION\s*=\s*"wt-v110"/.test(SW_SRC) &&
-    /Previously wt-v79/.test(SW_SRC));
+  check("11b. sw.js precaches ./routing.js at the bumped wt-v111 cache (trail preserved: previously wt-v110)",
+    /["']\.\/routing\.js["']/.test(SW_SRC) && /CACHE_VERSION\s*=\s*"wt-v111"/.test(SW_SRC) &&
+    /Previously wt-v110/.test(SW_SRC));
   check("11c. test/run-all.mjs lists verify_routing.js",
     /verify_routing\.js/.test(RUNALL_SRC));
   check("11d. the in-browser self-test covers the routing engine",

@@ -781,6 +781,57 @@
     seg(ctx, lx + lr * 0.7, cy + lr * 0.7, lx + lr * 1.4, cy + lr * 1.4);
   }
 
+  // v3.29 R2 - Goods-in QC bench: a bench top + an inspection lens + a pass tick.
+  function d2QcBench(ctx, x, y, w, d, cell, gc) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.18, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const bh = clampN(ih * 0.4, 4, 16);
+    ctx.fillRect(ix, iy + (ih - bh) / 2, iw, bh);      // bench top
+    ctx.strokeRect(ix, iy + (ih - bh) / 2, iw, bh);
+    const cy = iy + ih / 2;
+    const lr = clampN(Math.min(iw, ih) * 0.16, 3, 9);  // inspection lens
+    const lx = ix + iw * 0.3;
+    ring(ctx, lx, cy, lr);
+    seg(ctx, lx + lr * 0.7, cy + lr * 0.7, lx + lr * 1.4, cy + lr * 1.4);
+    const tx = ix + iw * 0.72, ts = clampN(Math.min(iw, ih) * 0.18, 3, 9); // the pass tick
+    seg(ctx, tx - ts * 0.6, cy, tx - ts * 0.15, cy + ts * 0.45);
+    seg(ctx, tx - ts * 0.15, cy + ts * 0.45, tx + ts * 0.7, cy - ts * 0.5);
+  }
+
+  // v3.29 R2 - Depalletiser: a machine housing, the pallet on its infeed with its
+  // layer lines, and an up-arrow (layers lifted off the stack).
+  function d2Depal(ctx, x, y, w, d, cell, gc) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.12, 2, 5);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    ctx.strokeRect(ix, iy, iw, ih);                     // the machine housing
+    const s = clampN(Math.min(iw, ih) * 0.5, 4, 4000);   // the pallet on the infeed
+    const px = ix + iw * 0.12, py = iy + (ih - s) / 2;
+    ctx.strokeRect(px, py, s, s);
+    const layers = 3;
+    for (let j = 1; j < layers; j++) seg(ctx, px, py + s * j / layers, px + s, py + s * j / layers); // the layers
+    const ax = ix + iw * 0.78;
+    arr(ctx, ax, iy + ih * 0.8, ax, iy + ih * 0.2, clampN(cell * 0.26, 3, 7)); // layers lifted off
+  }
+
+  // v3.29 R2 - Value-add / kitting bench: a bench top, a label roll and a kit box.
+  function d2Vas(ctx, x, y, w, d, cell, gc) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.18, 2, 6);
+    const ix = x + m, iy = y + m, iw = w - 2 * m, ih = d - 2 * m;
+    const bh = clampN(ih * 0.4, 4, 16);
+    ctx.fillRect(ix, iy + (ih - bh) / 2, iw, bh);      // bench top
+    ctx.strokeRect(ix, iy + (ih - bh) / 2, iw, bh);
+    const cy = iy + ih / 2;
+    const rr = clampN(Math.min(iw, ih) * 0.14, 3, 8);  // the label roll
+    ring(ctx, ix + iw * 0.25, cy, rr);
+    disc(ctx, ix + iw * 0.25, cy, clampN(rr * 0.35, 1, 3));
+    const bs = clampN(Math.min(iw, ih) * 0.3, 4, 12);  // the kit box being built
+    ctx.strokeRect(ix + iw * 0.6 - bs / 2, cy - bs / 2, bs, bs);
+    seg(ctx, ix + iw * 0.6, cy - bs / 2, ix + iw * 0.6, cy + bs / 2);
+  }
+
   // Gate / sectional door: side posts + horizontal roller-door slats + a latch.
   function d2Gate(ctx, x, y, w, d, cell, gc) {
     pen(ctx, gc, cell);
@@ -1298,6 +1349,10 @@
   function icLoop(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r * 0.7, r * 2, r * 1.4); ctx.strokeRect(cx - r * 0.5, cy - r * 0.3, r, r * 0.6); }
   function icWrap(ctx, cx, cy, r) { ctx.beginPath(); ctx.arc(cx, cy, r * 0.9, 0, TAU); ctx.stroke(); ctx.strokeRect(cx - r * 0.4, cy - r * 0.4, r * 0.8, r * 0.8); }
   function icReturn(ctx, cx, cy, r) { arr(ctx, cx + r, cy, cx - r, cy, r * 0.6); }
+  // v3.29 R2 routing-station icons.
+  function icQc(ctx, cx, cy, r) { ring(ctx, cx - r * 0.35, cy, r * 0.55); seg(ctx, cx + r * 0.05, cy + r * 0.4, cx + r * 0.4, cy + r * 0.75); seg(ctx, cx + r * 0.3, cy - r * 0.1, cx + r * 0.55, cy + r * 0.2); seg(ctx, cx + r * 0.55, cy + r * 0.2, cx + r, cy - r * 0.4); }
+  function icDepal(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r * 0.5, r * 1.2, r * 1.2); seg(ctx, cx - r, cy - r * 0.1, cx + r * 0.2, cy - r * 0.1); seg(ctx, cx - r, cy + r * 0.3, cx + r * 0.2, cy + r * 0.3); arr(ctx, cx + r * 0.7, cy + r * 0.7, cx + r * 0.7, cy - r * 0.8, r * 0.4); }
+  function icVas(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r * 0.5, r * 1.1, r); ring(ctx, cx + r * 0.55, cy, r * 0.4); disc(ctx, cx + r * 0.55, cy, r * 0.12); }
   function icGate(ctx, cx, cy, r) { ctx.strokeRect(cx - r * 0.8, cy - r, r * 1.6, r * 2); seg(ctx, cx - r * 0.8, cy - r * 0.4, cx + r * 0.8, cy - r * 0.4); seg(ctx, cx - r * 0.8, cy + r * 0.3, cx + r * 0.8, cy + r * 0.3); }
   function icLight(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r, r * 2, r * 2); disc(ctx, cx, cy, r * 0.35); }
   // v2.5 FACTORY-A production icons.
@@ -1769,6 +1824,42 @@
     box3d(ctx, P, x, y, w, d, topZ + topT, color); // the bench top
     const pw = w * 0.3, pd = clampN(d * 0.1, 0.08, 0.3);
     box3d(ctx, P, x + w * 0.2, y + d * 0.3, pw, pd, topZ + topT + h * 0.35, lighten(color, 0.12)); // inspection screen
+  }
+
+  // v3.29 R2 - Goods-in QC bench: the bench geometry + an inspection lamp post.
+  function d3QcBench(ctx, P, x, y, w, d, h, color, theme) {
+    const topZ = h * 0.66, topT = clampN(h * 0.16, 0.08, 0.3);
+    const t = clampN(Math.min(w, d) * 0.12, 0.08, 0.25);
+    colBox(ctx, P, x + t, y + t, t, topZ, color);
+    colBox(ctx, P, x + w - t, y + t, t, topZ, color);
+    colBox(ctx, P, x + t, y + d - t, t, topZ, color);
+    colBox(ctx, P, x + w - t, y + d - t, t, topZ, color);
+    box3d(ctx, P, x, y, w, d, topZ + topT, color); // the bench top
+    colBox(ctx, P, x + w * 0.8, y + d * 0.5, t * 0.8, topZ + topT + h * 0.6, shade(color, 0.7)); // the lamp post
+    box3d(ctx, P, x + w * 0.62, y + d * 0.38, w * 0.3, d * 0.24, topZ + topT + h * 0.62, lighten(color, 0.25)); // the lamp head
+  }
+
+  // v3.29 R2 - Depalletiser: a machine body, a gantry beam across the top and
+  // the pallet stack standing on the infeed deck.
+  function d3Depal(ctx, P, x, y, w, d, h, color, theme) {
+    box3d(ctx, P, x, y, w, d * 0.45, h, color);                                 // the machine body
+    box3d(ctx, P, x, y + d * 0.45, w, d * 0.55, h * 0.12, shade(color, 0.72));  // the infeed deck
+    const pw = w * 0.5, pd = d * 0.4;
+    box3d(ctx, P, x + (w - pw) / 2, y + d * 0.52, pw, pd, h * 0.55, lighten(color, 0.12)); // the pallet stack
+    const bm = beamColor(color, theme);
+    edge(ctx, P, x, y + d * 0.5, h, x + w, y + d * 0.5, h, bm, 2);             // the gantry beam
+  }
+
+  // v3.29 R2 - Value-add / kitting bench: the bench + a low kit box on the top.
+  function d3Vas(ctx, P, x, y, w, d, h, color, theme) {
+    const topZ = h * 0.66, topT = clampN(h * 0.16, 0.08, 0.3);
+    const t = clampN(Math.min(w, d) * 0.12, 0.08, 0.25);
+    colBox(ctx, P, x + t, y + t, t, topZ, color);
+    colBox(ctx, P, x + w - t, y + t, t, topZ, color);
+    colBox(ctx, P, x + t, y + d - t, t, topZ, color);
+    colBox(ctx, P, x + w - t, y + d - t, t, topZ, color);
+    box3d(ctx, P, x, y, w, d, topZ + topT, color); // the bench top
+    box3d(ctx, P, x + w * 0.55, y + d * 0.25, w * 0.3, d * 0.5, topZ + topT + h * 0.28, lighten(color, 0.18)); // the kit box
   }
 
   // Gate / sectional door: a tall wall / door frame + horizontal roller slats.
@@ -2366,6 +2457,7 @@
     // tier; the worker doing it is drawn by the workforce layer.
     "push-station": r2StationWork, "pull-station": r2StationWork,
     "pack-station": r2StationWork, "returns-station": r2StationWork,
+    "qc-bench": r2StationWork, "vas-station": r2StationWork,
     "dock-in": r2Dock, "dock-out": r2Dock, "mezzanine": r2Mezz,
     "forklift": r2Forklift, "rgv": r2CartLoad, "agv": r2CartLoad,
     "staging": r2Staging, "sorter": r2Sorter, "stretch-wrap": r2StretchWrap,
@@ -2476,6 +2568,7 @@
     // tier; the worker doing it is drawn by the workforce layer.
     "push-station": f3StationWork, "pull-station": f3StationWork,
     "pack-station": f3StationWork, "returns-station": f3StationWork,
+    "qc-bench": f3StationWork, "vas-station": f3StationWork,
   };
   function richDraw3D(ctx, P, type, x, y, w, d, h, color, theme, seed, anim, arc, stock) {
     const fn = RICH3D[type];
@@ -2588,6 +2681,10 @@
     "sorter": { d2: d2Sorter, d3: d3Sorter, icon: icLoop, g2: "closed loop track + trays + divert chutes", f3: "low sortation deck + loop channel + trays" },
     "stretch-wrap": { d2: d2StretchWrap, d3: d3StretchWrap, icon: icWrap, g2: "turntable ring + pallet + rotating wrap arm", f3: "turntable base + pallet + orbiting wrap mast" },
     "returns-station": { d2: d2Returns, d3: d3Returns, icon: icReturn, g2: "bench + return arrow + QA lens", f3: "bench on legs + inspection screen" },
+    // v3.29 R2: the routing stations the order archetypes were missing.
+    "qc-bench": { d2: d2QcBench, d3: d3QcBench, icon: icQc, g2: "bench + inspection lens + pass tick", f3: "bench on legs + inspection lamp post" },
+    "depalletiser": { d2: d2Depal, d3: d3Depal, icon: icDepal, g2: "machine housing + pallet layers + lift arrow", f3: "machine body + infeed deck + pallet stack + gantry beam" },
+    "vas-station": { d2: d2Vas, d3: d3Vas, icon: icVas, g2: "bench + label roll + kit box", f3: "bench on legs + a kit box on the top" },
     "gate": { d2: d2Gate, d3: d3Gate, icon: icGate, g2: "side posts + horizontal door slats + latch", f3: "wall / door frame + roller-door slats" },
     // v2.5 FACTORY-A: Production / Assembly manufacturing components.
     "mfg-source": { d2: d2Source, d3: d3Source, icon: icSource, g2: "emitter node radiating parts along an output arrow", f3: "emitter block + output spout + a part leaving" },

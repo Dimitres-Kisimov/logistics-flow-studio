@@ -356,6 +356,26 @@
       w: 3, d: 2, color: "#5d7a5a", resizable: true, heightM: 1.1,
       desc: "A bench for processing customer returns and quality inspection - grade, re-label, then restock or scrap. Processing equipment: 0 storage capacity; a working bench position. Synthetic teaching element.",
     },
+    // v3.29 R2 "THE MISSING STATIONS": the three processing positions the
+    // order-driven router (routing.js) needs so that case-pick, each-pick and
+    // value-add orders can be ROUTED instead of being reported unfulfillable on
+    // every floor. Processing equipment: 0 storage capacity (category "flow").
+    // Synthetic teaching elements - no vendor spec, no brand.
+    "qc-bench": {
+      id: "qc-bench", label: "Goods-in QC bench", category: "flow",
+      w: 3, d: 2, color: "#7a7364", resizable: true, heightM: 1.1,
+      desc: "A dedicated goods-in quality-control bench: sample-check inbound loads, and give export / fragile orders their final check before the dispatch pallet is built. Processing equipment: 0 storage capacity; a working bench position. When no QC bench is placed the router borrows the Returns / QA station and says so. Synthetic teaching element, not a vendor spec.",
+    },
+    "depalletiser": {
+      id: "depalletiser", label: "Depalletiser", category: "flow",
+      w: 3, d: 3, color: "#56606b", resizable: false, heightM: 2.4,
+      desc: "A layer depalletiser: breaks an inbound pallet down into cases (or cases into eaches) before put-away. Processing equipment: 0 storage capacity; a fixed machine footprint with a pallet infeed. Case-pick and each-pick orders cannot be routed without one. Synthetic teaching element, not a vendor spec.",
+    },
+    "vas-station": {
+      id: "vas-station", label: "Value-add / kitting bench", category: "flow",
+      w: 3, d: 2, color: "#8a6d3b", resizable: true, heightM: 1.1,
+      desc: "A value-added-services bench: kitting, labelling, bundling or gift-wrap on stock already in the building, before packing. Processing equipment: 0 storage capacity; a working bench position. Synthetic teaching element, not a vendor spec.",
+    },
     "gate": {
       id: "gate", label: "Gate / sectional door", category: "flow",
       w: 2, d: 1, color: "#78716c", resizable: false, heightM: 4.0,
@@ -1066,6 +1086,8 @@
       "rgv", "agv",
       "forklift", "charging-station", "sorter", "stretch-wrap",
       "returns-station", "gate",
+      // v3.29 R2: the routing stations the order archetypes were missing.
+      "qc-bench", "depalletiser", "vas-station",
       // v2.5 FACTORY-A: Production / Assembly manufacturing components.
       "mfg-source", "mfg-drain", "mfg-station", "mfg-parallel-station",
       "mfg-assembly", "mfg-dismantle",

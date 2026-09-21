@@ -111,6 +111,10 @@
     "stretch-wrap": 2.6,
     "returns-station": 1.1,
     "gate": 4.0,
+    // v3.29 R2 routing stations (mirror domain heightM).
+    "qc-bench": 1.1,
+    "depalletiser": 2.4,
+    "vas-station": 1.1,
     // v2.5 FACTORY-A "manufacturing components" (mirror domain heightM).
     "mfg-source": 1.6,
     "mfg-drain": 1.6,

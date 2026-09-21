@@ -3405,12 +3405,38 @@
       return { ok: noMix === legacyMix && oneRoute,
         detail: "identical=" + (noMix === legacyMix) + " singleSpine=" + oneRoute + " on " + lay.elements.length + " elements" };
     });
+    // ---- v3.29 R2 + R4: the missing stations exist everywhere they must, and
+    // a library scenario's declared order mix routes every unit by its type.
+    check("r2-stations-registered-everywhere", function () {
+      var D2 = WT.domain, S = WT.shapes, R = WT.routing;
+      var types = ["qc-bench", "depalletiser", "vas-station"];
+      var dom = types.every(function (t) { return D2.ELEMENTS[t] && D2.ELEMENTS[t].category === "flow" && D2.paletteOrder.indexOf(t) >= 0; });
+      var reg = !!S && types.every(function (t) { return S.meta && S.meta[t] && typeof S.ICONS[t] === "function"; });
+      var pal = types.every(function (t) { return !!document.querySelector('#palette .pal-item[data-type="' + t + '"]'); });
+      var wired = !!R && R.ANCHORS.depalletise.element === "depalletiser" && R.ANCHORS.vas.element === "vas-station" && R.ANCHORS.qc.element === "qc-bench";
+      return { ok: dom && reg && pal && wired, detail: "domain=" + dom + " registry=" + reg + " palette=" + pal + " anchors=" + wired };
+    });
+    check("order-mix-select-and-declared-example-mix", function () {
+      var sel = $("flowMixSelect"), F = WT.flowsim, EX2 = WT.examples;
+      if (!sel || sel.options.length !== 3 || !F || !EX2) return { ok: false, detail: "select or modules missing" };
+      var b = EX2.build("ecommerce-multichannel-fc");
+      var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
+      if (!lay.config.orderMix) return { ok: false, detail: "the scenario declares no mix" };
+      var plan = F.spawnPlan(lay, { seed: 3, mix: lay.config.orderMix });
+      var st = F.state(plan);
+      F.step(st, 400);
+      var types = 0;
+      for (var k in st.perArchetype) if (st.perArchetype[k].spawned > 0) types++;
+      var conserved = st.spawned === st.inflight + st.completed;
+      return { ok: plan.mix !== null && plan.unfulfillable.length === 0 && plan.routes.length > 1 && types >= 2 && conserved,
+        detail: "routes=" + plan.routes.length + " unfulfillable=" + plan.unfulfillable.length + " typesSpawned=" + types + " conserved=" + conserved };
+    });
     check("route-review-live-selection", function () {
       var picker = $("routeReviewPick"), body = $("routeReviewBody");
       if (!picker || !body || !WT.routeReview) return false;
       picker.value = "piece-pick";
       picker.dispatchEvent(new Event("change", { bubbles: true }));
-      var unsupported = body.textContent.indexOf("Operation not supported") >= 0 &&
+      var unsupported = body.textContent.indexOf("Depalletiser") >= 0 &&
         body.querySelectorAll("li").length === 8;
       picker.value = "returns:scrap";
       picker.dispatchEvent(new Event("change", { bubbles: true }));
@@ -3418,7 +3444,7 @@
       picker.value = "cross-dock";
       picker.dispatchEvent(new Event("change", { bubbles: true }));
       return { ok: unsupported && scrap && body.querySelectorAll("li").length === 4,
-        detail: "Unsupported each-pick, return scrap outcome and cross-dock all render via the real selector" };
+        detail: "Each-pick naming its missing depalletiser, return scrap outcome and cross-dock all render via the real selector" };
     });
     check("capacity-workbench-live-edit", function () {
       var picker = $("capacityProfile"), out = $("capacityResults");

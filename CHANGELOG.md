@@ -1,5 +1,50 @@
 # Changelog
 
+## v3.29 — R2 + R4: the missing stations, and the order mix goes live
+
+**The defect.** v3.25 built a per-order routing engine with eight order archetypes,
+but it was a DARK capability: nothing in the app ever declared an order mix, so every
+live run still walked the single legacy spine - and three of the eight archetypes
+(case pick, each pick, value-add) could never be routed on ANY floor, because no
+depalletiser or value-add bench existed and goods-in QC had to borrow the returns bench.
+
+**R2 - the missing stations.** Three new element types - `qc-bench` (Goods-in QC
+bench, 3x2, 1.1 m), `depalletiser` (3x3, 2.4 m) and `vas-station` (Value-add /
+kitting bench, 3x2, 1.1 m) - registered in the domain and palette order, the shape
+registry (2D glyph + 3D form + icon), iso heights, floor stage tint, library groups
+and clone bases, the workforce roster (benches manned with the bench pose, the machine
+unmanned), the goods carrier surfaces and the analytics equipment catalogue. The
+router binds `depalletise -> depalletiser`, `vas -> vas-station` and `qc -> qc-bench`,
+borrowing the Returns / QA station only when no QC bench is placed and disclosing it
+on the step. Nothing is "pending" any more; palletising still borrows the stretch-wrap
+element - a documented gap. Route review now ranks a MISSING station above fallback
+geometry (a recipe with an absent station is unroutable, not merely approximate).
+
+**R4 - the order mix.** Every one of the 22 warehouse scenarios declares a realistic
+mix of order types (synthetic teaching shares) and carries the stations that mix
+needs, so the declared mix is 100% routable on that floor - asserted for all of them.
+The signature plant declares the full seven-type mix and grew to 933 elements over
+32 warehouse types. The Live material flow card gained an Order-mix picker (this
+layout's declared mix / a realistic day / standard spine only; remembered on this
+device) and a readout block with per-type share, spawned, in-flight and done counts
+plus the routes the floor cannot serve, naming the element to place. A layout's mix
+rides on `config.orderMix` through save, share and export; a layout without one stays
+byte-identical.
+
+**Unchanged by construction.** With the standard spine selected (or no mix declared)
+every run is byte-identical to v3.28 - the legacy-collapse harness still proves it
+across all 31 layouts; the chain-issue badge on every scenario is unchanged.
+
+**Not done yet.** Goods on the floor still change form by STAGE (v3.23), not by
+operation - a case-pick unit is not yet drawn as a carton after the depalletiser (R3).
+Keyword-generated floors do not place the new stations; the readout names what to
+add. The shares are illustrative, not a forecast.
+
+**Verification.** 61 headless harnesses (two new: `verify_stations.js`, 41 checks
+including hand-computed anchor centroids on a hand-built floor and a live run of the
+full mix; `verify_ordermix.js`, 20 checks over every scenario), 62 Python tests,
+WT-SELFTEST 168/168 in headless Chromium (two new checks). Cache wt-v111.
+
 ## 2026-09-21 — Docs reconciled against the merged Codex review branch
 
 Merged the 2026-09-19 review branch (PR #1, 40 commits) into main. The README's

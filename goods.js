@@ -231,6 +231,7 @@
   // Manned benches: work in progress sits on the bench top.
   const BENCH_TYPES = {
     "pack-station": 1, "push-station": 1, "pull-station": 1, "returns-station": 1,
+    "qc-bench": 1, "vas-station": 1, // v3.29 R2 benches
     "mfg-station": 1, "mfg-parallel-station": 1, "mfg-assembly": 1, "mfg-dismantle": 1,
   };
 
@@ -240,6 +241,9 @@
     if (BELT_TYPES[t]) return { kind: "belt", z: heightOf(t) };
     if (DECK_TYPES[t]) return { kind: "deck", z: heightOf(t) * DECK_TOP };
     if (BENCH_TYPES[t]) return { kind: "bench", z: heightOf(t) * BENCH_TOP };
+    // v3.29 R2: a unit on the depalletiser stands on its pallet infeed deck
+    // (a nominal drawing constant, not a machine spec).
+    if (t === "depalletiser") return { kind: "bench", z: 0.45 };
     const b = baseOf(t);
     if (b === "conveyor" || b === "transporter") return { kind: "belt", z: heightOf(t) };
     if (b === "station") return { kind: "bench", z: heightOf(t) * BENCH_TOP };

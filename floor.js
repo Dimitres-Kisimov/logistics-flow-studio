@@ -283,6 +283,7 @@
     "pick-to-light": "picking", "vna": "picking",
     "push-station": "picking", "pull-station": "picking",
     "pack-station": "packing", "stretch-wrap": "packing", "returns-station": "packing",
+    "qc-bench": "receiving", "depalletiser": "receiving", "vas-station": "packing",
     "dock-out": "shipping",
   };
   function stageOfType(type) {

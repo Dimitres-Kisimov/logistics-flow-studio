@@ -484,14 +484,23 @@
     // an order type that needs one is honestly reported UNFULFILLABLE instead
     // of being quietly re-routed onto some other station.
     strictAnchor(A, "staging", els, (e) => e.type === "staging");
-    strictAnchor(A, "qc", els, (e) => e.type === "returns-station");
+    // v3.29 R2: a DEDICATED goods-in QC bench resolves first; with none placed
+    // the Returns / QA station is borrowed and the anchor is marked SHARED so
+    // the router discloses it on the step (never a hidden re-route).
+    strictAnchor(A, "qc", els, (e) => e.type === "qc-bench");
+    if (!A.qc.present) {
+      strictAnchor(A, "qc", els, (e) => e.type === "returns-station");
+      if (A.qc.present) { A.qc.source = "shared:returns-station"; A.qc.shared = "returns-station"; }
+    }
     strictAnchor(A, "returns", els, (e) => e.type === "returns-station");
     strictAnchor(A, "wrap", els, (e) => e.type === "stretch-wrap");
     strictAnchor(A, "palletise", els, (e) => e.type === "stretch-wrap");
-    // R2 pending: the app has NO element type for these yet, so they are
-    // ALWAYS absent and every archetype needing one says so in plain words.
-    A.depalletise = { x: NaN, y: NaN, present: false, source: "none", count: 0, pending: "R2" };
-    A.vas = { x: NaN, y: NaN, present: false, source: "none", count: 0, pending: "R2" };
+    if (A.palletise.present) { A.palletise.source = "shared:stretch-wrap"; A.palletise.shared = "stretch-wrap"; }
+    // v3.29 R2: the two stations that did not exist in v3.25 now do. Strict:
+    // no element, no route - the order type is reported unfulfillable and the
+    // message names the Depalletiser / Value-add bench to place.
+    strictAnchor(A, "depalletise", els, (e) => e.type === "depalletiser");
+    strictAnchor(A, "vas", els, (e) => e.type === "vas-station");
 
     A.gridW = gridW;
     A.gridH = gridH;

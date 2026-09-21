@@ -521,8 +521,9 @@
     { key: "forklift", label: "Forklift / reach truck", capex: 35000, amortYears: 8, powerKW: 3, types: ["forklift"] },
     { key: "dock", label: "Dock door + leveller", capex: 15000, amortYears: 20, powerKW: 0.5, types: ["dock-in", "dock-out"] },
     { key: "workstation", label: "Pack / handling station", capex: 6000, amortYears: 10, powerKW: 0.6,
-      types: ["pack-station", "push-station", "pull-station", "returns-station"] },
+      types: ["pack-station", "push-station", "pull-station", "returns-station", "qc-bench", "vas-station"] },
     { key: "wrapper", label: "Stretch wrapper", capex: 20000, amortYears: 12, powerKW: 2, types: ["stretch-wrap"] },
+    { key: "depalletiser", label: "Depalletiser", capex: 60000, amortYears: 12, powerKW: 4, types: ["depalletiser"] },
     { key: "charging", label: "Charging station", capex: 8000, amortYears: 10, powerKW: 0.2, types: ["charging-station"] },
   ];
 
