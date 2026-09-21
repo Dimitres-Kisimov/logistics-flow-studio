@@ -158,7 +158,7 @@ def connect(path: str) -> sqlite3.Connection:
 
 def initialize(db: sqlite3.Connection) -> None:
     db.executescript(DDL)
-    for name, ddl in VIEWS.items():
+    for ddl in VIEWS.values():
         db.executescript(ddl)
     for pid, slots in TRAILER_SLOTS.items():
         db.execute("INSERT OR IGNORE INTO pallet_type VALUES(?, ?)", (pid, slots))

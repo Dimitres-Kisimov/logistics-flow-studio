@@ -10,7 +10,6 @@ Two layers of proof:
      app shows - the readout and the database cannot disagree.
 """
 import json
-import sqlite3
 import sys
 import unittest
 from pathlib import Path
