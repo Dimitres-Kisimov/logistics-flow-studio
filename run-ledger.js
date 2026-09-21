@@ -316,14 +316,20 @@
       const x = (tick) => X0 + ((tick - t.start) / span) * (W - 2 * X0);
       let g = '<svg viewBox="0 0 ' + W + ' 86" class="gantt" role="img" aria-label="Timeline of ' + esc(h.id) + '">';
       for (const s of t.spans) g += '<rect x="' + x(s.from).toFixed(1) + '" y="10" width="' + Math.max(1, x(s.to) - x(s.from)).toFixed(1) + '" height="24" class="span-' + s.state + '"><title>' + esc(s.state + " · " + s.op + " · ticks " + s.from + "–" + s.to) + "</title></rect>";
-      // labels alternate between two rows so close events do not overprint
+      // labels go on two rows; a label too close to the previous one on a row
+      // moves to the other row, and is dropped when both rows are taken (the
+      // event table below and the span tooltips still carry every operation)
       let lastLabelOp = null;
-      t.events.forEach((e, i) => {
-        g += '<line x1="' + x(e.tick).toFixed(1) + '" y1="8" x2="' + x(e.tick).toFixed(1) + '" y2="40" class="ev-tick"/>';
-        if (e.op !== lastLabelOp) {
-          g += '<text x="' + x(e.tick).toFixed(1) + '" y="' + (i % 2 ? 66 : 54) + '" class="svg-label" text-anchor="middle">' + esc(e.op) + "</text>";
-          lastLabelOp = e.op;
-        }
+      const rowX = [-1e9, -1e9], MIN_GAP = 46;
+      t.events.forEach((e) => {
+        const px = x(e.tick);
+        g += '<line x1="' + px.toFixed(1) + '" y1="8" x2="' + px.toFixed(1) + '" y2="40" class="ev-tick"/>';
+        if (e.op === lastLabelOp) return;
+        lastLabelOp = e.op;
+        const row = px - rowX[0] >= MIN_GAP ? 0 : px - rowX[1] >= MIN_GAP ? 1 : -1;
+        if (row < 0) return;
+        rowX[row] = px;
+        g += '<text x="' + px.toFixed(1) + '" y="' + (row ? 66 : 54) + '" class="svg-label" text-anchor="middle">' + esc(e.op) + "</text>";
       });
       g += '<text x="10" y="82" class="svg-label">tick ' + t.start + " → " + t.end + " · dark = waiting at a bench, light = moving / being worked</text></svg>";
       $("rlTrace").innerHTML = '<div class="cards"><article><span>Unit</span><strong class="mono">' + esc(h.id) + "</strong></article><article><span>SSCC · GTIN-14</span><strong class=\"mono\">" + esc(h.sscc) + "<br>" + esc(h.gtin14) + "</strong></article><article><span>Received</span><strong>" + esc(h.received_eaches) + " eaches · " + esc(h.cases_per_pallet) + " cases × " + esc(h.eaches_per_case) + " on " + esc(h.pallet) + "</strong></article></div>" + g +
