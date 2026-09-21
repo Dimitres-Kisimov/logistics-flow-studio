@@ -473,11 +473,11 @@
     // slotting-anchored) before packing, and picking falls back to the
     // midpoint of those two.
     const A = {};
-    A["dock-in"] = { x: receiving.x, y: receiving.y, present: true, source: "element-or-zone", count: countOf(els, (e) => e.type === "dock-in" || dockDir(e) === "receiving") };
-    A.storage = { x: storage.x, y: storage.y, present: true, source: retrievalAnchored ? "slotting" : "element-or-zone", count: countOf(els, isStorage) };
-    A.pack = { x: packing.x, y: packing.y, present: true, source: "element-or-zone", count: countOf(els, (e) => e.type === "pack-station" || baseOf(e) === "station") };
-    A["dock-out"] = { x: shipping.x, y: shipping.y, present: true, source: "element-or-zone", count: countOf(els, (e) => e.type === "dock-out" || dockDir(e) === "shipping") };
-    A.pickface = { x: picking.x, y: picking.y, present: true, source: "element-or-zone", count: countOf(els, isPickFace) };
+    A["dock-in"] = { x: receiving.x, y: receiving.y, present: true, source: "element-or-zone", count: countOf(els, (e) => e.type === "dock-in" || dockDir(e) === "receiving"), ids: idsOf(els, (e) => e.type === "dock-in" || dockDir(e) === "receiving") };
+    A.storage = { x: storage.x, y: storage.y, present: true, source: retrievalAnchored ? "slotting" : "element-or-zone", count: countOf(els, isStorage), ids: idsOf(els, isStorage) };
+    A.pack = { x: packing.x, y: packing.y, present: true, source: "element-or-zone", count: countOf(els, (e) => e.type === "pack-station" || baseOf(e) === "station"), ids: idsOf(els, (e) => e.type === "pack-station" || baseOf(e) === "station") };
+    A["dock-out"] = { x: shipping.x, y: shipping.y, present: true, source: "element-or-zone", count: countOf(els, (e) => e.type === "dock-out" || dockDir(e) === "shipping"), ids: idsOf(els, (e) => e.type === "dock-out" || dockDir(e) === "shipping") };
+    A.pickface = { x: picking.x, y: picking.y, present: true, source: "element-or-zone", count: countOf(els, isPickFace), ids: idsOf(els, isPickFace) };
 
     // ---- The STRICT anchors added by the order-routing engine (v3.25). No
     // element, no route: there is NO zone fallback and NO geometric guess, so
@@ -516,11 +516,18 @@
   // A STRICT anchor: present ONLY when a real element carries it. No zone
   // metadata fallback, no geometric guess - the honest 'this floor cannot do
   // that operation' signal the router turns into a friendly message.
+  // v3.32: the ids of the elements an anchor binds to, so a ledger can name
+  // the equipment an operation happened at (never a guess).
+  function idsOf(els, pred) {
+    const out = [];
+    for (const e of els) if (pred(e) && e.id != null) out.push(String(e.id));
+    return out;
+  }
   function strictAnchor(A, id, els, pred) {
     const c = centroidOf(els, pred);
     A[id] = c
-      ? { x: c.x, y: c.y, present: true, source: "element", count: countOf(els, pred) }
-      : { x: NaN, y: NaN, present: false, source: "none", count: 0 };
+      ? { x: c.x, y: c.y, present: true, source: "element", count: countOf(els, pred), ids: idsOf(els, pred) }
+      : { x: NaN, y: NaN, present: false, source: "none", count: 0, ids: [] };
     return A[id];
   }
 
@@ -851,6 +858,7 @@
       const c = clampPt({ x: e.x + (e.w || 1) / 2, y: e.y + (e.d || 1) / 2 }, gridW, gridH);
       return {
         id: kind + "-" + i,
+        elementId: e && e.id != null ? String(e.id) : null, // v3.32: the bench this station IS
         kind: kind, // "put" | "pick" | "pack"
         stage: stage, // the flow stage a unit is in while queued here
         wpIndex: wpIndex,
@@ -967,7 +975,7 @@
     // Live stations: copy the specs and attach a mutable FIFO queue +
     // service accumulator. Index them by waypoint for O(1) enqueue.
     const stations = (plan.stations || []).map((s) => ({
-      id: s.id, kind: s.kind, stage: s.stage, wpIndex: s.wpIndex,
+      id: s.id, elementId: s.elementId || null, kind: s.kind, stage: s.stage, wpIndex: s.wpIndex,
       x: s.x, y: s.y, serviceRatePerTick: s.serviceRatePerTick,
       serviceAccum: 0, queue: [],
     }));
@@ -1235,6 +1243,9 @@
     refreshQueueStats(state);
     state.tick++;
     if (!plan.loop && (state.poolRemaining <= 0 || !plan.spawnable) && state.mus.length === 0) state.done = true;
+    // v3.32: pure observers (the run ledger) see every tick. Absent -> no-op,
+    // so a run is byte-identical with or without one.
+    if (state.hooks && typeof state.hooks.afterTick === "function") state.hooks.afterTick(state);
   }
 
   // Roll up per-station queue lengths into the state's congestion scalars.

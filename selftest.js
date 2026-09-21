@@ -90,6 +90,7 @@
       ["domain", function (m) { return m && m.ELEMENTS && typeof m.elementCapacity === "function"; }],
       ["ids", function (m) { return m && typeof m.sscc === "function" && typeof m.runId === "function"; }],
       ["pack", function (m) { return m && m.PALLETS && typeof m.tiHi === "function" && typeof m.quantitiesAlong === "function"; }],
+      ["ledger", function (m) { return m && typeof m.create === "function" && typeof m.observe === "function" && typeof m.exportJson === "function"; }],
       ["view", function (m) { return m && typeof m.worldToScreen === "function" && typeof m.fitView === "function"; }],
       ["compliance", function (m) { return m && typeof m.check === "function"; }],
       ["advisor", function (m) { return m && typeof m.analyze === "function"; }],
@@ -3432,6 +3433,32 @@
       var conserved = st.spawned === st.inflight + st.completed;
       return { ok: plan.mix !== null && plan.unfulfillable.length === 0 && plan.routes.length > 1 && types >= 2 && conserved,
         detail: "routes=" + plan.routes.length + " unfulfillable=" + plan.unfulfillable.length + " typesSpawned=" + types + " conserved=" + conserved };
+    });
+    // ---- v3.32: the run ledger records identities + quantities and conserves them.
+    check("run-ledger-records-identities-and-conserves-quantities", function () {
+      var Lg = WT.ledger, F = WT.flowsim, EX2 = WT.examples, I2 = WT.ids, P2 = WT.pack;
+      if (!Lg || !F || !EX2 || !I2 || !P2) return { ok: false, detail: "modules missing" };
+      if (!$("flowLedgerExport") || !$("flowLedgerUnit")) return { ok: false, detail: "ledger block missing" };
+      var b = EX2.build("ecommerce-multichannel-fc");
+      var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
+      var plan = F.spawnPlan(lay, { seed: 6, mix: lay.config.orderMix });
+      var st = F.state(plan);
+      var rec = Lg.create(plan, { scenarioId: "ecommerce-multichannel-fc", seed: 6, mix: lay.config.orderMix, layout: lay, profile: P2.profileFor("ecommerce-multichannel-fc") });
+      st.hooks = { afterTick: function (s) { Lg.observe(rec, s); } };
+      F.step(st, 300);
+      var exp = Lg.exportJson(rec), bad = null, byHu = {};
+      for (var i = 0; i < exp.events.length; i++) { var e = exp.events[i]; (byHu[e.hu_id] = byHu[e.hu_id] || []).push(e); }
+      for (var j = 0; j < exp.hus.length; j++) {
+        var h = exp.hus[j], evs = byHu[h.id] || [];
+        if (!I2.isValidGs1(h.sscc) || !I2.isValidGs1(h.gtin14)) bad = "invalid GS1 on " + h.id;
+        for (var k = 0; k < evs.length; k++) {
+          if (evs[k].version !== k) bad = "version gap on " + h.id;
+          if (evs[k].eaches + evs[k].retained + evs[k].scrapped !== h.received_eaches) bad = "not conserved on " + h.id;
+        }
+      }
+      var delivered = exp.hus.filter(function (h) { return h.final_kind === "delivered"; }).length;
+      return { ok: !bad && exp.schema === "factory-run-ledger/v1" && exp.hus.length === st.spawned && delivered > 0 && /^RUN-ecommerce-multichannel-fc-s6-h[0-9a-f]{8}$/.test(exp.run.id),
+        detail: bad || (exp.hus.length + " units, " + exp.events.length + " events, " + delivered + " delivered, run " + exp.run.id) };
     });
     // ---- v3.31: packaging hierarchy + numbering system, hand values.
     check("packaging-and-gs1-hand-values", function () {

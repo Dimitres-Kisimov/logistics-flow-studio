@@ -1,5 +1,35 @@
 # Changelog
 
+## v3.32 — The run ledger, and its SQL
+
+**What.** `ledger.js` records the live simulation as an append-only event stream: one
+record per handling unit (RUN / ORD / HU ids, SSCC, GTIN-13, GTIN-14, packaging
+profile, eaches received) and one event per operation passed (created, queued, served,
+passed, delivered / restocked / scrapped) with pallets, cases, eaches, parcels, retained
+and scrapped quantities and the equipment the operation happened at. It is a pure
+observer on a new after-tick hook: the sim is byte-identical with or without it; a
+tick that serves a unit and moves it on, or a unit that passes several waypoints in
+one tick, is recorded in full and in order. Stations now carry the element they are;
+anchors carry the ids they bound to. The flow card gained the run id, per-type counts,
+a per-unit trace and a JSON export (`factory-run-ledger/v1`, with the floor's element
+types so SQL can classify locations).
+
+**SQL.** `tools/run_ledger.py` (standard library): import (idempotent per run), the
+planner views `v_run_summary`, `v_cycle_time_by_type`, `v_touches_by_type`,
+`v_station_wait`, `v_wip_by_tick`, `v_quantities_by_op`, `v_dispatch`, the invariant
+views `v_conservation_violations`, `v_cross_dock_violations`, `v_version_gaps`,
+`v_terminal_violations`, a bounded read-only `query`, and a JSON `summary`.
+`tools/make_run_ledger_fixture.mjs` regenerates the committed fixture deterministically.
+
+**Verification.** `verify_ledger.js` (32 checks: identities, consecutive versions,
+exact route walks, conservation at every event, exact element locations, the SQL
+invariants in JS, determinism, byte-identical sim, no mutation, simulated time,
+wiring). `test/test_run_ledger.py` (14 tests: a hand-built ledger with hand-computed
+cycle times, touches, waits, WIP, quantities and dispatch; every invariant empty, then
+a deliberate corruption makes each fire; idempotent re-import; bounded query; the
+recorded fixture's SQL summary equals the JavaScript stats). 64 harnesses, 76
+Python tests, WT-SELFTEST 174/174. Cache wt-v114.
+
 ## v3.31 — The packaging hierarchy and the numbering system
 
 **Why.** A ledger, an SQL query and a viewer need two things the simulator did not

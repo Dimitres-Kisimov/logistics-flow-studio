@@ -2428,6 +2428,51 @@
       '<div class="flow-mix-rows">' + html + "</div>" + notes + "</div>";
   }
 
+  // v3.32: which library scenario the floor came from (the run id names it).
+  function currentScenarioId() {
+    return (state.flow && state.flow.scenarioId) || "custom";
+  }
+  let ledgerTraceCache = "";
+  function ledgerStatsHtml(rec) {
+    const s = WT.ledger.stats(rec);
+    const types = s.types.map((t) => '<span class="flow-chip">' + t.archetype + " <strong>" + t.units + "</strong>" +
+      (t.retired ? " · done " + t.retired + " · ~" + t.avg_cycle_ticks + " ticks" : "") + "</span>").join("");
+    return '<p class="flow-pool-stats"><code>' + rec.run.id + "</code><br>Units <strong>" + s.units + "</strong> · events <strong>" + s.events +
+      "</strong> · delivered <strong>" + s.delivered + "</strong> (" + s.delivered_eaches + " eaches · " + s.delivered_pallets + " pallets · " +
+      s.delivered_parcels + " parcels) · profile " + (rec.run.profile || "-") + "</p>" + (types ? '<div class="flow-chips">' + types + "</div>" : "");
+  }
+  function updateLedgerReadout() {
+    const out = $("flowLedgerStats"), sel = $("flowLedgerUnit"), trace = $("flowLedgerTrace");
+    const rec = state.flow.ledger;
+    if (!out || !rec || !WT.ledger) return;
+    out.innerHTML = ledgerStatsHtml(rec);
+    if (!sel || !trace) return;
+    // the unit picker lists the most recent 60 units; keep the user's choice
+    const chosen = sel.value;
+    const ids = rec.order.slice(-60).reverse();
+    const key = ids.length + ":" + (ids[0] || "") + ":" + chosen;
+    if (sel.getAttribute("data-key") !== key) {
+      sel.innerHTML = ids.map((id) => '<option value="' + id + '">' + rec.hus[id].archetype + " · " + id.slice(-9) + "</option>").join("");
+      if (chosen && ids.indexOf(chosen) >= 0) sel.value = chosen;
+      sel.setAttribute("data-key", key);
+    }
+    const id = sel.value || ids[0];
+    const hu = id ? rec.hus[id] : null;
+    if (!hu) { trace.innerHTML = ""; return; }
+    const evs = rec.events.filter((e) => e.hu_id === id);
+    const cacheKey = id + ":" + evs.length;
+    if (ledgerTraceCache === cacheKey) return;
+    ledgerTraceCache = cacheKey;
+    const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    trace.innerHTML = '<p class="flow-pool-stats"><code>' + esc(hu.id) + "</code><br>SSCC <code>" + esc(hu.sscc) + "</code> · GTIN-14 <code>" + esc(hu.gtin14) +
+      "</code> · " + esc(hu.archetype) + (hu.outcome ? " / " + esc(hu.outcome) : "") + " · received <strong>" + hu.received_eaches + "</strong> eaches (" +
+      hu.cases_per_pallet + " cases × " + hu.eaches_per_case + " on a " + esc(hu.pallet) + " pallet)</p>" +
+      '<table class="flow-ledger-table"><thead><tr><th>v</th><th>min</th><th>event</th><th>operation</th><th>at</th><th>pallets</th><th>cases</th><th>eaches</th><th>parcels</th><th>retained</th></tr></thead><tbody>' +
+      evs.map((e) => "<tr><td>" + e.version + "</td><td>" + e.minute + "</td><td>" + esc(e.kind) + "</td><td>" + esc(e.op) + "</td><td>" + esc(e.location) +
+        "</td><td>" + e.pallets + "</td><td>" + e.cases + "</td><td>" + e.eaches + "</td><td>" + e.parcels + "</td><td>" + e.retained + (e.scrapped ? " / scrapped " + e.scrapped : "") + "</td></tr>").join("") +
+      "</tbody></table>";
+  }
+
   function flowBuild() {
     if (!WT.flowsim) return false;
     readConfigFromUI();
@@ -2449,6 +2494,18 @@
     const shape = activeOrderShape();
     if (shape) { opts.orders = shape.orders; opts.linesPerOrderMax = shape.linesPerOrderMax; }
     state.flow.sim = WT.flowsim.state(layout, opts);
+    // v3.32 THE RUN LEDGER: a pure observer attached as an after-tick hook.
+    // Every unit gets its identities (ids.js) and quantities (pack.js); the
+    // export feeds tools/run_ledger.py (SQLite) and the run-ledger viewer.
+    state.flow.ledger = null;
+    if (WT.ledger && WT.ids && WT.pack) {
+      const scen = currentScenarioId();
+      state.flow.ledger = WT.ledger.create(state.flow.sim.plan, {
+        scenarioId: scen, seed: seed, mix: opts.mix || null, layout: layout, profile: WT.pack.profileFor(scen),
+      });
+      state.flow.sim.hooks = { afterTick: (st) => WT.ledger.observe(state.flow.ledger, st) };
+    }
+    ledgerTraceCache = "";
     sceneSelection = null;
     flowClock = WT.runClock.create(flowDurationMinutes);
     state.flow.sig = flowSignature();
@@ -2755,6 +2812,7 @@
       '<p class="flow-stats">In-flight <strong>' + s.inflight + "</strong> · Shipped <strong>" + s.completed +
       "</strong> · tick " + s.tick + " · bottleneck throughput ~" + s.plan.lineThroughput.toFixed(0) + " units/hr" +
       queueTxt + (state.flow.playing ? "" : " · paused") + "</p>";
+    updateLedgerReadout(); // v3.32
   }
 
   /* ------------------------------------------------------------------
@@ -2886,6 +2944,16 @@
     if (routePicker) routePicker.addEventListener("change", () => renderRouteReview(true));
     const on = (id, fn) => { const el = $(id); if (el) el.addEventListener("click", fn); };
     on("flowPlayBtn", flowPlay);
+    // v3.32: export the run ledger; trace a unit.
+    on("flowLedgerExport", () => {
+      const rec = state.flow.ledger;
+      if (!rec || !WT.ledger) { toast("Press Play first - the ledger records the run as it happens.", "warn"); return; }
+      const data = WT.ledger.exportJson(rec);
+      downloadFile("run-ledger-" + rec.run.id + ".json", JSON.stringify(data, null, 1), "application/json");
+      status("Run ledger exported: " + data.hus.length + " units, " + data.events.length + " events. Import it with tools/run_ledger.py or open it in run-ledger.html.");
+    });
+    const unitSel = $("flowLedgerUnit");
+    if (unitSel) unitSel.addEventListener("change", () => { ledgerTraceCache = ""; updateLedgerReadout(); });
     // v3.29 R4: the order-mix picker. Remembered on this device; a change
     // rebuilds the run from tick 0 (a different mix is a different day).
     (function wireMix() {
@@ -5786,6 +5854,7 @@
       if (!isNaN(n)) maxId = Math.max(maxId, n);
     }
     state.config.orderMix = undefined; // v3.29 R4: a loaded layout brings its own mix, or none
+    state.flow.scenarioId = obj.example && typeof obj.example.id === "string" ? obj.example.id : null; // v3.32
     state.elements = cleaned;
     $("optConstraints").value = obj.placementConstraintDraft === undefined ? '{"fixedIds":[],"zones":[]}' : obj.placementConstraintDraft;
     state.preview = null;
@@ -6495,6 +6564,7 @@
   // ================================================================
   function demoLayout() {
     state.config.orderMix = undefined; // v3.29 R4: the demo floor declares no mix
+    state.flow.scenarioId = null; // v3.32
     state.idCounter = 0;
     GRID_W = V.FLOOR_DEFAULT_W; // the starter uses the classic 40 x 24 floor
     GRID_H = V.FLOOR_DEFAULT_H;
@@ -6851,6 +6921,7 @@
   function applyGeneratedLayout(gen, source) {
     state.genLayout = gen;
     state.config.orderMix = undefined; // v3.29 R4: a generated / example layout brings its own mix, or none
+    state.flow.scenarioId = source === "example" && gen.meta && typeof gen.meta.exampleId === "string" ? gen.meta.exampleId : null; // v3.32
     state.idCounter = 0;
     // Respect a generated/example layout's own floor size when it carries
     // one (generator already builds against the current floor; examples
