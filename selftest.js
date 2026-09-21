@@ -3438,7 +3438,7 @@
     check("run-ledger-records-identities-and-conserves-quantities", function () {
       var Lg = WT.ledger, F = WT.flowsim, EX2 = WT.examples, I2 = WT.ids, P2 = WT.pack;
       if (!Lg || !F || !EX2 || !I2 || !P2) return { ok: false, detail: "modules missing" };
-      if (!$("flowLedgerExport") || !$("flowLedgerUnit")) return { ok: false, detail: "ledger block missing" };
+      if (!$("flowLedgerExport") || !$("flowLedgerUnit") || !$("flowLedgerOpen")) return { ok: false, detail: "ledger block missing" };
       var b = EX2.build("ecommerce-multichannel-fc");
       var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
       var plan = F.spawnPlan(lay, { seed: 6, mix: lay.config.orderMix });

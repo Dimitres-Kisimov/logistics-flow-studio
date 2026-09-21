@@ -707,6 +707,7 @@ const HARNESSES = [
   { name: "R3 - the goods follow the operation, not the stage (verify_forms.js)", args: ["verify_forms.js"] },
   { name: "Packaging hierarchy + numbering system: pallets, cases, ti-hi, trailers, GS1, conserved quantities (verify_pack.js)", args: ["verify_pack.js"] },
   { name: "The run ledger: identities + quantities recorded live, conserved, byte-identical sim (verify_ledger.js)", args: ["verify_ledger.js"] },
+  { name: "The run-ledger viewer: every table by the SQL definitions, hand-checked (verify_run_ledger_view.js)", args: ["verify_run_ledger_view.js"] },
   { name: "Timed route playback", args: ["verify_route_playback.js"] },
   { name: "Scheduled resource playback", args: ["verify_resource_playback.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },

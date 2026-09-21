@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Run ledger · from start to finish · Logistics Flow Studio</title><link rel="stylesheet" href="transfer-ledger.css"><link rel="stylesheet" href="run-ledger.css"></head>
+<body><main>
+<a href="index.html">← Factory planner</a>
+<p><a href="transfer-ledger.html">Package transfer evidence →</a> · <a href="resource-view.html">Scheduled resource movement →</a></p>
+<header><p class="eyebrow">Operations / Run ledger</p><h1>The whole run, from the inbound trailer to the outbound one.</h1>
+<p>Open a run ledger the simulator recorded (<em>Simulate → Live material flow → Export run ledger</em>). Every table on this page is a query over that one file: the same definitions <code>tools/run_ledger.py</code> runs in SQLite, and the test suite proves the two agree. Nothing here is measured off a drawing.</p></header>
+<section class="import" id="rlImport"><h2>Start with the recorded example or your export</h2>
+<button id="rlDemo" type="button">Load the recorded example</button>
+<label for="rlFile">Run ledger JSON (factory-run-ledger/v1)</label><input id="rlFile" type="file" accept=".json,application/json">
+<p id="rlStatus" role="status">Nothing loaded yet.</p>
+<p class="note">Synthetic events from a synthetic teaching simulation — not telemetry, not a WMS. Quantities are the synthetic order-line quantities of the scenario's packaging profile; GS1 numbers use GS1's documentation prefix.</p></section>
+<section id="rlView" hidden>
+<h2>The run</h2><div id="rlRun"></div>
+<h2>The packaging hierarchy</h2><p class="note">Each → case → layer → pallet → trailer, from the scenario's packaging profile. The pallet pattern is the ti-hi the optimiser computes: cases per layer in the better orientation, layers under the stack-height limit, reduced until the pallet's load limit holds.</p><div id="rlPack"></div>
+<h2>Start to finish, per order type</h2><div id="rlRibbon" class="ribbon-wrap"></div>
+<h2>What the planner asks</h2><div id="rlSummary"></div>
+<div class="grid2"><div id="rlCycle"></div><div id="rlTouches"></div></div>
+<div id="rlWait"></div>
+<h3>Work in progress over the run</h3><div id="rlWip"></div>
+<div id="rlByOp"></div>
+<h2>Dispatch manifest</h2><div id="rlDispatch"></div>
+<h2>Trace one unit</h2><label for="rlUnit">Handling unit</label><select id="rlUnit"></select><div id="rlTrace"></div>
+<h2>The invariants</h2><p class="note">Each of these views must return zero rows. They are the same views the SQLite tool exposes; a deliberate corruption in the test suite makes every one of them fire.</p><div id="rlInvariants"></div>
+</section>
+<footer>Deterministic: the same scenario, seed and order mix reproduce this file byte for byte. The viewer computes every table in the browser by the definitions shown under <em>SQL</em>; <code>python tools/run_ledger.py import &lt;file&gt; --database run.sqlite</code> then <code>views</code> runs them in SQLite. Unit-load dimensions follow DIN EN 13698 and VDA 4500; the 33 / 26 pallets per 13.6 m trailer are planning figures; everything about the goods themselves is a synthetic teaching value.</footer>
+</main><script src="ids.js"></script><script src="pack.js"></script><script src="run-ledger.js"></script></body></html>

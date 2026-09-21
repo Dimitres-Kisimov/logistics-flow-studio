@@ -915,7 +915,7 @@
         </div>
         <!-- v3.32: THE RUN LEDGER - every unit's identity, operations and quantities, recorded live. -->
         <div class="flow-ledger" id="flowLedger" aria-label="Run ledger">
-          <div class="flow-pool-head"><span class="flow-pool-title">Run ledger</span><button id="flowLedgerExport" class="btn small" type="button">Export run ledger (JSON)</button></div>
+          <div class="flow-pool-head"><span class="flow-pool-title">Run ledger</span><button id="flowLedgerExport" class="btn small" type="button">Export run ledger (JSON)</button><button id="flowLedgerOpen" class="btn small" type="button" title="Opens run-ledger.html with this run: the packaging hierarchy, the start-to-finish ribbon per order type, cycle times, waits, WIP, quantities per operation, the dispatch manifest and a unit trace">Open in the run-ledger viewer</button></div>
           <div id="flowLedgerStats"><p class="empty">Press Play to start recording: one record per handling unit, one event per operation, with SSCC / GTIN identities and pallet / case / each quantities.</p></div>
           <label for="flowLedgerUnit">Trace a unit</label>
           <select id="flowLedgerUnit" aria-label="Handling unit to trace"></select>

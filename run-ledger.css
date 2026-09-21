@@ -1,0 +1,17 @@
+/* run-ledger.html - on top of transfer-ledger.css (dark, industrial). */
+h2{margin:36px 0 10px;font-size:24px}h3{margin:22px 0 8px;font-size:18px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:15px}
+.cards article.good{border-top-color:#8fd3a4}.cards article.bad{border-top-color:#e58a7c}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.table-wrap{margin:8px 0 4px}table{font-size:13px}th,td{padding:8px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}td:first-child,th:first-child{white-space:normal}
+details.sql{margin:6px 0 18px}details.sql summary{cursor:pointer;color:#b6c0ba;font-size:13px}details.sql pre{margin:8px 0 0;padding:12px;background:#1b211d;border:1px solid #455149;border-radius:8px;font-size:12px;overflow:auto;color:#dfe7e2}
+.svg-label{font:12px system-ui,sans-serif;fill:#b6c0ba}
+.pallet-row{display:flex;gap:24px;flex-wrap:wrap;margin:14px 0}.pallet{width:260px;height:auto;background:#1b211d;border:1px solid #455149;border-radius:8px}
+.pallet-deck{fill:#8a6a3c;stroke:#c9a46b}.pallet-case{fill:#b98e5a;stroke:#3a2d1c}
+.ribbon-wrap{overflow-x:auto;padding-bottom:6px}.ribbon{display:block;height:100px;min-width:900px;margin:6px 0}
+.lane-label{font:600 13px system-ui,sans-serif;fill:#e9e8e4}.op-name{font:600 11px system-ui,sans-serif;fill:#171918}.op-qty{font:10px system-ui,sans-serif;fill:#171918}
+.op-box{fill:#dfe7e2;stroke:#455149}.op-box.form-pallet-load,.op-box.form-wrapped-pallet{fill:#e3c79a}.op-box.form-carton{fill:#d9b98a}.op-box.form-tote{fill:#a9cfe8}.op-box.form-parcel{fill:#e6d5a8}
+.ribbon-arrow{stroke:#9cdbd1;stroke-linecap:round}
+.wip{width:100%;height:auto;background:#1b211d;border:1px solid #455149;border-radius:8px}.wip-line{fill:none;stroke:#9cdbd1;stroke-width:2}
+.trailer-row{display:flex;gap:16px;flex-wrap:wrap;margin:12px 0}.trailer{width:200px;height:auto;background:#1b211d;border:1px solid #455149;border-radius:8px}.slot-full{fill:#c9a46b}.slot-empty{fill:none;stroke:#455149}
+.gantt{width:100%;height:auto;background:#1b211d;border:1px solid #455149;border-radius:8px;margin:10px 0}.span-waiting{fill:#8a5a3c}.span-moving{fill:#3f7a6a}.ev-tick{stroke:#e9e8e4;stroke-width:1}

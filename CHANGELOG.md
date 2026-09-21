@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.33 — The run-ledger viewer: the whole run, start to finish
+
+**What.** `run-ledger.html` + `run-ledger.js` + `run-ledger.css`: an offline page that
+draws one recorded run from the `factory-run-ledger/v1` export - the run card, the
+packaging hierarchy with the ti-hi pallet pattern drawn from the profile (plan +
+elevation), a start-to-finish ribbon per order type (units and pallets / cases /
+eaches / parcels at every operation, arrow width = eaches, form underneath), cycle
+time / touches / station wait / WIP over time / quantities per operation, the dispatch
+manifest with trailers drawn slot by slot, a unit trace with SSCC + GTIN-14, a
+waiting-vs-moving timeline and every event, and the invariants with the SQL that must
+return zero rows. Loads the recorded example, a chosen file, or a run handed over from
+the planner (new *Open in the run-ledger viewer* button; localStorage hand-over with a
+size guard). `RunLedger.views / ribbon / trace` are pure and mirror the SQLite views.
+
+**Verification.** `verify_run_ledger_view.js` (26 checks): the hand-built ledger with
+hand-computed cycle times, touches, waits, WIP, quantities, dispatch and ribbon; the
+recorded fixture's summary equal to the app's stats and every invariant zero; one lane
+per route; corruption surfaces; wiring, precache at wt-v115, offline-guard rules.
+Rasterized and inspected in headless Chromium. 65 harnesses, 76 Python tests,
+WT-SELFTEST 174/174.
+
 ## v3.32 — The run ledger, and its SQL
 
 **What.** `ledger.js` records the live simulation as an append-only event stream: one

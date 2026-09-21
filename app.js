@@ -2952,6 +2952,18 @@
       downloadFile("run-ledger-" + rec.run.id + ".json", JSON.stringify(data, null, 1), "application/json");
       status("Run ledger exported: " + data.hus.length + " units, " + data.events.length + " events. Import it with tools/run_ledger.py or open it in run-ledger.html.");
     });
+    on("flowLedgerOpen", () => {
+      const rec = state.flow.ledger;
+      if (!rec || !WT.ledger) { toast("Press Play first - the ledger records the run as it happens.", "warn"); return; }
+      const text = JSON.stringify(WT.ledger.exportJson(rec));
+      try {
+        localStorage.setItem("wt-run-ledger", text);
+      } catch (_) {
+        toast("This run is too large to hand over in the browser (" + Math.round(text.length / 1024) + " KB). Export it and open run-ledger.html, then choose the file.", "warn");
+        return;
+      }
+      window.open("run-ledger.html", "_blank", "noopener");
+    });
     const unitSel = $("flowLedgerUnit");
     if (unitSel) unitSel.addEventListener("change", () => { ledgerTraceCache = ""; updateLedgerReadout(); });
     // v3.29 R4: the order-mix picker. Remembered on this device; a change
