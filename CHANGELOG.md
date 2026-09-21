@@ -1,5 +1,36 @@
 # Changelog
 
+## v3.30 — R3: the goods follow the operation, not the stage
+
+**The defect.** v3.23 drew every handling unit in the form of its STAGE (receiving =
+wrapped pallet-load, storage = carton, picking = tote, packing / shipping = parcel).
+Honest for the single legacy spine, where the stage implies the operation; false the
+moment v3.29 let units walk their own recipes - a full pallet in "storage" is still a
+pallet, a cross-dock unit never becomes a carton, a return does not arrive as a pallet.
+
+**The fix.** `goods.js` gains `OP_FORM`, a closed table of the TRANSFORMING operations
+(depalletise -> cartons, pallet-pick -> pallet-load, case-pick -> cartons, piece-pick /
+pick -> tote, pack -> parcel, palletise -> pallet-load, wrap -> wrapped-pallet, restock ->
+carton); every other operation keeps the incoming form. `formAlong(route, op, queued)`
+walks the unit's own route to the operation it last passed (excluding it while the
+unit waits in that station's queue) from an honest start form: a pallet-load off the
+trailer, a parcel for a return, a case on the shelf for a route that starts in stock.
+`formFor(mu, route)` uses it on any non-legacy route and the stage chain otherwise, so
+with no mix declared every form is byte-identical to v3.23 - asserted at every tick.
+A new `wrapped-pallet` form (the pallet-load envelope, six film bands and a sheen edge)
+makes a wrapped dispatch pallet read differently from the inbound load it started as.
+`flowsim.makeRoute` now carries `startsInStock`. Units stay conserved; appearance only.
+
+**Verification.** `verify_forms.js` (25 checks): the table is closed against the
+routing operations; hand-derived form sequences for all eight archetypes and both
+returns outcomes; waiting semantics; a 600-tick live run of the full mix in which a
+cross-dock unit is a pallet-load at every tick, a full pallet is never a carton / tote /
+parcel, a case-pick unit is seen as cartons after the depalletiser and as a wrapped
+pallet after the wrapper, every return arrives as a parcel, and the drawable units
+carry exactly the model's forms; legacy byte-identity; a drawing smoke of the new form
+at every tier in both themes. Self-test gains one check. 62 harnesses, 62 Python
+tests, WT-SELFTEST 169/169. Cache wt-v112.
+
 ## v3.29 — R2 + R4: the missing stations, and the order mix goes live
 
 **The defect.** v3.25 built a per-order routing engine with eight order archetypes,

@@ -163,8 +163,8 @@ const megaEx = E.library.find((ex) => ex.config && ex.config.mega);
     /opts\.mix = mix/.test(app) && /function activeOrderMix/.test(app) && /orderMixHtml\(s\)/.test(app) && /sanitizeOrderMix\(obj\.config\.orderMix\)/.test(app));
   check("7c. the in-browser self-test covers the picker and a declared scenario mix",
     /order-mix-select-and-declared-example-mix/.test(self) && /r2-stations-registered-everywhere/.test(self));
-  check("7d. sw.js cache bumped to wt-v111 (trail preserved: previously wt-v110)",
-    /CACHE_VERSION\s*=\s*"wt-v111"/.test(sw) && /Previously wt-v110/.test(sw));
+  check("7d. sw.js cache bumped to wt-v112 (trail preserved: previously wt-v111)",
+    /CACHE_VERSION\s*=\s*"wt-v112"/.test(sw) && /Previously wt-v111/.test(sw));
   const hint = /Playback follows the <strong>order mix<\/strong> chosen here/.test(html);
   check("7e. the flow card no longer claims playback always follows the default route", hint && !/Playback below still uses the default teaching route/.test(html));
 })();

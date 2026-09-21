@@ -673,6 +673,7 @@
       label: res.label,
       short: res.short || res.label,
       legacy: !!res.legacy,
+      startsInStock: !!res.startsInStock, // v3.30 R3: the goods layer needs the start form
       ok: !!res.ok && !!waypoints && waypoints.length >= 2,
       ops: res.ops ? res.ops.slice() : [],
       steps: res.steps || [],

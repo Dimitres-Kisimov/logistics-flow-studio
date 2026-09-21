@@ -3431,6 +3431,28 @@
       return { ok: plan.mix !== null && plan.unfulfillable.length === 0 && plan.routes.length > 1 && types >= 2 && conserved,
         detail: "routes=" + plan.routes.length + " unfulfillable=" + plan.unfulfillable.length + " typesSpawned=" + types + " conserved=" + conserved };
     });
+    // ---- v3.30 R3: on a declared mix the drawn form follows the operation.
+    check("goods-form-follows-the-operation-on-a-declared-mix", function () {
+      var G = WT.goods, F = WT.flowsim, EX2 = WT.examples;
+      if (!G || !F || !EX2 || typeof G.formAlong !== "function") return { ok: false, detail: "modules missing" };
+      var b = EX2.build("ecommerce-multichannel-fc");
+      var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
+      var plan = F.spawnPlan(lay, { seed: 4, mix: lay.config.orderMix });
+      var st = F.state(plan), seen = {}, bad = null, returnsStart = true;
+      for (var i = 0; i < 400; i++) {
+        F.step(st, 1);
+        for (var j = 0; j < st.mus.length; j++) {
+          var mu = st.mus[j], r = plan.routes[mu.route], f = G.formFor(mu, r);
+          if (G.FORMS.indexOf(f) < 0) bad = "unknown form " + f;
+          (seen[r.archetype] = seen[r.archetype] || {})[f] = 1;
+          if (r.archetype === "returns" && mu.op === "receive" && f !== "parcel") returnsStart = false;
+        }
+      }
+      var pp = Object.keys(seen["piece-pick"] || {});
+      var legacyUntouched = G.formFor({ stage: "storage", status: "active" }) === "carton" && G.formFor({ stage: "picking", status: "queued" }) === "carton";
+      return { ok: !bad && pp.length >= 3 && pp.indexOf("tote") >= 0 && returnsStart && legacyUntouched,
+        detail: bad || ("each-pick forms: " + pp.join(">") + "; returns arrive as parcels=" + returnsStart + "; legacy chain untouched=" + legacyUntouched) };
+    });
     check("route-review-live-selection", function () {
       var picker = $("routeReviewPick"), body = $("routeReviewBody");
       if (!picker || !body || !WT.routeReview) return false;

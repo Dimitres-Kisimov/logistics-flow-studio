@@ -51,6 +51,15 @@
  * the station SERVES it, which is the honest visual of a station doing
  * work rather than a box changing colour in mid-air.
  *
+ * v3.30 R3 - WITH AN ORDER MIX DECLARED the form follows the OPERATION a
+ * unit last passed, not its stage (see OP_FORM below): a case-pick unit is
+ * a wrapped pallet-load, then cartons after the depalletiser, then a pallet
+ * again after palletising and a film-wrapped pallet after the wrapper; a
+ * cross-dock unit stays a pallet-load end to end; a return arrives as a
+ * parcel. Only transforming operations change the form; QC, put-away,
+ * replenishment, staging, loading, inspection and scrap keep it. The legacy
+ * spine is untouched: with no mix declared every form is exactly v3.23's.
+ *
  * RIDING THE ACTIVE COMPONENTS. `supportIndex()` reads the layout once
  * and records, per floor cell, the height of the surface that is carrying
  * goods there: a conveyor / curve / track / sorter belt top, an RGV or
@@ -109,8 +118,9 @@
     "carton":      { f: 0.40, l: 0.30, z: 0.30 },  // corrugated shipping carton
     "tote":        { f: 0.60, l: 0.40, z: 0.32 },  // Euro container tote
     "parcel":      { f: 0.35, l: 0.25, z: 0.22 },  // packed outbound parcel
+    "wrapped-pallet": { f: 1.20, l: 0.80, z: 1.45 }, // v3.30: the dispatch pallet after the wrapper - same envelope, film sheen
   };
-  const FORMS = ["pallet-load", "carton", "tote", "parcel", "pallet"];
+  const FORMS = ["pallet-load", "carton", "tote", "parcel", "pallet", "wrapped-pallet"];
 
   // Pallet construction (metres): the bottom blocks/runners and the top
   // deck of the EUR pallet, drawn at the rich tier.
@@ -134,6 +144,54 @@
     shipping: "parcel",       // loaded onto the outbound trailer
   };
   const STAGE_ORDER = ["receiving", "storage", "picking", "packing", "shipping"];
+
+  /* ------------------------------------------------------------------
+   * v3.30 R3 - THE FORM FOLLOWS THE OPERATION. With an order mix declared
+   * (v3.29) a unit walks its archetype's OWN operation sequence, so the
+   * stage no longer says what happened to it. The form is then a pure
+   * function of the operations the unit has PASSED: only a TRANSFORMING
+   * operation changes it; everything else (QC, put-away, replenish, stage
+   * out, load, inspect, scrap) keeps the incoming form. A unit WAITING at
+   * a station still shows the form BEFORE that station's operation. The
+   * legacy spine (no mix declared) keeps the stage-driven chain above,
+   * byte for byte.
+   * ------------------------------------------------------------------ */
+  const OP_FORM = {
+    depalletise: "carton",        // the inbound pallet is broken to cases
+    "pallet-pick": "pallet-load", // a whole pallet comes off the rack
+    "case-pick": "carton",        // whole cases are picked
+    "piece-pick": "tote",         // eaches are picked into a tote
+    pick: "tote",                 // the generic pick fills a tote
+    pack: "parcel",               // packed into a parcel
+    palletise: "pallet-load",     // built into a dispatch pallet
+    wrap: "wrapped-pallet",       // stretch-wrapped for dispatch
+    restock: "carton",            // a graded return goes back on the shelf as a case
+  };
+  // What a unit looks like when its route BEGINS: a wrapped pallet-load off
+  // the trailer; a returned parcel at the dock; a case already on the shelf
+  // when the route starts in stock (value-add, export).
+  function startFormOf(route) {
+    if (!route) return "pallet-load";
+    const a = route.archetype || route.id;
+    if (a === "returns") return "parcel";
+    if (route.startsInStock) return "carton";
+    return "pallet-load";
+  }
+  // The form after walking the route's ops up to and including `op` (up to
+  // but EXCLUDING it when `queued` - the station has not served the unit
+  // yet). Pure; an op not on the route yields the start form.
+  function formAlong(route, op, queued) {
+    const ops = (route && route.ops) || [];
+    let form = startFormOf(route);
+    if (ops.indexOf(op) < 0) return form; // not on this route: no progress is known
+    for (let i = 0; i < ops.length; i++) {
+      const cur = ops[i];
+      if (cur === op && queued) break;
+      if (OP_FORM[cur]) form = OP_FORM[cur];
+      if (cur === op) break;
+    }
+    return form;
+  }
 
   // Where each transformation HAPPENS, in the sim's own vocabulary. Used
   // by the UI/legend and asserted by the harness so the story drawn on
@@ -291,8 +349,13 @@
    * case it still has the form it arrived in - the station transforms it
    * when it SERVES it) or moving on.
    * ================================================================== */
-  function formFor(mu) {
+  function formFor(mu, route) {
     if (!mu) return "carton";
+    // v3.30 R3: on a per-order route the OPERATION decides the form. The
+    // legacy spine (route 0, or no route at all) keeps the stage chain.
+    if (route && !route.legacy && Array.isArray(route.ops) && route.ops.length && mu.op) {
+      return formAlong(route, mu.op, mu.status === "queued");
+    }
     let i = STAGE_ORDER.indexOf(mu.stage);
     if (i < 0) i = 0;
     if (mu.status === "queued") i = Math.max(0, i - 1); // still the incoming form
@@ -370,7 +433,8 @@
     const so = opts || {};
     const plan = (state && state.plan) || {};
     const wp = plan.waypoints || [];
-    const form = formFor(mu);
+    const route = plan.routes && mu ? plan.routes[mu.route] : null; // v3.30 R3
+    const form = formFor(mu, route);
     const size = sizeOf(form);
     const queued = !!(mu && mu.status === "queued" && mu.station);
     let x, y, heading, qIndex = -1;
@@ -714,6 +778,36 @@
     ctx.restore();
   }
 
+  // --- the stretch-film cocoon on a WRAPPED dispatch pallet ------------
+  // Drawn as more, tighter bands than the inbound load's three, plus a
+  // sheen line down the leading edge. Bands, not a tinted overlay, so the
+  // kraft still reads underneath. Nothing here is a model value.
+  function drawFilm(ctx, o, u, cosH, sinH, theme, rich, z0, topZ) {
+    const hz = Math.max(0.1, topZ - z0);
+    const lf = NOMINAL["pallet-load"].f * 0.96, ll = NOMINAL["pallet-load"].l * 0.96;
+    const hf = lf / 2, hl = ll / 2;
+    ctx.save();
+    ctx.strokeStyle = mat("band", theme);
+    ctx.globalAlpha = rich ? 0.85 : 0.6;
+    const bands = rich ? 6 : 2;
+    for (let b = 1; b <= bands; b++) {
+      const z = z0 + (hz * b) / (bands + 1);
+      const corners = [[-hf, -hl], [hf, -hl], [hf, hl], [-hf, hl]];
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const q = pt(o, corners[i][0], corners[i][1], z, cosH, sinH, u.x, u.y);
+        if (i === 0) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+    // The sheen: one bright vertical line on the leading corner.
+    ctx.globalAlpha = rich ? 0.9 : 0.7;
+    ctx.strokeStyle = theme === "dark" ? "#dfe6ee" : "#ffffff";
+    line(ctx, o, [hf, -hl, z0 + hz * 0.08], [hf, -hl, z0 + hz * 0.92], cosH, sinH, u.x, u.y);
+    ctx.restore();
+  }
+
   /**
    * Draw ONE unit.
    * opts = {
@@ -763,9 +857,13 @@
     const z0 = u.z;
     if (u.form === "pallet") {
       drawPallet(ctx, o, u, cosH, sinH, theme, rich, z0);
-    } else if (u.form === "pallet-load") {
+    } else if (u.form === "pallet-load" || u.form === "wrapped-pallet") {
       const deck = drawPallet(ctx, o, u, cosH, sinH, theme, rich, z0);
       drawCartonStack(ctx, o, u, cosH, sinH, theme, rich, deck, z0 + u.size.z);
+      // v3.30 R3: after the wrapper the load carries a full film cocoon -
+      // denser bands plus a sheen edge - so a wrapped dispatch pallet reads
+      // differently from the inbound load it started as.
+      if (u.form === "wrapped-pallet") drawFilm(ctx, o, u, cosH, sinH, theme, rich, deck, z0 + u.size.z);
     } else if (u.form === "tote") {
       const S = u.size;
       const plastic = mat(((u.id | 0) % 5) === 0 ? "toteRed" : "toteBlue", theme);
@@ -882,6 +980,7 @@
     HONESTY,
     // model (pure)
     formFor, sizeOf, supportIndex, supportAt, carrierOf,
+    OP_FORM, startFormOf, formAlong, // v3.30 R3
     queueTrail, sample, units,
     vehicles, sampleVehicle,
     rackStock,
