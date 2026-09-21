@@ -8,12 +8,14 @@
  *      industrial 1200 x 1000, half 800 x 600; 33 / 26 pallets per trailer).
  *   2. ti-hi pallet patterns: e-commerce carton 400 x 300 x 250 on EUR at
  *      1.8 m -> 8 per layer (rotated) x 6 layers = 48 cases, 313 kg, 90.6 %
- *      cube; KLT 600 x 400 x 280 on an industrial pallet at 1.6 m -> 4 x 5 =
- *      20; pharma 300 x 200 x 150 on EUR at 1.5 m -> 16 x 9 = 144; beverage
+ *      cube; KLT 600 x 400 x 280 on an industrial pallet at 1.6 m -> BANDS
+ *      600 + 400 = 5 per layer x 5 = 25; pharma 300 x 200 x 150 on EUR at 1.5 m
+ *      -> 16 x 9 = 144; beverage
  *      tray -> 8 x 11 = 88; food crate -> 4 x 7 = 28; drums on a 1200 x 1200
  *      pallet -> 4 x 1; a 40 kg carton is WEIGHT-limited to 4 layers = 32.
- *   3. The pattern optimiser ranks the industrial pallet (9 x 6 = 54) above
- *      EUR (48) above half (24) for that carton, and reports cube utilisation.
+ *   3. The pattern optimiser ranks the industrial pallet (bands 400 / 300 /
+ *      300 = 10 x 6 = 60) above EUR (48) above half (24) for that carton, and
+ *      reports cube utilisation; band layouts (v3.34) are checked by hand.
  *   4. Trailer fill: 40 EUR pallets need 2 trailers at 60.6 %; 33 fit one.
  *   5. GS1 check digits computed by hand: SSCC 340123450000000017, GTIN-13
  *      4012345678901, GTIN-14 14012345678908, GLN 4012345000016; a corrupted
@@ -72,8 +74,8 @@ console.log("=".repeat(72));
   check("2b. ... gross 25 + 48 x 6 = 313 kg, stack 144 + 6 x 250 = 1644 mm, cube 1.44 / 1.58976 m3 = 90.58 %",
     near(t.grossKg, 313) && t.stackMm === 1644 && near(t.cubeUtil, 0.9058, 1e-4) && t.weightLimited === false);
   const k = P.tiHi(P.PALLETS.ind, P.BOXES["klt-600x400x280"], 1600, 15);
-  check("2c. KLT 600 x 400 x 280 on an industrial pallet at 1.6 m: 2 x 2 = 4 per layer, 5 layers = 20, 333 kg",
-    k.ti === 4 && k.rotated === false && k.hi === 5 && k.cases === 20 && near(k.grossKg, 333));
+  check("2c. KLT 600 x 400 x 280 on an industrial pallet at 1.6 m: the 2 x 2 grid is beaten by BANDS 600 + 400 = 3 + 2 = 5 per layer (the standard VDA layer), 5 layers = 25, 408 kg",
+    k.ti === 5 && k.pattern === "bands" && k.hi === 5 && k.cases === 25 && near(k.grossKg, 408));
   const ph = P.tiHi(P.PALLETS.eur, P.BOXES["case-300x200x150"], 1500, 4);
   check("2d. pharma carton 300 x 200 x 150 on EUR at 1.5 m: 4 x 4 = 16 per layer, 9 layers = 144, 601 kg",
     ph.ti === 16 && ph.hi === 9 && ph.cases === 144 && near(ph.grossKg, 601));
@@ -89,23 +91,40 @@ console.log("=".repeat(72));
   check("2h. a 40 kg carton is WEIGHT-limited: 8 x 40 = 320 kg per layer -> floor(1500 / 320) = 4 layers = 32 cases, 1,305 kg",
     wl.weightLimited === true && wl.hi === 4 && wl.cases === 32 && near(wl.grossKg, 1305));
   const bk = P.tiHi(P.PALLETS.ind, P.BOXES["bulk-600x400x400"], 1400, 30);
-  check("2i. bulky 600 x 400 x 400 on an industrial pallet at 1.4 m: 4 x 3 = 12", bk.ti === 4 && bk.hi === 3 && bk.cases === 12);
+  check("2i. bulky 600 x 400 x 400 on an industrial pallet at 1.4 m: bands give 5 per layer, 3 layers = 15", bk.ti === 5 && bk.hi === 3 && bk.cases === 15);
   check("2j. a cage has a DECLARED capacity (24 tyres), not a computed pattern",
     P.casesPerPallet(P.PROFILES.tyres) === 24 && P.tiHi(P.PALLETS.cage, P.BOXES["tyre-630x630x230"], 1800, 9).fixed === true);
-  check("2k. casesPerPallet(profile) agrees with the hand values: ecommerce 48, automotive 20, pharma 144, beverage 88, cold-chain 28, chemical 4, bulky 12",
-    P.casesPerPallet(P.PROFILES.ecommerce) === 48 && P.casesPerPallet(P.PROFILES.automotive) === 20 &&
+  check("2k. casesPerPallet(profile) agrees with the hand values: ecommerce 48, automotive 25, pharma 144, beverage 88, cold-chain 28, chemical 4, bulky 15",
+    P.casesPerPallet(P.PROFILES.ecommerce) === 48 && P.casesPerPallet(P.PROFILES.automotive) === 25 &&
     P.casesPerPallet(P.PROFILES.pharma) === 144 && P.casesPerPallet(P.PROFILES.beverage) === 88 &&
-    P.casesPerPallet(P.PROFILES["cold-chain"]) === 28 && P.casesPerPallet(P.PROFILES.chemical) === 4 && P.casesPerPallet(P.PROFILES.bulky) === 12);
+    P.casesPerPallet(P.PROFILES["cold-chain"]) === 28 && P.casesPerPallet(P.PROFILES.chemical) === 4 && P.casesPerPallet(P.PROFILES.bulky) === 15);
+  // ---- band layouts by hand (v3.34) ----
+  const b10 = P.bandDP(1200, 1000, 400, 300);
+  check("2l. bands across a 1200 x 1000 pallet for a 400 x 300 case: 400 + 300 + 300 = 4 + 3 + 3 = 10 per layer (a perfect tiling; the grid gives 9)",
+    b10.count === 10 && b10.bands.length === 3 && b10.bands.reduce((a, b) => a + b.height, 0) === 1000 && b10.bands.reduce((a, b) => a + b.n, 0) === 10, JSON.stringify(b10.bands.map((b) => [b.alongL, b.alongW, b.n])));
+  const b5 = P.bandDP(1200, 1000, 600, 400);
+  check("2m. bands for a 600 x 400 KLT on 1200 x 1000: 600 + 400 = 3 + 2 = 5 per layer", b5.count === 5 && b5.bands.length === 2);
+  const lyr = P.bestLayer(P.PALLETS.eur, P.BOXES["case-400x300x250"]);
+  check("2n. on the EUR pallet the 400 x 300 case keeps the rotated GRID of 8 (bands do not beat it)", lyr.pattern === "grid" && lyr.count === 8 && lyr.rotated === true);
+  const rects = P.layerRects(P.PALLETS.ind, P.BOXES["case-400x300x250"]);
+  let ov = 0;
+  for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) { const a = rects[i], b = rects[j]; if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) ov++; }
+  check("2o. the drawn 10-case layer has 10 rectangles, none overlapping, none over the deck edge",
+    rects.length === 10 && ov === 0 && rects.every((r) => r.x >= 0 && r.y >= 0 && r.x + r.w <= 1200 && r.y + r.h <= 1000));
+  const oe = P.optimizeProfile(P.PROFILES.ecommerce), oa = P.optimizeProfile(P.PROFILES.automotive);
+  check("2p. optimizeProfile: e-commerce now EUR 48 -> best industrial 60 (+25 %); automotive already on its best pattern (25); tyres have nothing to optimise",
+    oe.current.pallet === "eur" && oe.current.cases === 48 && oe.best.pallet === "ind" && oe.best.cases === 60 && oe.gain.cases === 12 && oe.gain.pct === 25 && !oe.gain.samePallet &&
+    oa.current.cases === 25 && oa.gain.samePallet === true && P.optimizeProfile(P.PROFILES.tyres).fixed === true, JSON.stringify(oe.gain));
 })();
 
 /* ---- 3. the pattern optimiser ---------------------------------------- */
 (function () {
   const r = P.bestPattern(P.BOXES["case-400x300x250"], 1800, 6);
-  check("3a. ranking for the e-commerce carton: industrial 3 x 3 = 9 per layer x 6 = 54, then EUR 48, then half 24",
-    r.length === 3 && r[0].pallet === "ind" && r[0].ti === 9 && r[0].cases === 54 && r[1].pallet === "eur" && r[1].cases === 48 && r[2].pallet === "half" && r[2].cases === 24,
+  check("3a. ranking for the e-commerce carton: industrial 10 per layer (bands 400 / 300 / 300) x 6 = 60, then EUR 48, then half 24",
+    r.length === 3 && r[0].pallet === "ind" && r[0].ti === 10 && r[0].pattern === "bands" && r[0].cases === 60 && r[1].pallet === "eur" && r[1].cases === 48 && r[2].pallet === "half" && r[2].cases === 24,
     r.map((x) => x.pallet + ":" + x.cases).join(" "));
-  check("3b. ... with cube utilisation reported: industrial 81.5 %, EUR and half 90.6 %",
-    near(r[0].cubeUtil, 0.8152, 1e-4) && near(r[1].cubeUtil, 0.9058, 1e-4) && near(r[2].cubeUtil, 0.9058, 1e-4));
+  check("3b. ... with cube utilisation reported: 90.6 % on all three (perfect layers under the same height)",
+    near(r[0].cubeUtil, 0.9058, 1e-4) && near(r[1].cubeUtil, 0.9058, 1e-4) && near(r[2].cubeUtil, 0.9058, 1e-4));
   check("3c. cages never appear in a computed ranking", P.bestPattern(P.BOXES["tyre-630x630x230"], 1800, 9, ["cage", "eur"]).every((x) => x.pallet !== "cage"));
 })();
 

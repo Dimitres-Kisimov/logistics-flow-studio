@@ -16,7 +16,7 @@
  *   3. Corruption surfaces: one each off by one -> conservation violation;
  *      a cross-dock unit at a storage element -> cross-dock violation.
  *   4. Shipped wiring: page, stylesheet and script exist and are precached
- *      at wt-v115; the planner has the hand-over button; the offline guard
+ *      at wt-v116; the planner has the hand-over button; the offline guard
  *      rules hold (no external references).
  * ===================================================================== */
 "use strict";
@@ -94,6 +94,11 @@ console.log("=".repeat(72));
   check("1i. the ribbon lane for case-pick walks receive > depalletise > case-pick > palletise > load with 1 unit and the right eaches after each",
     cp && cp.units === 1 && cp.steps.map((s) => s.op).join(">") === "receive>depalletise>case-pick>palletise>load" &&
     cp.steps.map((s) => s.eaches).join(",") === "576,576,48,48,48" && cp.steps[3].pallets === 1, cp && cp.steps.map((s) => s.op + ":" + s.eaches).join(" "));
+  // the pallet-pattern what-if on the hand ledger: 576 + 576 pallet-borne eaches; EUR 48 x 12 = 576 per pallet
+  // -> 2 pallets / 1 trailer now; industrial 60 x 12 = 720 -> still 2 pallets / 1 trailer
+  const wi = RL.whatIf(handLedger(), { current: { pallet: "eur", cases: 48 }, best: { pallet: "ind", cases: 60 } });
+  check("1k. the pallet-pattern what-if: 1152 pallet-borne eaches over 2 units -> 2 EUR pallets / 1 trailer now, 2 industrial pallets / 1 trailer with the best pattern",
+    wi && wi.units === 2 && wi.eaches === 1152 && wi.now.pallets === 2 && wi.now.trailers === 1 && wi.best.pallets === 2 && wi.best.trailers === 1 && wi.best.slots === 26 && !wi.same);
   const tr = RL.trace(handLedger(), "HU-ORD-RUN-hand-s1-h00000000-000001-1");
   check("1j. a trace has 6 events, 5 spans, the case-pick wait span 8-12 marked waiting, start 0 end 30",
     tr && tr.events.length === 6 && tr.spans.length === 5 && tr.spans[2].state === "waiting" && tr.spans[2].from === 8 && tr.spans[2].to === 12 && tr.start === 0 && tr.end === 30);
@@ -141,11 +146,12 @@ console.log("=".repeat(72));
   const html = read("run-ledger.html"), sw = read("sw.js"), app = read("app.js"), idx = read("index.html"), runall = read("test/run-all.mjs");
   check("4a. the page loads ids.js, pack.js and run-ledger.js and links both stylesheets",
     /<script src="ids\.js">/.test(html) && /<script src="pack\.js">/.test(html) && /<script src="run-ledger\.js">/.test(html) && /run-ledger\.css/.test(html) && /transfer-ledger\.css/.test(html));
-  check("4b. sw.js precaches the page, its script, stylesheet and the recorded example at wt-v115 (previously wt-v114)",
+  check("4b. sw.js precaches the page, its script, stylesheet and the recorded example at wt-v116 (previously wt-v115)",
     /"\.\/run-ledger\.html"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw) && /"\.\/run-ledger\.css"/.test(sw) && /"\.\/test\/fixtures\/run-ledger\.json"/.test(sw) &&
-    /CACHE_VERSION\s*=\s*"wt-v115"/.test(sw) && /Previously wt-v114/.test(sw));
+    /CACHE_VERSION\s*=\s*"wt-v116"/.test(sw) && /Previously wt-v115/.test(sw));
   check("4c. the planner hands a run over to the viewer (button + localStorage hand-over)", /flowLedgerOpen/.test(idx) && /wt-run-ledger/.test(app) && /run-ledger\.html/.test(app));
   check("4d. test/run-all.mjs lists this harness", /verify_run_ledger_view\.js/.test(runall));
+  check("4g. the page has the optimisation section", /id="rlOptimise"/.test(html) && /renderOptimise\(exp\)/.test(read("run-ledger.js")));
   check("4e. no external references in the page or its script (offline guard rule)", !/(src|href)\s*=\s*["']https?:/i.test(html) && !/https?:\/\//.test(read("run-ledger.js")));
   check("4f. no Date / Math.random CALL in run-ledger.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(read("run-ledger.js")));
 })();

@@ -1,5 +1,41 @@
 # Changelog
 
+## v3.34 — Packaging optimisation, and the routing stations on generated floors
+
+**Band layouts.** `pack.js` `bandDP` / `bestLayer` / `layerRects`: the one-dimensional
+knapsack over strips (Smith & De Cani, 1980), tried in both band directions and used
+only when it packs strictly more than the single-orientation grid. It recovers the
+standard layers a plant stacks: 5 KLTs (600 x 400) per layer on an industrial pallet
+(bands 600 + 400 = 3 + 2), 10 cartons (400 x 300) per layer on 1200 x 1000 (bands
+400 / 300 / 300 = 4 + 3 + 3, a perfect tiling). `tiHi` now reports `pattern` and the
+`layer`; `optimizeProfile` ranks every pallet for a profile and states the gain.
+Profile consequences: automotive 25 KLTs per pallet (was 20), bulky 15 (was 12); every
+other profile unchanged, so the recorded fixture is byte-identical.
+
+**Viewer.** `run-ledger.html` gains *Optimise the pallet pattern*: the ranked
+candidates with layers, cases, gross weight, cube utilisation and the binding limit;
+the current and best layers drawn from their rectangles; the what-if on the run's own
+pallet-borne eaches (inbound pallets and trailers now vs with the best pattern). The
+packaging section now draws the real layer (grid or bands) instead of a grid guess.
+
+**Generator.** `generateLayout(key, { stationsForRouting: true })` places QC bench,
+depalletiser and returns bench in receiving and wrapper and value-add bench in packing
+with the zone-bounded free-spot search the scenarios use; `meta.routingStations` lists
+what was placed and what was skipped. The Generate panel has the option, on by
+default. Without it the output is byte-identical to before.
+
+**Docs.** `docs/PACKAGING_OPTIMISATION.md` (the question, sources with what is real
+and what is synthetic, the pattern model with worked examples, what is deliberately
+not modelled, how to reproduce) and `docs/RUN_LEDGER_SCHEMA.md` (identities, the
+export, every SQL view and invariant).
+
+**Verification.** `verify_pack.js` +5 hand-computed checks (bands 10 and 5, the EUR
+grid keeps 8, ten non-overlapping rectangles inside the deck, optimizeProfile gains);
+`verify_gen_stations.js` (6 checks over every profile x 3 seeds: placed or honestly
+skipped, overlap-free, compliance never FAILs, the full mix routable wherever all
+five were placed, byte-identical without the option, wiring); viewer harness +2.
+66 harnesses, 76 Python tests, WT-SELFTEST 174/174. Cache wt-v116.
+
 ## v3.33 — The run-ledger viewer: the whole run, start to finish
 
 **What.** `run-ledger.html` + `run-ledger.js` + `run-ledger.css`: an offline page that

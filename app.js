@@ -6904,6 +6904,7 @@
         gridW: GRID_W, gridH: GRID_H,
         seed: Number.isFinite(Number(state.config.seed)) ? Number(state.config.seed) : undefined,
         reserve: reserve,
+        stationsForRouting: !!($("genStations") && $("genStations").checked), // v3.34: place the R2 stations
       };
       gen = isFactory ? GEN.generateFactoryLayout(key, genOpts) : GEN.generateLayout(key, genOpts);
     } catch (err) {

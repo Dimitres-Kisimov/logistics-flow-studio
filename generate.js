@@ -443,8 +443,28 @@
       summary: plainSummary(profile, seed, gridW, gridH, minAisle, reserve, counts),
     };
 
-    return { elements: els, config: config, meta: meta, gridW: gridW, gridH: gridH };
+    let out = { elements: els, config: config, meta: meta, gridW: gridW, gridH: gridH };
+    // v3.34: the routing stations (R2) on request - placed by the SAME
+    // zone-bounded free-spot search the library scenarios use, so the floor
+    // stays overlap-free. A station that finds no free spot is REPORTED in
+    // meta.routingStations.skipped, never squeezed in; the order mix then
+    // says which order types the floor cannot serve. Without the option the
+    // output is byte-identical to before.
+    if (opts.stationsForRouting) {
+      const placed = [], skipped = [];
+      for (const st of ROUTING_STATIONS) {
+        const res = applyCommand(out, { kind: "add", type: st[0], zone: st[1], count: 1 });
+        if (res.ok) { out = res.layout; placed.push(st[0]); } else skipped.push(st[0]);
+      }
+      out.meta = Object.assign({}, out.meta, { routingStations: { placed: placed, skipped: skipped } });
+    }
+    return out;
   }
+  // [element type, zone] - inbound stations by the docks, outbound ones by the pack line.
+  const ROUTING_STATIONS = [
+    ["qc-bench", "receiving"], ["depalletiser", "receiving"], ["returns-station", "receiving"],
+    ["stretch-wrap", "packing"], ["vas-station", "packing"],
+  ];
 
   function plainSummary(profile, seed, gridW, gridH, minAisle, reserve, counts) {
     let s =

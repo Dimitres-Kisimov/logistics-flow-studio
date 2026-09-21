@@ -13,6 +13,7 @@
 <section id="rlView" hidden>
 <h2>The run</h2><div id="rlRun"></div>
 <h2>The packaging hierarchy</h2><p class="note">Each → case → layer → pallet → trailer, from the scenario's packaging profile. The pallet pattern is the ti-hi the optimiser computes: cases per layer in the better orientation, layers under the stack-height limit, reduced until the pallet's load limit holds.</p><div id="rlPack"></div>
+<h2>Optimise the pallet pattern</h2><p class="note">Every candidate pallet for this profile's case, ranked by cases per pallet: the single-orientation grid, or a band layout when strips of mixed orientation pack more (the one-dimensional knapsack of Smith &amp; De Cani, 1980). Then the what-if on this run's own volumes: how many inbound pallets and trailers the same eaches would need. Partial dispatch pallets do not change; racking, handling and stability for a different pallet type are not modelled.</p><div id="rlOptimise"></div>
 <h2>Start to finish, per order type</h2><div id="rlRibbon" class="ribbon-wrap"></div>
 <h2>What the planner asks</h2><div id="rlSummary"></div>
 <div class="grid2"><div id="rlCycle"></div><div id="rlTouches"></div></div>

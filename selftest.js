@@ -3466,8 +3466,9 @@
       if (!P2 || !I2) return { ok: false, detail: "modules missing" };
       var t = P2.tiHi(P2.PALLETS.eur, P2.BOXES["case-400x300x250"], 1800, 6);
       var q = P2.quantitiesAlong(P2.PROFILES.ecommerce, "case-pick", WT.routing.ARCHETYPE_BY_ID["case-pick"].ops, "HU-selftest");
-      var ok = t.ti === 8 && t.hi === 6 && t.cases === 48 && I2.sscc(3, 1) === "340123450000000017" && I2.gtin13(67890) === "4012345678901" && q.conserved && q.received === 576;
-      return { ok: ok, detail: "EUR 8x6=48, SSCC " + I2.sscc(3, 1) + ", case-pick received " + q.received + " conserved=" + q.conserved };
+      var klt = P2.tiHi(P2.PALLETS.ind, P2.BOXES["klt-600x400x280"], 1600, 15);
+      var ok = t.ti === 8 && t.hi === 6 && t.cases === 48 && klt.ti === 5 && klt.pattern === "bands" && I2.sscc(3, 1) === "340123450000000017" && I2.gtin13(67890) === "4012345678901" && q.conserved && q.received === 576 && !!$("genStations");
+      return { ok: ok, detail: "EUR 8x6=48, KLT bands 5/layer, SSCC " + I2.sscc(3, 1) + ", case-pick received " + q.received + " conserved=" + q.conserved + ", genStations=" + !!$("genStations") };
     });
     // ---- v3.30 R3: on a declared mix the drawn form follows the operation.
     check("goods-form-follows-the-operation-on-a-declared-mix", function () {

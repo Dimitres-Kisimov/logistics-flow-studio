@@ -172,6 +172,26 @@
     v_cross_dock_violations: "SELECT e.id FROM handling_event e JOIN hu h ON h.id = e.hu_id JOIN location l ON l.id = e.location\nWHERE h.archetype = 'cross-dock' AND (l.category = 'storage' OR e.op IN ('putaway','replen','pick','piece-pick','case-pick','pallet-pick'));   -- must be empty",
   };
 
+  /* ---------------- the pallet-pattern what-if ------------------------ */
+  // The same eaches this run received on pallets, re-palletised with the best
+  // pattern: inbound pallets and trailers now vs then. Pure.
+  function whatIf(exp, opt) {
+    const prof = exp.profile;
+    if (!prof || !opt || !opt.current || !opt.best) return null;
+    const epc = prof.eaches_per_case;
+    let eaches = 0, units = 0;
+    for (const h of exp.hus) {
+      if (h.cases_per_pallet > 0 && ["full-pallet-out", "case-pick", "piece-pick", "cross-dock", "legacy-spine"].indexOf(h.archetype) >= 0) { eaches += h.received_eaches; units++; }
+    }
+    const side = (c) => {
+      const epp = c.cases * epc;
+      const pallets = epp ? Math.ceil(eaches / epp) : 0;
+      const slots = TRAILER_SLOTS[c.pallet] || 33;
+      return { pallet: c.pallet, cases: c.cases, eachesPerPallet: epp, pallets: pallets, slots: slots, trailers: pallets ? Math.ceil(pallets / slots) : 0 };
+    };
+    return { units: units, eaches: eaches, now: side(opt.current), best: side(opt.best), same: opt.best.pallet === opt.current.pallet && opt.best.cases === opt.current.cases };
+  }
+  RunLedger.whatIf = whatIf;
   RunLedger.TRAILER_SLOTS = TRAILER_SLOTS;
   RunLedger.SQL = SQL;
   RunLedger.views = views;
@@ -205,6 +225,37 @@
       "<p><b>Order mix:</b> " + esc(mix) + " · <b>packaging profile:</b> " + esc(r.profile || "—") + "</p><p class=\"note\">" + esc(r.honesty || "") + "</p>";
   }
 
+  // One layer drawn from its rectangles (grid or bands), in pallet millimetres.
+  function layerSvg(P, pallet, box, layer, caption) {
+    const S = 220 / Math.max(pallet.l, pallet.w);
+    const rects = P.layerRects(pallet, box, layer);
+    let s = '<svg viewBox="0 0 250 ' + (pallet.w * S + 30) + '" class="pallet" role="img" aria-label="' + esc(caption) + '">';
+    s += '<rect x="10" y="10" width="' + pallet.l * S + '" height="' + pallet.w * S + '" class="pallet-deck"/>';
+    for (const r of rects) s += '<rect x="' + (10 + r.x * S + 1) + '" y="' + (10 + r.y * S + 1) + '" width="' + Math.max(1, r.w * S - 2) + '" height="' + Math.max(1, r.h * S - 2) + '" class="pallet-case"/>';
+    s += '<text x="10" y="' + (pallet.w * S + 24) + '" class="svg-label">' + esc(caption) + "</text></svg>";
+    return s;
+  }
+  function renderOptimise(exp) {
+    const P = window.WT && window.WT.pack;
+    const out = $("rlOptimise");
+    const prof = exp.profile;
+    if (!P || !prof || !P.PROFILES[prof.id]) { out.innerHTML = "<p class=\"note\">No packaging profile in this file.</p>"; return; }
+    const opt = P.optimizeProfile(P.PROFILES[prof.id]);
+    if (opt.fixed) { out.innerHTML = "<p class=\"note\">This profile ships in cages with a declared capacity; there is no pattern to optimise.</p>"; return; }
+    const rows = opt.ranked.map((r) => ({ pallet: r.label, per_layer: r.ti + " (" + r.pattern + (r.rotated ? ", rotated" : "") + ")", layers: r.hi, cases: r.cases,
+      eaches: r.cases * prof.eaches_per_case, gross_kg: r.grossKg, cube: Math.round(r.cubeUtil * 100) + "%", limit: r.weightLimited ? "weight" : "height" }));
+    const w = whatIf(exp, opt);
+    const box = P.BOXES[prof.box];
+    const drawings = '<div class="pallet-row">' + layerSvg(P, P.PALLETS[opt.current.pallet], box, opt.current.layer, "now: " + opt.current.label + " · " + opt.current.ti + " per layer") +
+      (opt.gain && !opt.gain.samePallet ? layerSvg(P, P.PALLETS[opt.best.pallet], box, opt.best.layer, "best: " + opt.best.label + " · " + opt.best.ti + " per layer") : "") + "</div>";
+    const cards = w ? '<div class="cards"><article><span>Pallet-borne eaches in this run</span><strong>' + w.eaches + " eaches · " + w.units + " units</strong></article>" +
+      "<article><span>Inbound pallets · trailers now</span><strong>" + w.now.pallets + " × " + esc(w.now.pallet) + " · " + w.now.trailers + " trailer" + (w.now.trailers === 1 ? "" : "s") + "</strong></article>" +
+      "<article><span>With the best pattern</span><strong>" + w.best.pallets + " × " + esc(w.best.pallet) + " · " + w.best.trailers + " trailer" + (w.best.trailers === 1 ? "" : "s") + (w.same ? " (no change)" : "") + "</strong></article></div>" : "";
+    const verdict = opt.gain ? (opt.gain.samePallet ? "<p><b>The profile already uses the best pattern</b> (" + opt.best.cases + " cases per pallet).</p>"
+      : "<p><b>" + esc(opt.best.label) + "</b> holds <b>" + opt.best.cases + "</b> cases against " + opt.current.cases + " on the profile's " + esc(opt.current.label) + " (" + (opt.gain.pct > 0 ? "+" : "") + opt.gain.pct + " %).</p>") : "";
+    out.innerHTML = verdict + table(rows, ["pallet", "per_layer", "layers", "cases", "eaches", "gross_kg", "cube", "limit"], "Candidates for " + esc(box.label) + " at " + prof.max_stack_mm + " mm stack height") + drawings + cards +
+      "<p class=\"note\">Grid = one orientation; bands = strips of mixed orientation. Height limit from the profile, load limit from the pallet's safe working load. " + esc(P.HONESTY) + "</p>";
+  }
   function renderPackaging(exp) {
     const P = window.WT && window.WT.pack;
     const prof = exp.profile;
@@ -216,14 +267,11 @@
     const fixed = t.fixed;
     const cases = fixed ? (exp.hus[0] && exp.hus[0].cases_per_pallet) || 0 : t.cases;
     const slots = TRAILER_SLOTS[prof.pallet] || 33;
-    // plan view of one layer + elevation of the stack
+    // plan view of one layer (the actual grid or band layout) + elevation of the stack
     const S = 220 / Math.max(pallet.l, pallet.w);
-    const cl = t.rotated ? box.w : box.l, cw = t.rotated ? box.l : box.w;
-    const cols = fixed ? 0 : Math.floor(pallet.l / cl), rows = fixed ? 0 : Math.floor(pallet.w / cw);
-    let plan = '<svg viewBox="0 0 250 ' + (pallet.w * S + 30) + '" class="pallet" role="img" aria-label="Pallet pattern, plan view">';
-    plan += '<rect x="10" y="10" width="' + pallet.l * S + '" height="' + pallet.w * S + '" class="pallet-deck"/>';
-    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) plan += '<rect x="' + (10 + i * cl * S + 1) + '" y="' + (10 + j * cw * S + 1) + '" width="' + (cl * S - 2) + '" height="' + (cw * S - 2) + '" class="pallet-case"/>';
-    plan += '<text x="10" y="' + (pallet.w * S + 24) + '" class="svg-label">' + esc(pallet.l + " × " + pallet.w + " mm · " + (fixed ? "declared capacity" : t.ti + " cases per layer" + (t.rotated ? " (rotated)" : ""))) + "</text></svg>";
+    const plan = fixed
+      ? '<svg viewBox="0 0 250 ' + (pallet.w * S + 30) + '" class="pallet" role="img" aria-label="Cage"><rect x="10" y="10" width="' + pallet.l * S + '" height="' + pallet.w * S + '" class="pallet-deck"/><text x="10" y="' + (pallet.w * S + 24) + '" class="svg-label">' + esc(pallet.l + " × " + pallet.w + " mm · declared capacity") + "</text></svg>"
+      : layerSvg(P, pallet, box, t.layer, pallet.l + " × " + pallet.w + " mm · " + t.ti + " per layer (" + t.pattern + (t.rotated ? ", rotated" : "") + ")");
     const H = fixed ? 0 : t.stackMm;
     const ES = 160 / Math.max(H, pallet.h + box.h);
     let elev = '<svg viewBox="0 0 250 200" class="pallet" role="img" aria-label="Pallet stack, elevation">';
@@ -347,7 +395,7 @@
     EXP = exp;
     $("rlStatus").textContent = "Loaded " + exp.hus.length + " units and " + exp.events.length + " events from " + exp.run.id + ".";
     $("rlView").hidden = false;
-    renderRun(exp); renderPackaging(exp); renderRibbon(exp); renderViews(exp); renderTrace(exp);
+    renderRun(exp); renderPackaging(exp); renderOptimise(exp); renderRibbon(exp); renderViews(exp); renderTrace(exp);
   }
 
   $("rlFile").addEventListener("change", (ev) => {

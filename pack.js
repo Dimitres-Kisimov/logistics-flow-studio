@@ -19,10 +19,12 @@
  * heights and order-line quantities in the industry profiles are TEACHING
  * VALUES, labelled as such. They are plausible, not measured, and they are
  * not anybody's packaging specification.
- * WHAT IS NOT MODELLED: interlocking / pinwheel patterns, overhang, load
- * stability, mixed-SKU pallets, weight distribution, double-stacking in the
- * trailer, axle loads. The optimiser is "informed by practice, not a load
- * plan".
+ * WHAT IS NOT MODELLED: pinwheel / interlocking patterns, overhang, load
+ * stability, layer alternation, mixed-SKU pallets, weight distribution,
+ * double-stacking in the trailer, axle loads. The optimiser is "informed by
+ * practice, not a load plan". v3.34 adds BAND layouts (see bandDP) - the
+ * one-dimensional knapsack over strips that finds the standard 5-KLT and
+ * 10-carton layers on the industrial pallet.
  *
  * CONSERVATION. `quantitiesAlong` returns, for every operation of an
  * archetype, the eaches / cases / pallets / parcels the handling unit carries
@@ -126,16 +128,81 @@
     const cl = rotated ? box.w : box.l, cw = rotated ? box.l : box.w;
     return Math.floor(pallet.l / cl) * Math.floor(pallet.w / cw);
   }
-  // The pallet pattern: ti (cases per layer, best of the two orientations),
+  /* ---- BAND (strip) layouts ------------------------------------------
+   * Split the pallet into parallel bands; each band holds ONE orientation of
+   * the case, packed along the band. Which bands to use is a one-dimensional
+   * knapsack over the pallet's width:  f(w) = max_o f(w - h_o) + floor(L / l_o)
+   * (Smith & De Cani, 1980, "An algorithm to optimize the layout of boxes in
+   * pallets"). Exact for band layouts, and it finds the classic patterns a
+   * single orientation cannot: 10 x (400 x 300) on 1200 x 1000 (bands 400 /
+   * 300 / 300) and 5 x KLT 600 x 400 on 1200 x 1000 (bands 600 + 400) - the
+   * layer every automotive plant actually stacks. Both band directions are
+   * tried. NOT modelled: pinwheel / interlocking patterns, overhang, layer
+   * alternation for stability. Pure; deterministic tie-breaks.
+   * ------------------------------------------------------------------ */
+  function bandDP(L, W, bl, bw) {
+    const os = [[bl, bw], [bw, bl]]; // [size along L, size along W]
+    const best = new Array(W + 1).fill(0), choice = new Array(W + 1).fill(-1);
+    for (let w = 1; w <= W; w++) {
+      best[w] = best[w - 1]; choice[w] = -1;
+      for (let i = 0; i < os.length; i++) {
+        const h = os[i][1], n = Math.floor(L / os[i][0]);
+        if (h <= w && n > 0 && best[w - h] + n > best[w]) { best[w] = best[w - h] + n; choice[w] = i; }
+      }
+    }
+    const bands = [];
+    let w = W;
+    while (w > 0) {
+      if (choice[w] < 0) { w--; continue; }
+      const o = os[choice[w]];
+      bands.unshift({ alongL: o[0], alongW: o[1], n: Math.floor(L / o[0]), start: w - o[1], height: o[1] });
+      w -= o[1];
+    }
+    return { count: best[W], bands: bands };
+  }
+  // The best LAYER for a case on a pallet: the single-orientation grid unless a
+  // band layout packs strictly more. `axis` says which pallet side the bands
+  // stack along ("W": bands stacked across the width, "L": across the length).
+  function bestLayer(pallet, box) {
+    const t0 = tiFor(pallet, box, false), t1 = tiFor(pallet, box, true);
+    const grid = Math.max(t0, t1);
+    const a = bandDP(pallet.l, pallet.w, box.l, box.w);
+    const b = bandDP(pallet.w, pallet.l, box.l, box.w);
+    const band = a.count >= b.count ? { axis: "W", count: a.count, bands: a.bands } : { axis: "L", count: b.count, bands: b.bands };
+    if (band.count > grid) return { count: band.count, pattern: "bands", rotated: false, axis: band.axis, bands: band.bands };
+    return { count: grid, pattern: "grid", rotated: t1 > t0, axis: null, bands: null };
+  }
+  // The rectangles of one layer in pallet millimetres (x along the pallet
+  // length, y along its width) - for drawing and for the harness, which
+  // asserts they never overlap and never leave the deck.
+  function layerRects(pallet, box, layer) {
+    const lay = layer || bestLayer(pallet, box);
+    const out = [];
+    if (lay.pattern === "grid") {
+      const cl = lay.rotated ? box.w : box.l, cw = lay.rotated ? box.l : box.w;
+      const cols = Math.floor(pallet.l / cl), rows = Math.floor(pallet.w / cw);
+      for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) out.push({ x: i * cl, y: j * cw, w: cl, h: cw });
+      return out;
+    }
+    for (const b of lay.bands) {
+      for (let k = 0; k < b.n; k++) {
+        if (lay.axis === "W") out.push({ x: k * b.alongL, y: b.start, w: b.alongL, h: b.height });
+        else out.push({ x: b.start, y: k * b.alongL, w: b.height, h: b.alongL });
+      }
+    }
+    return out;
+  }
+
+  // The pallet pattern: ti (cases per layer - the best grid or band layer),
   // hi (layers under the stack-height limit), reduced until the load respects
   // the pallet's safe working load. Pure.
   function tiHi(pallet, box, maxStackMm, caseKg) {
     if (pallet.fixed) {
-      return { ti: null, hi: null, rotated: false, cases: 0, grossKg: pallet.tareKg, cubeUtil: 0, weightLimited: false, fixed: true };
+      return { ti: null, hi: null, rotated: false, cases: 0, grossKg: pallet.tareKg, cubeUtil: 0, weightLimited: false, fixed: true, pattern: "fixed", layer: null };
     }
-    const t0 = tiFor(pallet, box, false), t1 = tiFor(pallet, box, true);
-    const rotated = t1 > t0;
-    const ti = Math.max(t0, t1);
+    const layer = bestLayer(pallet, box);
+    const rotated = layer.rotated;
+    const ti = layer.count;
     const usable = Math.max(0, (maxStackMm || 0) - pallet.h);
     let hi = ti > 0 ? Math.floor(usable / box.h) : 0;
     let weightLimited = false;
@@ -153,7 +220,21 @@
       cubeUtil: envelope > 0 ? Math.round((cases * caseVol / envelope) * 10000) / 10000 : 0,
       stackMm: pallet.h + hi * box.h,
       weightLimited: weightLimited, fixed: false,
+      pattern: layer.pattern, layer: layer,
     };
+  }
+  // Rank every candidate pallet for a PROFILE and say what the best one gains
+  // over the profile's own pallet. Pure.
+  function optimizeProfile(profile, candidates) {
+    const box = BOXES[profile.box];
+    if (!box || PALLETS[profile.pallet].fixed || profile.fixedPerPallet) {
+      return { profile: profile.id, box: profile.box, current: null, best: null, ranked: [], gain: null, fixed: true };
+    }
+    const ranked = bestPattern(box, profile.maxStackMm, profile.caseKg, candidates);
+    const current = ranked.find((r) => r.pallet === profile.pallet) || null;
+    const best = ranked[0] || null;
+    const gain = current && best ? { cases: best.cases - current.cases, pct: current.cases ? Math.round((best.cases / current.cases - 1) * 1000) / 10 : null, samePallet: best.pallet === current.pallet } : null;
+    return { profile: profile.id, box: profile.box, current: current, best: best, ranked: ranked, gain: gain, fixed: false };
   }
   function casesPerPallet(profile) {
     const pallet = PALLETS[profile.pallet];
@@ -257,6 +338,7 @@
   WT.pack = {
     HONESTY, PALLETS, TRAILERS, BOXES, PROFILES, SCENARIO_PROFILE, DEFAULT_PROFILE,
     profileFor, tiFor, tiHi, casesPerPallet, bestPattern, trailerFill,
+    bandDP, bestLayer, layerRects, optimizeProfile, // v3.34
     hash01, draw, quantitiesAlong,
   };
 })();
