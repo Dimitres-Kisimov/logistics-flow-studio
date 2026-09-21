@@ -88,6 +88,8 @@
     // ---- Every expected WT.* module present + of the right shape -------
     var MODULES = [
       ["domain", function (m) { return m && m.ELEMENTS && typeof m.elementCapacity === "function"; }],
+      ["ids", function (m) { return m && typeof m.sscc === "function" && typeof m.runId === "function"; }],
+      ["pack", function (m) { return m && m.PALLETS && typeof m.tiHi === "function" && typeof m.quantitiesAlong === "function"; }],
       ["view", function (m) { return m && typeof m.worldToScreen === "function" && typeof m.fitView === "function"; }],
       ["compliance", function (m) { return m && typeof m.check === "function"; }],
       ["advisor", function (m) { return m && typeof m.analyze === "function"; }],
@@ -3430,6 +3432,15 @@
       var conserved = st.spawned === st.inflight + st.completed;
       return { ok: plan.mix !== null && plan.unfulfillable.length === 0 && plan.routes.length > 1 && types >= 2 && conserved,
         detail: "routes=" + plan.routes.length + " unfulfillable=" + plan.unfulfillable.length + " typesSpawned=" + types + " conserved=" + conserved };
+    });
+    // ---- v3.31: packaging hierarchy + numbering system, hand values.
+    check("packaging-and-gs1-hand-values", function () {
+      var P2 = WT.pack, I2 = WT.ids;
+      if (!P2 || !I2) return { ok: false, detail: "modules missing" };
+      var t = P2.tiHi(P2.PALLETS.eur, P2.BOXES["case-400x300x250"], 1800, 6);
+      var q = P2.quantitiesAlong(P2.PROFILES.ecommerce, "case-pick", WT.routing.ARCHETYPE_BY_ID["case-pick"].ops, "HU-selftest");
+      var ok = t.ti === 8 && t.hi === 6 && t.cases === 48 && I2.sscc(3, 1) === "340123450000000017" && I2.gtin13(67890) === "4012345678901" && q.conserved && q.received === 576;
+      return { ok: ok, detail: "EUR 8x6=48, SSCC " + I2.sscc(3, 1) + ", case-pick received " + q.received + " conserved=" + q.conserved };
     });
     // ---- v3.30 R3: on a declared mix the drawn form follows the operation.
     check("goods-form-follows-the-operation-on-a-declared-mix", function () {

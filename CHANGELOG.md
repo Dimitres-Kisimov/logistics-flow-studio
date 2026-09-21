@@ -1,5 +1,32 @@
 # Changelog
 
+## v3.31 — The packaging hierarchy and the numbering system
+
+**Why.** A ledger, an SQL query and a viewer need two things the simulator did not
+have: quantities with real units (how many eaches, cases, pallets a unit is) and
+identities that mean the same thing in every layer and reproduce on re-run.
+
+**pack.js.** Unit loads with the public dimensions (DIN EN 13698 EUR / industrial /
+half pallets, VDA 4500 KLT footprints, 33 / 26 pallets per 13.6 m trailer); a ti-hi
+pattern optimiser (best orientation, height limit, load limit, cube utilisation, every
+pallet ranked); trailer fill; ten per-industry packaging profiles mapped onto every
+library scenario; and `quantitiesAlong(profile, archetype, ops)` - the pallets /
+cases / eaches / parcels a handling unit carries at every operation, with what stayed
+in stock and what was scrapped, conserving eaches at every step.
+
+**ids.js.** Deterministic `RUN- / ORD- / HU- / EVT-` identities (the run hash covers
+layout + seed + mix) and GS1 SSCC / GTIN-13 / GTIN-14 / GLN with the mod-10 check digit.
+
+**Honesty.** Profile values are synthetic teaching values; the optimiser is informed by
+practice, not a load plan; the GS1 prefix is GS1's documentation prefix.
+
+**Verification.** `verify_pack.js` (38 checks, all against hand-computed numbers:
+8 x 6 = 48 cartons on EUR at 90.6 % cube, 20 KLTs, 144 pharma cartons, a 40 kg carton
+weight-limited to 32, SSCC 340123450000000017, GTIN 4012345678901, conservation across
+every archetype x profile, no id collisions across the library). Self-test gains one
+check and two module shapes. 63 harnesses, 62 Python tests, WT-SELFTEST 172/172.
+Cache wt-v113.
+
 ## v3.30 — R3: the goods follow the operation, not the stage
 
 **The defect.** v3.23 drew every handling unit in the form of its STAGE (receiving =
