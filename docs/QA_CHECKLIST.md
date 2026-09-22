@@ -18,8 +18,14 @@ Convention below: `[ ]` to tick, **command** lines are copy-pasteable.
 
 ## 1. Automated harnesses (pure logic + wiring)
 
+- [ ] **The one gate (v3.42):** **`python tools/gate.py --check-readme`** runs everything
+      in §1 and §2 below (harnesses, Python tests, ruff, the generated SQL, both
+      in-browser self-tests through a headless Chromium-based browser) and fails when
+      README line 9's counts drift from what was measured. CI's `verify-browser` job
+      runs the browser half on every push and weekly.
 - [ ] **All Node harnesses green:**
-      **`node test/run-all.mjs`** → ends with `ALL 29 HARNESSES PASSED`.
+      **`node test/run-all.mjs`** → ends with `ALL <n> HARNESSES PASSED`, where n is the
+      harness count README line 9 states (the gate checks the two agree).
 - [ ] **Offline guard clean** (no external asset references anywhere): it is
       the last harness in the run above (`tools/offline-guard.mjs`).
 - [ ] **Syntax clean** on any changed script: **`node --check <file>.js`**.
@@ -33,13 +39,17 @@ Convention below: `[ ]` to tick, **command** lines are copy-pasteable.
       **`python -m http.server 8971 --bind 127.0.0.1`**
 - [ ] **Self-test passes** — open `http://127.0.0.1:8971/index.html?selftest=1`
       and read the `#wt-selftest` line / console: expect **`WT-SELFTEST: PASS n/n`**
-      (currently `57/57`).
+      (n is the count README line 9 states).
+- [ ] **Viewer self-test passes** — open `http://127.0.0.1:8971/run-ledger.html?selftest=1`:
+      it drives the real buttons and expects **`WT-SELFTEST: PASS n/n`** with
+      `data-page="run-ledger"` on the result element.
 - [ ] **Headless one-liner** (exit criterion = the scraped PASS line):
       ```
       msedge --headless=new --disable-gpu --virtual-time-budget=12000 --dump-dom \
         "http://127.0.0.1:8971/index.html?selftest=1" | grep -o 'WT-SELFTEST:[^<]*'
       ```
-      (`chrome` is identical — same engine.)
+      (`chrome` is identical — same engine.) Or, for both pages at once:
+      **`python tools/gate.py --skip-node --skip-python`**.
 - [ ] **No console errors/warnings** on a normal load (`?selftest=1` removed):
       the error boundary keeps `window.__WT_ERRORS__` empty on a clean boot.
 

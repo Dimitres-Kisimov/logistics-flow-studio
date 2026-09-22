@@ -1,7 +1,7 @@
 # Production hardening — running the in-browser self-test
 
-WarehouseTwin's 49 Node harnesses (`node test/run-all.mjs`) cover the **pure
-logic**. The **DOM/UI** is covered by a **real in-browser end-to-end self-test**
+WarehouseTwin's Node harnesses (`node test/run-all.mjs`; the count is on README
+line 9) cover the **pure logic**. The **DOM/UI** is covered by a **real in-browser end-to-end self-test**
 that drives the live app through the same handlers the UI uses. This document
 describes how to run it, and the two other hardening pieces shipped alongside it
 (the global error boundary and the Content-Security-Policy).
@@ -36,13 +36,13 @@ python -m http.server 8971 --bind 127.0.0.1
 
 ### Read the result
 
-After the app boots, the suite runs ~57 checks against the live app and writes a
-single **machine-readable** line into the `#wt-selftest` element (and
+After the app boots, the suite runs its checks (the count is on README line 9)
+against the live app and writes a single **machine-readable** line into the `#wt-selftest` element (and
 `console.log`s it, with per-check detail). Two exact formats:
 
 ```
-WT-SELFTEST: PASS 57/57
-WT-SELFTEST: FAIL 43/57 :: iso-toggle-layout-unchanged, report-build-sections
+WT-SELFTEST: PASS n/n
+WT-SELFTEST: FAIL k/n :: iso-toggle-layout-unchanged, report-build-sections
 ```
 
 The `#wt-selftest` element also carries `data-pass`, `data-total` and
@@ -58,7 +58,22 @@ msedge --headless=new --disable-gpu --virtual-time-budget=12000 --dump-dom \
 ```
 
 (`chrome` works identically — same engine.) Exit criterion: the scraped line is
-`WT-SELFTEST: PASS 57/57`.
+`WT-SELFTEST: PASS n/n` with n the count README line 9 states.
+
+### The gate (v3.42)
+
+`python tools/gate.py` does all of the above for **both** pages —
+`index.html?selftest=1` and the run-ledger viewer's own suite,
+`run-ledger.html?selftest=1` (same contract, plus `data-page="run-ledger"` on the
+result element) — and, unless skipped, the Node harnesses, the Python tests, ruff and
+the generated-SQL check, printing one scoreboard and the README line-9 sentence.
+It serves the repo over http on a free local port, finds a Chromium-based browser
+(`--browser` overrides), gives it a temporary profile (a running Chrome or Edge
+would otherwise adopt the request and print nothing), and treats a missing
+`WT-SELFTEST:` line as a failure. `--check-readme` fails when README's counts drift
+from what was measured. CI's `verify-browser` job runs
+`python tools/gate.py --skip-node --skip-python --check-readme` on the runner's
+Chrome on every push and weekly, so the self-tests no longer run on one machine only.
 
 ### What it checks
 
@@ -182,5 +197,5 @@ certification.
   and determinism is intact (the Node harnesses still pass byte-for-byte).
 
 Both are verified headlessly by `verify_a11y_perf.js` and, in a real browser,
-by the extended `?selftest=1` suite. See **[`QA_CHECKLIST.md`](QA_CHECKLIST.md)**
+by the extended `?selftest=1` suite (in CI too since v3.42). See **[`QA_CHECKLIST.md`](QA_CHECKLIST.md)**
 for the maintainer's pre-release checklist.

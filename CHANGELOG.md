@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.42 — One gate, in CI too
+
+**The gate.** `python tools/gate.py` runs every check a release must pass — the headless
+harnesses, the Python tests, ruff, the generated-SQL check and both in-browser self-tests
+(`index.html?selftest=1`, `run-ledger.html?selftest=1`) through a headless Chromium-based
+browser it finds itself, served over http on a free port — prints one scoreboard and the
+README line-9 sentence, and with `--check-readme` fails when the counts drift from what was
+measured. A missing `WT-SELFTEST:` line is a failure; the browser gets its own profile.
+
+**CI.** New `verify-browser` job (ubuntu's Chrome) runs both self-tests and the README
+check on every push; a weekly schedule re-runs every job. The maintainer checklist and
+the production notes name the gate, list the viewer's suite and carry no stale count
+(`ALL 29 HARNESSES`, `57/57`, `22/22` were all wrong).
+
+**Verification.** +1 harness (`verify_gate.js`, static: the gate's flags and browser drive,
+the CI job and schedule, README line 9 against the runner's list and `sw.js`, the docs),
++5 Python (`test_gate.py`: parse/render inverses, the scrape, the drift check, a browser
+lookup that never raises). 71 harnesses, 102 Python tests, WT-SELFTEST 178/178 + viewer
+23/23. Cache wt-v122 (no bump: no app-shell change).
+
 ## v3.41 — The report, and the guide
 
 **`report`.** `tools/run_ledger.py report --database db [--run R] [--runs A B] [--out report.md]`

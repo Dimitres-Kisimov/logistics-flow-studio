@@ -6,6 +6,8 @@ name: CI
 on:
   push:
   pull_request:
+  schedule:
+    - cron: "17 6 * * 1"  # Mondays 06:17 UTC: every check re-run on the default branch, weekly
 
 jobs:
   verify-js:
@@ -81,3 +83,23 @@ jobs:
             echo "PDF is suspiciously small (<= 10 KB) - failing"
             exit 1
           fi
+
+  verify-browser:
+    name: In-browser self-tests (headless Chrome through tools/gate.py)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Locate the browser the runner image ships
+        run: which google-chrome || which chromium-browser || which chromium
+
+      - name: Both self-tests (index.html?selftest=1, run-ledger.html?selftest=1) and README line 9
+        # tools/gate.py serves the repo over http on a free port, opens each page
+        # headlessly with a virtual-time budget, scrapes the WT-SELFTEST line
+        # (a missing line is a failure) and fails when README line 9's counts
+        # drift from what was measured.
+        run: python tools/gate.py --skip-node --skip-python --check-readme
