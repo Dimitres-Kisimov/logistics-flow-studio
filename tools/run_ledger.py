@@ -13,6 +13,7 @@ conservation of eaches, cross-dock never in storage, consecutive versions. Stand
     python tools/run_ledger.py summary --database work/run.sqlite [--run RUN-...] [--out summary.json]
     python tools/run_ledger.py query  --database work/run.sqlite "SELECT ..."   (read-only, bounded)
     python tools/run_ledger.py compare --database work/run.sqlite --runs RUN-a RUN-b [--out compare.json]   (v3.37: B - A)
+    python tools/run_ledger.py report  --database work/run.sqlite [--run RUN-...] [--runs RUN-a RUN-b] [--out report.md]   (v3.41: Markdown)
 
 Honesty: the events are synthetic (a teaching simulation, not telemetry, not a WMS);
 the quantities are the synthetic order-line quantities of the scenario's packaging
@@ -432,6 +433,110 @@ def compare(db: sqlite3.Connection, run_a: str, run_b: str) -> dict:
     return out
 
 
+# ---- v3.41 the Markdown report ---------------------------------------------------
+DROP_COLS = ("run_id", "run_a", "run_b")
+DASH = "\u2014"
+
+
+def md_cell(v) -> str:
+    if v is None:
+        return DASH
+    return str(v).replace("|", "\\|").replace("\n", " ")
+
+
+def md_table(rows: list[dict], cols: list[str] | None = None) -> str:
+    """A GitHub-flavoured Markdown table; NULL as an em dash, pipes escaped; '(no rows)' when empty."""
+    if not rows:
+        return "(no rows)\n"
+    cols = cols or [c for c in rows[0].keys() if c not in DROP_COLS]
+    out = ["| " + " | ".join(cols) + " |", "|" + "|".join("---" for _ in cols) + "|"]
+    for r in rows:
+        out.append("| " + " | ".join(md_cell(r.get(c)) for c in cols) + " |")
+    return "\n".join(out) + "\n"
+
+
+def mix_text(mix) -> str:
+    if not mix:
+        return "standard spine (no mix)"
+    if isinstance(mix, list):
+        return " · ".join(f"{m['id']} {round(m['share'] * 100)}%" for m in mix)
+    return " · ".join(f"{k} {round(v * 100)}%" for k, v in mix.items())
+
+
+def run_header(db: sqlite3.Connection, run_id: str) -> dict:
+    r = rows(db, "SELECT * FROM run WHERE id = ?", (run_id,))
+    if not r:
+        raise ValueError(f"unknown run {run_id!r}")
+    h = dict(r[0])
+    h["mix"] = json.loads(h["mix"]) if h.get("mix") else None
+    h["minutes"] = round(h["ticks"] * h["minutes_per_tick"], 2)
+    return h
+
+
+def report(db: sqlite3.Connection, run_id: str, runs: tuple[str, str] | None = None) -> str:
+    """One run as a deterministic Markdown report - the same views the viewer shows - and, with
+    `runs`, the six compare views for that ordered pair. No timestamps: the same database gives the same text."""
+    h = run_header(db, run_id)
+    s = summary(db, run_id)
+    top = s["v_run_summary"][0] if s["v_run_summary"] else {}
+    disp = s["v_dispatch"][0] if s["v_dispatch"] else {}
+    rate = rows(db, "SELECT * FROM rate WHERE run_id = ?", (run_id,))
+    rate = rate[0] if rate else None
+    cost = rows(db, "SELECT ROUND(SUM(hours), 4) AS hours, ROUND(SUM(labour_eur), 4) AS labour_eur, ROUND(SUM(equipment_eur), 4) AS equipment_eur, "
+                    "ROUND(SUM(energy_eur), 4) AS energy_eur, ROUND(SUM(holding_eur), 4) AS holding_eur, "
+                    "ROUND(SUM(labour_eur + equipment_eur + energy_eur + holding_eur), 4) AS total_eur FROM v_span_cost WHERE run_id = ?", (run_id,))[0]
+    received = rows(db, "SELECT COALESCE(SUM(received_eaches), 0) AS n, SUM(CASE WHEN retired_tick IS NULL THEN 1 ELSE 0 END) AS in_flight FROM hu WHERE run_id = ?", (run_id,))[0]
+    stations = rows(db, "SELECT COUNT(*) AS n, SUM(CASE WHEN ABS(service_ticks - 50) < 1e-6 THEN 1 ELSE 0 END) AS floor FROM location WHERE run_id = ? AND service_ticks IS NOT NULL", (run_id,))[0]
+    lines = [f"# Run report: {run_id}", "",
+             f"Scenario `{h['scenario']}` · seed {h['seed']} · profile {h.get('profile') or DASH} · order mix: {mix_text(h['mix'])} · "
+             f"{h['ticks']} ticks ({h['minutes']} min, {h['minutes_per_tick']} min per tick)", "",
+             "## At a glance", ""]
+    glance = {"units": top.get("units"), "events": top.get("events"), "delivered": top.get("delivered"), "delivered_eaches": top.get("delivered_eaches"),
+              "pallets": disp.get("pallets"), "parcels": disp.get("parcels"), "trailers": disp.get("trailers"), "received_eaches": received["n"], "in_flight": received["in_flight"]}
+    if rate and cost["total_eur"] is not None:
+        units = top.get("units") or 0
+        glance["total_eur"] = cost["total_eur"]
+        glance["eur_per_unit"] = round(cost["total_eur"] / units, 4) if units else None
+        glance["eur_per_received_each"] = round(cost["total_eur"] / received["n"], 4) if received["n"] else None
+        glance["eur_per_delivered_each"] = round(cost["total_eur"] / top["delivered_eaches"], 4) if top.get("delivered_eaches") else None
+    lines.append(md_table([glance]))
+    flags = []
+    if not rate:
+        flags.append("no rates in this file: the cost views are empty")
+    elif not rate["holding_per_unit_hour"]:
+        flags.append("no holding cost is set (0 per unit-hour): waiting stock costs nothing")
+    if stations["n"] and stations["floor"] == stations["n"]:
+        flags.append(f"every station ({stations['n']}) serves at the simulator's floor rate of 50 ticks per unit (the floor declares no capacities)")
+    elif stations["floor"]:
+        flags.append(f"{stations['floor']} of {stations['n']} stations serve at the floor rate of 50 ticks per unit")
+    if received["in_flight"]:
+        flags.append(f"{received['in_flight']} of {top.get('units')} units were still in flight at tick {h['ticks']}: their cycle time and cost are open")
+    lines.append("Data-quality flags: " + ("; ".join(flags) if flags else "none") + "\n")
+    lines += ["## Planner views", ""]
+    for name in PLANNER_VIEWS:
+        lines += [f"### {name}", "", md_table(s[name])]
+    lines += ["## Cost detail", ""]
+    if rate:
+        lines += [md_table([cost]),
+                  f"Rates: labour {rate['labour_per_hour']} per hour · energy {rate['energy_price_per_kwh']} per kWh · {rate['hours_per_year']} operating hours per year · "
+                  f"holding {rate['holding_per_unit_hour']} per unit-hour waiting · transport {rate['transport_class'] or 'none'}"
+                  f"{' (manned)' if rate['transport_labour'] else ''}\n"]
+    else:
+        lines.append("(no rates)\n")
+    lines += ["## Invariants", "", md_table([{"view": n, "rows": s["invariants"][n]} for n in INVARIANT_VIEWS]),
+              f"Invariant violations: {sum(s['invariants'].values())}\n"]
+    if runs:
+        c = compare(db, runs[0], runs[1])
+        lines += [f"## Compare {runs[0]} → {runs[1]} (deltas B − A)", ""]
+        for name in COMPARE_VIEWS:
+            lines += [f"### {name}", "", md_table(c[name])]
+    lines += ["## Honesty", "", h.get("honesty") or "", ""]
+    if rate and rate.get("honesty"):
+        lines += [rate["honesty"], ""]
+    lines.append("Generated by tools/run_ledger.py report from the views the viewer shows; no timestamp, so the same database gives the same text.\n")
+    return "\n".join(lines)
+
+
 def query(db: sqlite3.Connection, sql: str, limit: int = 500) -> list[dict]:
     """Bounded, read-only ad-hoc SQL: one SELECT / WITH statement, at most `limit` rows."""
     text = sql.strip().rstrip(";").strip()
@@ -459,11 +564,11 @@ def render(table: list[dict]) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=("import", "views", "summary", "query", "compare"))
+    ap.add_argument("command", choices=("import", "views", "summary", "query", "compare", "report"))
     ap.add_argument("arg", nargs="?", help="export JSON path (import) or SQL text (query)")
     ap.add_argument("--database", required=True)
     ap.add_argument("--run", help="run id (defaults to the only / latest imported run)")
-    ap.add_argument("--out", help="write the summary / compare JSON here")
+    ap.add_argument("--out", help="write the summary / compare JSON or the report Markdown here")
     ap.add_argument("--runs", nargs=2, metavar=("RUN_A", "RUN_B"), help="compare: the two run ids (deltas are B - A)")
     ap.add_argument("--all", action="store_true", help="views: also print the detail views (WIP by tick, spans, span cost, cost by unit)")
     a = ap.parse_args(argv)
@@ -499,6 +604,15 @@ def main(argv=None) -> int:
     if run_id is None:
         print("no run imported yet", file=sys.stderr)
         return 1
+    if a.command == "report":
+        md = report(db, a.runs[0] if a.runs else run_id, (a.runs[0], a.runs[1]) if a.runs else None)
+        if a.out:
+            with open(a.out, "w", encoding="utf-8", newline="\n") as f:
+                f.write(md)
+            print(f"report written to {a.out}")
+        else:
+            print(md)
+        return 0
     if a.command == "views":
         for name in PLANNER_VIEWS + INVARIANT_VIEWS + (DETAIL_VIEWS if a.all else ()):
             print(f"== {name} ==")

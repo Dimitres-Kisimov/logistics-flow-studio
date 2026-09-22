@@ -60,6 +60,17 @@ jobs:
       - name: Run SQL, routing and resource-planning tests
         run: python -m unittest discover -s test -p 'test_*.py' -v
 
+      - name: Import the recorded fixtures and write a Markdown report (tools/run_ledger.py report)
+        run: |
+          set -e
+          db="$RUNNER_TEMP/run.sqlite"
+          python tools/run_ledger.py import test/fixtures/run-ledger.json --database "$db"
+          python tools/run_ledger.py import test/fixtures/run-ledger-b.json --database "$db"
+          python tools/run_ledger.py report --database "$db" --runs RUN-hand-built-s31-hc28a7688 RUN-hand-built-s31-hd35e45d4 --out "$RUNNER_TEMP/report.md"
+          grep -q '^Invariant violations: 0' "$RUNNER_TEMP/report.md"
+          grep -q '^### v_compare_cost' "$RUNNER_TEMP/report.md"
+          python tools/export_viewer_sql.py --check
+
       - name: Build the one-pager PDF and check its size
         run: |
           set -e

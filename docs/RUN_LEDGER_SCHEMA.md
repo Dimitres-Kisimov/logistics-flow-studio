@@ -1,6 +1,6 @@
 # The run ledger — schema, identities, SQL views
 
-*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.40.*
+*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.41.*
 
 ## 1. One stream, three consumers
 
@@ -91,7 +91,28 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 
 **Detail views** (`views --all`): `v_wip_by_tick`, `v_spans`, `v_span_cost`, `v_cost_by_hu`. Views are dropped and recreated on every open, so a database created by an older version always runs the current text.
 
+**The report** (v3.41): `report --database run.sqlite [--run R] [--runs A B] [--out report.md]` writes one run as deterministic Markdown — the header (id, scenario, seed, mix, profile, ticks), the at-a-glance row with the data-quality flags, every planner view as a table, the cost detail with the rates, the invariants with the line `Invariant violations: 0`, the six compare tables when `--runs` is given, and the honesty text. No timestamp, so the same database gives the same text; CI imports both recorded fixtures and writes one. The committed example is [docs/examples/run-report.md](examples/run-report.md) (A against B), with a test that fails when it is stale.
+
 Ad-hoc SQL: `query "SELECT …"` accepts one `SELECT` / `WITH` statement and at most 500 rows.
+
+## 7. The viewer, section by section
+
+`run-ledger.html` is one report over one export (v3.39). Each section, what it shows, and what proves it:
+
+| Section | Shows | Definition | Proved by |
+|---|---|---|---|
+| The run at a glance | identity, mix, totals, cost, the four invariants, the data-quality flags (no rates; stations at the floor rate; units in flight; no holding cost) | `RunLedger.glance`, `v_run_summary` | `verify_run_ledger_view.js` §5, the viewer self-test |
+| Start to finish | the ribbon per order type; the flow as recorded (layered Sankey, units / retired only / eaches) | `RunLedger.ribbon`, `v_flow_links`, `sankeyLayoutLayered` | `verify_run_ledger_view.js`, `verify_ledger_flow.js` |
+| What the planner asks | cycle time, touches, waiting at each bench (with derived minutes), WIP, quantities per operation | `v_cycle_time_by_type` … `v_quantities_by_op` | `verify_run_ledger_view.js`, `test_run_ledger.py` |
+| What a handling unit costs | spans charged at the recorded rates: by order type (per unit, per received each, per delivered each), by location, the rates in the file | `v_spans`, `v_span_cost`, `v_cost_by_type`, `v_cost_by_location` | `verify_cost_ledger.js`, `test_run_ledger.py` |
+| Dispatch manifest | delivered units, pallets, parcels, trailers slot by slot | `v_dispatch` | `verify_run_ledger_view.js` |
+| Packaging | the hierarchy with the drawn pattern and the strength verdict; the ranked pallets with the what-if; a case of your own | `pack.js` `tiHi` / `optimizeProfile` / `fourBlock` / `safeLayers`, `RunLedger.whatIf` / `yourCase` | `verify_pack.js`, `verify_stacking.js` |
+| Trace one unit | one unit's events, timeline (ticks and minutes) and cost so far | `RunLedger.trace`, `v_cost_by_hu` | `verify_run_ledger_view.js`, `verify_cost_ledger.js` |
+| Compare two runs | every table paired key by key with deltas B − A | `RunLedger.compare`, `v_compare_*` | `verify_run_compare.js`, `test_run_ledger.py` |
+| The invariants | the four views that must return zero rows | `v_conservation_violations` … `v_terminal_violations` | `test_run_ledger.py` (deliberate corruption) |
+| Appendix | how to read the page; the reproduce commands filled in for the loaded run | — | the viewer self-test |
+
+Every table carries a CSV button (raw values) and the SQL SQLite runs for it (generated, see §4); minutes beside ticks are display-only derived columns; *Print report* expands every SQL. `?example=a|b` loads an example; the planner hands a run over through *Open in the run-ledger viewer*. `run-ledger.html?selftest=1` drives the real buttons and reports `WT-SELFTEST: PASS n/n`.
 
 ## 5. What the ledger is not
 
@@ -108,6 +129,8 @@ node verify_cost_ledger.js                   # spans and money by hand; SQL == J
 node verify_ledger_flow.js                   # flow links, conservation, the layered Sankey geometry (v3.36)
 node verify_run_compare.js                   # two runs paired key by key, deltas B - A (v3.37)
 python tools/export_viewer_sql.py --check    # the SQL the viewer shows is the SQL in this tool (v3.39)
+python tools/run_ledger.py import test/fixtures/run-ledger.json --database work/run.sqlite && python tools/run_ledger.py import test/fixtures/run-ledger-b.json --database work/run.sqlite
+python tools/run_ledger.py report --database work/run.sqlite --runs RUN-hand-built-s31-hc28a7688 RUN-hand-built-s31-hd35e45d4 --out docs/examples/run-report.md   # the committed example (v3.41)
 ```
 
 The viewer's own self-test: serve the folder and open `run-ledger.html?selftest=1`; it drives the real buttons and prints `WT-SELFTEST: PASS n/n`.

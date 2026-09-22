@@ -360,6 +360,45 @@ CREATE VIEW v_span_cost AS SELECT 1 AS stale;
             RL.import_ledger(fresh(), bad)
 
 
+class Report(unittest.TestCase):
+    """tools/run_ledger.py report (v3.41): one deterministic Markdown report from the views."""
+
+    def setUp(self):
+        self.db = fresh()
+        self.run = RL.import_ledger(self.db, hand_ledger())
+
+    def test_report_names_every_planner_view_and_the_run(self):
+        md = RL.report(self.db, self.run)
+        self.assertIn(f"# Run report: {self.run}", md)
+        for name in RL.PLANNER_VIEWS:
+            self.assertIn(f"### {name}", md)
+        self.assertIn("Invariant violations: 0", md)
+        self.assertIn("| case-pick | 1 | 1 | 30.0 | 30.0 | 30 | 30 |", md)
+        self.assertIn("order mix: case-pick 50% · cross-dock 30% · returns 20%", md)
+        self.assertIn("1 of 3 units were still in flight", md)
+        self.assertNotIn("run_id", md.split("## Planner views")[1].split("## Cost detail")[0])
+        self.assertEqual(md, RL.report(self.db, self.run))  # deterministic
+
+    def test_report_compare_section(self):
+        b = hand_ledger("RUN-hand-s2-h00000001", shift=10)
+        run_b = RL.import_ledger(self.db, b)
+        md = RL.report(self.db, self.run, (self.run, run_b))
+        self.assertIn("### v_compare_cycle", md)
+        cycle = md.split("### v_compare_cycle")[1].split("###")[0]
+        self.assertIn("| case-pick | 1 | 1 | 0 | 1 | 1 | 0 | 30.0 | 40.0 | 10.0 |", cycle)
+        self.assertNotIn("### v_compare_cycle", RL.report(self.db, self.run))
+
+    def test_md_table_escapes_pipes_and_nulls(self):
+        self.assertEqual(RL.md_table([{"a": "x|y", "b": None}], ["a", "b"]), "| a | b |\n|---|---|\n| x\\|y | \u2014 |\n")
+        self.assertEqual(RL.md_table([], ["a"]), "(no rows)\n")
+        self.assertEqual(RL.md_table([{"run_id": "r", "k": 1}]), "| k |\n|---|\n| 1 |\n")
+
+    def test_views_all_lists_detail_views(self):
+        self.assertTrue(set(RL.DETAIL_VIEWS) <= set(RL.VIEWS))
+        for group in (RL.PLANNER_VIEWS, RL.INVARIANT_VIEWS, RL.COMPARE_VIEWS):
+            self.assertFalse(set(RL.DETAIL_VIEWS) & set(group))
+
+
 class ViewerSql(unittest.TestCase):
     """run-ledger-sql.js (v3.39): the SQL the viewer shows IS the SQL the tool runs."""
 
@@ -481,6 +520,16 @@ class RecordedFixture(unittest.TestCase):
         links_b = [{k: r[k] for k in ("from_op", "to_op", "units", "retired_units", "eaches")} for r in
                    RL.rows(self.db, "SELECT * FROM v_flow_links WHERE run_id = ? ORDER BY from_op, to_op", (run_b,))]
         self.assertEqual(links_b, jb["flowLinks"])
+
+    @unittest.skipUnless((FIX / "run-ledger-b.json").exists() and (ROOT / "docs" / "examples" / "run-report.md").exists(), "example report not generated")
+    def test_committed_example_report_is_fresh(self):
+        b = json.loads((FIX / "run-ledger-b.json").read_text(encoding="utf-8"))
+        run_b = RL.import_ledger(self.db, b)
+        md = RL.report(self.db, self.run, (self.run, run_b))
+        committed = (ROOT / "docs" / "examples" / "run-report.md").read_text(encoding="utf-8")
+        self.assertEqual(committed, md, "stale: regenerate docs/examples/run-report.md (see docs/RUN_LEDGER_SCHEMA.md section 6)")
+        self.assertIn("Invariant violations: 0", md)
+        self.assertIn("### v_compare_cost", md)
 
     def test_every_gs1_number_is_unique_and_18_or_14_digits(self):
         ssccs = RL.rows(self.db, "SELECT sscc, gtin14 FROM hu WHERE run_id = ?", (self.run,))

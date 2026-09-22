@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.41 — The report, and the guide
+
+**`report`.** `tools/run_ledger.py report --database db [--run R] [--runs A B] [--out report.md]`
+writes one run as deterministic Markdown: header, the at-a-glance row (units, events,
+delivered, received, in flight, pallets, parcels, trailers, cost total / per unit / per
+received each / per delivered each) with the data-quality flags, every planner view as a
+table (`md_table`, `run_id` dropped), the cost detail with the rates, the invariants with
+`Invariant violations: 0`, the six compare tables when `--runs` is given, the honesty
+text. `docs/examples/run-report.md` is the committed example (fixture A against B) with a
+freshness test; CI imports both fixtures, writes a report and checks the generated SQL.
+
+**Guide.** `docs/RUN_LEDGER_SCHEMA.md` §7 walks the viewer section by section (what it
+shows, the defining view, the proving harness); README links the example report.
+
+**Verification.** Python +5 (the report names every planner view and the run, a hand row,
+the compare section, `md_table` escaping, the detail-view groups; the committed example is
+fresh). 70 harnesses, 97 Python tests, WT-SELFTEST 178/178 + viewer 23/23. Cache wt-v122 (no bump: no app-shell change).
+
 ## v3.40 — Cost that answers the question
 
 **Holding cost.** `analytics.defaultRates()` gains `holdingPerUnitHour: 0` (a fourth rate
