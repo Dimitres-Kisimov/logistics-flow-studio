@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.46 — Replications over seeds
+
+**The runner.** `node tools/replicate.mjs <scenario-id|hand> --seeds 1-10 --ticks 300 --out <dir>
+[--policy queue-staffing]` builds the floor once (the hand floor or a library scenario with
+its declared mix and capacities), records one run ledger per seed and writes `run-<seed>.json`
+and `bundle.json`; deterministic. `tools/ledger_env.mjs` is the shared loader.
+
+**SQL.** A seeded `t_critical` table (Student's t, two-sided 95 %, df 1–30; the views fall to
+1.960 beyond), `sqrt()` registered when the SQLite build lacks it, and four views -
+`v_replication_groups`, `v_replication_cycle_by_type`, `v_replication_cost_by_type`,
+`v_replication_summary` - grouping every run by scenario, mix, ticks and policy: n, mean,
+the two-pass sample standard deviation, t(n−1) × s / √n, min, max. `replications` prints them.
+
+**Viewer.** A multi-file input (several runs of one scenario), a *Replications* section with a
+strip plot per order type (a dot per seed, the bar the mean ± the half-width) and the tables,
+the four SQL texts (29 now); `RunLedger.replications` is the twin. `howwecompare.js` now says
+*replications over seeds with Student-t 95 % intervals; no warm-up removal, no validation against
+a real plant* instead of *deterministic single-run heuristics*.
+
+**Verification.** +1 harness (`verify_replicate.js`, 20 checks), +3 Python (the hand numbers
+30 / 32 / 34 → 32, 2, 4.9687 in SQL; a single run has no interval; the t table and sqrt),
+viewer self-test +1, the comparison harness +1. CI replicates three seeds into the database
+and prints the views. 75 harnesses, 120 Python tests, WT-SELFTEST 180/180 + viewer
+30/30. Cache wt-v126.
+
 ## v3.45 — Adaptive staffing, a what-if
 
 **The policy.** `flowsim.spawnPlan` takes `opts.policy = {kind:"queue-staffing", threshold,

@@ -136,6 +136,10 @@ const src = fs.readFileSync(path.join(__dirname, "howwecompare.js"), "utf8");
 check("howwecompare.js source calls no Date / Math.random (deterministic + offline)",
   !/new\s+Date|Date\.(now|parse|UTC)|Date\(/.test(src) && !/Math\.random/.test(src));
 
+// v3.46: the replications row is honest - it names what the app now does and what it still does not.
+check("the statistical-rigour row names replications over seeds honestly and no longer claims single-run only",
+  /Replications over seeds/.test(page) && /no validation against a real plant/.test(page) && !/single-run/i.test(page));
+
 console.log("");
 console.log(failures === 0 ? "ALL HOW-WE-COMPARE CHECKS PASSED (" + checks + " checks)" : failures + " OF " + checks + " CHECKS FAILED");
 process.exit(failures === 0 ? 0 : 1);

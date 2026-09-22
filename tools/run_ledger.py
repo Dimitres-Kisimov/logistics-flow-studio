@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sqlite3
 import sys
 from pathlib import Path
@@ -80,6 +81,8 @@ CREATE TABLE IF NOT EXISTS equipment_rate(
   run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, class TEXT NOT NULL,
   capex REAL NOT NULL CHECK(capex >= 0), amort_years REAL NOT NULL CHECK(amort_years > 0), power_kw REAL NOT NULL CHECK(power_kw >= 0),
   labour INTEGER NOT NULL DEFAULT 0 CHECK(labour IN (0, 1)), PRIMARY KEY(run_id, class));
+-- v3.46 Student's t, two-sided 95 %, seeded on open (df 1..30; df > 30 uses 1.960 in the views)
+CREATE TABLE IF NOT EXISTS t_critical(df INTEGER PRIMARY KEY NOT NULL, t975 REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS location_class(
   run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, type TEXT NOT NULL, class TEXT,
   labour INTEGER NOT NULL DEFAULT 0 CHECK(labour IN (0, 1)), PRIMARY KEY(run_id, type));
@@ -361,6 +364,73 @@ FROM ev JOIN run r ON r.id = ev.run_id
 GROUP BY ev.run_id, ev.location_id;"""
 
 
+# ---- v3.46 replications over seeds ---------------------------------------------------------
+# Runs that share scenario, order mix, ticks and policy but differ in seed form a group; per
+# group and order type: n, the mean, the SAMPLE standard deviation (two-pass, mean first),
+# a Student-t two-sided 95 % half-width t(n-1) x s / sqrt(n), min and max. df > 30 uses
+# 1.960. Not keyed by run_id (a group spans runs). Seeds only: no warm-up removal, no
+# validation against a real plant.
+VIEWS["v_replication_groups"] = """
+CREATE VIEW IF NOT EXISTS v_replication_groups AS
+SELECT scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy, COUNT(*) AS n, GROUP_CONCAT(seed, ',') AS seeds
+FROM (SELECT scenario, mix, ticks, policy, seed FROM run ORDER BY scenario, seed)
+GROUP BY scenario, COALESCE(mix, ''), ticks, COALESCE(policy, '');"""
+VIEWS["v_replication_cycle_by_type"] = """
+CREATE VIEW IF NOT EXISTS v_replication_cycle_by_type AS
+WITH g AS (SELECT id AS run_id, scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy FROM run),
+     x AS (SELECT g.scenario, g.mix, g.ticks, g.policy, c.archetype AS k, c.avg_cycle_ticks AS v
+           FROM v_cycle_time_by_type c JOIN g ON g.run_id = c.run_id WHERE c.avg_cycle_ticks IS NOT NULL),
+     m AS (SELECT scenario, mix, ticks, policy, k, COUNT(*) AS n, AVG(v) AS mean, MIN(v) AS min, MAX(v) AS max
+           FROM x GROUP BY scenario, mix, ticks, policy, k),
+     s AS (SELECT x.scenario, x.mix, x.ticks, x.policy, x.k, SUM((x.v - m.mean) * (x.v - m.mean)) AS ss
+           FROM x JOIN m ON m.scenario = x.scenario AND m.mix = x.mix AND m.ticks = x.ticks AND m.policy = x.policy AND m.k = x.k
+           GROUP BY x.scenario, x.mix, x.ticks, x.policy, x.k)
+SELECT m.scenario, m.mix, m.ticks, m.policy, m.k AS archetype, m.n, ROUND(m.mean, 4) AS mean,
+       CASE WHEN m.n > 1 THEN ROUND(sqrt(s.ss / (m.n - 1)), 4) END AS stdev,
+       CASE WHEN m.n > 1 THEN ROUND(COALESCE(t.t975, 1.960) * sqrt(s.ss / (m.n - 1)) / sqrt(m.n), 4) END AS ci95_half,
+       ROUND(m.min, 4) AS min, ROUND(m.max, 4) AS max
+FROM m JOIN s ON s.scenario = m.scenario AND s.mix = m.mix AND s.ticks = m.ticks AND s.policy = m.policy AND s.k = m.k
+LEFT JOIN t_critical t ON t.df = m.n - 1;"""
+VIEWS["v_replication_cost_by_type"] = """
+CREATE VIEW IF NOT EXISTS v_replication_cost_by_type AS
+WITH g AS (SELECT id AS run_id, scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy FROM run),
+     x AS (SELECT g.scenario, g.mix, g.ticks, g.policy, c.archetype AS k, c.total_eur AS v
+           FROM v_cost_by_type c JOIN g ON g.run_id = c.run_id),
+     m AS (SELECT scenario, mix, ticks, policy, k, COUNT(*) AS n, AVG(v) AS mean, MIN(v) AS min, MAX(v) AS max
+           FROM x GROUP BY scenario, mix, ticks, policy, k),
+     s AS (SELECT x.scenario, x.mix, x.ticks, x.policy, x.k, SUM((x.v - m.mean) * (x.v - m.mean)) AS ss
+           FROM x JOIN m ON m.scenario = x.scenario AND m.mix = x.mix AND m.ticks = x.ticks AND m.policy = x.policy AND m.k = x.k
+           GROUP BY x.scenario, x.mix, x.ticks, x.policy, x.k)
+SELECT m.scenario, m.mix, m.ticks, m.policy, m.k AS archetype, m.n, ROUND(m.mean, 4) AS mean,
+       CASE WHEN m.n > 1 THEN ROUND(sqrt(s.ss / (m.n - 1)), 4) END AS stdev,
+       CASE WHEN m.n > 1 THEN ROUND(COALESCE(t.t975, 1.960) * sqrt(s.ss / (m.n - 1)) / sqrt(m.n), 4) END AS ci95_half,
+       ROUND(m.min, 4) AS min, ROUND(m.max, 4) AS max
+FROM m JOIN s ON s.scenario = m.scenario AND s.mix = m.mix AND s.ticks = m.ticks AND s.policy = m.policy AND s.k = m.k
+LEFT JOIN t_critical t ON t.df = m.n - 1;"""
+VIEWS["v_replication_summary"] = """
+CREATE VIEW IF NOT EXISTS v_replication_summary AS
+WITH g AS (SELECT id AS run_id, scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy FROM run),
+     x AS (SELECT g.scenario, g.mix, g.ticks, g.policy, 'units' AS k, CAST(r.units AS REAL) AS v FROM v_run_summary r JOIN g ON g.run_id = r.run_id
+           UNION ALL SELECT g.scenario, g.mix, g.ticks, g.policy, 'delivered', CAST(r.delivered AS REAL) FROM v_run_summary r JOIN g ON g.run_id = r.run_id
+           UNION ALL SELECT g.scenario, g.mix, g.ticks, g.policy, 'total_eur', COALESCE((SELECT SUM(c.total_eur) FROM v_cost_by_type c WHERE c.run_id = g.run_id), 0) FROM g),
+     m AS (SELECT scenario, mix, ticks, policy, k, COUNT(*) AS n, AVG(v) AS mean, MIN(v) AS min, MAX(v) AS max
+           FROM x GROUP BY scenario, mix, ticks, policy, k),
+     s AS (SELECT x.scenario, x.mix, x.ticks, x.policy, x.k, SUM((x.v - m.mean) * (x.v - m.mean)) AS ss
+           FROM x JOIN m ON m.scenario = x.scenario AND m.mix = x.mix AND m.ticks = x.ticks AND m.policy = x.policy AND m.k = x.k
+           GROUP BY x.scenario, x.mix, x.ticks, x.policy, x.k)
+SELECT m.scenario, m.mix, m.ticks, m.policy, m.k AS metric, m.n, ROUND(m.mean, 4) AS mean,
+       CASE WHEN m.n > 1 THEN ROUND(sqrt(s.ss / (m.n - 1)), 4) END AS stdev,
+       CASE WHEN m.n > 1 THEN ROUND(COALESCE(t.t975, 1.960) * sqrt(s.ss / (m.n - 1)) / sqrt(m.n), 4) END AS ci95_half,
+       ROUND(m.min, 4) AS min, ROUND(m.max, 4) AS max
+FROM m JOIN s ON s.scenario = m.scenario AND s.mix = m.mix AND s.ticks = m.ticks AND s.policy = m.policy AND s.k = m.k
+LEFT JOIN t_critical t ON t.df = m.n - 1;"""
+REPLICATION_VIEWS = ("v_replication_groups", "v_replication_cycle_by_type", "v_replication_cost_by_type", "v_replication_summary")
+# Student's t, two-sided 95 % (0.975 quantile) for df 1..30 - standard tables; df > 30 uses 1.960.
+T975 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
+        11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086,
+        21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042}
+
+
 INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations")
 PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
                  "v_cost_by_type", "v_cost_by_location", "v_flow_links", "v_staffing")
@@ -372,6 +442,10 @@ def connect(path: str) -> sqlite3.Connection:
     db = sqlite3.connect(path)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys = ON")
+    try:  # v3.46: sqrt() is built in when SQLite was compiled with the math functions; register it otherwise
+        db.execute("SELECT sqrt(4)").fetchone()
+    except sqlite3.OperationalError:
+        db.create_function("sqrt", 1, math.sqrt, deterministic=True)
     return db
 
 
@@ -402,6 +476,7 @@ def initialize(db: sqlite3.Connection) -> None:
         db.executescript(ddl)
     for pid, slots in TRAILER_SLOTS.items():
         db.execute("INSERT OR IGNORE INTO pallet_type VALUES(?, ?)", (pid, slots))
+    db.executemany("INSERT OR IGNORE INTO t_critical VALUES(?, ?)", list(T975.items()))  # v3.46
     db.commit()
 
 
@@ -697,7 +772,7 @@ def render(table: list[dict]) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=("import", "views", "summary", "query", "compare", "report", "reconcile"))
+    ap.add_argument("command", choices=("import", "views", "summary", "query", "compare", "report", "reconcile", "replications"))
     ap.add_argument("arg", nargs="?", help="export JSON path (import, reconcile) or SQL text (query)")
     ap.add_argument("--database", help="the SQLite file (every command but reconcile, which uses memory)")
     ap.add_argument("--js", help="reconcile: the JavaScript rows written by `node tools/make_run_ledger_fixture.mjs reconcile <dir>`")
@@ -736,6 +811,12 @@ def main(argv=None) -> int:
         rid = import_ledger(db, data)
         s = rows(db, "SELECT units, events, delivered FROM v_run_summary WHERE run_id = ?", (rid,))[0]
         print(f"imported {rid}: {s['units']} units, {s['events']} events, {s['delivered']} delivered")
+        return 0
+    if a.command == "replications":
+        for name in REPLICATION_VIEWS:
+            print(f"== {name} ==")
+            print(render(rows(db, f"SELECT * FROM {name} ORDER BY 1, 2, 3, 4, 5")))
+            print()
         return 0
     if a.command == "compare":
         if not a.runs:

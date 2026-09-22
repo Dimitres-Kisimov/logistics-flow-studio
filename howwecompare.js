@@ -125,7 +125,7 @@
     { label: "Sharing", suites: "Proprietary formats; export can be limited", thisApp: "JSON / CSV + shareable URL", edge: "this", sourceId: "saashub" },
     { label: "Validated / certified DES", suites: "Yes - the reason to buy them", thisApp: "No - modelled, not measured; teaching-scale", edge: "suites", sourceId: null },
     { label: "Object libraries + track record", suites: "Deep, mature, decades of use", thisApp: "Focused, user-definable, honest", edge: "suites", sourceId: null },
-    { label: "Statistical rigour (replications, CI)", suites: "Yes", thisApp: "Deterministic single-run heuristics", edge: "suites", sourceId: null },
+    { label: "Statistical rigour (replications, CI)", suites: "Yes", thisApp: "Replications over seeds with Student-t 95 % intervals (v3.46); no warm-up removal, no validation against a real plant", edge: "suites", sourceId: null },
     { label: "Honesty labelling (model vs measurement)", suites: "Not foregrounded", thisApp: "Foregrounded everywhere", edge: "this", sourceId: null },
   ];
 

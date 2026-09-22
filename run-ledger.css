@@ -43,3 +43,8 @@ pre.cmds{padding:12px;background:#1b211d;border:1px solid #455149;border-radius:
 /* v3.45 the staffing step chart */
 .staffing{width:100%;max-width:680px;height:auto;display:block}
 .staffing .staff-line{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
+/* v3.46 the replications strip plot */
+.strip{width:100%;max-width:680px;height:auto;display:block}
+.strip .strip-dot{fill:currentColor;opacity:.85}
+.strip .strip-ci{stroke:currentColor;stroke-width:6;opacity:.3}
+.strip .strip-mean{stroke:currentColor;stroke-width:2}

@@ -40,7 +40,7 @@
   }
   function clickAndWait(id, side) { var p = nextLoaded(side); $(id).click(); return p; }
   function wait(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
-  var SECTIONS = ["rlGlance", "rlRibbon", "rlFlow", "rlCycle", "rlTouches", "rlWait", "rlWip", "rlStaffing", "rlByOp", "rlCost", "rlDispatch", "rlPack", "rlOptimise", "rlYourCase", "rlTrace", "rlInvariants", "rlAppendix"];
+  var SECTIONS = ["rlGlance", "rlRibbon", "rlFlow", "rlCycle", "rlTouches", "rlWait", "rlWip", "rlStaffing", "rlByOp", "rlCost", "rlDispatch", "rlPack", "rlOptimise", "rlYourCase", "rlTrace", "rlReplications", "rlInvariants", "rlAppendix"];
   var BAD_TEXT = /\[FAIL\]|Could not|is not loaded|not a factory-run-ledger|\bNaN\b|\bundefined\b/;
 
   function runSuite() {
@@ -48,7 +48,7 @@
     check("errors-boundary-installed", function () { return Array.isArray(window.__WT_ERRORS__); });
     check("no-errors-during-boot", function () { var e = window.__WT_ERRORS__ || []; return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" }; });
     check("model-and-generated-sql-present", function () {
-      return { ok: !!R && typeof R.views === "function" && typeof R.model === "function" && typeof R.csv === "function" && typeof R.glance === "function" && R.SQL === window.RunLedgerSQL && Object.keys(R.SQL).length === 25,
+      return { ok: !!R && typeof R.views === "function" && typeof R.model === "function" && typeof R.csv === "function" && typeof R.glance === "function" && R.SQL === window.RunLedgerSQL && Object.keys(R.SQL).length === 29,
         detail: R ? Object.keys(R.SQL).length + " SQL texts" : "no RunLedger" };
     });
     check("nav-anchors-resolve", function () {
@@ -61,6 +61,11 @@
       var exp = R.current();
       check("example-a-loaded", function () { return { ok: !!exp && exp.run.id === d.run && exp.hus.length > 20, detail: d.run }; });
       check("focus-moved-to-glance", function () { return document.activeElement === $("rlGlance"); });
+      check("replications-section-needs-two-runs-and-the-twin-is-pure", function () {
+        var el = $("rlReplications"), one = R.replications([exp]), two = R.replications([exp, exp]);
+        return { ok: !!el && /Load two or more runs/.test(el.textContent) && el.querySelectorAll("details.sql[data-view]").length === 4 && one.groups.length === 1 && one.groups[0].n === 1 && one.groups[0].cycle.every(function (r) { return r.stdev === null && r.ci95_half === null; }) &&
+          two.groups[0].n === 2 && two.groups[0].cycle.every(function (r) { return r.stdev === 0 && r.ci95_half === 0; }) && R.T975[2] === 4.303, detail: one.groups[0].cycle.length + " types" };
+      });
       check("staffing-section-without-policy", function () { var el = $("rlStaffing"); return { ok: !!el && /No staffing policy in this run/.test(el.textContent) && !!el.querySelector('details.sql[data-view="v_staffing"]') && /declared stations only/.test($("rlGlance").textContent), detail: el ? el.textContent.slice(0, 60) : "missing" }; });
       check("every-section-non-empty", function () { var empty = SECTIONS.filter(function (id) { return !$(id) || !$(id).innerHTML.trim(); }); return { ok: empty.length === 0, detail: empty.length ? empty.join(",") : SECTIONS.length + " sections" }; });
       check("no-fail-or-error-text", function () { var m = BAD_TEXT.exec($("rlView").textContent); return { ok: !m, detail: m ? m[0] : "clean" }; });
@@ -93,11 +98,11 @@
       });
     }).then(function (d) {
       check("compare-renders-after-b", function () { var n = $("rlCompare").querySelectorAll("table").length; return { ok: !!window.RunLedger.currentB() && window.RunLedger.currentB().run.id === d.run && n === 6, detail: d.run + " · " + n + " tables" }; });
-      check("all-25-sql-blocks-after-compare", function () {
+      check("all-29-sql-blocks-after-compare", function () {
         var seen = {}, els = $("rlView").querySelectorAll("details.sql[data-view]");
         for (var i = 0; i < els.length; i++) seen[els[i].getAttribute("data-view")] = 1;
         var miss = Object.keys(window.RunLedgerSQL).filter(function (k) { return !seen[k]; });
-        return { ok: miss.length === 0, detail: miss.length ? "missing " + miss.join(",") : "25/25" };
+        return { ok: miss.length === 0, detail: miss.length ? "missing " + miss.join(",") : "29/29" };
       });
       check("no-errors-after-b", function () { var e = window.__WT_ERRORS__ || []; return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" }; });
       return clickAndWait("rlDemoC", "a");

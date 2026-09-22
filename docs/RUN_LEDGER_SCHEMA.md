@@ -1,6 +1,6 @@
 # The run ledger — schema, identities, SQL views
 
-*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.45.*
+*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.46.*
 
 ## 1. One stream, three consumers
 
@@ -80,6 +80,7 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 | `v_cost_by_location` | per station: waiting spans, ticks, charged ticks, hours and their € incl. holding — plus one `transport` row for every moving span (v3.35, v3.40) |
 | `v_flow_links` | per pair of operations: units that moved from the one to the next, retired units, eaches that left (v3.36) |
 | `v_staffing` | per bench the what-if changed: changes, most workers, first change tick, ticks with more than one worker (each change holds until the next at that bench or the end of the run; v3.45, a planner view, empty without a policy); `v_run_summary` carries `policy` |
+| `v_replication_groups`, `v_replication_cycle_by_type`, `v_replication_cost_by_type`, `v_replication_summary` | runs that share scenario, order mix, ticks and policy but differ in seed, as a group: n and the seeds; per order type (cycle ticks, cost) and per run total (units, delivered, total_eur): n, mean, the sample standard deviation (two-pass), a Student-t two-sided 95 % half-width t(n−1) × s / √n from the seeded `t_critical` table (df 1–30; beyond, 1.960), min, max — not keyed by run (v3.46, see §8) |
 | `v_dispatch_by_order` | per order: lines, delivered lines, eaches in and out, cases, parcels, cases per pallet and `pallets_needed` = delivered cases over cases per pallet, rounded up — consolidation modelled at dispatch, not in the flow (v3.44; a detail view); `v_run_summary` carries `dataset_source / dataset_orders / dataset_lines` |
 
 **Cost views** (v3.35; empty when the run carries no `rates`): `v_spans` pairs each event with the next one of the same unit (`LEAD` over `version`) and names the state; `v_span_cost` charges each span by the rule in §3; `v_cost_by_hu` sums per unit. Rounding happens only at the aggregates (4 dp). Since v3.43 both sides sum with compensated arithmetic — SQLite's `SUM()` has used Kahan-Babuška-Neumaier since 3.43.0 and `ledger.js` sums the same way — so the rounded aggregates agree to at most one step in the fourth decimal. `python tools/run_ledger.py reconcile <export.json> --js <rows.json>` measures the drift column by column over 13 views (the rows come from `node tools/make_run_ledger_fixture.mjs reconcile <dir>`) and fails above 1e-4 (1e-9 on the unrounded span views); measured on the three fixtures: 5.6e-17 (A, B) and 1.1e-13 (C) over 111 columns. The tests use the same tolerance when SQLite is 3.44 or newer.
@@ -120,6 +121,12 @@ Ad-hoc SQL: `query "SELECT …"` accepts one `SELECT` / `WITH` statement and at 
 
 Every table carries a CSV button (raw values) and the SQL SQLite runs for it (generated, see §4); minutes beside ticks are display-only derived columns; *Print report* expands every SQL. `?example=a|b|c` loads an example (C is the library floor *ecommerce-multichannel-fc* recorded at declared capacities, v3.43); the planner hands a run over through *Open in the run-ledger viewer*. `run-ledger.html?selftest=1` drives the real buttons and reports `WT-SELFTEST: PASS n/n`.
 
+## 8. Replications over seeds
+
+`node tools/replicate.mjs <scenario-id|hand> --seeds 1-10 --ticks 300 --out <dir> [--policy queue-staffing]` builds the floor once and records one ledger per seed (`run-<seed>.json`) plus `bundle.json {scenario, mix, ticks, policy, seeds, runs}`; the same arguments write the same bytes. Import the runs into one database and `python tools/run_ledger.py replications --database run.sqlite` prints the four views above; the viewer's *Replications* section does the same over several loaded files (its `RunLedger.replications` is the twin, asserted against independent arithmetic and by hand: cycles 30 / 32 / 34 → mean 32, s 2, half-width 4.303 × 2 / √3 = 4.9687).
+
+What this is not: seeds only — the same floor, mix and tick count with a different seed each; no warm-up removal (the run starts empty and the interval covers the whole run), no batch means, no validation against a real plant. The interval is the arithmetic of the t distribution over the seeds you ran, of a synthetic teaching simulation.
+
 ## 5. What the ledger is not
 
 Synthetic events from a synthetic teaching simulation — not telemetry, not a WMS, not a measurement of any site. The quantities are the packaging profile's synthetic teaching values ([PACKAGING_OPTIMISATION.md](PACKAGING_OPTIMISATION.md) §2). The identities are deterministic functions of the inputs, which is what makes them useful and also what makes them meaningless outside the simulation.
@@ -129,6 +136,7 @@ Synthetic events from a synthetic teaching simulation — not telemetry, not a W
 ```sh
 node tools/make_run_ledger_fixture.mjs       # regenerates test/fixtures/run-ledger.json, -b, -c and -d byte for byte ([a|b|c|d|all]; a and b are built before wms.js loads; d reads docs/examples through wmsdata.js)
 python tools/make_sample_data.py --check     # the synthetic sample SKU master and order file are what the generator writes (v3.44)
+node tools/replicate.mjs hand --seeds 1-3 --ticks 300 --out work/rep && for s in 1 2 3; do python tools/run_ledger.py import work/rep/run-$s.json --database work/run.sqlite; done && python tools/run_ledger.py replications --database work/run.sqlite   # replications over seeds (v3.46)
 node verify_ledger.js                        # the recorder: identities, exact route walks, conservation, byte-identical sim
 python -m pytest test/test_run_ledger.py -q  # the SQL: hand-built ledger, corruption, SQL == JavaScript stats
 node verify_run_ledger_view.js               # the viewer's model against the same hand ledger and fixture

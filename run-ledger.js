@@ -254,6 +254,41 @@
   // The same tables for two exports, paired key by key (order type; bench +
   // operation); deltas are B - A and null whenever a side lacks the key, so
   // a type or bench seen in only one run still appears. Mirrors v_compare_*.
+  /* ---------------- replications over seeds (v3.46) ------------------ */
+  // Runs that share scenario, order mix, ticks and policy but differ in seed form a
+  // group; per group and order type the SAME numbers as v_replication_* in SQL: n,
+  // the mean, the sample standard deviation (two-pass), a Student-t two-sided 95 %
+  // half-width t(n-1) x s / sqrt(n), min and max. Seeds only: no warm-up removal, no
+  // validation against a real plant. Pure.
+  const T975 = { 1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
+    11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086,
+    21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042 };
+  const tcrit = (df) => T975[df] || 1.96;
+  function nsum(xs) { const Lg = window.WT && window.WT.ledger; return Lg && typeof Lg.nsum === "function" ? Lg.nsum(xs) : xs.reduce((a, b) => a + b, 0); }
+  function repStats(values) {
+    const n = values.length, mean = nsum(values) / n;
+    const s = n > 1 ? Math.sqrt(nsum(values.map((v) => (v - mean) * (v - mean))) / (n - 1)) : null;
+    return { n: n, mean: r4(mean), stdev: s == null ? null : r4(s), ci95_half: s == null ? null : r4(tcrit(n - 1) * s / Math.sqrt(n)), min: r4(Math.min.apply(null, values)), max: r4(Math.max.apply(null, values)) };
+  }
+  function replications(exps) {
+    const groups = {};
+    for (const exp of exps || []) {
+      const r = exp.run;
+      const mixKey = JSON.stringify(r.mix == null ? null : (Array.isArray(r.mix) ? r.mix : Object.keys(r.mix).sort().map((k) => [k, r.mix[k]])));
+      const key = [r.scenario, mixKey, r.ticks, r.policy ? JSON.stringify([r.policy.kind, r.policy.threshold, r.policy.maxServers, r.policy.cooldownTicks]) : ""].join("|");
+      const g = groups[key] || (groups[key] = { key: key, scenario: r.scenario, mix: r.mix, ticks: r.ticks, policy: r.policy || null, seeds: [], runs: [], n: 0, cyc: {}, cost: {}, summ: { units: [], delivered: [], total_eur: [] } });
+      g.n++; g.seeds.push(r.seed); g.runs.push(r.id);
+      const v = views(exp);
+      for (const row of v.cycle) if (row.avg_cycle_ticks != null) (g.cyc[row.archetype] = g.cyc[row.archetype] || []).push(row.avg_cycle_ticks);
+      for (const row of v.costByType || []) (g.cost[row.archetype] = g.cost[row.archetype] || []).push(row.total_eur);
+      g.summ.units.push(v.summary.units); g.summ.delivered.push(v.summary.delivered); g.summ.total_eur.push(v.costByType ? nsum(v.costByType.map((t) => t.total_eur)) : 0);
+    }
+    const rowsOf = (map, key) => Object.keys(map).sort().map((k) => { const row = {}; row[key] = k; return Object.assign(row, repStats(map[k])); });
+    return { groups: Object.keys(groups).sort().map((k) => { const g = groups[k];
+      return { key: g.key, scenario: g.scenario, mix: g.mix, ticks: g.ticks, policy: g.policy, n: g.n, seeds: g.seeds.slice().sort((a, b) => a - b), runs: g.runs.slice(),
+        cycle: rowsOf(g.cyc, "archetype"), cost: rowsOf(g.cost, "archetype"), summary: rowsOf(g.summ, "metric"), values: { cycle: g.cyc, cost: g.cost } }; }) };
+  }
+
   function compare(a, b) {
     const va = views(a), vb = views(b);
     const cmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
@@ -376,6 +411,8 @@
   RunLedger.ribbon = ribbon;
   RunLedger.trace = trace;
   RunLedger.compare = compare;
+  RunLedger.replications = replications; // v3.46
+  RunLedger.T975 = T975;
   RunLedger.yourCase = yourCase;
   RunLedger.whatIf = whatIf;
   RunLedger.glance = glance;
@@ -674,6 +711,53 @@
     return "<h3>Dispatch by order</h3><p class=\"note\">Consolidation is modelled at dispatch, not in the flow: every order line moved through the building as its own unit; an order's <code>pallets_needed</code> is its delivered cases over the profile's cases per pallet, the customer pallets those cases would fill (" + rows.length + " orders, " + multi + " with more than one line). A mixed pallet's build sequence and stability are not modelled.</p>" +
       table(rows, BY_ORDER_COLS, "Dispatch by order") + sqlBlock("v_dispatch_by_order");
   }
+  /* ---------------- replications (v3.46) ------------------------------ */
+  const REP_COLS = (key) => [key, "n", "mean", "stdev", "ci95_half", "min", "max"];
+  let REPS = [];
+  function stripPlot(g) {
+    const types = Object.keys(g.values.cycle).sort();
+    if (!types.length) return "";
+    const W = 680, rowH = 26, H = 30 + types.length * rowH;
+    const all = [].concat.apply([], types.map((t) => g.values.cycle[t]));
+    const hi = Math.max(1, Math.max.apply(null, all)) * 1.05;
+    const X = (v) => (120 + (v / hi) * (W - 140)).toFixed(1);
+    let s = '<svg viewBox="0 0 ' + W + " " + H + '" class="strip" role="img" aria-label="Cycle time per seed and the 95 % interval per order type">';
+    types.forEach((t, i) => {
+      const y = 12 + i * rowH + rowH / 2, st = g.cycle.find((r) => r.archetype === t);
+      s += '<text x="8" y="' + (y + 4) + '" class="svg-label">' + esc(t) + "</text>";
+      if (st && st.ci95_half != null) s += '<line x1="' + X(Math.max(0, st.mean - st.ci95_half)) + '" x2="' + X(st.mean + st.ci95_half) + '" y1="' + y + '" y2="' + y + '" class="strip-ci"/>';
+      for (const v of g.values.cycle[t]) s += '<circle cx="' + X(v) + '" cy="' + y + '" r="3.5" class="strip-dot"/>';
+      if (st) s += '<line x1="' + X(st.mean) + '" x2="' + X(st.mean) + '" y1="' + (y - 8) + '" y2="' + (y + 8) + '" class="strip-mean"/>';
+    });
+    s += '<text x="120" y="' + (H - 4) + '" class="svg-label">0 ticks</text><text x="' + (W - 10) + '" y="' + (H - 4) + '" class="svg-label" text-anchor="end">' + Math.round(hi) + " ticks · a dot per seed, the bar = mean ± the 95 % half-width</text></svg>";
+    return s;
+  }
+  function renderReplications() {
+    const out = $("rlReplications");
+    if (!out) return;
+    const exps = REPS.length ? REPS : (EXP ? [EXP] : []);
+    const r = exps.length ? replications(exps) : { groups: [] };
+    const multi = r.groups.filter((g) => g.n >= 2);
+    let html = "";
+    if (!multi.length) {
+      html += "<p class=\"note\">Load two or more runs of one scenario, seed by seed - <code>node tools/replicate.mjs &lt;scenario-id|hand&gt; --seeds 1-10 --ticks 300 --out runs/</code>, then the file input above with all of the files - to see the mean, the sample standard deviation and a Student-t 95 % interval per order type." +
+        (exps.length ? " " + exps.length + " run" + (exps.length === 1 ? "" : "s") + " loaded, no two of one scenario, order mix, tick count and policy." : "") + "</p>";
+    }
+    for (const g of multi) {
+      html += "<h3>" + esc(g.scenario) + " · " + g.n + " runs (seeds " + esc(g.seeds.join(", ")) + ") · " + g.ticks + " ticks" + (g.policy ? " · adaptive staffing (what-if)" : "") + "</h3>" + stripPlot(g) +
+        table(g.cycle, REP_COLS("archetype"), "Cycle time by order type (average ticks per run)") + table(g.cost, REP_COLS("archetype"), "Cost by order type (EUR per run)") + table(g.summary, REP_COLS("metric"), "Run totals");
+    }
+    html += "<p class=\"note\">Seeds only: the same floor, order mix and tick count, a different seed each; no warm-up removal, no validation against a real plant. Student's t, two-sided 95 % (df above 30 uses 1.960). In SQLite the same four views read every run in one database: <code>python tools/run_ledger.py replications --database run.sqlite</code>.</p>";
+    html += sqlBlock("v_replication_groups") + sqlBlock("v_replication_cycle_by_type") + sqlBlock("v_replication_cost_by_type") + sqlBlock("v_replication_summary");
+    out.innerHTML = html;
+  }
+  function loadMany(exps) {
+    REPS = (exps || []).filter(valid);
+    if (!REPS.length) { $("rlStatus").textContent = "None of those files is a factory-run-ledger/v1 export."; return; }
+    if (!EXP) load(REPS[0]); else renderReplications();
+    $("rlStatus").textContent = "Replications: " + REPS.length + " runs loaded (" + REPS.map((e) => e.run.id).join(", ") + ").";
+    document.dispatchEvent(new CustomEvent("rl:loaded", { detail: { side: "many", run: REPS.length + " runs" } }));
+  }
   function renderDispatch(exp) {
     const d = views(exp).dispatch;
     if (!d) { $("rlDispatch").innerHTML = "<p class=\"note\">Nothing delivered yet in this run.</p>" + sqlBlock("v_dispatch") + byOrderHtml(exp); return; }
@@ -864,7 +948,7 @@
     $("rlStatus").textContent = "Loaded " + exp.hus.length + " units and " + exp.events.length + " events from " + exp.run.id + ".";
     $("rlView").hidden = false;
     renderGlance(exp); renderRibbon(exp); renderFlow(exp); renderPlanner(exp); renderCost(exp); renderDispatch(exp);
-    renderPackaging(exp); renderOptimise(exp); renderYourCase(exp); renderTrace(exp); renderCompare(); renderInvariants(exp); renderAppendix(exp);
+    renderPackaging(exp); renderOptimise(exp); renderYourCase(exp); renderTrace(exp); renderCompare(); renderReplications(); renderInvariants(exp); renderAppendix(exp);
     $("rlNav").hidden = false;
     setCurrentNav("secGlance");
     try { $("rlGlance").focus({ preventScroll: true }); } catch (_) { /* older focus() */ }
@@ -886,6 +970,12 @@
   };
   $("rlFile").addEventListener("change", (ev) => readFile(ev, load));
   $("rlFileB").addEventListener("change", (ev) => readFile(ev, loadB));
+  $("rlFiles").addEventListener("change", (ev) => { // v3.46: several runs of one scenario
+    const files = Array.prototype.slice.call((ev.target && ev.target.files) || []);
+    if (!files.length) return;
+    Promise.all(files.map((f) => new Promise((resolve, reject) => { const rd = new FileReader(); rd.onload = () => { try { resolve(JSON.parse(String(rd.result))); } catch (e) { reject(e); } }; rd.onerror = () => reject(new Error("could not read " + f.name)); rd.readAsText(f); })))
+      .then(loadMany).catch((e) => { $("rlStatus").textContent = "Could not read those files: " + e.message; });
+  });
   $("rlDemo").addEventListener("click", () => {
     fetch("test/fixtures/run-ledger.json").then((r) => r.json()).then(load).catch((e) => { $("rlStatus").textContent = "Could not load the example: " + e.message; });
   });
@@ -910,6 +1000,7 @@
   if (!handed && q && $(EXAMPLE_BUTTON[q[1]])) $(EXAMPLE_BUTTON[q[1]]).click();
   RunLedger.load = load;
   RunLedger.loadB = loadB;
+  RunLedger.loadMany = loadMany; // v3.46
   RunLedger.current = () => EXP;
   RunLedger.currentB = () => EXP_B;
 })();

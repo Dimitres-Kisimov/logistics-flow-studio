@@ -21,7 +21,7 @@ import run_ledger as RL
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "run-ledger-sql.js"
 PREFIX = re.compile(r"\A\s*CREATE VIEW IF NOT EXISTS (\w+) AS\s*")
-GROUPS = ("PLANNER_VIEWS", "INVARIANT_VIEWS", "DETAIL_VIEWS", "COMPARE_VIEWS")
+GROUPS = ("PLANNER_VIEWS", "INVARIANT_VIEWS", "DETAIL_VIEWS", "COMPARE_VIEWS", "REPLICATION_VIEWS")
 
 
 def view_bodies() -> dict[str, str]:

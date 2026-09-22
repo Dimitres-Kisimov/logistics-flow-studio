@@ -13,6 +13,7 @@ Two layers of proof:
      units, rates linear, empty without rates, and SQL == JavaScript on the fixture.
 """
 import json
+import math
 import shutil
 import sqlite3
 import subprocess
@@ -601,6 +602,55 @@ class RecordedFixture(unittest.TestCase):
         data["staffing"] = [{"tick": 1, "location_id": "face", "servers": 2}]
         RL.import_ledger(db, data)
         self.assertEqual(RL.rows(db, "SELECT changes FROM v_staffing")[0]["changes"], 1)
+
+    def _replicated_hand(self, shifts=(0, 2, 4)):
+        """Three hand ledgers that differ only in seed (and the shift that moves the terminal events)."""
+        db = fresh()
+        for k, shift in enumerate(shifts, start=1):
+            data = hand_ledger(f"RUN-hand-s{k}-h0000000{k}", shift=shift)
+            data["run"]["seed"] = k
+            data["run"]["ticks"] = 40  # one group: the same scenario, mix, ticks and (no) policy
+            RL.import_ledger(db, data)
+        return db
+
+    def test_replications_by_hand(self):
+        """v3.46: case-pick cycles 30 / 32 / 34 -> n 3, mean 32, s 2, t(2) = 4.303 -> half-width 4.9687; cross-dock 15 / 17 / 19 likewise."""
+        db = self._replicated_hand()
+        groups = RL.rows(db, "SELECT * FROM v_replication_groups")
+        self.assertEqual(len(groups), 1)
+        self.assertEqual((groups[0]["scenario"], groups[0]["ticks"], groups[0]["n"]), ("hand", 40, 3))
+        self.assertEqual(sorted(groups[0]["seeds"].split(",")), ["1", "2", "3"])
+        cyc = {r["archetype"]: r for r in RL.rows(db, "SELECT * FROM v_replication_cycle_by_type")}
+        self.assertEqual(sorted(cyc), ["case-pick", "cross-dock"])  # the live return has no cycle
+        c = cyc["case-pick"]
+        self.assertEqual((c["n"], c["mean"], c["stdev"], c["min"], c["max"]), (3, 32.0, 2.0, 30.0, 34.0))
+        self.assertAlmostEqual(c["ci95_half"], 4.303 * 2 / math.sqrt(3), places=4)
+        self.assertEqual(c["ci95_half"], 4.9687)
+        x = cyc["cross-dock"]
+        self.assertEqual((x["mean"], x["stdev"], x["ci95_half"]), (17.0, 2.0, 4.9687))
+        cost = {r["archetype"]: r for r in RL.rows(db, "SELECT * FROM v_replication_cost_by_type")}
+        self.assertEqual(cost["returns"]["stdev"], 0.0)  # the return never moves later
+        self.assertAlmostEqual(cost["case-pick"]["stdev"], 1.2331, delta=1e-3)  # +6.1656 per 10 ticks -> 1.2331 per 2
+        summ = {r["metric"]: r for r in RL.rows(db, "SELECT * FROM v_replication_summary")}
+        self.assertEqual((summ["units"]["n"], summ["units"]["mean"], summ["units"]["stdev"]), (3, 3.0, 0.0))
+        self.assertEqual(summ["delivered"]["mean"], 2.0)
+        self.assertGreater(summ["total_eur"]["stdev"], 0)
+
+    def test_replication_of_one_run_has_no_interval(self):
+        db = fresh_with(hand_ledger())
+        rows = RL.rows(db, "SELECT * FROM v_replication_cycle_by_type")
+        self.assertTrue(rows and all(r["n"] == 1 and r["stdev"] is None and r["ci95_half"] is None for r in rows))
+        self.assertEqual(RL.rows(db, "SELECT n FROM v_replication_groups")[0]["n"], 1)
+
+    def test_t_table_and_sqrt(self):
+        db = fresh()
+        self.assertEqual(RL.rows(db, "SELECT t975 FROM t_critical WHERE df = 2")[0]["t975"], 4.303)
+        self.assertEqual(RL.rows(db, "SELECT COUNT(*) AS n FROM t_critical")[0]["n"], 30)
+        self.assertEqual(RL.rows(db, "SELECT sqrt(4) AS s")[0]["s"], 2.0)
+        self.assertEqual(RL.T975[1], 12.706)
+        self.assertTrue(all(RL.T975[d] > RL.T975[d + 1] for d in range(1, 30)))
+        self.assertIn("REPLICATION_VIEWS", XV.GROUPS)
+        self.assertEqual(RL.REPLICATION_VIEWS, ("v_replication_groups", "v_replication_cycle_by_type", "v_replication_cost_by_type", "v_replication_summary"))
 
     def test_service_ticks_round_trip_unrounded(self):
         """v3.43: a declared-capacity station's service time is stored as recorded, not rounded."""

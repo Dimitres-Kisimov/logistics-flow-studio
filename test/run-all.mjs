@@ -717,6 +717,7 @@ const HARNESSES = [
   { name: "A realistic recording at full precision: A/B byte-identical under compensated sums, fixture C at declared capacities, reconcile wiring (verify_precision.js)", args: ["verify_precision.js"] },
   { name: "Your own orders through the ledger: one unit per order line, ids n/k, line quantities, dispatch by order, fixture D via the real importer (verify_pool.js)", args: ["verify_pool.js"] },
   { name: "Adaptive staffing, a what-if: the second worker joins at the tick the queue reaches 6, byte-identical without it, logged in the ledger and SQL (verify_staffing.js)", args: ["verify_staffing.js"] },
+  { name: "Replications over seeds: the runner, the viewer twin against independent arithmetic, the t table, honest wiring (verify_replicate.js)", args: ["verify_replicate.js"] },
   { name: "Timed route playback", args: ["verify_route_playback.js"] },
   { name: "Scheduled resource playback", args: ["verify_resource_playback.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
