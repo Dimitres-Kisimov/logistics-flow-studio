@@ -20,9 +20,10 @@
 <div id="rlWait"></div>
 <h3>Work in progress over the run</h3><div id="rlWip"></div>
 <div id="rlByOp"></div>
+<h2>What a handling unit costs</h2><p class="note">The spans between a unit's events, charged at the rates the run was recorded under (the planner's Analyze panel, defaults from <code>analytics.js</code>): a unit served at a station is charged that station's service time, whatever it waited; a moving unit is charged at the class of mover the floor contains. Cost per span = hours × labour rate (manned classes) + hours × capex ÷ amortisation years ÷ operating hours per year + hours × kW × energy price. Queue time costs nothing: holding cost is not modelled.</p><div id="rlCost"></div>
 <h2>Dispatch manifest</h2><div id="rlDispatch"></div>
 <h2>Trace one unit</h2><label for="rlUnit">Handling unit</label><select id="rlUnit"></select><div id="rlTrace"></div>
 <h2>The invariants</h2><p class="note">Each of these views must return zero rows. They are the same views the SQLite tool exposes; a deliberate corruption in the test suite makes every one of them fire.</p><div id="rlInvariants"></div>
 </section>
 <footer>Deterministic: the same scenario, seed and order mix reproduce this file byte for byte. The viewer computes every table in the browser by the definitions shown under <em>SQL</em>; <code>python tools/run_ledger.py import &lt;file&gt; --database run.sqlite</code> then <code>views</code> runs them in SQLite. Unit-load dimensions follow DIN EN 13698 and VDA 4500; the 33 / 26 pallets per 13.6 m trailer are planning figures; everything about the goods themselves is a synthetic teaching value.</footer>
-</main><script src="ids.js"></script><script src="pack.js"></script><script src="run-ledger.js"></script></body></html>
+</main><script src="ids.js"></script><script src="pack.js"></script><script src="ledger.js"></script><script src="run-ledger.js"></script></body></html>

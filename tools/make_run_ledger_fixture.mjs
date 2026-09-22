@@ -1,7 +1,10 @@
-/* Regenerate test/fixtures/run-ledger.json (+ .stats.json) from the hand-built
- * floor of verify_ledger.js with the FULL order mix, 300 ticks, seed 31.
+/* Regenerate test/fixtures/run-ledger.json (+ .stats.json, .views.json) from the
+ * hand-built floor of verify_ledger.js with the FULL order mix, 300 ticks, seed 31,
+ * recorded under the default analytics rates (v3.35).
  * Deterministic: the same commit reproduces the same bytes.
  *   node tools/make_run_ledger_fixture.mjs
+ * run-ledger.views.json holds the JavaScript cost tables the Python test equates
+ * with the SQL views (v_cost_by_type, v_cost_by_location).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -10,10 +13,10 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..");
 globalThis.window = globalThis;
-for (const f of ["domain.js", "iso.js", "shapes.js", "routing.js", "ids.js", "pack.js", "flowsim.js", "goods.js", "ledger.js"]) {
+for (const f of ["domain.js", "iso.js", "shapes.js", "routing.js", "ids.js", "pack.js", "flowsim.js", "goods.js", "analytics.js", "ledger.js"]) {
   (0, eval)(fs.readFileSync(path.join(root, f), "utf8"));
 }
-const { routing: R, flowsim: F, ledger: L, pack: P } = globalThis.WT;
+const { routing: R, flowsim: F, ledger: L, pack: P, analytics: A } = globalThis.WT;
 
 const FLOOR = {
   gridW: 40, gridH: 24, cell: 1,
@@ -35,11 +38,14 @@ const FLOOR = {
 const mix = R.defaultMix();
 const plan = F.spawnPlan(FLOOR, { seed: 31, mix });
 const st = F.state(plan);
-const rec = L.create(plan, { scenarioId: "hand-built", seed: 31, mix, layout: FLOOR, profile: P.PROFILES.ecommerce });
+const rec = L.create(plan, { scenarioId: "hand-built", seed: 31, mix, layout: FLOOR, profile: P.PROFILES.ecommerce, rates: A.defaultRates() });
 st.hooks = { afterTick: (s) => L.observe(rec, s) };
 F.step(st, 300);
 const out = path.join(root, "test", "fixtures");
 fs.mkdirSync(out, { recursive: true });
-fs.writeFileSync(path.join(out, "run-ledger.json"), JSON.stringify(L.exportJson(rec), null, 1) + "\n");
+const exp = L.exportJson(rec);
+const cost = L.costs(exp);
+fs.writeFileSync(path.join(out, "run-ledger.json"), JSON.stringify(exp, null, 1) + "\n");
 fs.writeFileSync(path.join(out, "run-ledger.stats.json"), JSON.stringify(L.stats(rec), null, 1) + "\n");
-console.log("fixture:", rec.order.length, "units,", rec.events.length, "events, run", rec.run.id);
+fs.writeFileSync(path.join(out, "run-ledger.views.json"), JSON.stringify({ costByType: cost.byType, costByLocation: cost.byLocation, costTotal: cost.total }, null, 1) + "\n");
+console.log("fixture:", rec.order.length, "units,", rec.events.length, "events, run", rec.run.id, "- cost", cost.total.total_eur, "EUR, transport", exp.rates.transport.class);

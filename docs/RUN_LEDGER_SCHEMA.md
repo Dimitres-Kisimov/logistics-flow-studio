@@ -1,6 +1,6 @@
 # The run ledger — schema, identities, SQL views
 
-*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.34.*
+*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.35.*
 
 ## 1. One stream, three consumers
 
@@ -33,12 +33,15 @@ Ids never encode a fact that can change: archetype, outcome and location are att
   "schema": "factory-run-ledger/v1",
   "run":       { id, scenario, seed, hash, mix, profile, ticks_per_hour, minutes_per_tick, ticks, honesty },
   "profile":   { id, label, box, pallet, eaches_per_case, case_kg, max_stack_mm, eaches_per_parcel },
-  "locations": [ { id, type, category } ],            // the floor's equipment, so SQL can classify a location
+  "locations": [ { id, type, category, service_ticks } ],   // the floor's equipment; service_ticks = 1 / the station's service rate (v3.35), null off a station
   "hus":       [ { id, order_id, seq, archetype, outcome, route_id, sscc, gtin13, gtin14, pallet, box,
                    eaches_per_case, cases_per_pallet, received_eaches, spawned_tick, retired_tick,
                    final_kind, final: { pallets, cases, eaches, parcels, form, retained, scrapped } } ],
   "events":    [ { id, hu_id, version, kind, op, anchor, location, tick, minute, stage, form,
-                   pallets, cases, eaches, parcels, retained, scrapped } ]
+                   pallets, cases, eaches, parcels, retained, scrapped } ],
+  "rates":     { source, currency, labour_per_hour, energy_price_per_kwh, hours_per_year, co2_per_kwh,   // v3.35, optional
+                 transport: { class, labour }, equipment: { <class>: { capex, amort_years, power_kw, labour } },
+                 classes: { <element type>: { class, labour } }, honesty }
 }
 ```
 
@@ -46,11 +49,13 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 
 **Time.** `tick` is the simulation tick; `minute = tick × 60 / ticks_per_hour`. There is no wall clock anywhere in the file.
 
+**Spans and costs (v3.35).** A *span* is the time between two consecutive events of one unit: `waiting` when the first is `queued` (queue + service, inseparable in the simulation), `moving` otherwise; the last event of a live unit opens no span, and the spans of a retired unit add up to `retired_tick − spawned_tick`. A waiting span is charged the station's `service_ticks` (1 / its service rate) whatever the unit waited — queue time costs nothing, holding cost is not modelled; a moving span is charged in full at `rates.transport` (the first of AGV, forklift, conveyor present on the floor; none = free). Per span: `hours = charged_ticks × minutes_per_tick / 60`; `labour = hours × labour × labour_per_hour`; `equipment = hours × capex / amort_years / hours_per_year`; `energy = hours × power_kw × energy_price_per_kwh`. Manned classes: racking (a picker at the face), workstation, forklift; `staging` has no class and is manned. The rates are the planner's Analyze-panel rates (illustrative teaching values); `ledger.js` `costs(exp)` and the SQL views below are the same arithmetic.
+
 **Quantities.** At every event `eaches + retained + scrapped = received_eaches` of its unit. A pallet unit arrives as `cases_per_pallet × eaches_per_case` eaches; a case pick carries the line's cases and books the rest as `retained` (still in stock); a piece pick does the same in eaches; `pack` books `parcels = ⌈eaches / eaches_per_parcel⌉`; `restock` moves everything to `retained`; `scrap` to `scrapped`.
 
 ## 4. The SQL
 
-`python tools/run_ledger.py import <file> --database run.sqlite` creates the tables `run`, `packaging_profile`, `pallet_type`, `location`, `hu`, `handling_event` (with `UNIQUE(hu_id, version)`, a `CHECK` on the event kinds and on `retired_tick ≥ spawned_tick`) and the views below. Re-importing a run replaces it.
+`python tools/run_ledger.py import <file> --database run.sqlite` creates the tables `run`, `packaging_profile`, `pallet_type`, `location`, `hu`, `handling_event` (with `UNIQUE(hu_id, version)`, a `CHECK` on the event kinds and on `retired_tick ≥ spawned_tick`), the rate tables `rate`, `equipment_rate`, `location_class` (v3.35) and the views below. Re-importing a run replaces it.
 
 **Planner views** (`views` prints them; `summary --out x.json` writes them):
 
@@ -63,6 +68,10 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 | `v_wip_by_tick` | in flight and retired at every tick (recursive CTE over the run's ticks) |
 | `v_quantities_by_op` | per operation and event kind: events and the pallets / cases / eaches / parcels / retained / scrapped carried |
 | `v_dispatch` | delivered units, pallets, cases, eaches, parcels, trailer slots and trailers (⌈pallets / slots⌉) |
+| `v_cost_by_type` | per archetype: units, retired, delivered eaches, labour / equipment / energy / total €, € per unit, € per delivered each (v3.35) |
+| `v_cost_by_location` | per station: waiting spans, ticks, charged ticks and their € — plus one `transport` row for every moving span (v3.35) |
+
+**Cost views** (v3.35; empty when the run carries no `rates`): `v_spans` pairs each event with the next one of the same unit (`LEAD` over `version`) and names the state; `v_span_cost` charges each span by the rule in §3; `v_cost_by_hu` sums per unit. Rounding happens only at the aggregates (4 dp), so the JavaScript and SQLite sums agree to the tolerance the tests use.
 
 **Invariant views** — each must return **zero rows**; the tests corrupt one value and watch each fire:
 
@@ -86,4 +95,5 @@ node tools/make_run_ledger_fixture.mjs       # regenerates test/fixtures/run-led
 node verify_ledger.js                        # the recorder: identities, exact route walks, conservation, byte-identical sim
 python -m pytest test/test_run_ledger.py -q  # the SQL: hand-built ledger, corruption, SQL == JavaScript stats
 node verify_run_ledger_view.js               # the viewer's model against the same hand ledger and fixture
+node verify_cost_ledger.js                   # spans and money by hand; SQL == JavaScript on the fixture (v3.35)
 ```

@@ -2502,6 +2502,8 @@
       const scen = currentScenarioId();
       state.flow.ledger = WT.ledger.create(state.flow.sim.plan, {
         scenarioId: scen, seed: seed, mix: opts.mix || null, layout: layout, profile: WT.pack.profileFor(scen),
+        // v3.35: the Analyze panel's rates ride with the run, so the export can cost a unit
+        rates: WT.analytics ? ensureRates() : null,
       });
       state.flow.sim.hooks = { afterTick: (st) => WT.ledger.observe(state.flow.ledger, st) };
     }

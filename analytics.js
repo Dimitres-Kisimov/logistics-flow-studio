@@ -828,6 +828,7 @@
     EQUIP_CLASSES: EQUIP_CLASSES,
     STATION_KINDS: STATION_KINDS,
     CLASS_LABEL: CLASS_LABEL,
+    TYPE_TO_CLASS: TYPE_TO_CLASS, // v3.35: the run ledger classifies a location by it
     defaultRates: defaultRates,
     classifyEquipment: classifyEquipment,
     energyModel: energyModel,

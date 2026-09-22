@@ -1,5 +1,54 @@
 # Changelog
 
+## v3.35 — What a handling unit costs
+
+**Spans and costs.** `ledger.js` `spans(exp)` / `costs(exp[, rates])`, computed from the
+export alone so the viewer, the fixture script and the harness share one definition
+with the SQL. A span is the time between two consecutive events of a unit: waiting
+when the first is `queued` (queue + service, inseparable in the sim), moving
+otherwise. A waiting span is charged the station's service time (1 / its service
+rate), whatever the unit waited - queue time costs nothing; a moving span is charged
+in full at the class of mover the floor contains (AGV, forklift, conveyor; none =
+free). Per span: hours x labour rate (manned classes: racking = a picker, workstation,
+forklift; the staging pad is manned with no equipment class) + hours x capex /
+amortisation years / operating hours per year + hours x kW x energy price. Rounded
+only at the aggregates (4 dp).
+
+**Export.** `locations[].service_ticks` (1 / the station's service rate, null off a
+station) and an optional `rates` block (`ratesBlock`: labour, energy, hours per year,
+transport class, the equipment catalogue with a manned flag, the type -> class map
+for every element type on the floor, an honesty line). Schema id unchanged; a file
+without rates simply has no cost. `app.js` passes the Analyze panel's rates at
+create; `analytics.js` exports `TYPE_TO_CLASS`. The recording is byte-identical with
+and without rates (asserted).
+
+**SQL.** `tools/run_ledger.py`: tables `rate`, `equipment_rate`, `location_class`,
+`location.service_ticks` (guarded migration for older databases); views `v_spans`
+(LEAD over each unit's versions), `v_span_cost`, `v_cost_by_hu`, `v_cost_by_type`
+(euros per unit and per delivered each), `v_cost_by_location` (+ one internal-
+transport row). `summary` and `views` include the two aggregates.
+
+**Viewer.** `run-ledger.html` loads `ledger.js` and gains *What a handling unit
+costs*: this run / per unit / per delivered each, cost by order type, cost by location,
+the rates in the file (classes with euros per hour, the type -> class map), the
+disclosure; a unit's trace shows what it cost so far. `RunLedger.SQL` now carries all
+16 views the SQLite tool defines - `v_run_summary`, `v_version_gaps` and
+`v_terminal_violations` were missing although the page said otherwise.
+
+**Finding.** The recorded fixture costs 349.74 EUR for 39 units over 300 ticks, 92 %
+of it labour, because the hand-built floor declares no stage capacities: every
+station serves at the floor rate of one unit per 50 ticks, and the staging pad alone
+books 175 EUR. Disclosed on the page, not tuned.
+
+**Verification.** `verify_cost_ledger.js` (31 checks: the hand ledger's spans and money
+written out by hand - 17.2032 + 9.2484 + 2.4663 = 28.9179 by type = by location, rates
+linear in each input, zero-duration spans free, no rates -> no cost; the recorded run's
+waiting spans only at the three stations each charged 50, spans of every retired unit
+= its cycle, the committed views.json, byte-identical sim with and without rates,
+every route ends in a terminal kind; wiring). Python +5 (spans and money by hand,
+linearity, empty without rates, SQL == JavaScript on the fixture), self-test +1.
+67 harnesses, 81 Python tests, WT-SELFTEST 175/175. Cache wt-v117.
+
 ## v3.34 — Packaging optimisation, and the routing stations on generated floors
 
 **Band layouts.** `pack.js` `bandDP` / `bestLayer` / `layerRects`: the one-dimensional

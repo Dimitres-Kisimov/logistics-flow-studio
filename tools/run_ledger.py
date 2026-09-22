@@ -4,8 +4,9 @@ Imports a `factory-run-ledger/v1` export from the browser (Simulate -> Live mate
 flow -> Export run ledger) into SQLite and answers the questions a planner asks with
 plain SQL views: cycle time and touches per order type, waiting at each bench, WIP
 over time, quantities per operation (pallets / cases / eaches / parcels), the dispatch
-manifest (pallets, parcels, trailers), and the invariants that must hold - conservation
-of eaches, cross-dock never in storage, consecutive versions. Standard library only.
+manifest (pallets, parcels, trailers), what a handling unit costs (v3.35: spans between
+events charged at the rates the run was recorded under), and the invariants that must hold -
+conservation of eaches, cross-dock never in storage, consecutive versions. Standard library only.
 
     python tools/run_ledger.py import run-ledger.json --database work/run.sqlite
     python tools/run_ledger.py views  --database work/run.sqlite [--run RUN-...]
@@ -37,7 +38,8 @@ CREATE TABLE IF NOT EXISTS packaging_profile(
   eaches_per_case INTEGER, case_kg REAL, max_stack_mm INTEGER, eaches_per_parcel INTEGER, PRIMARY KEY(run_id, id));
 CREATE TABLE IF NOT EXISTS pallet_type(id TEXT PRIMARY KEY NOT NULL, trailer_slots INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS location(
-  run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, id TEXT NOT NULL, type TEXT, category TEXT, PRIMARY KEY(run_id, id));
+  run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, id TEXT NOT NULL, type TEXT, category TEXT,
+  service_ticks REAL, PRIMARY KEY(run_id, id));
 CREATE TABLE IF NOT EXISTS hu(
   id TEXT PRIMARY KEY NOT NULL, run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE,
   order_id TEXT NOT NULL, seq INTEGER NOT NULL, archetype TEXT NOT NULL, outcome TEXT, route_id TEXT NOT NULL,
@@ -55,6 +57,19 @@ CREATE TABLE IF NOT EXISTS handling_event(
   retained INTEGER NOT NULL, scrapped INTEGER NOT NULL, UNIQUE(hu_id, version));
 CREATE INDEX IF NOT EXISTS ix_event_hu ON handling_event(hu_id, tick);
 CREATE INDEX IF NOT EXISTS ix_hu_run ON hu(run_id, archetype);
+-- v3.35 the rates a run was recorded under (illustrative; see the export's rates.honesty)
+CREATE TABLE IF NOT EXISTS rate(
+  run_id TEXT PRIMARY KEY NOT NULL REFERENCES run(id) ON DELETE CASCADE, currency TEXT NOT NULL DEFAULT 'EUR',
+  labour_per_hour REAL NOT NULL CHECK(labour_per_hour >= 0), energy_price_per_kwh REAL NOT NULL CHECK(energy_price_per_kwh >= 0),
+  hours_per_year REAL NOT NULL CHECK(hours_per_year > 0), co2_per_kwh REAL,
+  transport_class TEXT, transport_labour INTEGER NOT NULL DEFAULT 0 CHECK(transport_labour IN (0, 1)), source TEXT, honesty TEXT);
+CREATE TABLE IF NOT EXISTS equipment_rate(
+  run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, class TEXT NOT NULL,
+  capex REAL NOT NULL CHECK(capex >= 0), amort_years REAL NOT NULL CHECK(amort_years > 0), power_kw REAL NOT NULL CHECK(power_kw >= 0),
+  labour INTEGER NOT NULL DEFAULT 0 CHECK(labour IN (0, 1)), PRIMARY KEY(run_id, class));
+CREATE TABLE IF NOT EXISTS location_class(
+  run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, type TEXT NOT NULL, class TEXT,
+  labour INTEGER NOT NULL DEFAULT 0 CHECK(labour IN (0, 1)), PRIMARY KEY(run_id, type));
 """
 
 VIEWS = {
@@ -120,6 +135,76 @@ SELECT r.id AS run_id, r.scenario, r.seed, r.profile, r.ticks,
        (SELECT COALESCE(SUM(h.final_pallets), 0) FROM hu h WHERE h.run_id = r.id AND h.final_kind = 'delivered') AS delivered_pallets,
        (SELECT COALESCE(SUM(h.final_parcels), 0) FROM hu h WHERE h.run_id = r.id AND h.final_kind = 'delivered') AS delivered_parcels
 FROM run r;""",
+    # ---- v3.35 what a handling unit costs ---------------------------------------
+    # A span is the time between two consecutive events of a unit: WAITING when the
+    # first is `queued` (queue + service, inseparable), MOVING otherwise.
+    "v_spans": """
+CREATE VIEW IF NOT EXISTS v_spans AS
+WITH s AS (
+  SELECT e.hu_id, e.version, e.kind, e.op, e.location, e.tick,
+         LEAD(e.tick)     OVER (PARTITION BY e.hu_id ORDER BY e.version) AS to_tick,
+         LEAD(e.kind)     OVER (PARTITION BY e.hu_id ORDER BY e.version) AS to_kind,
+         LEAD(e.op)       OVER (PARTITION BY e.hu_id ORDER BY e.version) AS to_op,
+         LEAD(e.location) OVER (PARTITION BY e.hu_id ORDER BY e.version) AS to_location
+  FROM handling_event e)
+SELECT h.run_id, s.hu_id, s.version, s.kind AS from_kind, s.op, s.location, s.tick AS from_tick,
+       s.to_kind, s.to_op, s.to_location, s.to_tick, s.to_tick - s.tick AS ticks,
+       CASE WHEN s.kind = 'queued' THEN 'waiting' ELSE 'moving' END AS state
+FROM s JOIN hu h ON h.id = s.hu_id
+WHERE s.to_tick IS NOT NULL;""",
+    # A waiting span is charged the station's service time (1 / its rate), whatever
+    # it waited; a moving span is charged in full at the floor's mover class.
+    "v_span_cost": """
+CREATE VIEW IF NOT EXISTS v_span_cost AS
+WITH c AS (
+  SELECT s.run_id, s.hu_id, s.version, s.state, s.op, s.location, s.ticks,
+         CASE WHEN s.state = 'waiting' THEN COALESCE(l.service_ticks, 0) ELSE s.ticks END AS charged_ticks,
+         CASE WHEN s.state = 'waiting' THEN lc.class ELSE r.transport_class END AS class,
+         CASE WHEN s.state = 'waiting' THEN COALESCE(lc.labour, 0) ELSE r.transport_labour END AS labour,
+         (CASE WHEN s.state = 'waiting' THEN COALESCE(l.service_ticks, 0) ELSE s.ticks END) * ru.minutes_per_tick / 60.0 AS hours,
+         r.labour_per_hour, r.energy_price_per_kwh, r.hours_per_year
+  FROM v_spans s
+  JOIN run ru ON ru.id = s.run_id
+  JOIN rate r ON r.run_id = s.run_id
+  LEFT JOIN location l ON l.run_id = s.run_id AND l.id = s.location
+  LEFT JOIN location_class lc ON lc.run_id = s.run_id AND lc.type = l.type)
+SELECT c.run_id, c.hu_id, c.version, c.state, c.op, c.location, c.ticks, c.charged_ticks, c.class, c.labour, c.hours,
+       c.hours * c.labour * c.labour_per_hour                              AS labour_eur,
+       c.hours * COALESCE(er.capex / er.amort_years / c.hours_per_year, 0) AS equipment_eur,
+       c.hours * COALESCE(er.power_kw, 0) * c.energy_price_per_kwh         AS energy_eur
+FROM c LEFT JOIN equipment_rate er ON er.run_id = c.run_id AND er.class = c.class;""",
+    "v_cost_by_hu": """
+CREATE VIEW IF NOT EXISTS v_cost_by_hu AS
+SELECT run_id, hu_id, SUM(ticks) AS ticks,
+       SUM(CASE WHEN state = 'waiting' THEN ticks ELSE 0 END) AS waiting_ticks,
+       SUM(CASE WHEN state = 'moving' THEN ticks ELSE 0 END) AS moving_ticks,
+       SUM(charged_ticks) AS charged_ticks,
+       ROUND(SUM(labour_eur), 4) AS labour_eur, ROUND(SUM(equipment_eur), 4) AS equipment_eur, ROUND(SUM(energy_eur), 4) AS energy_eur,
+       ROUND(SUM(labour_eur + equipment_eur + energy_eur), 4) AS total_eur
+FROM v_span_cost GROUP BY run_id, hu_id;""",
+    "v_cost_by_type": """
+CREATE VIEW IF NOT EXISTS v_cost_by_type AS
+WITH c AS (SELECT hu_id, SUM(labour_eur) AS l, SUM(equipment_eur) AS q, SUM(energy_eur) AS n FROM v_span_cost GROUP BY hu_id)
+SELECT h.run_id, h.archetype, COUNT(*) AS units,
+       SUM(CASE WHEN h.retired_tick IS NOT NULL THEN 1 ELSE 0 END) AS retired,
+       COALESCE(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_eaches END), 0) AS eaches_out,
+       ROUND(COALESCE(SUM(c.l), 0), 4) AS labour_eur, ROUND(COALESCE(SUM(c.q), 0), 4) AS equipment_eur, ROUND(COALESCE(SUM(c.n), 0), 4) AS energy_eur,
+       ROUND(COALESCE(SUM(c.l + c.q + c.n), 0), 4) AS total_eur,
+       ROUND(COALESCE(SUM(c.l + c.q + c.n), 0) / COUNT(*), 4) AS eur_per_unit,
+       ROUND(COALESCE(SUM(c.l + c.q + c.n), 0) / NULLIF(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_eaches END), 0), 4) AS eur_per_each
+FROM hu h JOIN rate r ON r.run_id = h.run_id
+LEFT JOIN c ON c.hu_id = h.id
+GROUP BY h.run_id, h.archetype;""",
+    "v_cost_by_location": """
+CREATE VIEW IF NOT EXISTS v_cost_by_location AS
+SELECT run_id, location, MAX(class) AS class, COUNT(*) AS spans, SUM(ticks) AS ticks, SUM(charged_ticks) AS charged_ticks,
+       ROUND(SUM(labour_eur), 4) AS labour_eur, ROUND(SUM(equipment_eur), 4) AS equipment_eur, ROUND(SUM(energy_eur), 4) AS energy_eur,
+       ROUND(SUM(labour_eur + equipment_eur + energy_eur), 4) AS total_eur
+FROM v_span_cost WHERE state = 'waiting' GROUP BY run_id, location
+UNION ALL
+SELECT run_id, 'transport' AS location, MAX(class), COUNT(*), SUM(ticks), SUM(charged_ticks),
+       ROUND(SUM(labour_eur), 4), ROUND(SUM(equipment_eur), 4), ROUND(SUM(energy_eur), 4), ROUND(SUM(labour_eur + equipment_eur + energy_eur), 4)
+FROM v_span_cost WHERE state = 'moving' GROUP BY run_id;""",
     # ---- the invariants: every one of these must return ZERO rows --------------
     "v_conservation_violations": """
 CREATE VIEW IF NOT EXISTS v_conservation_violations AS
@@ -146,7 +231,9 @@ WHERE (h.retired_tick IS NOT NULL AND h.final_kind NOT IN ('delivered', 'restock
    OR (h.retired_tick IS NULL AND h.final_kind IS NOT NULL);""",
 }
 INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations")
-PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch")
+PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
+                 "v_cost_by_type", "v_cost_by_location")
+COST_VIEWS = ("v_spans", "v_span_cost", "v_cost_by_hu", "v_cost_by_type", "v_cost_by_location")
 
 
 def connect(path: str) -> sqlite3.Connection:
@@ -158,6 +245,10 @@ def connect(path: str) -> sqlite3.Connection:
 
 def initialize(db: sqlite3.Connection) -> None:
     db.executescript(DDL)
+    try:  # a database created before v3.35 has no service_ticks column yet
+        db.execute("ALTER TABLE location ADD COLUMN service_ticks REAL")
+    except sqlite3.OperationalError:
+        pass
     for ddl in VIEWS.values():
         db.executescript(ddl)
     for pid, slots in TRAILER_SLOTS.items():
@@ -197,7 +288,20 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
                 run["id"], prof["id"], prof.get("label"), prof.get("box"), prof.get("pallet"), prof.get("eaches_per_case"),
                 prof.get("case_kg"), prof.get("max_stack_mm"), prof.get("eaches_per_parcel")))
         for loc in data.get("locations") or []:
-            db.execute("INSERT OR REPLACE INTO location VALUES(?,?,?,?)", (run["id"], loc["id"], loc.get("type"), loc.get("category")))
+            db.execute("INSERT OR REPLACE INTO location VALUES(?,?,?,?,?)", (
+                run["id"], loc["id"], loc.get("type"), loc.get("category"), loc.get("service_ticks")))
+        rates = data.get("rates")
+        if rates:
+            tr = rates.get("transport") or {}
+            db.execute("INSERT INTO rate VALUES(?,?,?,?,?,?,?,?,?,?)", (
+                run["id"], rates.get("currency", "EUR"), float(rates["labour_per_hour"]), float(rates["energy_price_per_kwh"]),
+                float(rates["hours_per_year"]), rates.get("co2_per_kwh"), tr.get("class"), 1 if tr.get("labour") else 0,
+                rates.get("source"), rates.get("honesty")))
+            for cls, e in sorted((rates.get("equipment") or {}).items()):
+                db.execute("INSERT INTO equipment_rate VALUES(?,?,?,?,?,?)", (
+                    run["id"], cls, float(e["capex"]), float(e["amort_years"]), float(e["power_kw"]), 1 if e.get("labour") else 0))
+            for typ, c in sorted((rates.get("classes") or {}).items()):
+                db.execute("INSERT INTO location_class VALUES(?,?,?,?)", (run["id"], typ, c.get("class"), 1 if c.get("labour") else 0))
         for h in hus:
             f = h.get("final") or {}
             db.execute("INSERT INTO hu VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (

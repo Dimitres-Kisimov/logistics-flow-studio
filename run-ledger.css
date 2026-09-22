@@ -2,6 +2,7 @@
 h2{margin:36px 0 10px;font-size:24px}h3{margin:22px 0 8px;font-size:18px}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:15px}
 .cards article.good{border-top-color:#8fd3a4}.cards article.bad{border-top-color:#e58a7c}
+.cards article strong+span{display:block;margin-top:4px;font-size:12px;color:#b6c0ba}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}@media(max-width:820px){.grid2{grid-template-columns:1fr}}
 .table-wrap{margin:8px 0 4px}table{font-size:13px}th,td{padding:8px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}td:first-child,th:first-child{white-space:normal}
 details.sql{margin:6px 0 18px}details.sql summary{cursor:pointer;color:#b6c0ba;font-size:13px}details.sql pre{margin:8px 0 0;padding:12px;background:#1b211d;border:1px solid #455149;border-radius:8px;font-size:12px;overflow:auto;color:#dfe7e2}

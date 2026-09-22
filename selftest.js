@@ -3460,6 +3460,29 @@
       return { ok: !bad && exp.schema === "factory-run-ledger/v1" && exp.hus.length === st.spawned && delivered > 0 && /^RUN-ecommerce-multichannel-fc-s6-h[0-9a-f]{8}$/.test(exp.run.id),
         detail: bad || (exp.hus.length + " units, " + exp.events.length + " events, " + delivered + " delivered, run " + exp.run.id) };
     });
+    // ---- v3.35: what a handling unit costs - spans x the Analyze rates.
+    check("run-ledger-costs-a-unit-from-its-spans-and-the-analyze-rates", function () {
+      var Lg = WT.ledger, F = WT.flowsim, EX2 = WT.examples, P2 = WT.pack, A2 = WT.analytics;
+      if (!Lg || !F || !EX2 || !P2 || !A2 || typeof Lg.costs !== "function") return { ok: false, detail: "modules missing" };
+      var b = EX2.build("ecommerce-multichannel-fc");
+      var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
+      var plan = F.spawnPlan(lay, { seed: 6, mix: lay.config.orderMix });
+      var st = F.state(plan);
+      var rec = Lg.create(plan, { scenarioId: "ecommerce-multichannel-fc", seed: 6, mix: lay.config.orderMix, layout: lay, profile: P2.profileFor("ecommerce-multichannel-fc"), rates: A2.defaultRates() });
+      st.hooks = { afterTick: function (s) { Lg.observe(rec, s); } };
+      F.step(st, 300);
+      var exp = Lg.exportJson(rec);
+      var c = Lg.costs(exp);
+      if (!exp.rates || !c) return { ok: false, detail: "no rates block / no cost" };
+      var r2 = JSON.parse(JSON.stringify(exp.rates)); r2.labour_per_hour = exp.rates.labour_per_hour * 2;
+      var c2 = Lg.costs(exp, r2);
+      var byHu = {};
+      for (var i = 0; i < c.spans.length; i++) byHu[c.spans[i].hu_id] = (byHu[c.spans[i].hu_id] || 0) + c.spans[i].ticks;
+      var cyc = true;
+      for (var j = 0; j < exp.hus.length; j++) { var h = exp.hus[j]; if (h.retired_tick != null && byHu[h.id] !== h.retired_tick - h.spawned_tick) cyc = false; }
+      var ok = c.total.total_eur > 0 && Math.abs(c2.total.labour_eur - 2 * c.total.labour_eur) <= 1e-3 && Math.abs(c2.total.equipment_eur - c.total.equipment_eur) <= 1e-9 && cyc && !!exp.rates.transport;
+      return { ok: ok, detail: "total " + c.total.total_eur + " EUR (labour " + c.total.labour_eur + "), transport " + exp.rates.transport.class + ", " + c.spans.length + " spans, cycles " + (cyc ? "conserved" : "NOT conserved") };
+    });
     // ---- v3.31: packaging hierarchy + numbering system, hand values.
     check("packaging-and-gs1-hand-values", function () {
       var P2 = WT.pack, I2 = WT.ids;

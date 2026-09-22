@@ -243,9 +243,9 @@ check("app.js dispatches each command kind to the SAME existing handler",
 
 // ---- service worker precache + cache bump --------------------------------
 check("sw.js precaches ./palette.js", swJs.indexOf('"./palette.js"') !== -1, "in APP_SHELL");
-check("sw.js cache bumped to wt-v116 (and no longer wt-v115)",
-  /CACHE_VERSION\s*=\s*"wt-v116"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v115"/.test(swJs),
-  "CACHE_VERSION = wt-v116");
+check("sw.js cache bumped to wt-v117 (and no longer wt-v116)",
+  /CACHE_VERSION\s*=\s*"wt-v117"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v116"/.test(swJs),
+  "CACHE_VERSION = wt-v117");
 
 // ---- offline + deterministic (NO Date / NO RNG) --------------------------
 const externalRe = /https?:\/\/(?!schemas?\.|www\.w3\.org)/i;

@@ -14,7 +14,9 @@
  * every operation, arrow width = eaches) · the planner tables (cycle time,
  * touches, station wait, WIP over time, quantities per operation) · the
  * dispatch manifest with trailers · a unit trace with its timeline · the
- * invariants (must be zero) · the SQL behind each table.
+ * invariants (must be zero) · the SQL behind each table · (v3.35) what a
+ * handling unit costs, from the spans between its events and the rates the
+ * run was recorded under (WT.ledger.costs; ledger.js is loaded on the page).
  *
  * Pure model (RunLedger.views / ribbon / trace) + DOM rendering. No Date,
  * no Math.random, no network beyond loading the local example file.
@@ -114,8 +116,14 @@
       units: exp.hus.length, events: exp.events.length, delivered: delivered.length,
       delivered_eaches: dispatch ? dispatch.eaches : 0, delivered_pallets: pallets, delivered_parcels: dispatch ? dispatch.parcels : 0,
     };
+    // v3.35 what a handling unit costs - the same definition as the SQL views
+    // (WT.ledger.costs); null when the file carries no rates or ledger.js is absent
+    const Lg = window.WT && window.WT.ledger;
+    const cost = Lg && typeof Lg.costs === "function" ? Lg.costs(exp) : null;
     return { summary, cycle, touches, wait, wip, byOp, dispatch,
-      invariants: { v_conservation_violations: conservation, v_cross_dock_violations: crossDock, v_version_gaps: versionGaps, v_terminal_violations: terminals } };
+      invariants: { v_conservation_violations: conservation, v_cross_dock_violations: crossDock, v_version_gaps: versionGaps, v_terminal_violations: terminals },
+      rates: exp.rates || null, spans: cost ? cost.spans : null, costByHu: cost ? cost.byHu : null,
+      costByType: cost ? cost.byType : null, costByLocation: cost ? cost.byLocation : null, costTotal: cost ? cost.total : null };
   }
 
   /* ---------------- the start-to-finish ribbon --------------------- */
@@ -168,8 +176,17 @@
     v_wip_by_tick: "WITH RECURSIVE t(tick) AS (SELECT 0 UNION ALL SELECT tick + 1 FROM t WHERE tick < (SELECT ticks FROM run))\nSELECT tick,\n  (SELECT COUNT(*) FROM hu WHERE spawned_tick <= tick AND (retired_tick IS NULL OR retired_tick > tick)) in_flight,\n  (SELECT COUNT(*) FROM hu WHERE retired_tick IS NOT NULL AND retired_tick <= tick) retired\nFROM t;",
     v_quantities_by_op: "SELECT op, kind, COUNT(*) events, SUM(pallets), SUM(cases), SUM(eaches), SUM(parcels), SUM(retained), SUM(scrapped)\nFROM handling_event GROUP BY op, kind;",
     v_dispatch: "SELECT COUNT(*) delivered_units, SUM(final_pallets) pallets, SUM(final_cases) cases, SUM(final_eaches) eaches,\n       SUM(final_parcels) parcels, MAX(p.trailer_slots) trailer_slots,\n       (SUM(final_pallets) + MAX(p.trailer_slots) - 1) / MAX(p.trailer_slots) trailers\nFROM hu h JOIN pallet_type p ON p.id = COALESCE(h.pallet, 'eur') WHERE final_kind = 'delivered';",
+    v_run_summary: "SELECT r.scenario, r.seed, r.profile, r.ticks, (SELECT COUNT(*) FROM hu) units, (SELECT COUNT(*) FROM handling_event) events,\n       (SELECT COUNT(*) FROM hu WHERE final_kind = 'delivered') delivered,\n       (SELECT COALESCE(SUM(final_eaches), 0) FROM hu WHERE final_kind = 'delivered') delivered_eaches,\n       (SELECT COALESCE(SUM(final_pallets), 0) FROM hu WHERE final_kind = 'delivered') delivered_pallets,\n       (SELECT COALESCE(SUM(final_parcels), 0) FROM hu WHERE final_kind = 'delivered') delivered_parcels\nFROM run r;",
+    // v3.35 what a handling unit costs
+    v_spans: "WITH s AS (SELECT hu_id, version, kind, op, location, tick,\n  LEAD(tick) OVER (PARTITION BY hu_id ORDER BY version) to_tick, LEAD(kind) OVER w to_kind, LEAD(op) OVER w to_op, LEAD(location) OVER w to_location\n  FROM handling_event WINDOW w AS (PARTITION BY hu_id ORDER BY version))\nSELECT hu_id, version, kind from_kind, op, location, tick from_tick, to_kind, to_op, to_location, to_tick, to_tick - tick ticks,\n       CASE WHEN kind = 'queued' THEN 'waiting' ELSE 'moving' END state\nFROM s WHERE to_tick IS NOT NULL;",
+    v_span_cost: "-- a waiting span is charged the station's service time (1 / its rate); a moving span in full at the floor's mover class\nWITH c AS (SELECT s.*, CASE WHEN s.state = 'waiting' THEN COALESCE(l.service_ticks, 0) ELSE s.ticks END charged_ticks,\n  CASE WHEN s.state = 'waiting' THEN lc.class ELSE r.transport_class END class,\n  CASE WHEN s.state = 'waiting' THEN COALESCE(lc.labour, 0) ELSE r.transport_labour END labour\n  FROM v_spans s JOIN rate r LEFT JOIN location l ON l.id = s.location LEFT JOIN location_class lc ON lc.type = l.type)\nSELECT c.hu_id, c.version, c.state, c.op, c.location, c.ticks, c.charged_ticks, c.class, c.labour,\n       c.charged_ticks * run.minutes_per_tick / 60.0 hours,\n       hours * c.labour * r.labour_per_hour labour_eur,\n       hours * COALESCE(er.capex / er.amort_years / r.hours_per_year, 0) equipment_eur,\n       hours * COALESCE(er.power_kw, 0) * r.energy_price_per_kwh energy_eur\nFROM c JOIN run JOIN rate r LEFT JOIN equipment_rate er ON er.class = c.class;",
+    v_cost_by_hu: "SELECT hu_id, SUM(ticks) ticks, SUM(state = 'waiting') waiting_spans, SUM(charged_ticks) charged_ticks,\n       ROUND(SUM(labour_eur), 4) labour_eur, ROUND(SUM(equipment_eur), 4) equipment_eur, ROUND(SUM(energy_eur), 4) energy_eur,\n       ROUND(SUM(labour_eur + equipment_eur + energy_eur), 4) total_eur\nFROM v_span_cost GROUP BY hu_id;",
+    v_cost_by_type: "WITH c AS (SELECT hu_id, SUM(labour_eur) l, SUM(equipment_eur) q, SUM(energy_eur) n FROM v_span_cost GROUP BY hu_id)\nSELECT h.archetype, COUNT(*) units, SUM(h.retired_tick IS NOT NULL) retired,\n       COALESCE(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_eaches END), 0) eaches_out,\n       ROUND(COALESCE(SUM(c.l), 0), 4) labour_eur, ROUND(COALESCE(SUM(c.q), 0), 4) equipment_eur, ROUND(COALESCE(SUM(c.n), 0), 4) energy_eur,\n       ROUND(COALESCE(SUM(c.l + c.q + c.n), 0), 4) total_eur,\n       ROUND(COALESCE(SUM(c.l + c.q + c.n), 0) / COUNT(*), 4) eur_per_unit,\n       ROUND(COALESCE(SUM(c.l + c.q + c.n), 0) / NULLIF(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_eaches END), 0), 4) eur_per_each\nFROM hu h JOIN rate r LEFT JOIN c ON c.hu_id = h.id GROUP BY h.archetype;",
+    v_cost_by_location: "SELECT location, MAX(class) class, COUNT(*) spans, SUM(ticks) ticks, SUM(charged_ticks) charged_ticks,\n       ROUND(SUM(labour_eur), 4) labour_eur, ROUND(SUM(equipment_eur), 4) equipment_eur, ROUND(SUM(energy_eur), 4) energy_eur,\n       ROUND(SUM(labour_eur + equipment_eur + energy_eur), 4) total_eur\nFROM v_span_cost WHERE state = 'waiting' GROUP BY location\nUNION ALL\nSELECT 'transport', MAX(class), COUNT(*), SUM(ticks), SUM(charged_ticks), ROUND(SUM(labour_eur), 4), ROUND(SUM(equipment_eur), 4), ROUND(SUM(energy_eur), 4),\n       ROUND(SUM(labour_eur + equipment_eur + energy_eur), 4)\nFROM v_span_cost WHERE state = 'moving';",
     v_conservation_violations: "SELECT e.id FROM handling_event e JOIN hu h ON h.id = e.hu_id\nWHERE e.eaches + e.retained + e.scrapped <> h.received_eaches;   -- must be empty",
     v_cross_dock_violations: "SELECT e.id FROM handling_event e JOIN hu h ON h.id = e.hu_id JOIN location l ON l.id = e.location\nWHERE h.archetype = 'cross-dock' AND (l.category = 'storage' OR e.op IN ('putaway','replen','pick','piece-pick','case-pick','pallet-pick'));   -- must be empty",
+    v_version_gaps: "SELECT h.id hu_id, COUNT(e.id) events, MIN(e.version) first_version, MAX(e.version) last_version\nFROM hu h JOIN handling_event e ON e.hu_id = h.id GROUP BY h.id\nHAVING MIN(e.version) <> 0 OR MAX(e.version) + 1 <> COUNT(e.id);   -- must be empty",
+    v_terminal_violations: "SELECT id hu_id, final_kind, retired_tick FROM hu\nWHERE (retired_tick IS NOT NULL AND final_kind NOT IN ('delivered', 'restocked', 'scrapped'))\n   OR (retired_tick IS NULL AND final_kind IS NOT NULL);   -- must be empty",
   };
 
   /* ---------------- the pallet-pattern what-if ------------------------ */
@@ -319,7 +336,7 @@
     const s = v.summary;
     $("rlSummary").innerHTML = '<div class="cards"><article><span>Units · events</span><strong>' + s.units + " · " + s.events + "</strong></article>" +
       "<article><span>Delivered</span><strong>" + s.delivered + " units · " + s.delivered_eaches + " eaches</strong></article>" +
-      "<article><span>Delivered pallets · parcels</span><strong>" + s.delivered_pallets + " · " + s.delivered_parcels + "</strong></article></div>";
+      "<article><span>Delivered pallets · parcels</span><strong>" + s.delivered_pallets + " · " + s.delivered_parcels + "</strong></article></div>" + sqlBlock("v_run_summary");
     $("rlCycle").innerHTML = table(v.cycle, ["archetype", "units", "retired", "avg_cycle_ticks", "avg_cycle_minutes", "min_cycle_ticks", "max_cycle_ticks"], "Cycle time by order type") + sqlBlock("v_cycle_time_by_type");
     $("rlTouches").innerHTML = table(v.touches, ["archetype", "units", "events", "touches", "served_per_unit"], "Touches by order type") + sqlBlock("v_touches_by_type");
     $("rlWait").innerHTML = table(v.wait, ["location", "op", "waits", "avg_wait_ticks", "max_wait_ticks", "still_waiting"], "Waiting at each bench") + sqlBlock("v_station_wait");
@@ -350,7 +367,34 @@
     const bad = Object.keys(inv).filter((k) => inv[k] > 0);
     $("rlInvariants").innerHTML = '<div class="cards">' + Object.keys(inv).map((k) => '<article class="' + (inv[k] ? "bad" : "good") + '"><span>' + esc(k) + "</span><strong>" + inv[k] + (inv[k] ? " violations" : " · holds") + "</strong></article>").join("") + "</div>" +
       (bad.length ? '<p class="note">This file breaks an invariant - it is not a faithful recording.</p>' : "<p class=\"note\">Every invariant holds on this file: eaches are conserved at every event, no cross-dock unit touched storage, versions are consecutive, terminals are well-formed.</p>") +
-      sqlBlock("v_conservation_violations") + sqlBlock("v_cross_dock_violations");
+      sqlBlock("v_conservation_violations") + sqlBlock("v_cross_dock_violations") + sqlBlock("v_version_gaps") + sqlBlock("v_terminal_violations");
+  }
+
+  // v3.35 what a handling unit costs
+  const money = (v) => (v == null ? "—" : "€\u202f" + (Math.round(v * 100) / 100).toFixed(2));
+  function renderCost(exp) {
+    const out = $("rlCost");
+    const Lg = window.WT && window.WT.ledger;
+    if (!Lg || typeof Lg.costs !== "function") { out.innerHTML = "<p class=\"note\">ledger.js is not loaded on this page.</p>"; return; }
+    if (!exp.rates) { out.innerHTML = "<p class=\"note\">This file carries no rates: export it from the planner (v3.35 or later) to cost its units.</p>"; return; }
+    const c = Lg.costs(exp);
+    const r = c.rates;
+    const units = exp.hus.length;
+    const eachesOut = c.byType.reduce((a, t) => a + t.eaches_out, 0);
+    const cards = '<div class="cards"><article><span>This run</span><strong>' + money(c.total.total_eur) + "</strong><span>labour " + money(c.total.labour_eur) + " · equipment " + money(c.total.equipment_eur) + " · energy " + money(c.total.energy_eur) + "</span></article>" +
+      "<article><span>Per handling unit</span><strong>" + money(units ? c.total.total_eur / units : null) + "</strong><span>" + units + " units, delivered or in flight</span></article>" +
+      "<article><span>Per delivered each</span><strong>" + (eachesOut ? money(c.total.total_eur / eachesOut) : "—") + "</strong><span>" + eachesOut + " eaches delivered</span></article></div>";
+    const typeRows = c.byType.map((t) => Object.assign({}, t, { labour_eur: money(t.labour_eur), equipment_eur: money(t.equipment_eur), energy_eur: money(t.energy_eur), total_eur: money(t.total_eur), eur_per_unit: money(t.eur_per_unit), eur_per_each: money(t.eur_per_each) }));
+    const locRows = c.byLocation.map((l) => Object.assign({}, l, { class: l.class || "—", labour_eur: money(l.labour_eur), equipment_eur: money(l.equipment_eur), energy_eur: money(l.energy_eur), total_eur: money(l.total_eur) }));
+    const rateRows = Object.keys(r.equipment).map((k) => { const e = r.equipment[k];
+      return { class: k, capex: e.capex, amort_years: e.amort_years, eur_per_hour: Math.round((e.capex / e.amort_years / r.hours_per_year) * 10000) / 10000, power_kw: e.power_kw, manned: e.labour ? "yes" : "no" }; });
+    const classList = Object.keys(r.classes).map((t) => t + " → " + (r.classes[t].class || "no class") + (r.classes[t].labour ? " (manned)" : "")).join(" · ");
+    out.innerHTML = cards +
+      table(typeRows, ["archetype", "units", "retired", "eaches_out", "labour_eur", "equipment_eur", "energy_eur", "total_eur", "eur_per_unit", "eur_per_each"], "Cost by order type") + sqlBlock("v_cost_by_type") +
+      table(locRows, ["location", "class", "spans", "ticks", "charged_ticks", "labour_eur", "equipment_eur", "energy_eur", "total_eur"], "Cost by location: waiting spans charged at the station's service time, and internal transport") + sqlBlock("v_cost_by_location") + sqlBlock("v_spans") + sqlBlock("v_span_cost") +
+      "<p><b>Rates in this file:</b> labour " + money(r.labour_per_hour) + "/h · energy " + money(r.energy_price_per_kwh) + "/kWh · " + r.hours_per_year + " operating hours per year · internal transport: " + (r.transport.class ? r.transport.class + (r.transport.labour ? " (manned)" : " (unmanned)") : "no mover on this floor, movement is free") + ".</p>" +
+      table(rateRows, ["class", "capex", "amort_years", "eur_per_hour", "power_kw", "manned"], "Equipment classes (illustrative)") +
+      "<p class=\"note\">Location types on this floor: " + esc(classList) + ".</p><p class=\"note\">" + esc(r.honesty) + "</p>";
   }
 
   function renderTrace(exp) {
@@ -380,7 +424,11 @@
         g += '<text x="' + px.toFixed(1) + '" y="' + (row ? 66 : 54) + '" class="svg-label" text-anchor="middle">' + esc(e.op) + "</text>";
       });
       g += '<text x="10" y="82" class="svg-label">tick ' + t.start + " → " + t.end + " · dark = waiting at a bench, light = moving / being worked</text></svg>";
-      $("rlTrace").innerHTML = '<div class="cards"><article><span>Unit</span><strong class="mono">' + esc(h.id) + "</strong></article><article><span>SSCC · GTIN-14</span><strong class=\"mono\">" + esc(h.sscc) + "<br>" + esc(h.gtin14) + "</strong></article><article><span>Received</span><strong>" + esc(h.received_eaches) + " eaches · " + esc(h.cases_per_pallet) + " cases × " + esc(h.eaches_per_case) + " on " + esc(h.pallet) + "</strong></article></div>" + g +
+      // v3.35 what this unit cost (null without rates)
+      const Lg = window.WT && window.WT.ledger;
+      const cost = Lg && typeof Lg.costs === "function" && exp.rates ? Lg.costs(exp).byHu.find((x) => x.hu_id === h.id) : null;
+      const costCard = cost ? "<article><span>Cost so far</span><strong>" + money(cost.total_eur) + "</strong><span>" + cost.charged_ticks + " charged ticks: labour " + money(cost.labour_eur) + " · equipment " + money(cost.equipment_eur) + " · energy " + money(cost.energy_eur) + "</span></article>" : "";
+      $("rlTrace").innerHTML = '<div class="cards"><article><span>Unit</span><strong class="mono">' + esc(h.id) + "</strong></article><article><span>SSCC · GTIN-14</span><strong class=\"mono\">" + esc(h.sscc) + "<br>" + esc(h.gtin14) + "</strong></article><article><span>Received</span><strong>" + esc(h.received_eaches) + " eaches · " + esc(h.cases_per_pallet) + " cases × " + esc(h.eaches_per_case) + " on " + esc(h.pallet) + "</strong></article>" + costCard + "</div>" + g +
         table(t.events, ["version", "minute", "kind", "op", "location", "form", "pallets", "cases", "eaches", "parcels", "retained", "scrapped"], "Recorded events");
     };
     sel.onchange = draw;
@@ -395,7 +443,7 @@
     EXP = exp;
     $("rlStatus").textContent = "Loaded " + exp.hus.length + " units and " + exp.events.length + " events from " + exp.run.id + ".";
     $("rlView").hidden = false;
-    renderRun(exp); renderPackaging(exp); renderOptimise(exp); renderRibbon(exp); renderViews(exp); renderTrace(exp);
+    renderRun(exp); renderPackaging(exp); renderOptimise(exp); renderRibbon(exp); renderViews(exp); renderCost(exp); renderTrace(exp);
   }
 
   $("rlFile").addEventListener("change", (ev) => {

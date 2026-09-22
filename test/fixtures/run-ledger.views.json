@@ -1,0 +1,140 @@
+{
+ "costByType": [
+  {
+   "archetype": "case-pick",
+   "units": 8,
+   "retired": 1,
+   "eaches_out": 60,
+   "labour_eur": 87.5,
+   "equipment_eur": 2.2861,
+   "energy_eur": 3.3,
+   "total_eur": 93.0861,
+   "eur_per_unit": 11.6358,
+   "eur_per_each": 1.5514
+  },
+  {
+   "archetype": "cross-dock",
+   "units": 5,
+   "retired": 3,
+   "eaches_out": 1728,
+   "labour_eur": 0,
+   "equipment_eur": 1.84,
+   "energy_eur": 2.76,
+   "total_eur": 4.6,
+   "eur_per_unit": 0.92,
+   "eur_per_each": 0.0027
+  },
+  {
+   "archetype": "export-fragile",
+   "units": 1,
+   "retired": 1,
+   "eaches_out": 84,
+   "labour_eur": 0,
+   "equipment_eur": 0.56,
+   "energy_eur": 0.84,
+   "total_eur": 1.4,
+   "eur_per_unit": 1.4,
+   "eur_per_each": 0.0167
+  },
+  {
+   "archetype": "full-pallet-out",
+   "units": 7,
+   "retired": 1,
+   "eaches_out": 576,
+   "labour_eur": 58.3333,
+   "equipment_eur": 1.6811,
+   "energy_eur": 2.3925,
+   "total_eur": 62.4069,
+   "eur_per_unit": 8.9153,
+   "eur_per_each": 0.1083
+  },
+  {
+   "archetype": "piece-pick",
+   "units": 12,
+   "retired": 1,
+   "eaches_out": 4,
+   "labour_eur": 145.8333,
+   "equipment_eur": 2.9861,
+   "energy_eur": 4.3125,
+   "total_eur": 153.1319,
+   "eur_per_unit": 12.761,
+   "eur_per_each": 38.283
+  },
+  {
+   "archetype": "returns",
+   "units": 4,
+   "retired": 3,
+   "eaches_out": 0,
+   "labour_eur": 0,
+   "equipment_eur": 1.74,
+   "energy_eur": 2.61,
+   "total_eur": 4.35,
+   "eur_per_unit": 1.0875,
+   "eur_per_each": null
+  },
+  {
+   "archetype": "vas",
+   "units": 2,
+   "retired": 1,
+   "eaches_out": 9,
+   "labour_eur": 29.1667,
+   "equipment_eur": 0.655,
+   "energy_eur": 0.945,
+   "total_eur": 30.7667,
+   "eur_per_unit": 15.3833,
+   "eur_per_each": 3.4185
+  }
+ ],
+ "costByLocation": [
+  {
+   "location": "face",
+   "class": "racking",
+   "spans": 3,
+   "ticks": 3,
+   "charged_ticks": 150,
+   "labour_eur": 87.5,
+   "equipment_eur": 0.3333,
+   "energy_eur": 0.1125,
+   "total_eur": 87.9458
+  },
+  {
+   "location": "pack",
+   "class": "workstation",
+   "spans": 2,
+   "ticks": 5,
+   "charged_ticks": 100,
+   "labour_eur": 58.3333,
+   "equipment_eur": 0.25,
+   "energy_eur": 0.3,
+   "total_eur": 58.8833
+  },
+  {
+   "location": "stg",
+   "class": null,
+   "spans": 6,
+   "ticks": 662,
+   "charged_ticks": 300,
+   "labour_eur": 175,
+   "equipment_eur": 0,
+   "energy_eur": 0,
+   "total_eur": 175
+  },
+  {
+   "location": "transport",
+   "class": "conveyor",
+   "spans": 107,
+   "ticks": 2233,
+   "charged_ticks": 2233,
+   "labour_eur": 0,
+   "equipment_eur": 11.165,
+   "energy_eur": 16.7475,
+   "total_eur": 27.9125
+  }
+ ],
+ "costTotal": {
+  "labour_eur": 320.8333,
+  "equipment_eur": 11.7483,
+  "energy_eur": 17.16,
+  "total_eur": 349.7417
+ }
+}

@@ -55,62 +55,74 @@
   {
    "id": "in",
    "type": "dock-in",
-   "category": "flow"
+   "category": "flow",
+   "service_ticks": null
   },
   {
    "id": "stg",
    "type": "staging",
-   "category": "flow"
+   "category": "flow",
+   "service_ticks": 50
   },
   {
    "id": "qc",
    "type": "qc-bench",
-   "category": "flow"
+   "category": "flow",
+   "service_ticks": null
   },
   {
    "id": "dep",
    "type": "depalletiser",
-   "category": "flow"
+   "category": "flow",
+   "service_ticks": null
   },
   {
    "id": "ret",
    "type": "returns-station",
-   "category": "flow"
+   "category": "flow",
+   "service_ticks": null
   },
   {
    "id": "rack",
    "type": "selective-racking",
-   "category": "storage"
+   "category": "storage",
+   "service_ticks": null
   },
   {
    "id": "face",
    "type": "carton-flow",
-   "category": "storage"
+   "category": "storage",
+   "service_ticks": 50
   },
   {
    "id": "belt",
    "type": "conveyor",
-   "category": "flow"
+   "category": "flow",
+   "service_ticks": null
   },
   {
    "id": "pack",
    "type": "pack-station",
-   "category": "flow"
+   "category": "flow",
+   "service_ticks": 50
   },
   {
    "id": "wrap",
    "type": "stretch-wrap",
-   "category": "flow"
+   "category": "flow",
+   "service_ticks": null
   },
   {
    "id": "vas",
    "type": "vas-station",
-   "category": "flow"
+   "category": "flow",
+   "service_ticks": null
   },
   {
    "id": "out",
    "type": "dock-out",
-   "category": "flow"
+   "category": "flow",
+   "service_ticks": null
   }
  ],
  "hus": [
@@ -3967,5 +3979,136 @@
    "retained": 9,
    "scrapped": 0
   }
- ]
+ ],
+ "rates": {
+  "source": "WT.analytics rates as edited in the planner's Analyze panel (defaults: analytics.defaultRates())",
+  "currency": "EUR",
+  "labour_per_hour": 35,
+  "energy_price_per_kwh": 0.3,
+  "hours_per_year": 4000,
+  "co2_per_kwh": 0.3,
+  "transport": {
+   "class": "conveyor",
+   "labour": 0
+  },
+  "equipment": {
+   "racking": {
+    "capex": 8000,
+    "amort_years": 15,
+    "power_kw": 0.15,
+    "labour": 1
+   },
+   "asrs": {
+    "capex": 250000,
+    "amort_years": 12,
+    "power_kw": 15,
+    "labour": 0
+   },
+   "shuttle": {
+    "capex": 180000,
+    "amort_years": 10,
+    "power_kw": 8,
+    "labour": 0
+   },
+   "conveyor": {
+    "capex": 12000,
+    "amort_years": 10,
+    "power_kw": 1.5,
+    "labour": 0
+   },
+   "amr": {
+    "capex": 45000,
+    "amort_years": 8,
+    "power_kw": 2,
+    "labour": 0
+   },
+   "forklift": {
+    "capex": 35000,
+    "amort_years": 8,
+    "power_kw": 3,
+    "labour": 1
+   },
+   "dock": {
+    "capex": 15000,
+    "amort_years": 20,
+    "power_kw": 0.5,
+    "labour": 0
+   },
+   "workstation": {
+    "capex": 6000,
+    "amort_years": 10,
+    "power_kw": 0.6,
+    "labour": 1
+   },
+   "wrapper": {
+    "capex": 20000,
+    "amort_years": 12,
+    "power_kw": 2,
+    "labour": 0
+   },
+   "depalletiser": {
+    "capex": 60000,
+    "amort_years": 12,
+    "power_kw": 4,
+    "labour": 0
+   },
+   "charging": {
+    "capex": 8000,
+    "amort_years": 10,
+    "power_kw": 0.2,
+    "labour": 0
+   }
+  },
+  "classes": {
+   "carton-flow": {
+    "class": "racking",
+    "labour": 1
+   },
+   "conveyor": {
+    "class": "conveyor",
+    "labour": 0
+   },
+   "depalletiser": {
+    "class": "depalletiser",
+    "labour": 0
+   },
+   "dock-in": {
+    "class": "dock",
+    "labour": 0
+   },
+   "dock-out": {
+    "class": "dock",
+    "labour": 0
+   },
+   "pack-station": {
+    "class": "workstation",
+    "labour": 1
+   },
+   "qc-bench": {
+    "class": "workstation",
+    "labour": 1
+   },
+   "returns-station": {
+    "class": "workstation",
+    "labour": 1
+   },
+   "selective-racking": {
+    "class": "racking",
+    "labour": 1
+   },
+   "staging": {
+    "class": null,
+    "labour": 1
+   },
+   "stretch-wrap": {
+    "class": "wrapper",
+    "labour": 0
+   },
+   "vas-station": {
+    "class": "workstation",
+    "labour": 1
+   }
+  },
+  "honesty": "Illustrative teaching rates (analytics.js defaults, or as edited in the planner's Analyze panel) - not a quote. A unit served at a station is charged that station's service time (1 / its service rate), whatever it waited: queue time costs nothing (holding cost is not modelled). Internal transport is charged at the class of mover the floor contains (AGV, forklift or conveyor, in that order); a floor without one moves for free. The picking KPI's wage (Simulate card) is a different input and is not used here."
+ }
 }
