@@ -8,7 +8,8 @@
  * cost cards, print and CSV controls, the memo, "Your case" reacting to
  * input, the compare section after B, then example C (v3.43: a library floor
  * whose stations serve at declared capacities - no floor-rate flag, and the
- * compare against B names the different scenario). Same contract as selftest.js:
+ * compare against B names the different scenario), then example D (v3.44: the
+ * sample order file through the ledger - own data on the glance, dispatch by order). Same contract as selftest.js:
  * console `WT-SELFTEST: PASS n/n`, a #wt-selftest element with
  * data-pass / data-total / data-ok (+ data-page="run-ledger"), and
  * window.__WT_SELFTEST_RESULT__. No eval, no inline script, no network
@@ -47,7 +48,7 @@
     check("errors-boundary-installed", function () { return Array.isArray(window.__WT_ERRORS__); });
     check("no-errors-during-boot", function () { var e = window.__WT_ERRORS__ || []; return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" }; });
     check("model-and-generated-sql-present", function () {
-      return { ok: !!R && typeof R.views === "function" && typeof R.model === "function" && typeof R.csv === "function" && typeof R.glance === "function" && R.SQL === window.RunLedgerSQL && Object.keys(R.SQL).length === 23,
+      return { ok: !!R && typeof R.views === "function" && typeof R.model === "function" && typeof R.csv === "function" && typeof R.glance === "function" && R.SQL === window.RunLedgerSQL && Object.keys(R.SQL).length === 24,
         detail: R ? Object.keys(R.SQL).length + " SQL texts" : "no RunLedger" };
     });
     check("nav-anchors-resolve", function () {
@@ -91,11 +92,11 @@
       });
     }).then(function (d) {
       check("compare-renders-after-b", function () { var n = $("rlCompare").querySelectorAll("table").length; return { ok: !!window.RunLedger.currentB() && window.RunLedger.currentB().run.id === d.run && n === 6, detail: d.run + " · " + n + " tables" }; });
-      check("all-23-sql-blocks-after-compare", function () {
+      check("all-24-sql-blocks-after-compare", function () {
         var seen = {}, els = $("rlView").querySelectorAll("details.sql[data-view]");
         for (var i = 0; i < els.length; i++) seen[els[i].getAttribute("data-view")] = 1;
         var miss = Object.keys(window.RunLedgerSQL).filter(function (k) { return !seen[k]; });
-        return { ok: miss.length === 0, detail: miss.length ? "missing " + miss.join(",") : "23/23" };
+        return { ok: miss.length === 0, detail: miss.length ? "missing " + miss.join(",") : "24/24" };
       });
       check("no-errors-after-b", function () { var e = window.__WT_ERRORS__ || []; return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" }; });
       return clickAndWait("rlDemoC", "a");
@@ -110,6 +111,16 @@
       check("compare-after-c-names-the-different-scenario", function () {
         var c = R.compare(exp, R.currentB());
         return { ok: !!c && c.same_scenario === false && /different scenario or profile/.test($("rlCompare").textContent) && $("rlCompare").querySelectorAll("table").length === 6, detail: "same_scenario " + String(c && c.same_scenario) };
+      });
+      check("no-errors-after-c", function () { var e = window.__WT_ERRORS__ || []; return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" }; });
+      return clickAndWait("rlDemoD", "a");
+    }).then(function (d) {
+      check("example-d-own-data-glance-and-dispatch-by-order", function () {
+        var exp = R.current(), g = R.glance(exp), disp = $("rlDispatch");
+        var rows = R.views(exp).dispatchByOrder || [];
+        return { ok: exp.run.id === d.run && !!exp.run.dataset && exp.run.dataset.orders === 300 && /^own data: 300 orders \/ \d+ lines$/.test(g.dataset.text) && $("rlGlance").textContent.indexOf("own data: 300 orders") >= 0 &&
+          disp.textContent.indexOf("Dispatch by order") >= 0 && !!disp.querySelector('details.sql[data-view="v_dispatch_by_order"]') && rows.length > 0 && rows.every(function (r) { return /^ORD-\d{4}$/.test(r.order_ref); }) && !BAD_TEXT.test(disp.textContent),
+          detail: d.run + " · " + rows.length + " orders" };
       });
       check("no-errors-after-drive", function () { var e = window.__WT_ERRORS__ || []; return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" }; });
     });

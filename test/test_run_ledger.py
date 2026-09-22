@@ -109,6 +109,12 @@ def fresh():
     return db
 
 
+def fresh_with(data):
+    db = fresh()
+    RL.import_ledger(db, data)
+    return db
+
+
 class HandLedger(unittest.TestCase):
     def setUp(self):
         self.db = fresh()
@@ -496,6 +502,67 @@ class RecordedFixture(unittest.TestCase):
         self.assertAlmostEqual(sum(r["total_eur"] for r in s["v_cost_by_type"]), js["costTotal"]["total_eur"], delta=5e-4)
         self.assertGreater(js["costTotal"]["total_eur"], 0)
 
+    def test_dataset_and_order_line_columns_round_trip(self):
+        """v3.44: run.dataset and the unit's order_ref / sku / line_qty land in SQL and in v_run_summary."""
+        data = hand_ledger("RUN-hand-s1-h0000000d")
+        data["run"]["dataset"] = {"source": "hand pool", "orders": 2, "lines": 3, "skus": 3}
+        data["hus"][0].update(order_ref="A", sku="S1", line_qty=2)
+        data["hus"][1].update(order_ref="B", sku="S2", line_qty=48)
+        db = fresh()
+        rid = RL.import_ledger(db, data)
+        top = RL.rows(db, "SELECT dataset_source, dataset_orders, dataset_lines FROM v_run_summary WHERE run_id = ?", (rid,))[0]
+        self.assertEqual(dict(top), {"dataset_source": "hand pool", "dataset_orders": 2, "dataset_lines": 3})
+        hus = {r["id"][-8:]: r for r in RL.rows(db, "SELECT id, order_ref, sku, line_qty FROM hu WHERE run_id = ? ORDER BY seq", (rid,))}
+        self.assertEqual((hus["000001-1"]["order_ref"], hus["000001-1"]["sku"], hus["000001-1"]["line_qty"]), ("A", "S1", 2))
+        self.assertEqual((hus["000002-1"]["order_ref"], hus["000002-1"]["line_qty"]), ("B", 48))
+        self.assertIsNone(hus["000003-1"]["order_ref"])
+        plain = RL.rows(fresh_with(hand_ledger()), "SELECT dataset_source, dataset_orders FROM v_run_summary")[0]
+        self.assertEqual((plain["dataset_source"], plain["dataset_orders"]), (None, None))
+
+    def test_old_database_gains_the_dataset_and_order_line_columns(self):
+        """v3.44: a database from before v3.44 gains the seven columns on open and imports a pooled run."""
+        db = fresh()
+        for table, column in (("run", "dataset_source"), ("run", "dataset_orders"), ("run", "dataset_lines"), ("run", "dataset_skus"),
+                              ("hu", "order_ref"), ("hu", "sku"), ("hu", "line_qty")):
+            for name in RL.VIEWS:
+                db.execute(f"DROP VIEW IF EXISTS {name}")
+            db.execute(f"ALTER TABLE {table} DROP COLUMN {column}")
+        cols = {r["name"] for r in RL.rows(db, "PRAGMA table_info(hu)")}
+        self.assertNotIn("order_ref", cols)
+        RL.initialize(db)
+        cols = {r["name"] for r in RL.rows(db, "PRAGMA table_info(hu)")} | {r["name"] for r in RL.rows(db, "PRAGMA table_info(run)")}
+        self.assertTrue({"order_ref", "sku", "line_qty", "dataset_source", "dataset_orders", "dataset_lines", "dataset_skus"} <= cols)
+        data = hand_ledger()
+        data["run"]["dataset"] = {"source": "x", "orders": 1, "lines": 1, "skus": 1}
+        data["hus"][0].update(order_ref="A", sku="S1", line_qty=2)
+        self.assertEqual(RL.import_ledger(db, data), data["run"]["id"])
+        self.assertEqual(RL.rows(db, "SELECT line_qty FROM hu WHERE order_ref = 'A'")[0]["line_qty"], 2)
+
+    def test_dispatch_by_order_by_hand(self):
+        """v3.44: the hand ledger's three one-line orders: 4 cases -> 1 pallet, 48 -> 1, the live return -> 0."""
+        db = fresh_with(hand_ledger())
+        rows = {r["order_id"][-6:]: r for r in RL.rows(db, "SELECT * FROM v_dispatch_by_order")}
+        self.assertEqual(sorted(rows), ["000001", "000002", "000003"])
+        a, b, c = rows["000001"], rows["000002"], rows["000003"]
+        self.assertEqual((a["lines"], a["delivered_lines"], a["eaches_in"], a["eaches_out"], a["cases"], a["cases_per_pallet"], a["pallets_needed"]), (1, 1, 576, 48, 4, 48, 1))
+        self.assertEqual((b["lines"], b["delivered_lines"], b["eaches_out"], b["cases"], b["pallets_needed"]), (1, 1, 576, 48, 1))
+        self.assertEqual((c["lines"], c["delivered_lines"], c["eaches_in"], c["eaches_out"], c["cases"], c["pallets_needed"]), (1, 0, 3, 0, 0, 0))
+        self.assertIsNone(a["order_ref"])
+
+    def test_consolidation_at_dispatch_two_lines_one_order(self):
+        """v3.44: a second delivered case-pick line of order 1 - 4 + 4 cases need ONE customer pallet although the flow moved two units."""
+        data = hand_ledger()
+        a = data["hus"][0]
+        a2 = dict(a, id=a["id"][:-2] + "-2", seq=4, sscc="340123459999999999", order_ref="A", sku="S9", line_qty=48)
+        data["hus"].append(a2)
+        evs = [dict(e, id=f"EVT-{a2['id']}-{e['version']}", hu_id=a2["id"]) for e in data["events"] if e["hu_id"] == a["id"]]
+        data["events"].extend(evs)
+        db = fresh_with(data)
+        row = RL.rows(db, "SELECT * FROM v_dispatch_by_order WHERE order_id LIKE '%000001'")[0]
+        self.assertEqual((row["lines"], row["delivered_lines"], row["eaches_out"], row["cases"], row["pallets_needed"], row["order_ref"]), (2, 2, 96, 8, 1, "A"))
+        self.assertEqual(RL.rows(db, "SELECT SUM(final_pallets) AS p FROM hu WHERE order_id LIKE '%000001'")[0]["p"], 2)
+        self.assertEqual(RL.summary(db, data["run"]["id"])["invariants"], {n: 0 for n in RL.INVARIANT_VIEWS})
+
     def test_service_ticks_round_trip_unrounded(self):
         """v3.43: a declared-capacity station's service time is stored as recorded, not rounded."""
         data = hand_ledger("RUN-hand-s1-h0000000c")
@@ -553,6 +620,22 @@ class RecordedFixture(unittest.TestCase):
                 ok, table = RL.reconcile(db, rid, js, tolerance=TOL, tolerance_raw=1e-9)
                 self.assertTrue(ok, (base, [r for r in table if not r["ok"]]))
                 self.assertGreaterEqual(sum(1 for r in table if not r["column"].startswith("<")), 60, base)
+
+    @unittest.skipUnless((FIX / "run-ledger-d.json").exists(), "fixture D not generated")
+    def test_fixture_d_records_the_sample_order_file(self):
+        """v3.44: fixture D = fixture C's floor fed docs/examples/orders.csv through the real importer."""
+        data = json.loads((FIX / "run-ledger-d.json").read_text(encoding="utf-8"))
+        db = fresh()
+        rid = RL.import_ledger(db, data)
+        top = RL.rows(db, "SELECT * FROM v_run_summary WHERE run_id = ?", (rid,))[0]
+        self.assertEqual((top["dataset_orders"], top["dataset_lines"]), (300, data["run"]["dataset"]["lines"]))
+        self.assertIn("synthetic", top["dataset_source"])
+        self.assertEqual(RL.rows(db, "SELECT COUNT(*) AS n FROM hu WHERE run_id = ? AND order_ref IS NULL", (rid,))[0]["n"], 0)
+        self.assertGreater(RL.rows(db, "SELECT COUNT(*) AS n FROM hu WHERE run_id = ? AND id NOT LIKE '%-1'", (rid,))[0]["n"], 0)
+        by_order = RL.rows(db, "SELECT * FROM v_dispatch_by_order WHERE run_id = ?", (rid,))
+        self.assertTrue(by_order and all(r["order_ref"].startswith("ORD-") for r in by_order))
+        self.assertEqual(RL.summary(db, rid)["invariants"], {n: 0 for n in RL.INVARIANT_VIEWS})
+        self.assertNotEqual(rid, RL.import_ledger(fresh(), json.loads((FIX / "run-ledger-c.json").read_text(encoding="utf-8"))))
 
     @unittest.skipUnless((FIX / "run-ledger-c.json").exists(), "fixture C not generated")
     def test_fixture_c_serves_at_declared_capacities(self):

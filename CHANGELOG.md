@@ -1,5 +1,42 @@
 # Changelog
 
+## v3.44 — Your own orders, through the ledger
+
+**The pool itself.** `flowsim.spawnPlan` takes `opts.pool` ([{orderId, lines:[{sku, qty}]}]):
+one unit per order line, released in file order, re-released from the first line with the
+loop (a re-released order counts on: cycle × orders + n); no extra RNG draw; absent, nothing
+changes. `ids.inputHash` folds a pool digest into the run id only when a pool is present.
+`ledger.js` names line k of order n (`HU-ORD-<run>-<n>-<k>`), keeps `order_ref`, `sku` and
+`line_qty` on the unit, records `run.dataset = {source, orders, lines, skus}`; `pack.js`
+`quantitiesAlong(…, line)` lets the line's quantity drive the entering quantity of a returns /
+vas / export line and the pick of a case- (rounded up to cases) or piece-pick line - a pallet
+archetype still moves a whole pallet. The app hands the loaded pool to the flow and the ledger.
+
+**SQL and viewer.** `run` gains `dataset_source / dataset_orders / dataset_lines / dataset_skus`,
+`hu` gains `order_ref / sku / line_qty` (guarded ALTERs migrate older databases; the inserts
+are named-column now); `v_run_summary` shows the provenance; new detail view
+`v_dispatch_by_order` (lines, delivered lines, eaches in / out, cases, parcels, cases per
+pallet, `pallets_needed` rounded up) - consolidation modelled at dispatch, not in the flow.
+The viewer's glance gains the *Order stream* card (own data: n orders / m lines, or synthetic)
+and the dispatch section the *Dispatch by order* table with its SQL (24 views now).
+
+**Sample data and fixture D.** `tools/make_sample_data.py` writes `docs/examples/skus.csv` (120
+articles), `orders.csv` (300 orders, 1,021 lines) and a README - synthetic, seeded, checked
+fresh by a test and in CI; `node tools/make_run_ledger_fixture.mjs d` feeds them through the
+real importer (`wmsdata.js`) onto fixture C's floor: fixture D, `?example=d`, imported and
+reconciled in CI. README gained *Run it on your own data* (the two headers, the sample, what
+the model still does not know: no order type in the file, no article dimensions, whole
+pallets for pallet lines, consolidation at dispatch only).
+
+**Verification.** +1 harness (`verify_pool.js`, 30 checks: a hand pool of 3 orders / 6 lines
+spawning exactly six units n/k in file order with the quantities by the rule, the loop, the
+pool-less run byte for byte fixture A, dispatch by order with a two-line consolidation,
+fixture D rebuilt through the importer, the wiring), +8 Python (dataset and line columns
+round trip, an old database migrating, dispatch by order by hand, the consolidation case,
+fixture D, the sample data fresh / headers / ranges), app self-test +1 (an inline CSV through
+the importer reaches the flow and the ledger), viewer self-test +2 (example D). 73 harnesses,
+114 Python tests, WT-SELFTEST 179/179 + viewer 28/28. Cache wt-v124.
+
 ## v3.43 — A realistic recording, at full precision
 
 **Fixture C.** The recorded examples served at the simulator's floor rate (50 ticks per

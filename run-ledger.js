@@ -111,6 +111,18 @@
       trailers: slots ? Math.floor((pallets + slots - 1) / slots) : 0,
     } : null;
     if (dispatch) dispatch.fill = dispatch.trailers ? r4(pallets / (dispatch.trailers * slots)) : 0;
+    // v3.44 dispatch by order: consolidation modelled AT DISPATCH, not in the flow -
+    // the same definition as v_dispatch_by_order (MAX of order_ref and cases per
+    // pallet, sums over the order's delivered lines, pallets_needed rounded up).
+    const ordMap = {};
+    for (const h of exp.hus) {
+      const o = ordMap[h.order_id] || (ordMap[h.order_id] = { order_id: h.order_id, order_ref: null, lines: 0, delivered_lines: 0, eaches_in: 0, eaches_out: 0, cases: 0, parcels: 0, cases_per_pallet: null, pallets_needed: 0 });
+      o.lines++; o.eaches_in += h.received_eaches || 0;
+      if (h.order_ref != null && (o.order_ref == null || String(h.order_ref) > o.order_ref)) o.order_ref = String(h.order_ref);
+      if (h.cases_per_pallet != null && (o.cases_per_pallet == null || h.cases_per_pallet > o.cases_per_pallet)) o.cases_per_pallet = h.cases_per_pallet;
+      if (h.final_kind === "delivered" && h.final) { o.delivered_lines++; o.eaches_out += h.final.eaches; o.cases += h.final.cases; o.parcels += h.final.parcels; }
+    }
+    const dispatchByOrder = Object.keys(ordMap).sort().map((k) => { const o = ordMap[k]; o.pallets_needed = o.cases_per_pallet > 0 ? Math.floor((o.cases + o.cases_per_pallet - 1) / o.cases_per_pallet) : 0; return o; });
     // invariants (must all be 0)
     let conservation = 0, crossDock = 0, versionGaps = 0, terminals = 0;
     for (const e of exp.events) {
@@ -131,7 +143,7 @@
     // the SQL views (WT.ledger); computed once per export by model(), null without
     // rates or without ledger.js
     const cost = m.costs;
-    return { summary, cycle, touches, wait, wip, byOp, dispatch,
+    return { summary, cycle, touches, wait, wip, byOp, dispatch, dispatchByOrder,
       invariants: { v_conservation_violations: conservation, v_cross_dock_violations: crossDock, v_version_gaps: versionGaps, v_terminal_violations: terminals },
       flowLinks: m.flowLinks,
       rates: exp.rates || null, spans: cost ? cost.spans : null, costByHu: cost ? cost.byHu : null,
@@ -315,6 +327,9 @@
       trailers: v.dispatch ? v.dispatch.trailers : 0,
       cost: m.costs ? { total: m.costs.total.total_eur, per_unit: exp.hus.length ? r4(m.costs.total.total_eur / exp.hus.length) : null, per_delivered_each: eachesOut ? r4(m.costs.total.total_eur / eachesOut) : null,
         per_received_each: eachesIn ? r4(m.costs.total.total_eur / eachesIn) : null, holding: m.costs.total.holding_eur || 0 } : null,
+      // v3.44: where the order stream came from
+      dataset: r.dataset ? { text: "own data: " + r.dataset.orders + " orders / " + r.dataset.lines + " lines", sub: (r.dataset.source || "pool") + (r.dataset.skus != null ? " · " + r.dataset.skus + " articles" : "") + " · one unit per order line, the line's quantity on the unit; order types from the mix" }
+        : { text: "synthetic order stream", sub: "one-line orders numbered in spawn order; quantities drawn by the packaging profile" },
       invariantsOk: bad.length === 0, invariantsBad: bad, flags: flags, stations: stations.length, atFloor: atFloor.length,
     };
   }
@@ -419,6 +434,7 @@
     const items = [
       { label: "Run", value: r.id, mono: true, sub: r.scenario + " · seed " + r.seed + " · profile " + (r.profile || "—") },
       { label: "Order mix", value: g.mix },
+      { label: "Order stream", value: g.dataset.text, sub: g.dataset.sub },
       { label: "Simulated", value: r.ticks + " ticks · " + g.minutes + " min", sub: r.minutes_per_tick + " min per tick" },
       { label: "Units · events", value: g.units + " · " + g.events, sub: g.retired + " retired · " + g.inFlight + " in flight" },
       { label: "Delivered", value: g.delivered + " units · " + g.delivered_eaches + " eaches", sub: g.delivered_pallets + " pallets · " + g.delivered_parcels + " parcels · " + g.trailers + " trailer" + (g.trailers === 1 ? "" : "s") },
@@ -607,9 +623,19 @@
   }
 
   /* ---------------- dispatch ------------------------------------------ */
+  // v3.44: consolidation modelled AT DISPATCH, not in the flow - each line moved as its
+  // own unit; the pallets an order needs are its delivered cases over the profile's
+  // cases per pallet (the customer pallets those cases would fill).
+  const BY_ORDER_COLS = ["order_id", "order_ref", "lines", "delivered_lines", "eaches_in", "eaches_out", "cases", "parcels", "cases_per_pallet", "pallets_needed"];
+  function byOrderHtml(exp) {
+    const rows = views(exp).dispatchByOrder || [];
+    const multi = rows.filter((r) => r.lines > 1).length;
+    return "<h3>Dispatch by order</h3><p class=\"note\">Consolidation is modelled at dispatch, not in the flow: every order line moved through the building as its own unit; an order's <code>pallets_needed</code> is its delivered cases over the profile's cases per pallet, the customer pallets those cases would fill (" + rows.length + " orders, " + multi + " with more than one line). A mixed pallet's build sequence and stability are not modelled.</p>" +
+      table(rows, BY_ORDER_COLS, "Dispatch by order") + sqlBlock("v_dispatch_by_order");
+  }
   function renderDispatch(exp) {
     const d = views(exp).dispatch;
-    if (!d) { $("rlDispatch").innerHTML = "<p class=\"note\">Nothing delivered yet in this run.</p>" + sqlBlock("v_dispatch"); return; }
+    if (!d) { $("rlDispatch").innerHTML = "<p class=\"note\">Nothing delivered yet in this run.</p>" + sqlBlock("v_dispatch") + byOrderHtml(exp); return; }
     const cols = d.trailer_slots === 26 ? 13 : d.trailer_slots === 22 ? 11 : 11, rows = Math.ceil(d.trailer_slots / cols);
     let trailers = "";
     for (let t = 0; t < Math.min(d.trailers, 6); t++) {
@@ -623,7 +649,7 @@
       { label: "Delivered", value: d.delivered_units + " units" },
       { label: "Pallets · cases · parcels", value: d.pallets + " · " + d.cases + " · " + d.parcels },
       { label: "Trailers", value: d.trailers + " × " + d.trailer_slots + " slots · " + Math.round(d.fill * 100) + "% full" },
-    ]) + '<div class="trailer-row">' + trailers + (d.trailers > 6 ? '<p class="note">… and ' + (d.trailers - 6) + " more</p>" : "") + "</div>" + sqlBlock("v_dispatch");
+    ]) + '<div class="trailer-row">' + trailers + (d.trailers > 6 ? '<p class="note">… and ' + (d.trailers - 6) + " more</p>" : "") + "</div>" + sqlBlock("v_dispatch") + byOrderHtml(exp);
   }
 
   /* ---------------- the invariants ----------------------------------- */
@@ -829,6 +855,9 @@
   $("rlDemoC").addEventListener("click", () => {
     fetch("test/fixtures/run-ledger-c.json").then((r) => r.json()).then(load).catch((e) => { $("rlStatus").textContent = "Could not load example C: " + e.message; });
   });
+  $("rlDemoD").addEventListener("click", () => {
+    fetch("test/fixtures/run-ledger-d.json").then((r) => r.json()).then(load).catch((e) => { $("rlStatus").textContent = "Could not load example D: " + e.message; });
+  });
   // handed over from the planner (Simulate -> Live material flow -> Open in the run-ledger viewer); else ?example=a|b|c
   let handed = null;
   try {
@@ -836,7 +865,7 @@
     if (handed) { load(JSON.parse(handed)); localStorage.removeItem("wt-run-ledger"); }
   } catch (_) { /* no storage */ }
   const q = /[?&]example=(a|b|c|d)(?:&|$)/.exec(window.location.search);
-  const EXAMPLE_BUTTON = { a: "rlDemo", b: "rlDemoB", c: "rlDemoC", d: "rlDemoD" }; // d arrives with v3.44; an unknown letter does nothing
+  const EXAMPLE_BUTTON = { a: "rlDemo", b: "rlDemoB", c: "rlDemoC", d: "rlDemoD" }; // an unknown letter does nothing
   if (!handed && q && $(EXAMPLE_BUTTON[q[1]])) $(EXAMPLE_BUTTON[q[1]]).click();
   RunLedger.load = load;
   RunLedger.loadB = loadB;

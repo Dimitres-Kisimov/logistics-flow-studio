@@ -14,9 +14,9 @@ Data-quality flags: no holding cost is set (0 per unit-hour): waiting stock cost
 
 ### v_run_summary
 
-| scenario | seed | profile | ticks | units | events | delivered | delivered_eaches | delivered_pallets | delivered_parcels |
-|---|---|---|---|---|---|---|---|---|---|
-| hand-built | 31 | ecommerce | 300 | 39 | 157 | 8 | 2461 | 6 | 3 |
+| scenario | seed | profile | ticks | dataset_source | dataset_orders | dataset_lines | units | events | delivered | delivered_eaches | delivered_pallets | delivered_parcels |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hand-built | 31 | ecommerce | 300 | — | — | — | 39 | 157 | 8 | 2461 | 6 | 3 |
 
 ### v_cycle_time_by_type
 

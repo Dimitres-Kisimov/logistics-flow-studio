@@ -34,7 +34,8 @@ TRAILER_SLOTS = {"eur": 33, "ind": 26, "half": 66, "drum": 22, "cage": 26}
 DDL = """
 CREATE TABLE IF NOT EXISTS run(
   id TEXT PRIMARY KEY NOT NULL, scenario TEXT NOT NULL, seed INTEGER NOT NULL, hash TEXT, mix TEXT,
-  profile TEXT, ticks_per_hour INTEGER NOT NULL, minutes_per_tick REAL NOT NULL, ticks INTEGER NOT NULL, honesty TEXT);
+  profile TEXT, ticks_per_hour INTEGER NOT NULL, minutes_per_tick REAL NOT NULL, ticks INTEGER NOT NULL, honesty TEXT,
+  dataset_source TEXT, dataset_orders INTEGER, dataset_lines INTEGER, dataset_skus INTEGER);  -- v3.44: the order pool's provenance, NULL for a synthetic stream
 CREATE TABLE IF NOT EXISTS packaging_profile(
   run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, id TEXT NOT NULL, label TEXT, box TEXT, pallet TEXT,
   eaches_per_case INTEGER, case_kg REAL, max_stack_mm INTEGER, eaches_per_parcel INTEGER, PRIMARY KEY(run_id, id));
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS hu(
   spawned_tick INTEGER NOT NULL, retired_tick INTEGER, final_kind TEXT,
   final_pallets INTEGER, final_cases INTEGER, final_eaches INTEGER, final_parcels INTEGER, final_form TEXT,
   final_retained INTEGER, final_scrapped INTEGER,
+  order_ref TEXT, sku TEXT, line_qty INTEGER,  -- v3.44: the order line as the file gave it, NULL for a synthetic stream
   CHECK(retired_tick IS NULL OR retired_tick >= spawned_tick), UNIQUE(run_id, sscc));
 CREATE TABLE IF NOT EXISTS handling_event(
   id TEXT PRIMARY KEY NOT NULL, hu_id TEXT NOT NULL REFERENCES hu(id) ON DELETE CASCADE,
@@ -130,7 +132,7 @@ WHERE h.final_kind = 'delivered'
 GROUP BY h.run_id;""",
     "v_run_summary": """
 CREATE VIEW IF NOT EXISTS v_run_summary AS
-SELECT r.id AS run_id, r.scenario, r.seed, r.profile, r.ticks,
+SELECT r.id AS run_id, r.scenario, r.seed, r.profile, r.ticks, r.dataset_source, r.dataset_orders, r.dataset_lines,
        (SELECT COUNT(*) FROM hu h WHERE h.run_id = r.id) AS units,
        (SELECT COUNT(*) FROM handling_event e JOIN hu h ON h.id = e.hu_id WHERE h.run_id = r.id) AS events,
        (SELECT COUNT(*) FROM hu h WHERE h.run_id = r.id AND h.final_kind = 'delivered') AS delivered,
@@ -315,10 +317,30 @@ FROM keys k
 LEFT JOIN v_cost_by_type a ON a.run_id = k.run_a AND a.archetype = k.archetype
 LEFT JOIN v_cost_by_type b ON b.run_id = k.run_b AND b.archetype = k.archetype;""",
 }
+# ---- v3.44 your own orders: consolidation modelled AT DISPATCH, not in the flow --------
+# Every order line moved through the building as its own unit; an order's pallets_needed is
+# its delivered cases over the profile's cases per pallet (integer division rounds up) - the
+# customer pallets the order's cases would fill if consolidated at dispatch; 0 when nothing
+# was delivered. A mixed pallet's build sequence or stability is not modelled.
+VIEWS["v_dispatch_by_order"] = """
+CREATE VIEW IF NOT EXISTS v_dispatch_by_order AS
+SELECT h.run_id, h.order_id, MAX(h.order_ref) AS order_ref, COUNT(*) AS lines,
+       SUM(CASE WHEN h.final_kind = 'delivered' THEN 1 ELSE 0 END) AS delivered_lines,
+       SUM(h.received_eaches) AS eaches_in,
+       COALESCE(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_eaches END), 0) AS eaches_out,
+       COALESCE(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_cases END), 0) AS cases,
+       COALESCE(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_parcels END), 0) AS parcels,
+       MAX(h.cases_per_pallet) AS cases_per_pallet,
+       CASE WHEN MAX(h.cases_per_pallet) > 0
+            THEN (COALESCE(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_cases END), 0) + MAX(h.cases_per_pallet) - 1) / MAX(h.cases_per_pallet)
+            ELSE 0 END AS pallets_needed
+FROM hu h GROUP BY h.run_id, h.order_id;"""
+
+
 INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations")
 PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
                  "v_cost_by_type", "v_cost_by_location", "v_flow_links")
-DETAIL_VIEWS = ("v_wip_by_tick", "v_spans", "v_span_cost", "v_cost_by_hu")  # long or per-row views: `views --all`
+DETAIL_VIEWS = ("v_wip_by_tick", "v_spans", "v_span_cost", "v_cost_by_hu", "v_dispatch_by_order")  # long or per-row views: `views --all`
 COMPARE_VIEWS = ("v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost")
 
 
@@ -339,6 +361,14 @@ def initialize(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE rate ADD COLUMN holding_per_unit_hour REAL NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    for table, column, typ in (  # a database created before v3.44 has no dataset / order-line columns yet
+        ("run", "dataset_source", "TEXT"), ("run", "dataset_orders", "INTEGER"), ("run", "dataset_lines", "INTEGER"), ("run", "dataset_skus", "INTEGER"),
+        ("hu", "order_ref", "TEXT"), ("hu", "sku", "TEXT"), ("hu", "line_qty", "INTEGER"),
+    ):
+        try:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {typ}")
+        except sqlite3.OperationalError:
+            pass
     # views are dropped and recreated on every open, so a database created by an
     # older version always runs the current text (v3.39) - the text the viewer shows
     for name in VIEWS:
@@ -372,10 +402,14 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
             raise ValueError(f"event {e['id']!r} has unknown kind {e['kind']!r}")
     with db:
         db.execute("DELETE FROM run WHERE id = ?", (run["id"],))
-        db.execute("INSERT INTO run VALUES(?,?,?,?,?,?,?,?,?,?)", (
+        ds = run.get("dataset") or {}
+        db.execute(
+            "INSERT INTO run(id, scenario, seed, hash, mix, profile, ticks_per_hour, minutes_per_tick, ticks, honesty, "
+            "dataset_source, dataset_orders, dataset_lines, dataset_skus) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
             run["id"], run["scenario"], int(run["seed"]), run.get("hash"),
             json.dumps(run.get("mix"), sort_keys=True) if run.get("mix") is not None else None,
-            run.get("profile"), int(run["ticks_per_hour"]), float(run["minutes_per_tick"]), int(run["ticks"]), run.get("honesty")))
+            run.get("profile"), int(run["ticks_per_hour"]), float(run["minutes_per_tick"]), int(run["ticks"]), run.get("honesty"),
+            ds.get("source"), ds.get("orders"), ds.get("lines"), ds.get("skus")))
         prof = data.get("profile")
         if prof:
             db.execute("INSERT INTO packaging_profile VALUES(?,?,?,?,?,?,?,?,?)", (
@@ -400,11 +434,15 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
                 db.execute("INSERT INTO location_class VALUES(?,?,?,?)", (run["id"], typ, c.get("class"), 1 if c.get("labour") else 0))
         for h in hus:
             f = h.get("final") or {}
-            db.execute("INSERT INTO hu VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+            db.execute(
+                "INSERT INTO hu(id, run_id, order_id, seq, archetype, outcome, route_id, sscc, gtin13, gtin14, pallet, box, eaches_per_case, "
+                "cases_per_pallet, received_eaches, spawned_tick, retired_tick, final_kind, final_pallets, final_cases, final_eaches, final_parcels, "
+                "final_form, final_retained, final_scrapped, order_ref, sku, line_qty) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
                 h["id"], run["id"], h["order_id"], int(h["seq"]), h["archetype"], h.get("outcome"), h["route_id"],
                 h["sscc"], h["gtin13"], h["gtin14"], h.get("pallet"), h.get("box"), h.get("eaches_per_case"), h.get("cases_per_pallet"),
                 int(h["received_eaches"]), int(h["spawned_tick"]), h.get("retired_tick"), h.get("final_kind"),
-                f.get("pallets"), f.get("cases"), f.get("eaches"), f.get("parcels"), f.get("form"), f.get("retained"), f.get("scrapped")))
+                f.get("pallets"), f.get("cases"), f.get("eaches"), f.get("parcels"), f.get("form"), f.get("retained"), f.get("scrapped"),
+                h.get("order_ref"), h.get("sku"), h.get("line_qty")))
         db.executemany("INSERT INTO handling_event VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [(
             e["id"], e["hu_id"], int(e["version"]), e["kind"], e["op"], e.get("anchor"), e["location"], int(e["tick"]), float(e["minute"]),
             e.get("stage"), e.get("form"), int(e["pallets"]), int(e["cases"]), int(e["eaches"]), int(e["parcels"]), int(e["retained"]), int(e["scrapped"]))
@@ -548,6 +586,7 @@ RECONCILE_KEYS = {
     "v_station_wait": ("location", "op"), "v_wip_by_tick": ("tick",), "v_quantities_by_op": ("op", "kind"),
     "v_dispatch": (), "v_flow_links": ("from_op", "to_op"), "v_spans": ("hu_id", "version"), "v_span_cost": ("hu_id", "version"),
     "v_cost_by_hu": ("hu_id",), "v_cost_by_type": ("archetype",), "v_cost_by_location": ("location",),
+    "v_dispatch_by_order": ("order_id",),
 }
 RAW_VIEWS = ("v_spans", "v_span_cost")
 

@@ -3460,6 +3460,26 @@
       return { ok: !bad && exp.schema === "factory-run-ledger/v1" && exp.hus.length === st.spawned && delivered > 0 && /^RUN-ecommerce-multichannel-fc-s6-h[0-9a-f]{8}$/.test(exp.run.id),
         detail: bad || (exp.hus.length + " units, " + exp.events.length + " events, " + delivered + " delivered, run " + exp.run.id) };
     });
+    // ---- v3.44: your own orders reach the flow and the ledger (pure: an inline CSV through the real importer).
+    check("own-data-pool-reaches-the-flow-and-the-ledger", function () {
+      var Lg = WT.ledger, F = WT.flowsim, EX2 = WT.examples, WD = WT.wmsdata, P2 = WT.pack;
+      if (!Lg || !F || !EX2 || !WD || !P2) return { ok: false, detail: "modules missing" };
+      var skus = WD.importSkusCsv("sku,description,abc_class,velocity,weight_kg,storage_type\nS1,one,A,100,1,\nS2,two,B,10,2,\nS3,three,C,1,3,\n");
+      var orders = WD.importOrdersCsv("order_id,sku,qty\nO1,S1,2\nO1,S2,12\nO2,S3,5\n", skus.skus);
+      if (!skus.ok || !orders.ok) return { ok: false, detail: "import failed" };
+      var b = EX2.build("ecommerce-multichannel-fc");
+      var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
+      var plan = F.spawnPlan(lay, { seed: 3, mix: lay.config.orderMix, pool: orders.orders });
+      var st = F.state(plan);
+      var rec = Lg.create(plan, { scenarioId: "ecommerce-multichannel-fc", seed: 3, mix: lay.config.orderMix, layout: lay, profile: P2.profileFor("ecommerce-multichannel-fc"), pool: orders.orders, dataset: { source: "inline", skus: 3 } });
+      st.hooks = { afterTick: function (s) { Lg.observe(rec, s); } };
+      F.step(st, 60);
+      var exp = Lg.exportJson(rec);
+      var numbered = st.mus.every(function (m) { return typeof m.order === "number" && typeof m.line === "number"; });
+      var second = exp.hus.some(function (h) { return /-000001-2$/.test(h.id) && h.order_ref === "O1" && h.line_qty === 12; });
+      return { ok: plan.poolLines === 3 && numbered && second && !!exp.run.dataset && exp.run.dataset.orders === 2 && exp.run.dataset.lines === 3,
+        detail: plan.poolLines + " lines, " + exp.hus.length + " units, dataset " + JSON.stringify(exp.run.dataset) };
+    });
     // ---- v3.38: stacking strength (simplified McKee) and the pinwheel, hand values.
     check("stacking-strength-and-pinwheel-hand-values", function () {
       var P2 = WT.pack;

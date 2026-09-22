@@ -1,6 +1,6 @@
 /* Regenerate the recorded run-ledger fixtures (deterministic: the same commit
  * reproduces the same bytes).
- *   node tools/make_run_ledger_fixture.mjs [a|b|c|all]      (default: all)
+ *   node tools/make_run_ledger_fixture.mjs [a|b|c|d|all]    (default: all)
  *   a  test/fixtures/run-ledger.json     the hand-built floor of verify_ledger.js, seed 31, 300 ticks,
  *                                        the full default order mix
  *   b  test/fixtures/run-ledger-b.json   the same floor and seed, a cross-dock-heavy day (v3.37 compare)
@@ -8,7 +8,12 @@
  *                                        loaded, so its eight stations serve at the floor's DECLARED
  *                                        capacities instead of the simulator's floor rate (v3.43);
  *                                        seed 6, 180 ticks (300 would weigh 1.25 MB in the precache)
- *   node tools/make_run_ledger_fixture.mjs reconcile <dir> [a|b|c ...]
+ *   d  test/fixtures/run-ledger-d.json   the same floor and seed fed the synthetic sample order file
+ *                                        (docs/examples/skus.csv + orders.csv) through the REAL importer
+ *                                        (wmsdata.js) - one unit per order line, the line's quantity on
+ *                                        the unit, the pool's provenance in run.dataset (v3.44); not
+ *                                        precached (the service worker caches it at runtime)
+ *   node tools/make_run_ledger_fixture.mjs reconcile <dir> [a|b|c|d ...]
  *      reads the COMMITTED exports and writes <dir>/<base>.reconcile.json - the JavaScript rows
  *      of every planner, detail and cost view - for `python tools/run_ledger.py reconcile`, which
  *      measures how far SQLite's rows are from these (nothing is committed; CI generates them).
@@ -30,6 +35,7 @@ const VARIANTS = {
   a: { base: "run-ledger", mix: R.defaultMix(), seed: 31, ticks: 300, note: "the full default mix" },
   b: { base: "run-ledger-b", mix: MIX_B, seed: 31, ticks: 300, note: "a cross-dock-heavy day" },
   c: { base: "run-ledger-c", scenario: "ecommerce-multichannel-fc", seed: 6, ticks: 180, note: "a library floor with declared capacities" },
+  d: { base: "run-ledger-d", scenario: "ecommerce-multichannel-fc", seed: 6, ticks: 180, pool: path.join("docs", "examples"), note: "the same floor fed the sample order file" },
 };
 const OUT = path.join(root, "test", "fixtures");
 
@@ -45,9 +51,22 @@ function record(v) {
     if (globalThis.WT.wms) throw new Error("build a and b before c: with wms.js loaded the hand floor no longer serves at the floor rate");
     layout = FLOOR; mix = v.mix; scenarioId = "hand-built"; profile = P.PROFILES.ecommerce;
   }
-  const plan = F.spawnPlan(layout, { seed: v.seed, mix: mix });
+  // v3.44: a pool read through the real importer (one unit per order line)
+  let pool = null, dataset = null;
+  if (v.pool) {
+    if (!globalThis.WT.wmsdata) loadWT(["wmsdata.js"]);
+    const WD = globalThis.WT.wmsdata;
+    const skus = WD.importSkusCsv(fs.readFileSync(path.join(root, v.pool, "skus.csv"), "utf8"));
+    const orders = WD.importOrdersCsv(fs.readFileSync(path.join(root, v.pool, "orders.csv"), "utf8"), skus.skus);
+    if (!skus.ok || !orders.ok) throw new Error("the sample data did not import: " + JSON.stringify((skus.errors || []).concat(orders.errors || []).slice(0, 3)));
+    pool = orders.orders;
+    dataset = { source: v.pool.replace(/\\/g, "/") + " sample (synthetic)", skus: skus.skus.length };
+  }
+  const opts = { seed: v.seed, mix: mix };
+  if (pool) opts.pool = pool;
+  const plan = F.spawnPlan(layout, opts);
   const st = F.state(plan);
-  const rec = L.create(plan, { scenarioId: scenarioId, seed: v.seed, mix: mix, layout: layout, profile: profile, rates: A.defaultRates() });
+  const rec = L.create(plan, { scenarioId: scenarioId, seed: v.seed, mix: mix, layout: layout, profile: profile, rates: A.defaultRates(), pool: pool, dataset: dataset });
   st.hooks = { afterTick: (s) => L.observe(rec, s) };
   F.step(st, v.ticks);
   return rec;
@@ -76,6 +95,7 @@ export function reconcileRows(exp) {
       v_run_summary: [v.summary], v_cycle_time_by_type: v.cycle, v_touches_by_type: v.touches, v_station_wait: v.wait,
       v_wip_by_tick: v.wip, v_quantities_by_op: v.byOp, v_dispatch: v.dispatch ? [v.dispatch] : [], v_flow_links: v.flowLinks || [],
       v_spans: c ? c.spans : L.spans(exp), v_span_cost: c ? c.spans : [], v_cost_by_hu: c ? c.byHu : [], v_cost_by_type: c ? c.byType : [], v_cost_by_location: c ? c.byLocation : [],
+      v_dispatch_by_order: v.dispatchByOrder || [],
     },
   };
 }
@@ -86,7 +106,7 @@ if (args[0] === "reconcile") {
   if (!dir) { console.error("usage: reconcile <dir> [a|b|c ...]"); process.exit(2); }
   fs.mkdirSync(dir, { recursive: true });
   for (const k of args.length > 2 ? args.slice(2) : Object.keys(VARIANTS)) {
-    if (!VARIANTS[k]) { console.error("unknown variant " + k + " (a | b | c)"); process.exit(2); }
+    if (!VARIANTS[k]) { console.error("unknown variant " + k + " (a | b | c | d)"); process.exit(2); }
     const base = VARIANTS[k].base;
     const exp = JSON.parse(fs.readFileSync(path.join(OUT, base + ".json"), "utf8"));
     const target = path.join(dir, base + ".reconcile.json");
@@ -96,7 +116,7 @@ if (args[0] === "reconcile") {
 } else {
   const which = args[0] || "all";
   for (const k of which === "all" ? Object.keys(VARIANTS) : [which]) {
-    if (!VARIANTS[k]) { console.error("unknown variant " + k + " (a | b | c | all)"); process.exit(2); }
+    if (!VARIANTS[k]) { console.error("unknown variant " + k + " (a | b | c | d | all)"); process.exit(2); }
     build(VARIANTS[k]);
   }
 }

@@ -2508,6 +2508,8 @@
     // shape. With nothing loaded, opts is unchanged -> identical to before.
     const shape = activeOrderShape();
     if (shape) { opts.orders = shape.orders; opts.linesPerOrderMax = shape.linesPerOrderMax; }
+    const pool = activeOrderPool(); // v3.44: the pool itself, one unit per order line
+    if (pool) opts.pool = pool;
     state.flow.sim = WT.flowsim.state(layout, opts);
     // v3.32 THE RUN LEDGER: a pure observer attached as an after-tick hook.
     // Every unit gets its identities (ids.js) and quantities (pack.js); the
@@ -2519,6 +2521,9 @@
         scenarioId: scen, seed: seed, mix: opts.mix || null, layout: layout, profile: WT.pack.profileFor(scen),
         // v3.35: the Analyze panel's rates ride with the run, so the export can cost a unit
         rates: WT.analytics ? ensureRates() : null,
+        // v3.44: the pool's provenance rides in run.dataset; the pool digest joins the run id
+        pool: opts.pool || null,
+        dataset: opts.pool && state.dataset ? { source: state.dataset.source || "imported", skus: (state.dataset.skus || []).length } : null,
       });
       state.flow.sim.hooks = { afterTick: (st) => WT.ledger.observe(state.flow.ledger, st) };
     }
@@ -4879,6 +4884,14 @@
   // pool per frame. Returns null when no order pool is loaded, in which
   // case flowsim/wms fall back to the synthetic default from config -
   // byte-identical to before (guarded by verify_wmsdata.js).
+  // v3.44 YOUR OWN ORDERS: the loaded pool itself, in the shape flowsim.spawnPlan
+  // takes (opts.pool): one unit per order line, the line's sku and quantity on
+  // the unit in the ledger. Null when nothing is loaded -> opts unchanged.
+  function activeOrderPool() {
+    const ds = state.dataset;
+    if (!ds || !Array.isArray(ds.orders) || !ds.orders.length) return null;
+    return ds.orders.map((o) => ({ orderId: o.orderId, lines: (o.lines || []).map((l) => ({ sku: ds.skus[l.skuIndex] ? ds.skus[l.skuIndex].id : String(l.skuIndex), qty: l.qty })) }));
+  }
   function activeOrderShape() {
     const ds = state.dataset;
     if (!ds || !Array.isArray(ds.orders) || !ds.orders.length) return null;

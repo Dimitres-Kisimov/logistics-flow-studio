@@ -73,15 +73,17 @@ jobs:
           python tools/run_ledger.py import test/fixtures/run-ledger.json --database "$db"
           python tools/run_ledger.py import test/fixtures/run-ledger-b.json --database "$db"
           python tools/run_ledger.py import test/fixtures/run-ledger-c.json --database "$db"
+          python tools/run_ledger.py import test/fixtures/run-ledger-d.json --database "$db"
           python tools/run_ledger.py report --database "$db" --runs RUN-hand-built-s31-hc28a7688 RUN-hand-built-s31-hd35e45d4 --out "$RUNNER_TEMP/report.md"
           grep -q '^Invariant violations: 0' "$RUNNER_TEMP/report.md"
           grep -q '^### v_compare_cost' "$RUNNER_TEMP/report.md"
           python tools/export_viewer_sql.py --check
+          python tools/make_sample_data.py --check
           # v3.43: the JavaScript rows of 13 views (node) against SQLite's, column by column;
           # both sides sum compensated, so the rounded aggregates may differ by one step at most
           python -c "import sqlite3; print('sqlite', sqlite3.sqlite_version)"
           node tools/make_run_ledger_fixture.mjs reconcile "$RUNNER_TEMP/rec"
-          for f in run-ledger run-ledger-b run-ledger-c; do
+          for f in run-ledger run-ledger-b run-ledger-c run-ledger-d; do
             python tools/run_ledger.py reconcile "test/fixtures/$f.json" --js "$RUNNER_TEMP/rec/$f.reconcile.json"
           done
 

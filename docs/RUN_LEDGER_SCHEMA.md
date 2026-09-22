@@ -1,6 +1,6 @@
 # The run ledger — schema, identities, SQL views
 
-*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.43.*
+*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.44.*
 
 ## 1. One stream, three consumers
 
@@ -16,9 +16,9 @@ The material-flow simulation is observed by `ledger.js` after every tick. It wri
 
 | Id | Shape | Meaning |
 |---|---|---|
-| Run | `RUN-<scenario>-s<seed>-h<hash8>` | `hash8` is FNV-1a over the layout's elements, its size, the seed and the order mix, so the same inputs give the same id on every machine |
-| Order | `ORD-<run>-<n:6>` | one order line per handling unit, numbered in spawn order |
-| Handling unit | `HU-<order>-<k>` | `k` is 1 today (one unit per line) |
+| Run | `RUN-<scenario>-s<seed>-h<hash8>` | `hash8` is FNV-1a over the layout's elements, its size, the seed and the order mix — and, since v3.44, the digest of the order pool when one was loaded — so the same inputs give the same id on every machine |
+| Order | `ORD-<run>-<n:6>` | the synthetic stream: one one-line order per handling unit, numbered in spawn order; with an imported pool (v3.44): `n` is the order's number in the file (a re-released order counts on: cycle × orders + n) |
+| Handling unit | `HU-<order>-<k>` | `k` is the line's number within its order when a pool was loaded (v3.44); 1 for the synthetic stream (one unit per line) |
 | Event | `EVT-<hu>-<version>` | `version` counts the unit's events from 0, consecutive |
 | SSCC | 18 digits | GS1 logistic-unit number: extension digit (3 = pallet unit, 0 = parcel; the app's convention), company prefix 4012345 (GS1's documentation prefix, **not registered**), serial, mod-10 check |
 | GTIN-13 / GTIN-14 | 13 / 14 digits | the each / the case; GTIN-14 = indicator 1 + the GTIN-13 body + new check digit |
@@ -49,6 +49,8 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 
 **Event kinds.** `created` (the unit exists; its first operation is done at spawn) · `queued` (reached a station, waiting — quantities not yet changed) · `served` (the station served it — the operation's quantities apply) · `passed` (an operation without a station: dock, wrapper, staging, depalletiser…) · `delivered` / `restocked` / `scrapped` (terminal, by the route's final operation).
 
+**Your own orders (v3.44).** When the flow was fed an order pool (`flowsim` `opts.pool`, the planner's imported file), `run.dataset = { source, orders, lines, skus }` records its provenance and every unit carries `order_ref` (the file's order id), `sku` and `line_qty`; the line's quantity is the entering quantity of a returns / vas / export-fragile line and the pick of a case-pick (cases rounded up) or piece-pick line, while a pallet archetype moves a whole pallet whatever the line says. Without a pool none of these keys exist and the export is byte-identical to earlier versions.
+
 **Time.** `tick` is the simulation tick; `minute = tick × 60 / ticks_per_hour` (unrounded since v3.43; an integer at 60 ticks per hour). There is no wall clock anywhere in the file.
 
 **Spans and costs (v3.35).** A *span* is the time between two consecutive events of one unit: `waiting` when the first is `queued` (queue + service, inseparable in the simulation), `moving` otherwise; the last event of a live unit opens no span, and the spans of a retired unit add up to `retired_tick − spawned_tick`. A waiting span is charged the station's `service_ticks` (1 / its service rate) whatever the unit waited — queue time costs no labour; since v3.40 the *elapsed* wait is charged a holding cost per unit-hour when `rates.holding_per_unit_hour` is set (default 0); a moving span is charged in full at `rates.transport` (the first of AGV, forklift, conveyor present on the floor; none = free). Per span: `hours = charged_ticks × minutes_per_tick / 60`; `held_hours = ticks × minutes_per_tick / 60` for a waiting span; `labour = hours × labour × labour_per_hour`; `equipment = hours × capex / amort_years / hours_per_year`; `energy = hours × power_kw × energy_price_per_kwh`; `holding = held_hours × holding_per_unit_hour`. Per order type the cost is given per unit, per **received** each (every unit) and per **delivered** each (partial while units are in flight). Manned classes: racking (a picker at the face), workstation, forklift; `staging` has no class and is manned. The rates are the planner's Analyze-panel rates (illustrative teaching values); `ledger.js` `costs(exp)` and the SQL views below are the same arithmetic.
@@ -75,6 +77,7 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 | `v_cost_by_type` | per archetype: units, retired, eaches received and delivered, charged hours, labour / equipment / energy / holding / total €, € per unit, per received each, per delivered each (v3.35, v3.40) |
 | `v_cost_by_location` | per station: waiting spans, ticks, charged ticks, hours and their € incl. holding — plus one `transport` row for every moving span (v3.35, v3.40) |
 | `v_flow_links` | per pair of operations: units that moved from the one to the next, retired units, eaches that left (v3.36) |
+| `v_dispatch_by_order` | per order: lines, delivered lines, eaches in and out, cases, parcels, cases per pallet and `pallets_needed` = delivered cases over cases per pallet, rounded up — consolidation modelled at dispatch, not in the flow (v3.44; a detail view); `v_run_summary` carries `dataset_source / dataset_orders / dataset_lines` |
 
 **Cost views** (v3.35; empty when the run carries no `rates`): `v_spans` pairs each event with the next one of the same unit (`LEAD` over `version`) and names the state; `v_span_cost` charges each span by the rule in §3; `v_cost_by_hu` sums per unit. Rounding happens only at the aggregates (4 dp). Since v3.43 both sides sum with compensated arithmetic — SQLite's `SUM()` has used Kahan-Babuška-Neumaier since 3.43.0 and `ledger.js` sums the same way — so the rounded aggregates agree to at most one step in the fourth decimal. `python tools/run_ledger.py reconcile <export.json> --js <rows.json>` measures the drift column by column over 13 views (the rows come from `node tools/make_run_ledger_fixture.mjs reconcile <dir>`) and fails above 1e-4 (1e-9 on the unrounded span views); measured on the three fixtures: 5.6e-17 (A, B) and 1.1e-13 (C) over 111 columns. The tests use the same tolerance when SQLite is 3.44 or newer.
 
@@ -121,7 +124,8 @@ Synthetic events from a synthetic teaching simulation — not telemetry, not a W
 ## 6. Reproduce
 
 ```sh
-node tools/make_run_ledger_fixture.mjs       # regenerates test/fixtures/run-ledger.json, run-ledger-b.json and run-ledger-c.json byte for byte ([a|b|c|all]; a and b are built before wms.js loads)
+node tools/make_run_ledger_fixture.mjs       # regenerates test/fixtures/run-ledger.json, -b, -c and -d byte for byte ([a|b|c|d|all]; a and b are built before wms.js loads; d reads docs/examples through wmsdata.js)
+python tools/make_sample_data.py --check     # the synthetic sample SKU master and order file are what the generator writes (v3.44)
 node verify_ledger.js                        # the recorder: identities, exact route walks, conservation, byte-identical sim
 python -m pytest test/test_run_ledger.py -q  # the SQL: hand-built ledger, corruption, SQL == JavaScript stats
 node verify_run_ledger_view.js               # the viewer's model against the same hand ledger and fixture

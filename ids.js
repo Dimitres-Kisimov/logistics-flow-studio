@@ -60,13 +60,21 @@
   // A stable hash of the run inputs: the layout's elements (id, type, geometry),
   // the seed and the order mix. Key order is fixed, so the same inputs hash the
   // same on every machine.
-  function inputHash(layout, seed, mix) {
+  // v3.44: an order pool is a run input too - its digest joins the hash ONLY when a
+  // pool is present, so every run without one keeps the id it always had.
+  function poolDigest(pool) {
+    const rows = (pool || []).map((o) => [String(o.orderId), (Array.isArray(o.lines) ? o.lines : []).map((l) => [l.sku != null ? String(l.sku) : (l.skuIndex != null ? l.skuIndex : null), Math.round(Number(l.qty) || 0)])]);
+    return hex8(fnv1a(JSON.stringify(rows)));
+  }
+  function inputHash(layout, seed, mix, pool) {
     const els = ((layout && layout.elements) || []).map((e) => [e.id, e.type, e.x, e.y, e.w, e.d, e.arc || null]);
     const m = mix == null ? null : (Array.isArray(mix) ? mix : Object.keys(mix).sort().map((k) => [k, mix[k]]));
-    return hex8(fnv1a(JSON.stringify([(layout && layout.gridW) || 0, (layout && layout.gridH) || 0, els, seed >>> 0, m])));
+    const parts = [(layout && layout.gridW) || 0, (layout && layout.gridH) || 0, els, seed >>> 0, m];
+    if (Array.isArray(pool) && pool.length) parts.push(poolDigest(pool));
+    return hex8(fnv1a(JSON.stringify(parts)));
   }
-  function runId(scenarioId, seed, layout, mix) {
-    return "RUN-" + slug(scenarioId) + "-s" + (seed >>> 0) + "-h" + inputHash(layout, seed, mix);
+  function runId(scenarioId, seed, layout, mix, pool) {
+    return "RUN-" + slug(scenarioId) + "-s" + (seed >>> 0) + "-h" + inputHash(layout, seed, mix, pool);
   }
   function orderId(run, n) { return "ORD-" + run + "-" + pad(n, 6); }
   function huId(order, k) { return "HU-" + order + "-" + (k == null ? 1 : k); }

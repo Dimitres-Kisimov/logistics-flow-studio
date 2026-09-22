@@ -168,13 +168,21 @@
     const seed = (m.seed != null ? m.seed : plan.seed) >>> 0;
     const mix = m.mix == null ? null : m.mix;
     const profile = m.profile || (P ? P.profileFor(scenario) : null);
-    const runId = I ? I.runId(scenario, seed, layout, mix) : "RUN-" + scenario + "-s" + seed;
+    // v3.44 YOUR OWN ORDERS: the pool the units were spawned from (flowsim opts.pool) is a run
+    // input - it joins the id hash - and its provenance rides in run.dataset.
+    const pool = (Array.isArray(m.pool) && m.pool.length ? m.pool : null) || (plan && plan.pool) || null;
+    const runId = I ? I.runId(scenario, seed, layout, mix, pool) : "RUN-" + scenario + "-s" + seed;
+    const dataset = pool ? {
+      source: (m.dataset && m.dataset.source) || "pool", orders: pool.length,
+      lines: plan && plan.poolLines != null ? plan.poolLines : pool.reduce((a, o) => a + ((o.lines && o.lines.length) || 0), 0),
+      skus: m.dataset && m.dataset.skus != null ? m.dataset.skus : null,
+    } : null;
     // v3.35: the service time a station charges per unit (1 / its service rate)
     const serviceTicks = {};
     for (const s of (plan && plan.stations) || []) {
       if (s.elementId != null && s.serviceRatePerTick > 0) serviceTicks[String(s.elementId)] = 1 / s.serviceRatePerTick; // v3.43: unrounded (at the floor rate 1 / 0.02 is exactly 50)
     }
-    return {
+    const rec = {
       kind: "wt-run-ledger",
       schema: SCHEMA,
       run: {
@@ -200,14 +208,16 @@
       events: [],
       last: {},       // mu.id -> { hu, op, status, tick, stepIndex }
     };
+    if (dataset) rec.run.dataset = dataset; // key only when a pool was used (older exports unchanged)
+    return rec;
   }
 
   /* ---------------- observe ----------------------------------------- */
-  function stepsFor(rec, route, huId) {
+  function stepsFor(rec, route, huId, line) {
     const P = WT.pack;
     if (!P) return null;
     const arch = route.legacy ? "legacy-spine" : route.archetype;
-    return P.quantitiesAlong(rec.profile, arch, route.ops, huId);
+    return P.quantitiesAlong(rec.profile, arch, route.ops, huId, line || null); // v3.44: the order line's quantity, when the unit carries one
   }
   function quantityAt(q, route, op, before) {
     if (!q) return { pallets: 0, cases: 0, eaches: 0, parcels: 0, form: null, retained: 0, scrapped: 0 };
@@ -253,9 +263,16 @@
       if (!hu) {
         // ---- created ----
         const route = plan.routes[mu.route] || plan.routes[0];
-        const orderId = I ? I.orderId(rec.run.id, mu.id) : rec.run.id + "-" + mu.id;
-        const id = I ? I.huId(orderId, 1) : orderId + "-1";
-        const q = stepsFor(rec, route, id);
+        // v3.44: a unit spawned from an order pool IS one line of one order - order n
+        // (a re-released order counts on: cycle x orders + n), line k; otherwise the
+        // synthetic stream's one-line orders numbered in spawn order.
+        const pooled = !!(plan.pool && mu.order != null);
+        const orderNo = pooled ? (mu.cycle || 0) * plan.pool.length + mu.order + 1 : mu.id;
+        const line = pooled ? ((plan.pool[mu.order].lines || [])[mu.line] || null) : null;
+        const k = pooled ? mu.line + 1 : 1;
+        const orderId = I ? I.orderId(rec.run.id, orderNo) : rec.run.id + "-" + orderNo;
+        const id = I ? I.huId(orderId, k) : orderId + "-" + k;
+        const q = stepsFor(rec, route, id, line);
         const isPalletUnit = !!(q && q.steps.length && q.steps[0].pallets > 0);
         const itemRef = I ? 1 + (I.fnv1a(id) % 99999) : mu.id;
         hu = {
@@ -271,6 +288,11 @@
           __route: mu.route, __q: q, __version: 0, __lastQ: null,
         };
         if (I && hu.gtin13) hu.gtin14 = I.gtin14(1, hu.gtin13);
+        if (pooled) { // the line as the file gave it (keys only on pooled runs)
+          hu.order_ref = String(plan.pool[mu.order].orderId);
+          hu.sku = line && line.sku != null ? String(line.sku) : null;
+          hu.line_qty = line && Number(line.qty) > 0 ? Math.round(Number(line.qty)) : null;
+        }
         rec.hus[id] = hu;
         rec.order.push(id);
         const op0 = mu.op || route.ops[0];

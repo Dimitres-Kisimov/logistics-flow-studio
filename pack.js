@@ -446,20 +446,27 @@
   //   palletise      cases -> one dispatch pallet (partial pallets are honest)
   //   scrap          everything is written off
   //   restock        a return goes back to stock (carried -> retained)
-  function quantitiesAlong(profile, archetype, ops, key) {
+  // v3.44 YOUR OWN ORDERS: when the unit carries an order line ({sku, qty}), the
+  // line's quantity replaces the synthetic draw - for the ENTERING quantity of a
+  // returns / vas / export-fragile line and for the PICK of a case-pick (ceil by
+  // eaches per case, capped by the pallet) or piece-pick line (capped by the
+  // case stock). A pallet archetype (full pallet out, cross-dock, pallet pick)
+  // moves a whole pallet whatever the line says - documented, not hidden.
+  function quantitiesAlong(profile, archetype, ops, key, line) {
     const pr = profile || PROFILES[DEFAULT_PROFILE];
     const epc = pr.eachesPerCase;
     const cpp = casesPerPallet(pr);
     const k = key || archetype;
+    const qty = line && Number(line.qty) > 0 ? Math.round(Number(line.qty)) : null;
     const startsInStock = archetype === "vas" || archetype === "export-fragile";
     // The inbound (or in-stock) supply the unit starts as.
     let q;
     if (archetype === "returns") {
-      const e = draw(pr.line.eaches, k, "returns");
+      const e = qty != null ? qty : draw(pr.line.eaches, k, "returns");
       q = { pallets: 0, cases: 0, eaches: e, parcels: 1, form: "parcel" };
     } else if (startsInStock) {
-      const c = archetype === "export-fragile" ? draw(pr.line.exportCases, k, "export") : 0;
-      const e = archetype === "vas" ? draw(pr.line.eaches, k, "vas") : c * epc;
+      const c = archetype === "export-fragile" ? (qty != null ? Math.max(1, Math.ceil(qty / epc)) : draw(pr.line.exportCases, k, "export")) : 0;
+      const e = archetype === "vas" ? (qty != null ? qty : draw(pr.line.eaches, k, "vas")) : c * epc;
       q = { pallets: 0, cases: archetype === "export-fragile" ? c : Math.ceil(e / epc), eaches: e, parcels: 0, form: "carton" };
     } else {
       q = { pallets: 1, cases: cpp, eaches: cpp * epc, parcels: 0, form: "pallet-load" };
@@ -470,11 +477,11 @@
     for (const op of ops || []) {
       if (op === "depalletise") { q = Object.assign({}, q, { pallets: 0 }); }
       else if (op === "case-pick") {
-        const want = Math.min(q.cases, Math.max(1, draw(pr.line.cases, k, "case-pick")));
+        const want = Math.min(q.cases, Math.max(1, qty != null ? Math.ceil(qty / epc) : draw(pr.line.cases, k, "case-pick")));
         retained += (q.cases - want) * epc;
         q = { pallets: 0, cases: want, eaches: want * epc, parcels: 0, form: "carton" };
       } else if (op === "piece-pick") {
-        const want = Math.min(q.eaches, Math.max(1, draw(pr.line.eaches, k, "piece-pick")));
+        const want = Math.min(q.eaches, Math.max(1, qty != null ? qty : draw(pr.line.eaches, k, "piece-pick")));
         retained += q.eaches - want;
         q = { pallets: 0, cases: Math.ceil(want / epc), eaches: want, parcels: 0, form: "tote" };
       } else if (op === "pick") { q = Object.assign({}, q, { form: "tote" }); }

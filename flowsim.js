@@ -912,7 +912,20 @@
 
     const orders = Math.max(1, Math.round(o.orders != null ? o.orders : PARAMS.defaultOrders));
     const avgUnits = (1 + (o.linesPerOrderMax || cfg.linesPerOrderMax || PARAMS.linesPerOrderMax)) / 2;
-    const totalUnits = Math.max(1, Math.round(o.units != null ? o.units : orders * avgUnits));
+    // v3.44 YOUR OWN ORDERS: an optional order pool [{orderId, lines:[{sku, qty}]}].
+    // One unit per order line, released in pool order; with `loop` the pool is
+    // re-released from its first line (a cycle counter continues the order
+    // numbering); without it the pool drains exactly once. No extra RNG draw.
+    // Absent -> nothing below changes (byte-identical to before).
+    const pool = Array.isArray(o.pool) && o.pool.length ? o.pool : null;
+    let poolIndex = null, poolLines = 0;
+    if (pool) {
+      poolIndex = [];
+      pool.forEach((ord, oi) => { const lines = Array.isArray(ord.lines) ? ord.lines : []; for (let li = 0; li < lines.length; li++) poolIndex.push([oi, li]); });
+      poolLines = poolIndex.length;
+      if (!poolLines) poolIndex = null;
+    }
+    const totalUnits = Math.max(1, Math.round(o.units != null ? o.units : (poolIndex ? poolLines : orders * avgUnits)));
     const loop = o.loop != null ? !!o.loop : true;
 
     // Optional what-if arrival override (units/hr). Default = the balanced
@@ -921,7 +934,7 @@
     const arrivalUnitsPerHr = o.arrivalUnitsPerHr != null && o.arrivalUnitsPerHr > 0
       ? Number(o.arrivalUnitsPerHr) : null;
 
-    return {
+    const plan = {
       kind: "wt-flowsim-plan",
       seed: seed,
       gridW: gridW,
@@ -961,6 +974,8 @@
         "NOT pathfinding and NOT a DES queueing model.",
       dataLabel: SYNTHETIC_LABEL,
     };
+    if (poolIndex) { plan.pool = pool; plan.poolIndex = poolIndex; plan.poolLines = poolLines; } // v3.44: keys only with a pool
+    return plan;
   }
 
   /* ------------------------------------------------------------------
@@ -1131,6 +1146,12 @@
         archetype: (plan.routes[rIdx] && plan.routes[rIdx].routeId) || LEGACY_ROUTE_ID,
         op: rwp[0].op || null,
       };
+      if (plan.pool) { // v3.44: which order line this unit IS (pool order, cycling with loop)
+        if (state.poolCursor == null) state.poolCursor = 0;
+        const j = state.poolCursor++;
+        const pi = plan.poolIndex[j % plan.poolLines];
+        mu.order = pi[0]; mu.line = pi[1]; mu.cycle = Math.floor(j / plan.poolLines);
+      }
       const p = positionOf(state, mu);
       mu.cx = p.x; mu.cy = p.y;
       state.mus.push(mu);
