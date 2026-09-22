@@ -339,7 +339,7 @@
       run: Object.assign({}, rec.run),
       profile: rec.profile ? { id: rec.profile.id, label: rec.profile.label, box: rec.profile.box, pallet: rec.profile.pallet,
         eaches_per_case: rec.profile.eachesPerCase, case_kg: rec.profile.caseKg, max_stack_mm: rec.profile.maxStackMm,
-        eaches_per_parcel: rec.profile.eachesPerParcel } : null,
+        eaches_per_parcel: rec.profile.eachesPerParcel, board: rec.profile.board || null } : null, // board: v3.38
       locations: rec.locations.slice(),
       hus: hus,
       events: rec.events.slice(),

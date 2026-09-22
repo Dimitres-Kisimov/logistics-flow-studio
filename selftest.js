@@ -3460,6 +3460,19 @@
       return { ok: !bad && exp.schema === "factory-run-ledger/v1" && exp.hus.length === st.spawned && delivered > 0 && /^RUN-ecommerce-multichannel-fc-s6-h[0-9a-f]{8}$/.test(exp.run.id),
         detail: bad || (exp.hus.length + " units, " + exp.events.length + " events, " + delivered + " delivered, run " + exp.run.id) };
     });
+    // ---- v3.38: stacking strength (simplified McKee) and the pinwheel, hand values.
+    check("stacking-strength-and-pinwheel-hand-values", function () {
+      var P2 = WT.pack;
+      if (!P2 || typeof P2.bct !== "function" || typeof P2.fourBlock !== "function") return { ok: false, detail: "pack.js without v3.38" };
+      var b = P2.bct(5, 4, 1400); // 5.874 x 5 x sqrt(5600) = 2197.85 N
+      var s = P2.safeLayers(b, 6); // defaults 1.0 x 0.6 x 1.0 x 1.0 -> 134.47 kg -> 23 layers
+      var pin = P2.fourBlock(1000, 1000, 600, 400); // the hand pinwheel: 4 against bands 3
+      var t = P2.tiHi(P2.PALLETS.eur, P2.BOXES["case-400x300x250"], 1800, 6, P2.PROFILES.ecommerce.board);
+      var ok = Math.abs(b - 2197.85) < 0.05 && s.layers === 23 && Math.abs(s.allowableKg - 134.47) < 0.01 && pin.count === 4 && pin.rects.length === 4 &&
+        t.ti === 8 && t.hi === 6 && t.strengthLimited === false && t.strength && t.strength.safeLayers === 23 && Math.abs(t.strength.loadKg - 30) < 1e-9 &&
+        P2.casesPerPallet(P2.PROFILES.ecommerce) === 48 && P2.casesPerPallet(P2.PROFILES.automotive) === 25;
+      return { ok: ok, detail: "BCT " + Math.round(b) + " N, allowable " + Math.round(s.allowableKg) + " kg, safe layers " + s.layers + ", pinwheel " + pin.count + ", ecommerce 8 x " + t.hi + " within " + (t.strength ? t.strength.safeLayers : "?") };
+    });
     // ---- v3.37: two runs on the same floor differ by mix in id and in flow (the viewer compares them).
     check("run-ledger-two-runs-same-floor-different-mix-differ-in-id-and-flow", function () {
       var Lg = WT.ledger, F = WT.flowsim, EX2 = WT.examples, P2 = WT.pack;

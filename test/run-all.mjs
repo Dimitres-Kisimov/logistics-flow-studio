@@ -712,6 +712,7 @@ const HARNESSES = [
   { name: "What a handling unit costs: spans x the recorded rates, hand-checked, SQL == JS (verify_cost_ledger.js)", args: ["verify_cost_ledger.js"] },
   { name: "The flow as recorded: ledger links + layered conserving Sankey, SQL == JS (verify_ledger_flow.js)", args: ["verify_ledger_flow.js"] },
   { name: "Compare two runs: paired tables, deltas B - A, hand pair + recorded pair, SQL == JS (verify_run_compare.js)", args: ["verify_run_compare.js"] },
+  { name: "Stacking strength (McKee), the four-block pinwheel and your case, hand values (verify_stacking.js)", args: ["verify_stacking.js"] },
   { name: "Timed route playback", args: ["verify_route_playback.js"] },
   { name: "Scheduled resource playback", args: ["verify_resource_playback.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },

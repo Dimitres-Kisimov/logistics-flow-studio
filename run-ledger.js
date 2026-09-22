@@ -17,7 +17,8 @@
  * invariants (must be zero) · the SQL behind each table · (v3.35) what a
  * handling unit costs, from the spans between its events and the rates the
  * run was recorded under (WT.ledger.costs; ledger.js is loaded on the page) ·
- * (v3.37) compare two runs key by key, deltas B - A (RunLedger.compare).
+ * (v3.37) compare two runs key by key, deltas B - A (RunLedger.compare) ·
+ * (v3.38) the stack-strength verdict and 'Your case' (RunLedger.yourCase).
  *
  * Pure model (RunLedger.views / ribbon / trace) + DOM rendering. No Date,
  * no Math.random, no network beyond loading the local example file.
@@ -254,6 +255,28 @@
     };
   }
   RunLedger.compare = compare;
+  /* ---------------- your case (v3.38) ------------------------------- */
+  // A case of your own on every standard pallet (and a custom one): pattern,
+  // layers under the height / load / strength limits, the strength verdict.
+  // Pure; the page's form calls it on every change.
+  function yourCase(inp) {
+    const P = window.WT && window.WT.pack;
+    if (!P) return null;
+    const n = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
+    const box = { id: "custom", label: "your case " + n(inp.l, 0) + " × " + n(inp.w, 0) + " × " + n(inp.h, 0), l: n(inp.l, 0), w: n(inp.w, 0), h: n(inp.h, 0) };
+    if (!(box.l > 0 && box.w > 0 && box.h > 0)) return { error: "case length, width and height must be positive" };
+    const board = n(inp.ect, 0) > 0 && n(inp.caliper, 0) > 0 ? { ectKNm: n(inp.ect, 0), caliperMm: n(inp.caliper, 0) } : null;
+    const factors = { humidity: inp.humidity, duration: inp.duration, overhang: inp.overhang, pattern: inp.pattern };
+    const stack = { palletsOnTop: Math.max(0, Math.floor(n(inp.palletsOnTop, 0))) };
+    const pallets = { eur: P.PALLETS.eur, ind: P.PALLETS.ind, half: P.PALLETS.half };
+    if (n(inp.palletL, 0) > 0 && n(inp.palletW, 0) > 0) {
+      pallets.custom = { id: "custom", label: "your pallet " + n(inp.palletL, 0) + " × " + n(inp.palletW, 0), l: n(inp.palletL, 0), w: n(inp.palletW, 0), h: 144, tareKg: 25, maxLoadKg: n(inp.palletLoad, 1500) > 0 ? n(inp.palletLoad, 1500) : 1500, standard: "your pallet", trailerSlots: 0 };
+    }
+    const rows = Object.keys(pallets).map((id) => Object.assign({ pallet: id, label: pallets[id].label }, P.tiHi(pallets[id], box, n(inp.stackMm, 1800), n(inp.kg, 0), board, factors, stack)));
+    rows.sort((a, b) => b.cases - a.cases || b.cubeUtil - a.cubeUtil || (a.pallet < b.pallet ? -1 : a.pallet > b.pallet ? 1 : 0));
+    return { box: box, board: board, factors: P.stackFactor(factors), stack: stack, rows: rows, best: rows[0] || null, pallets: pallets };
+  }
+  RunLedger.yourCase = yourCase;
   RunLedger.whatIf = whatIf;
   RunLedger.TRAILER_SLOTS = TRAILER_SLOTS;
   RunLedger.SQL = SQL;
@@ -307,7 +330,8 @@
     const opt = P.optimizeProfile(P.PROFILES[prof.id]);
     if (opt.fixed) { out.innerHTML = "<p class=\"note\">This profile ships in cages with a declared capacity; there is no pattern to optimise.</p>"; return; }
     const rows = opt.ranked.map((r) => ({ pallet: r.label, per_layer: r.ti + " (" + r.pattern + (r.rotated ? ", rotated" : "") + ")", layers: r.hi, cases: r.cases,
-      eaches: r.cases * prof.eaches_per_case, gross_kg: r.grossKg, cube: Math.round(r.cubeUtil * 100) + "%", limit: r.weightLimited ? "weight" : "height" }));
+      eaches: r.cases * prof.eaches_per_case, gross_kg: r.grossKg, cube: Math.round(r.cubeUtil * 100) + "%", limit: r.strengthLimited ? "strength" : r.weightLimited ? "weight" : "height",
+      bottom_case_kg: r.strength ? r.strength.loadKg + " of " + r.strength.allowableKg : "—" }));
     const w = whatIf(exp, opt);
     const box = P.BOXES[prof.box];
     const drawings = '<div class="pallet-row">' + layerSvg(P, P.PALLETS[opt.current.pallet], box, opt.current.layer, "now: " + opt.current.label + " · " + opt.current.ti + " per layer") +
@@ -317,8 +341,8 @@
       "<article><span>With the best pattern</span><strong>" + w.best.pallets + " × " + esc(w.best.pallet) + " · " + w.best.trailers + " trailer" + (w.best.trailers === 1 ? "" : "s") + (w.same ? " (no change)" : "") + "</strong></article></div>" : "";
     const verdict = opt.gain ? (opt.gain.samePallet ? "<p><b>The profile already uses the best pattern</b> (" + opt.best.cases + " cases per pallet).</p>"
       : "<p><b>" + esc(opt.best.label) + "</b> holds <b>" + opt.best.cases + "</b> cases against " + opt.current.cases + " on the profile's " + esc(opt.current.label) + " (" + (opt.gain.pct > 0 ? "+" : "") + opt.gain.pct + " %).</p>") : "";
-    out.innerHTML = verdict + table(rows, ["pallet", "per_layer", "layers", "cases", "eaches", "gross_kg", "cube", "limit"], "Candidates for " + esc(box.label) + " at " + prof.max_stack_mm + " mm stack height") + drawings + cards +
-      "<p class=\"note\">Grid = one orientation; bands = strips of mixed orientation. Height limit from the profile, load limit from the pallet's safe working load. " + esc(P.HONESTY) + "</p>";
+    out.innerHTML = verdict + table(rows, ["pallet", "per_layer", "layers", "cases", "eaches", "gross_kg", "cube", "limit", "bottom_case_kg"], "Candidates for " + esc(box.label) + " at " + prof.max_stack_mm + " mm stack height") + drawings + cards +
+      "<p class=\"note\">Grid = one orientation; bands = strips of mixed orientation; pinwheel = four blocks around the edges. Height limit from the profile, load limit from the pallet's safe working load, strength limit from the board (bottom case load of its allowable, at the default factors). " + esc(P.HONESTY) + "</p>";
   }
   function renderPackaging(exp) {
     const P = window.WT && window.WT.pack;
@@ -327,7 +351,8 @@
     if (!prof || !P) { out.innerHTML = "<p class=\"note\">No packaging profile in this file.</p>"; return; }
     const pallet = P.PALLETS[prof.pallet], box = P.BOXES[prof.box];
     if (!pallet || !box) { out.innerHTML = "<p class=\"note\">Unknown pallet or box id.</p>"; return; }
-    const t = P.tiHi(pallet, box, prof.max_stack_mm, prof.case_kg);
+    const board = prof.board !== undefined ? prof.board : (P.PROFILES[prof.id] ? P.PROFILES[prof.id].board : null);
+    const t = P.tiHi(pallet, box, prof.max_stack_mm, prof.case_kg, board);
     const fixed = t.fixed;
     const cases = fixed ? (exp.hus[0] && exp.hus[0].cases_per_pallet) || 0 : t.cases;
     const slots = TRAILER_SLOTS[prof.pallet] || 33;
@@ -348,7 +373,49 @@
       "<article><span>Pallet → trailer</span><strong>" + esc(slots) + " per 13.6 m trailer</strong></article></div>" +
       '<div class="pallet-row">' + plan + elev + "</div>" +
       "<p class=\"note\">" + esc(pallet.label) + " (" + esc(pallet.standard) + "), safe working load " + esc(pallet.maxLoadKg) + " kg. " +
-      (fixed ? "" : "Cube utilisation " + Math.round(t.cubeUtil * 100) + "%. ") + esc(P.HONESTY) + "</p>";
+      (fixed ? "" : "Cube utilisation " + Math.round(t.cubeUtil * 100) + "%. ") + esc(P.HONESTY) + "</p>" +
+      (fixed ? "" : strengthText(t, board));
+  }
+  // v3.38 the stack-strength verdict, with its arithmetic shown
+  function strengthText(t, board) {
+    if (!board || !(board.ectKNm > 0) || !t.strength) return "<p class=\"note\"><b>Stack strength:</b> not evaluated - " + esc((board && board.note) || "no board values for this case") + ".</p>";
+    const s = t.strength, p = s.parts;
+    return "<p><b>Stack strength</b> (simplified McKee on synthetic board values" + (board.note ? ": " + esc(board.note) : "") + "): ECT " + esc(board.ectKNm) + " kN/m × caliper " + esc(board.caliperMm) + " mm × perimeter " + esc(s.perimeterMm) + " mm → BCT ≈ " + Math.round(s.bctN) + " N (" + Math.round(s.bctKgf) + " kgf) per case" + (s.inRange ? "" : " - outside the formula's published range (height ≥ perimeter / 7, footprint ratio ≤ 3 : 1)") +
+      ". After the factors humidity " + p.humidity + " × time under load " + p.duration + " × overhang " + p.overhang + " × pattern " + p.pattern + " = " + s.factor + ", the allowable load on a bottom case is " + s.allowableKg + " kg" + (s.palletsOnTop ? " with " + s.palletsOnTop + " pallet" + (s.palletsOnTop > 1 ? "s" : "") + " stacked on top" : "") + "; this pattern puts " + s.loadKg + " kg on it (" + Math.round((s.utilisation || 0) * 100) + " %) - " +
+      (t.strengthLimited ? "<b>the board, not the height, limits the stack to " + t.hi + " layers</b>." : "within the " + s.safeLayers + " layers the board allows.") + "</p>";
+  }
+  // v3.38 your case: a form over RunLedger.yourCase
+  function renderYourCase(exp) {
+    const P = window.WT && window.WT.pack;
+    const out = $("rlYourCase");
+    if (!P) { out.innerHTML = "<p class=\"note\">pack.js is not loaded.</p>"; return; }
+    const prof = exp.profile && P.PROFILES[exp.profile.id] ? P.PROFILES[exp.profile.id] : P.PROFILES.ecommerce;
+    const box = P.BOXES[prof.box] || P.BOXES["case-400x300x250"];
+    const board = prof.board && prof.board.ectKNm > 0 ? prof.board : { ectKNm: 5, caliperMm: 4 };
+    const F = P.STACK_FACTORS;
+    const sel = (k) => '<label>' + esc(F[k].label) + '<select data-yc="' + k + '">' + Object.keys(F[k].options).map((o) => '<option value="' + o + '"' + (o === F[k].default ? " selected" : "") + ">" + esc(F[k].options[o].label) + " × " + F[k].options[o].value + "</option>").join("") + "</select></label>";
+    const num = (k, label, v, step) => '<label>' + esc(label) + '<input data-yc="' + k + '" type="number" step="' + (step || 1) + '" min="0" value="' + esc(v) + '"></label>';
+    out.innerHTML = '<div class="yc-form">' + num("l", "case length (mm)", box.l) + num("w", "case width (mm)", box.w) + num("h", "case height (mm)", box.h) + num("kg", "case weight (kg)", prof.caseKg, 0.1) +
+      num("ect", "board ECT (kN/m; 0 = no strength check)", board.ectKNm, 0.1) + num("caliper", "board caliper (mm)", board.caliperMm, 0.1) + num("stackMm", "stack height limit (mm)", prof.maxStackMm, 10) + num("palletsOnTop", "pallets stacked on top", 0) +
+      num("palletL", "custom pallet length (mm, 0 = none)", 0, 10) + num("palletW", "custom pallet width (mm)", 0, 10) + num("palletLoad", "custom pallet load limit (kg)", 1500, 10) +
+      sel("humidity") + sel("duration") + sel("overhang") + sel("pattern") + '</div><div id="rlYourCaseOut"></div>';
+    const draw = () => {
+      const inp = {};
+      out.querySelectorAll("[data-yc]").forEach((el) => { inp[el.getAttribute("data-yc")] = el.value; });
+      const r = yourCase(inp);
+      const o = $("rlYourCaseOut");
+      if (!r || r.error) { o.innerHTML = "<p class=\"note\">" + esc(r ? r.error : "no result") + "</p>"; return; }
+      const rows = r.rows.map((x) => ({ pallet: x.label, per_layer: x.ti + " (" + x.pattern + (x.rotated ? ", rotated" : "") + ")", layers: x.hi, cases: x.cases, gross_kg: x.grossKg, cube: Math.round(x.cubeUtil * 100) + "%",
+        limit: x.strengthLimited ? "strength" : x.weightLimited ? "weight" : "height", bottom_case_kg: x.strength ? x.strength.loadKg + " of " + x.strength.allowableKg : "—", safe_layers: x.strength ? x.strength.safeLayers : "—" }));
+      const b = r.best;
+      const drawing = b && b.layer && b.ti > 0 ? '<div class="pallet-row">' + layerSvg(P, r.pallets[b.pallet], r.box, b.layer, b.label + " · " + b.ti + " per layer (" + b.pattern + ")") + "</div>" : "";
+      o.innerHTML = table(rows, ["pallet", "per_layer", "layers", "cases", "gross_kg", "cube", "limit", "bottom_case_kg", "safe_layers"], "Your case " + r.box.l + " × " + r.box.w + " × " + r.box.h + " mm, " + inp.kg + " kg, on every pallet") + drawing +
+        (b ? strengthText(b, r.board ? Object.assign({ note: "your board values" }, r.board) : null) : "") +
+        "<p class=\"note\">Factors in force: " + Object.keys(r.factors.parts).map((k) => k + " " + r.factors.parts[k]).join(" × ") + " = " + Math.round(r.factors.factor * 10000) / 10000 + ". " + esc(P.HONESTY) + "</p>";
+    };
+    out.addEventListener("input", draw);
+    out.addEventListener("change", draw);
+    draw();
   }
 
   function renderRibbon(exp) {
@@ -535,7 +602,7 @@
     EXP = exp;
     $("rlStatus").textContent = "Loaded " + exp.hus.length + " units and " + exp.events.length + " events from " + exp.run.id + ".";
     $("rlView").hidden = false;
-    renderRun(exp); renderPackaging(exp); renderOptimise(exp); renderRibbon(exp); renderFlow(exp); renderViews(exp); renderCost(exp); renderCompare(); renderTrace(exp);
+    renderRun(exp); renderPackaging(exp); renderOptimise(exp); renderYourCase(exp); renderRibbon(exp); renderFlow(exp); renderViews(exp); renderCost(exp); renderCompare(); renderTrace(exp);
   }
 
   $("rlFile").addEventListener("change", (ev) => {

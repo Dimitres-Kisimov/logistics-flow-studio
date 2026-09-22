@@ -41,7 +41,12 @@
   "eaches_per_case": 12,
   "case_kg": 6,
   "max_stack_mm": 1800,
-  "eaches_per_parcel": 6
+  "eaches_per_parcel": 6,
+  "board": {
+   "ectKNm": 5,
+   "caliperMm": 4,
+   "note": "single-wall C flute (synthetic)"
+  }
  },
  "locations": [
   {

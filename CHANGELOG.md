@@ -1,5 +1,47 @@
 # Changelog
 
+## v3.38 — Stacking strength, the pinwheel and your case
+
+**Stacking strength.** `pack.js` `bct(ect, caliper, perimeter)` - the simplified McKee
+formula, 5.874 x ECT x sqrt(caliper x perimeter), newtons with ECT in kN/m and lengths
+in mm, `inRange` false outside the published range (height >= perimeter / 7, footprint
+ratio <= 3 : 1); `STACK_FACTORS` with the published derating options (90 days under
+load 0.6, a year 0.5; 85 % RH 0.6, 90 % RH 0.5; 25 mm overhang 0.68; column in
+practice 0.85, interlocked 0.5) and `stackFactor`; `stackLoadKg` (the cases above the
+bottom case plus each pallet on top with its tare share); `safeLayers`. `tiHi(pallet,
+box, maxStackMm, caseKg, board, factors, stack)` reduces the layers until the bottom
+case stays within its allowable load and reports `strengthLimited` and a `strength`
+block (BCT, allowable, load, utilisation, safe layers). Every profile declares a
+synthetic `board` or an honest `evaluated: false` note; `casesPerPallet` does not pass
+the board, so every simulated quantity is unchanged - and at the default factors no
+profile is strength-limited anyway (asserted). The fixed-capacity cage now reports
+`stackMm: 0` (a v3.34 gap).
+
+**The pinwheel.** `fourBlock(L, W, bl, bw)` - Steudel's four-block layout: cases with
+their long side along each edge, pinwheel-fashion, the hole filled with the best grid /
+band layer, thicknesses enumerated, deterministic tie-break, overlap-free by
+construction. `bestLayer` uses it only when it packs strictly more than both the grid
+and the bands; on the ten profiles x the standard pallets it never does (the harness
+prints where it would). Hand case: 1000 x 1000 with 600 x 400 -> 4 against bands 3.
+`layerRects` draws it.
+
+**Viewer.** The packaging section states the strength verdict with its arithmetic (or
+'not evaluated' with the reason); the optimisation table shows the bottom-case load of
+its allowable per candidate and 'strength' as a limit; the new *Your case* section
+(`RunLedger.yourCase`) ranks a case of your own on every pallet, draws the best layer
+and states the verdict. The export's profile block carries the board.
+
+**Docs.** `docs/PACKAGING_OPTIMISATION.md` §2 gains the sources (Steudel 1979; McKee,
+Gander & Wachuta 1963 with the validity range; the derating guidance), §3.6 the
+pinwheel, §3.7 stacking strength with the worked arithmetic, §4 rewritten.
+
+**Verification.** `verify_stacking.js` (31 checks, every number written out by hand:
+2,197.85 N; 36 and 81.125 kg; 0.6 and 0.085; 134.47 kg, 23 and 11 layers; the pinwheel
+4 / 3 / 2 with overlap-free rectangles; no profile changed and none strength-limited
+at the defaults, the grocery tray at 90 % RH for a year; the 40 kg / ECT 3 carton
+limited to 3 layers; your case; wiring). Self-test +1.
+70 harnesses, 87 Python tests, WT-SELFTEST 178/178. Cache wt-v120.
+
 ## v3.37 — Compare two runs
 
 **Paired tables.** `RunLedger.compare(A, B)`: the viewer's tables for two exports paired

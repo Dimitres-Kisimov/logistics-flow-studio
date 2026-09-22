@@ -1,6 +1,6 @@
 # The run ledger — schema, identities, SQL views
 
-*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.37.*
+*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.38.*
 
 ## 1. One stream, three consumers
 
@@ -32,7 +32,8 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 {
   "schema": "factory-run-ledger/v1",
   "run":       { id, scenario, seed, hash, mix, profile, ticks_per_hour, minutes_per_tick, ticks, honesty },
-  "profile":   { id, label, box, pallet, eaches_per_case, case_kg, max_stack_mm, eaches_per_parcel },
+  "profile":   { id, label, box, pallet, eaches_per_case, case_kg, max_stack_mm, eaches_per_parcel,
+                 board: { ectKNm, caliperMm, note } | { evaluated: false, note } },   // board: v3.38, synthetic
   "locations": [ { id, type, category, service_ticks } ],   // the floor's equipment; service_ticks = 1 / the station's service rate (v3.35), null off a station
   "hus":       [ { id, order_id, seq, archetype, outcome, route_id, sscc, gtin13, gtin14, pallet, box,
                    eaches_per_case, cases_per_pallet, received_eaches, spawned_tick, retired_tick,
