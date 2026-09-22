@@ -172,7 +172,7 @@
     // v3.35: the service time a station charges per unit (1 / its service rate)
     const serviceTicks = {};
     for (const s of (plan && plan.stations) || []) {
-      if (s.elementId != null && s.serviceRatePerTick > 0) serviceTicks[String(s.elementId)] = Math.round((1 / s.serviceRatePerTick) * 10000) / 10000;
+      if (s.elementId != null && s.serviceRatePerTick > 0) serviceTicks[String(s.elementId)] = 1 / s.serviceRatePerTick; // v3.43: unrounded (at the floor rate 1 / 0.02 is exactly 50)
     }
     return {
       kind: "wt-run-ledger",
@@ -232,7 +232,7 @@
       hu_id: hu.id, version: version, kind: kind, op: op,
       anchor: anchorFor(op),
       location: locationFor(rec.plan, route, mu, op, stationEl),
-      tick: state.tick, minute: Math.round(state.tick * rec.run.minutes_per_tick * 1000) / 1000,
+      tick: state.tick, minute: state.tick * rec.run.minutes_per_tick, // v3.43: unrounded (an integer at 60 ticks per hour)
       stage: (mu && mu.stage) || (route.steps && route.steps.length ? null : null),
       form: G && typeof G.formAlong === "function" && !route.legacy ? G.formAlong(route, op, !!before) : (q.form || null),
       pallets: q.pallets, cases: q.cases, eaches: q.eaches, parcels: q.parcels, retained: q.retained, scrapped: q.scrapped,
@@ -356,6 +356,13 @@
   // Every function here reads an EXPORT (the JSON), so the viewer, the fixture
   // script and the harnesses share one definition with the SQL views.
   const r4 = (v) => Math.round(v * 10000) / 10000;
+  // v3.43: compensated (Neumaier) summation for every total, so the JavaScript
+  // aggregates and SQLite's SUM() (Kahan-Babuska-Neumaier since 3.43.0) agree to
+  // the last representable digit instead of drifting with the summation order.
+  const acc = () => ({ s: 0, c: 0 });
+  function add(a, x) { const t = a.s + x; a.c += Math.abs(a.s) >= Math.abs(x) ? (a.s - t) + x : (x - t) + a.s; a.s = t; }
+  const val = (a) => a.s + a.c;
+  function nsum(xs) { const a = acc(); for (const x of xs) add(a, x); return val(a); }
   function spans(exp) {
     const byHu = {};
     for (const e of exp.events) (byHu[e.hu_id] = byHu[e.hu_id] || []).push(e);
@@ -403,41 +410,41 @@
     const huMap = {}, huOrder = [];
     for (const s of sp) {
       let h = huMap[s.hu_id];
-      if (!h) { h = huMap[s.hu_id] = { hu_id: s.hu_id, ticks: 0, waiting_ticks: 0, moving_ticks: 0, charged_ticks: 0, hr: 0, l: 0, q: 0, n: 0, g: 0 }; huOrder.push(s.hu_id); }
+      if (!h) { h = huMap[s.hu_id] = { hu_id: s.hu_id, ticks: 0, waiting_ticks: 0, moving_ticks: 0, charged_ticks: 0, hr: acc(), l: acc(), q: acc(), n: acc(), g: acc() }; huOrder.push(s.hu_id); }
       h.ticks += s.ticks; if (s.state === "waiting") h.waiting_ticks += s.ticks; else h.moving_ticks += s.ticks;
-      h.charged_ticks += s.charged_ticks; h.hr += s.hours; h.l += s.labour_eur; h.q += s.equipment_eur; h.n += s.energy_eur; h.g += s.holding_eur;
+      h.charged_ticks += s.charged_ticks; add(h.hr, s.hours); add(h.l, s.labour_eur); add(h.q, s.equipment_eur); add(h.n, s.energy_eur); add(h.g, s.holding_eur);
     }
     const byHu = huOrder.map((id) => { const h = huMap[id];
-      return { hu_id: id, ticks: h.ticks, waiting_ticks: h.waiting_ticks, moving_ticks: h.moving_ticks, charged_ticks: h.charged_ticks, hours: r4(h.hr),
-        labour_eur: r4(h.l), equipment_eur: r4(h.q), energy_eur: r4(h.n), holding_eur: r4(h.g), total_eur: r4(h.l + h.q + h.n + h.g) }; });
+      return { hu_id: id, ticks: h.ticks, waiting_ticks: h.waiting_ticks, moving_ticks: h.moving_ticks, charged_ticks: h.charged_ticks, hours: r4(val(h.hr)),
+        labour_eur: r4(val(h.l)), equipment_eur: r4(val(h.q)), energy_eur: r4(val(h.n)), holding_eur: r4(val(h.g)), total_eur: r4(val(h.l) + val(h.q) + val(h.n) + val(h.g)) }; });
     const types = {};
     for (const h of exp.hus) {
-      const t = types[h.archetype] || (types[h.archetype] = { archetype: h.archetype, units: 0, retired: 0, eaches_in: 0, eaches_out: 0, hr: 0, l: 0, q: 0, n: 0, g: 0 });
+      const t = types[h.archetype] || (types[h.archetype] = { archetype: h.archetype, units: 0, retired: 0, eaches_in: 0, eaches_out: 0, hr: acc(), l: acc(), q: acc(), n: acc(), g: acc() });
       t.units++;
       if (h.retired_tick != null) t.retired++;
       t.eaches_in += h.received_eaches || 0;
       if (h.final_kind === "delivered" && h.final) t.eaches_out += h.final.eaches;
       const c = huMap[h.id];
-      if (c) { t.hr += c.hr; t.l += c.l; t.q += c.q; t.n += c.n; t.g += c.g; }
+      if (c) { add(t.hr, val(c.hr)); add(t.l, val(c.l)); add(t.q, val(c.q)); add(t.n, val(c.n)); add(t.g, val(c.g)); }
     }
-    const byType = Object.keys(types).sort().map((k) => { const t = types[k], tot = t.l + t.q + t.n + t.g;
-      return { archetype: k, units: t.units, retired: t.retired, eaches_in: t.eaches_in, eaches_out: t.eaches_out, hours: r4(t.hr),
-        labour_eur: r4(t.l), equipment_eur: r4(t.q), energy_eur: r4(t.n), holding_eur: r4(t.g),
+    const byType = Object.keys(types).sort().map((k) => { const t = types[k], tot = val(t.l) + val(t.q) + val(t.n) + val(t.g);
+      return { archetype: k, units: t.units, retired: t.retired, eaches_in: t.eaches_in, eaches_out: t.eaches_out, hours: r4(val(t.hr)),
+        labour_eur: r4(val(t.l)), equipment_eur: r4(val(t.q)), energy_eur: r4(val(t.n)), holding_eur: r4(val(t.g)),
         total_eur: r4(tot), eur_per_unit: r4(tot / t.units), eur_per_received_each: t.eaches_in ? r4(tot / t.eaches_in) : null, eur_per_each: t.eaches_out ? r4(tot / t.eaches_out) : null }; });
     const locAgg = {};
-    const tr = { location: "transport", class: (rates.transport && rates.transport.class) || null, spans: 0, ticks: 0, charged_ticks: 0, hr: 0, l: 0, q: 0, n: 0, g: 0 };
+    const tr = { location: "transport", class: (rates.transport && rates.transport.class) || null, spans: 0, ticks: 0, charged_ticks: 0, hr: acc(), l: acc(), q: acc(), n: acc(), g: acc() };
     for (const s of sp) {
-      const a = s.state === "waiting" ? (locAgg[s.location] || (locAgg[s.location] = { location: s.location, class: s.class, spans: 0, ticks: 0, charged_ticks: 0, hr: 0, l: 0, q: 0, n: 0, g: 0 })) : tr;
-      a.spans++; a.ticks += s.ticks; a.charged_ticks += s.charged_ticks; a.hr += s.hours; a.l += s.labour_eur; a.q += s.equipment_eur; a.n += s.energy_eur; a.g += s.holding_eur;
+      const a = s.state === "waiting" ? (locAgg[s.location] || (locAgg[s.location] = { location: s.location, class: s.class, spans: 0, ticks: 0, charged_ticks: 0, hr: acc(), l: acc(), q: acc(), n: acc(), g: acc() })) : tr;
+      a.spans++; a.ticks += s.ticks; a.charged_ticks += s.charged_ticks; add(a.hr, s.hours); add(a.l, s.labour_eur); add(a.q, s.equipment_eur); add(a.n, s.energy_eur); add(a.g, s.holding_eur);
     }
-    const row = (a) => ({ location: a.location, class: a.class, spans: a.spans, ticks: a.ticks, charged_ticks: a.charged_ticks, hours: r4(a.hr),
-      labour_eur: r4(a.l), equipment_eur: r4(a.q), energy_eur: r4(a.n), holding_eur: r4(a.g), total_eur: r4(a.l + a.q + a.n + a.g) });
+    const row = (a) => ({ location: a.location, class: a.class, spans: a.spans, ticks: a.ticks, charged_ticks: a.charged_ticks, hours: r4(val(a.hr)),
+      labour_eur: r4(val(a.l)), equipment_eur: r4(val(a.q)), energy_eur: r4(val(a.n)), holding_eur: r4(val(a.g)), total_eur: r4(val(a.l) + val(a.q) + val(a.n) + val(a.g)) });
     const byLocation = Object.keys(locAgg).sort().map((k) => row(locAgg[k]));
     if (tr.spans) byLocation.push(row(tr));
-    let L = 0, Q = 0, N = 0, G = 0;
-    for (const s of sp) { L += s.labour_eur; Q += s.equipment_eur; N += s.energy_eur; G += s.holding_eur; }
+    const L = acc(), Q = acc(), N = acc(), G = acc();
+    for (const s of sp) { add(L, s.labour_eur); add(Q, s.equipment_eur); add(N, s.energy_eur); add(G, s.holding_eur); }
     return { rates: rates, spans: sp, byHu: byHu, byType: byType, byLocation: byLocation,
-      total: { labour_eur: r4(L), equipment_eur: r4(Q), energy_eur: r4(N), holding_eur: r4(G), total_eur: r4(L + Q + N + G) } };
+      total: { labour_eur: r4(val(L)), equipment_eur: r4(val(Q)), energy_eur: r4(val(N)), holding_eur: r4(val(G)), total_eur: r4(val(L) + val(Q) + val(N) + val(G)) } };
   }
   // The same aggregates the SQL views compute (tools/run_ledger.py) - kept
   // here so the readout and the database can be proved to agree.
@@ -522,7 +529,7 @@
 
   WT.ledger = { SCHEMA, HONESTY, TERMINAL, create, observe, exportJson, stats, minutesPerTick, locationFor,
     // v3.35 what a handling unit costs
-    RATES_HONESTY, CLASS_LABOUR, TRANSPORT_ORDER, classOfType, ratesBlock, spans, costs,
+    RATES_HONESTY, CLASS_LABOUR, TRANSPORT_ORDER, classOfType, ratesBlock, spans, costs, nsum,
     // v3.36 the flow as recorded
     FLOW_HONESTY, flowLinks, sankeyFromLedger };
 })();

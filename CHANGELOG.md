@@ -1,5 +1,31 @@
 # Changelog
 
+## v3.43 — A realistic recording, at full precision
+
+**Fixture C.** The recorded examples served at the simulator's floor rate (50 ticks per
+unit) because the fixture script never loaded `wms.js`, so no floor declared capacities.
+Fixture C is the library floor `ecommerce-multichannel-fc` recorded with `wms.js` loaded
+(seed 6, 180 ticks, the scenario's declared mix, the AGV floor's `amr` transport class):
+193 units, 1,175 events, 35 delivered, eight stations at 1.82 (staging), 0.83 (pick faces)
+and 1.28 (pack stations) ticks per unit — the stage sums equal the wms capacities — and no
+floor-rate flag on the glance. `?example=c` and a button load it; `sw.js` precaches it; A
+and B are byte-identical (built before the scenario modules load). `tools/ledger_env.mjs`
+is the one headless loader; the fixture script gained `reconcile <dir>`.
+
+**Precision.** `ledger.js` records `service_ticks` and `minute` unrounded (A and B
+unchanged: 1 / 0.02 is exactly 50 and a minute is a tick at 60 per hour) and sums every
+cost total with compensated (Neumaier) arithmetic; SQLite's `SUM()` has been compensated
+since 3.43.0. `python tools/run_ledger.py reconcile <export> --js <rows>` measures SQLite
+against the JavaScript rows of 13 views column by column: 5.6e-17 on A and B, 1.1e-13 on
+C, over 111 columns. Tolerances tightened from 5e-4 to one step in the fourth decimal
+(1e-4) where both sides are compensated; CI reconciles every fixture on every push.
+
+**Verification.** +1 harness (`verify_precision.js`, 24 checks), +4 Python (unrounded
+round trip, the reconcile tool by hand, every fixture reconciled through node, fixture C at
+declared capacities), viewer self-test +3 (example C: no floor-rate flag; the compare names
+the different scenario). 72 harnesses, 106 Python tests, WT-SELFTEST 178/178 + viewer
+26/26. Cache wt-v123.
+
 ## v3.42 — One gate, in CI too
 
 **The gate.** `python tools/gate.py` runs every check a release must pass — the headless

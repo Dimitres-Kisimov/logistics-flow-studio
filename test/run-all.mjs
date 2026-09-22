@@ -714,6 +714,7 @@ const HARNESSES = [
   { name: "Compare two runs: paired tables, deltas B - A, hand pair + recorded pair, SQL == JS (verify_run_compare.js)", args: ["verify_run_compare.js"] },
   { name: "Stacking strength (McKee), the four-block pinwheel and your case, hand values (verify_stacking.js)", args: ["verify_stacking.js"] },
   { name: "The one gate: tools/gate.py, CI's browser job, README line 9 (verify_gate.js)", args: ["verify_gate.js"] },
+  { name: "A realistic recording at full precision: A/B byte-identical under compensated sums, fixture C at declared capacities, reconcile wiring (verify_precision.js)", args: ["verify_precision.js"] },
   { name: "Timed route playback", args: ["verify_route_playback.js"] },
   { name: "Scheduled resource playback", args: ["verify_resource_playback.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },

@@ -537,6 +537,72 @@ def report(db: sqlite3.Connection, run_id: str, runs: tuple[str, str] | None = N
     return "\n".join(lines)
 
 
+# ----------------------------------------------------------------------------- reconcile (v3.43)
+# The JavaScript side (tools/make_run_ledger_fixture.mjs reconcile) writes the rows of every
+# view it can also compute; this measures how far SQLite's rows are from them, column by
+# column. Both sides sum with compensated (Neumaier) arithmetic since v3.43, so the rounded
+# aggregates agree to at most one step in the fourth decimal (tolerance 1e-4) and the raw
+# per-span values to 1e-9. Missing rows fail; a column only one side has is listed, not failed.
+RECONCILE_KEYS = {
+    "v_run_summary": (), "v_cycle_time_by_type": ("archetype",), "v_touches_by_type": ("archetype",),
+    "v_station_wait": ("location", "op"), "v_wip_by_tick": ("tick",), "v_quantities_by_op": ("op", "kind"),
+    "v_dispatch": (), "v_flow_links": ("from_op", "to_op"), "v_spans": ("hu_id", "version"), "v_span_cost": ("hu_id", "version"),
+    "v_cost_by_hu": ("hu_id",), "v_cost_by_type": ("archetype",), "v_cost_by_location": ("location",),
+}
+RAW_VIEWS = ("v_spans", "v_span_cost")
+
+
+def reconcile(db: sqlite3.Connection, run_id: str, js: dict, tolerance: float = 1e-4, tolerance_raw: float = 1e-9) -> tuple[bool, list[dict]]:
+    """SQL rows of every view against the JavaScript rows -> (ok, [{view, column, rows, max_abs_delta, tolerance, ok, note}])."""
+    out: list[dict] = []
+    ok = True
+    for view, keys in RECONCILE_KEYS.items():
+        js_rows = (js.get("views") or {}).get(view)
+        if js_rows is None:
+            continue
+        sql_rows = rows(db, f"SELECT * FROM {view} WHERE run_id = ?", (run_id,))
+        tol = tolerance_raw if view in RAW_VIEWS else tolerance
+        if keys:
+            def key(r, cols=keys):
+                return tuple(r.get(c) for c in cols)
+            sm = {key(r): r for r in sql_rows}
+            jm = {key(r): r for r in js_rows}
+            missing = sorted(set(sm) ^ set(jm), key=str)
+            pairs = [(sm[k], jm[k]) for k in sm if k in jm]
+        else:
+            missing = [] if len(sql_rows) == len(js_rows) else [("rows", len(sql_rows), len(js_rows))]
+            pairs = list(zip(sql_rows, js_rows))
+        if missing:
+            ok = False
+            out.append({"view": view, "column": "<rows>", "rows": len(pairs), "max_abs_delta": None, "tolerance": tol, "ok": False,
+                        "note": f"{len(missing)} key(s) on one side only: {missing[:3]}"})
+        if not pairs:
+            out.append({"view": view, "column": "<rows>", "rows": 0, "max_abs_delta": 0.0, "tolerance": tol, "ok": not missing, "note": "no rows on either side" if not missing else ""})
+            continue
+        shared = [c for c in sql_rows[0] if c in js_rows[0] and c != "run_id"]
+        only_sql = [c for c in sql_rows[0] if c not in js_rows[0] and c != "run_id"]
+        only_js = [c for c in js_rows[0] if c not in sql_rows[0]]
+        for c in shared:
+            mx = 0.0
+            mismatch = None
+            for s, j in pairs:
+                a, b = s.get(c), j.get(c)
+                if a is None and b is None:
+                    continue
+                if isinstance(a, (int, float)) and isinstance(b, (int, float)) and not isinstance(a, bool) and not isinstance(b, bool):
+                    mx = max(mx, abs(float(a) - float(b)))
+                elif a != b:
+                    mismatch = (a, b)
+            col_ok = mismatch is None and mx <= tol
+            ok = ok and col_ok
+            out.append({"view": view, "column": c, "rows": len(pairs), "max_abs_delta": mx, "tolerance": tol, "ok": col_ok,
+                        "note": "" if mismatch is None else f"value mismatch {mismatch}"})
+        if only_sql or only_js:
+            out.append({"view": view, "column": "<columns>", "rows": len(pairs), "max_abs_delta": None, "tolerance": tol, "ok": True,
+                        "note": (f"only in SQL: {only_sql}; " if only_sql else "") + (f"only in JavaScript: {only_js}" if only_js else "")})
+    return ok, out
+
+
 def query(db: sqlite3.Connection, sql: str, limit: int = 500) -> list[dict]:
     """Bounded, read-only ad-hoc SQL: one SELECT / WITH statement, at most `limit` rows."""
     text = sql.strip().rstrip(";").strip()
@@ -564,14 +630,36 @@ def render(table: list[dict]) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=("import", "views", "summary", "query", "compare", "report"))
-    ap.add_argument("arg", nargs="?", help="export JSON path (import) or SQL text (query)")
-    ap.add_argument("--database", required=True)
+    ap.add_argument("command", choices=("import", "views", "summary", "query", "compare", "report", "reconcile"))
+    ap.add_argument("arg", nargs="?", help="export JSON path (import, reconcile) or SQL text (query)")
+    ap.add_argument("--database", help="the SQLite file (every command but reconcile, which uses memory)")
+    ap.add_argument("--js", help="reconcile: the JavaScript rows written by `node tools/make_run_ledger_fixture.mjs reconcile <dir>`")
+    ap.add_argument("--tolerance", type=float, default=1e-4, help="reconcile: the largest |SQL - JavaScript| allowed on a rounded column (default 1e-4)")
+    ap.add_argument("--tolerance-raw", type=float, default=1e-9, help="reconcile: the same for the unrounded span views (default 1e-9)")
     ap.add_argument("--run", help="run id (defaults to the only / latest imported run)")
     ap.add_argument("--out", help="write the summary / compare JSON or the report Markdown here")
     ap.add_argument("--runs", nargs=2, metavar=("RUN_A", "RUN_B"), help="compare: the two run ids (deltas are B - A)")
     ap.add_argument("--all", action="store_true", help="views: also print the detail views (WIP by tick, spans, span cost, cost by unit)")
     a = ap.parse_args(argv)
+    if a.command == "reconcile":
+        if not a.arg or not a.js:
+            ap.error("reconcile needs the export JSON path and --js <rows.json>")
+        db = connect(":memory:")
+        initialize(db)
+        rid = import_ledger(db, json.loads(Path(a.arg).read_text(encoding="utf-8")))
+        js = json.loads(Path(a.js).read_text(encoding="utf-8"))
+        if js.get("run") and js["run"] != rid:
+            print(f"the JavaScript rows are for {js['run']}, the export is {rid}", file=sys.stderr)
+            return 1
+        ok, table = reconcile(db, rid, js, a.tolerance, a.tolerance_raw)
+        print(f"sqlite {sqlite3.sqlite_version} - {rid}")
+        print(render([{k: (f"{v:.3e}" if isinstance(v, float) and k == "max_abs_delta" else v) for k, v in r.items()} for r in table]))
+        worst = max((r["max_abs_delta"] for r in table if r["max_abs_delta"] is not None), default=0.0)
+        cols = sum(1 for r in table if not r["column"].startswith("<"))
+        print(f"RECONCILE: {'OK' if ok else 'FAIL'} - {cols} columns over {len({r['view'] for r in table})} views, largest |SQL - JavaScript| {worst:.3e}")
+        return 0 if ok else 1
+    if not a.database:
+        ap.error("--database is required")
     db = connect(a.database)
     initialize(db)
     if a.command == "import":

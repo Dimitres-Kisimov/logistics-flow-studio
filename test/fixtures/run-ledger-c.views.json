@@ -1,0 +1,296 @@
+{
+ "costByType": [
+  {
+   "archetype": "case-pick",
+   "units": 29,
+   "retired": 0,
+   "eaches_in": 16704,
+   "eaches_out": 0,
+   "hours": 31.1701,
+   "labour_eur": 25.7867,
+   "equipment_eur": 42.8262,
+   "energy_eur": 18.2699,
+   "holding_eur": 0,
+   "total_eur": 86.8828,
+   "eur_per_unit": 2.996,
+   "eur_per_received_each": 0.0052,
+   "eur_per_each": null
+  },
+  {
+   "archetype": "piece-pick",
+   "units": 116,
+   "retired": 22,
+   "eaches_in": 66816,
+   "eaches_out": 139,
+   "hours": 117.3733,
+   "labour_eur": 200.3146,
+   "equipment_eur": 157.2054,
+   "energy_eur": 67.1337,
+   "holding_eur": 0,
+   "total_eur": 424.6537,
+   "eur_per_unit": 3.6608,
+   "eur_per_received_each": 0.0064,
+   "eur_per_each": 3.0551
+  },
+  {
+   "archetype": "returns",
+   "units": 29,
+   "retired": 24,
+   "eaches_in": 170,
+   "eaches_out": 0,
+   "hours": 11.7833,
+   "labour_eur": 0,
+   "equipment_eur": 16.5703,
+   "energy_eur": 7.07,
+   "holding_eur": 0,
+   "total_eur": 23.6403,
+   "eur_per_unit": 0.8152,
+   "eur_per_received_each": 0.1391,
+   "eur_per_each": null
+  },
+  {
+   "archetype": "vas",
+   "units": 19,
+   "retired": 13,
+   "eaches_in": 120,
+   "eaches_out": 85,
+   "hours": 14.1191,
+   "labour_eur": 11.1702,
+   "equipment_eur": 19.4541,
+   "energy_eur": 8.3374,
+   "holding_eur": 0,
+   "total_eur": 38.9618,
+   "eur_per_unit": 2.0506,
+   "eur_per_received_each": 0.3247,
+   "eur_per_each": 0.4584
+  }
+ ],
+ "costByLocation": [
+  {
+   "location": "gen-10",
+   "class": "workstation",
+   "spans": 2,
+   "ticks": 2,
+   "charged_ticks": 2.5531914893617023,
+   "hours": 0.0426,
+   "labour_eur": 1.4894,
+   "equipment_eur": 0.0064,
+   "energy_eur": 0.0077,
+   "holding_eur": 0,
+   "total_eur": 1.5034
+  },
+  {
+   "location": "gen-17",
+   "class": "racking",
+   "spans": 5,
+   "ticks": 5,
+   "charged_ticks": 4.125860509283773,
+   "hours": 0.0688,
+   "labour_eur": 2.4068,
+   "equipment_eur": 0.0092,
+   "energy_eur": 0.0031,
+   "holding_eur": 0,
+   "total_eur": 2.419
+  },
+  {
+   "location": "gen-3",
+   "class": null,
+   "spans": 81,
+   "ticks": 1035,
+   "charged_ticks": 147.72036474164122,
+   "hours": 2.462,
+   "labour_eur": 86.1702,
+   "equipment_eur": 0,
+   "energy_eur": 0,
+   "holding_eur": 0,
+   "total_eur": 86.1702
+  },
+  {
+   "location": "gen-4",
+   "class": null,
+   "spans": 78,
+   "ticks": 956,
+   "charged_ticks": 142.24924012158047,
+   "hours": 2.3708,
+   "labour_eur": 82.9787,
+   "equipment_eur": 0,
+   "energy_eur": 0,
+   "holding_eur": 0,
+   "total_eur": 82.9787
+  },
+  {
+   "location": "gen-7",
+   "class": "racking",
+   "spans": 70,
+   "ticks": 70,
+   "charged_ticks": 57.76204712997292,
+   "hours": 0.9627,
+   "labour_eur": 33.6945,
+   "equipment_eur": 0.1284,
+   "energy_eur": 0.0433,
+   "holding_eur": 0,
+   "total_eur": 33.8662
+  },
+  {
+   "location": "gen-9",
+   "class": "workstation",
+   "spans": 41,
+   "ticks": 41,
+   "charged_ticks": 52.34042553191494,
+   "hours": 0.8723,
+   "labour_eur": 30.5319,
+   "equipment_eur": 0.1309,
+   "energy_eur": 0.157,
+   "holding_eur": 0,
+   "total_eur": 30.8198
+  },
+  {
+   "location": "transport",
+   "class": "amr",
+   "spans": 705,
+   "ticks": 10060,
+   "charged_ticks": 10060,
+   "hours": 167.6667,
+   "labour_eur": 0,
+   "equipment_eur": 235.7813,
+   "energy_eur": 100.6,
+   "holding_eur": 0,
+   "total_eur": 336.3813
+  }
+ ],
+ "costTotal": {
+  "labour_eur": 237.2715,
+  "equipment_eur": 236.056,
+  "energy_eur": 100.8111,
+  "holding_eur": 0,
+  "total_eur": 574.1386
+ },
+ "flowLinks": [
+  {
+   "from_op": "case-pick",
+   "to_op": "consolidate",
+   "units": 11,
+   "retired_units": 0,
+   "eaches": 660
+  },
+  {
+   "from_op": "consolidate",
+   "to_op": "pack",
+   "units": 28,
+   "retired_units": 22,
+   "eaches": 180
+  },
+  {
+   "from_op": "consolidate",
+   "to_op": "palletise",
+   "units": 4,
+   "retired_units": 0,
+   "eaches": 264
+  },
+  {
+   "from_op": "depalletise",
+   "to_op": "putaway",
+   "units": 95,
+   "retired_units": 22,
+   "eaches": 54720
+  },
+  {
+   "from_op": "inspect",
+   "to_op": "restock",
+   "units": 18,
+   "retired_units": 17,
+   "eaches": 99
+  },
+  {
+   "from_op": "inspect",
+   "to_op": "scrap",
+   "units": 7,
+   "retired_units": 7,
+   "eaches": 45
+  },
+  {
+   "from_op": "pack",
+   "to_op": "load",
+   "units": 38,
+   "retired_units": 35,
+   "eaches": 252
+  },
+  {
+   "from_op": "palletise",
+   "to_op": "wrap",
+   "units": 4,
+   "retired_units": 0,
+   "eaches": 264
+  },
+  {
+   "from_op": "pick",
+   "to_op": "vas",
+   "units": 18,
+   "retired_units": 13,
+   "eaches": 116
+  },
+  {
+   "from_op": "piece-pick",
+   "to_op": "consolidate",
+   "units": 45,
+   "retired_units": 22,
+   "eaches": 287
+  },
+  {
+   "from_op": "putaway",
+   "to_op": "case-pick",
+   "units": 16,
+   "retired_units": 0,
+   "eaches": 9216
+  },
+  {
+   "from_op": "putaway",
+   "to_op": "replen",
+   "units": 64,
+   "retired_units": 22,
+   "eaches": 36864
+  },
+  {
+   "from_op": "qc-sample",
+   "to_op": "depalletise",
+   "units": 25,
+   "retired_units": 0,
+   "eaches": 14400
+  },
+  {
+   "from_op": "receive",
+   "to_op": "depalletise",
+   "units": 110,
+   "retired_units": 22,
+   "eaches": 63360
+  },
+  {
+   "from_op": "receive",
+   "to_op": "inspect",
+   "units": 29,
+   "retired_units": 24,
+   "eaches": 170
+  },
+  {
+   "from_op": "receive",
+   "to_op": "qc-sample",
+   "units": 26,
+   "retired_units": 0,
+   "eaches": 14976
+  },
+  {
+   "from_op": "replen",
+   "to_op": "piece-pick",
+   "units": 59,
+   "retired_units": 22,
+   "eaches": 33984
+  },
+  {
+   "from_op": "vas",
+   "to_op": "pack",
+   "units": 15,
+   "retired_units": 13,
+   "eaches": 104
+  }
+ ]
+}

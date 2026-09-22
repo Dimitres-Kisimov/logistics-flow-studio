@@ -33,7 +33,8 @@
   const TERMINAL = { delivered: 1, restocked: 1, scrapped: 1 };
   // 1 / flowsim.js PARAMS.minStationServicePerTick (0.02): the service time a
   // station gets when its floor declares no capacity. ledger.js records
-  // round(1 / rate, 4), so a station at the floor rate carries exactly 50.
+  // 1 / rate unrounded (v3.43), so a station at the floor rate carries exactly
+  // 50 and a station with a declared capacity carries its true service time.
   const FLOOR_SERVICE_TICKS = 50;
   const r2 = (v) => Math.round(v * 100) / 100;
   const r4 = (v) => Math.round(v * 10000) / 10000;
@@ -825,14 +826,18 @@
     const go = () => fetch("test/fixtures/run-ledger-b.json").then((r) => r.json()).then(loadB).catch((e) => { $("rlStatus").textContent = "Could not load example B: " + e.message; });
     if (EXP) go(); else fetch("test/fixtures/run-ledger.json").then((r) => r.json()).then((a) => { load(a); go(); }).catch((e) => { $("rlStatus").textContent = "Could not load the example: " + e.message; });
   });
-  // handed over from the planner (Simulate -> Live material flow -> Open in the run-ledger viewer); else ?example=a|b
+  $("rlDemoC").addEventListener("click", () => {
+    fetch("test/fixtures/run-ledger-c.json").then((r) => r.json()).then(load).catch((e) => { $("rlStatus").textContent = "Could not load example C: " + e.message; });
+  });
+  // handed over from the planner (Simulate -> Live material flow -> Open in the run-ledger viewer); else ?example=a|b|c
   let handed = null;
   try {
     handed = localStorage.getItem("wt-run-ledger");
     if (handed) { load(JSON.parse(handed)); localStorage.removeItem("wt-run-ledger"); }
   } catch (_) { /* no storage */ }
-  const q = /[?&]example=(a|b)(?:&|$)/.exec(window.location.search);
-  if (!handed && q) $(q[1] === "b" ? "rlDemoB" : "rlDemo").click();
+  const q = /[?&]example=(a|b|c|d)(?:&|$)/.exec(window.location.search);
+  const EXAMPLE_BUTTON = { a: "rlDemo", b: "rlDemoB", c: "rlDemoC", d: "rlDemoD" }; // d arrives with v3.44; an unknown letter does nothing
+  if (!handed && q && $(EXAMPLE_BUTTON[q[1]])) $(EXAMPLE_BUTTON[q[1]]).click();
   RunLedger.load = load;
   RunLedger.loadB = loadB;
   RunLedger.current = () => EXP;

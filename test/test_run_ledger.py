@@ -13,8 +13,11 @@ Two layers of proof:
      units, rates linear, empty without rates, and SQL == JavaScript on the fixture.
 """
 import json
+import shutil
 import sqlite3
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -24,6 +27,10 @@ import export_viewer_sql as XV  # noqa: E402
 import run_ledger as RL  # noqa: E402
 
 FIX = ROOT / "test" / "fixtures"
+# v3.43: SQLite sums with Kahan-Babuska-Neumaier since 3.43.0 (a corner case fixed in the
+# releases after it) and ledger.js sums compensated too, so two totals rounded to 4 dp
+# differ by at most one step; an older SQLite keeps the old order-dependent tolerance.
+TOL = 1e-4 + 1e-12 if sqlite3.sqlite_version_info >= (3, 44) else 5e-4
 
 
 def hand_ledger(run="RUN-hand-s1-h00000000", shift=0):
@@ -192,19 +199,19 @@ class HandLedger(unittest.TestCase):
         self.assertEqual((a["ticks"], a["waiting_ticks"], a["moving_ticks"], a["charged_ticks"]), (30, 4, 26, 28))
         for row, want in ((a, (16.3333, 0.4784, 0.3915, 17.2032)), (b, (8.75, 0.2734, 0.225, 9.2484)), (c, (2.3333, 0.0729, 0.06, 2.4663))):
             for key, val in zip(("labour_eur", "equipment_eur", "energy_eur", "total_eur"), want):
-                self.assertAlmostEqual(row[key], val, delta=5e-4, msg=f"{row['hu_id']} {key}")
+                self.assertAlmostEqual(row[key], val, delta=TOL, msg=f"{row['hu_id']} {key}")
         ty = {r["archetype"]: r for r in self.view("v_cost_by_type")}
         self.assertEqual((ty["case-pick"]["units"], ty["case-pick"]["eaches_out"]), (1, 48))
-        self.assertAlmostEqual(ty["case-pick"]["eur_per_each"], 0.3584, delta=5e-4)
-        self.assertAlmostEqual(ty["cross-dock"]["eur_per_each"], 0.0161, delta=5e-4)
+        self.assertAlmostEqual(ty["case-pick"]["eur_per_each"], 0.3584, delta=TOL)
+        self.assertAlmostEqual(ty["cross-dock"]["eur_per_each"], 0.0161, delta=TOL)
         self.assertIsNone(ty["returns"]["eur_per_each"])
-        self.assertAlmostEqual(ty["returns"]["total_eur"], 2.4663, delta=5e-4)
+        self.assertAlmostEqual(ty["returns"]["total_eur"], 2.4663, delta=TOL)
         loc = {r["location"]: r for r in self.view("v_cost_by_location")}
         self.assertEqual(set(loc), {"face", "transport"})
         self.assertEqual((loc["face"]["class"], loc["face"]["spans"], loc["face"]["ticks"], loc["face"]["charged_ticks"]), ("racking", 1, 4, 2))
-        self.assertAlmostEqual(loc["face"]["total_eur"], 1.1726, delta=5e-4)
+        self.assertAlmostEqual(loc["face"]["total_eur"], 1.1726, delta=TOL)
         self.assertEqual((loc["transport"]["class"], loc["transport"]["spans"], loc["transport"]["ticks"]), ("forklift", 7, 45))
-        self.assertAlmostEqual(loc["transport"]["total_eur"], 27.7453, delta=5e-4)
+        self.assertAlmostEqual(loc["transport"]["total_eur"], 27.7453, delta=TOL)
         by_type = sum(r["total_eur"] for r in ty.values())
         by_loc = sum(r["total_eur"] for r in loc.values())
         self.assertAlmostEqual(by_type, 28.9179, delta=2e-3)
@@ -213,13 +220,13 @@ class HandLedger(unittest.TestCase):
     def test_cost_rates_are_linear(self):
         self.db.execute("UPDATE rate SET labour_per_hour = 70 WHERE run_id = ?", (self.run,))
         ty = {r["archetype"]: r for r in self.view("v_cost_by_type")}
-        self.assertAlmostEqual(ty["case-pick"]["labour_eur"], 32.6667, delta=5e-4)
-        self.assertAlmostEqual(ty["case-pick"]["equipment_eur"], 0.4784, delta=5e-4)
-        self.assertAlmostEqual(ty["cross-dock"]["labour_eur"], 17.5, delta=5e-4)
+        self.assertAlmostEqual(ty["case-pick"]["labour_eur"], 32.6667, delta=TOL)
+        self.assertAlmostEqual(ty["case-pick"]["equipment_eur"], 0.4784, delta=TOL)
+        self.assertAlmostEqual(ty["cross-dock"]["labour_eur"], 17.5, delta=TOL)
         self.db.execute("UPDATE rate SET labour_per_hour = 35, hours_per_year = 8000 WHERE run_id = ?", (self.run,))
         ty = {r["archetype"]: r for r in self.view("v_cost_by_type")}
-        self.assertAlmostEqual(ty["case-pick"]["equipment_eur"], 0.4784 / 2, delta=5e-4)
-        self.assertAlmostEqual(ty["case-pick"]["labour_eur"], 16.3333, delta=5e-4)
+        self.assertAlmostEqual(ty["case-pick"]["equipment_eur"], 0.4784 / 2, delta=TOL)
+        self.assertAlmostEqual(ty["case-pick"]["labour_eur"], 16.3333, delta=TOL)
 
     # ---- v3.40 holding cost, cost per received each, hours -----------------------
     # With 1 EUR per unit-hour waiting, A's 4 waiting ticks cost 4/60 = 0.0667 more;
@@ -227,24 +234,24 @@ class HandLedger(unittest.TestCase):
     def test_holding_cost_by_hand(self):
         self.db.execute("UPDATE rate SET holding_per_unit_hour = 1 WHERE run_id = ?", (self.run,))
         hu = {r["hu_id"][-8:]: r for r in self.view("v_cost_by_hu")}
-        self.assertAlmostEqual(hu["000001-1"]["holding_eur"], 0.0667, delta=5e-4)
-        self.assertAlmostEqual(hu["000001-1"]["total_eur"], 17.2699, delta=5e-4)
-        self.assertAlmostEqual(hu["000001-1"]["hours"], 0.4667, delta=5e-4)
+        self.assertAlmostEqual(hu["000001-1"]["holding_eur"], 0.0667, delta=TOL)
+        self.assertAlmostEqual(hu["000001-1"]["total_eur"], 17.2699, delta=TOL)
+        self.assertAlmostEqual(hu["000001-1"]["hours"], 0.4667, delta=TOL)
         self.assertEqual((hu["000002-1"]["holding_eur"], hu["000003-1"]["holding_eur"]), (0, 0))
-        self.assertAlmostEqual(hu["000002-1"]["hours"], 0.25, delta=5e-4)
+        self.assertAlmostEqual(hu["000002-1"]["hours"], 0.25, delta=TOL)
         loc = {r["location"]: r for r in self.view("v_cost_by_location")}
-        self.assertAlmostEqual(loc["face"]["holding_eur"], 0.0667, delta=5e-4)
-        self.assertAlmostEqual(loc["face"]["total_eur"], 1.2393, delta=5e-4)
+        self.assertAlmostEqual(loc["face"]["holding_eur"], 0.0667, delta=TOL)
+        self.assertAlmostEqual(loc["face"]["total_eur"], 1.2393, delta=TOL)
         self.assertEqual(loc["transport"]["holding_eur"], 0)
         ty = {r["archetype"]: r for r in self.view("v_cost_by_type")}
         self.assertEqual((ty["case-pick"]["eaches_in"], ty["cross-dock"]["eaches_in"], ty["returns"]["eaches_in"]), (576, 576, 3))
-        self.assertAlmostEqual(ty["case-pick"]["holding_eur"], 0.0667, delta=5e-4)
-        self.assertAlmostEqual(ty["case-pick"]["eur_per_received_each"], 0.03, delta=5e-4)  # 17.2699 / 576
-        self.assertAlmostEqual(ty["returns"]["eur_per_received_each"], 0.8221, delta=5e-4)  # 2.4663 / 3
+        self.assertAlmostEqual(ty["case-pick"]["holding_eur"], 0.0667, delta=TOL)
+        self.assertAlmostEqual(ty["case-pick"]["eur_per_received_each"], 0.03, delta=TOL)  # 17.2699 / 576
+        self.assertAlmostEqual(ty["returns"]["eur_per_received_each"], 0.8221, delta=TOL)  # 2.4663 / 3
         self.assertIsNone(ty["returns"]["eur_per_each"])
         self.db.execute("UPDATE rate SET holding_per_unit_hour = 2 WHERE run_id = ?", (self.run,))
         ty2 = {r["archetype"]: r for r in self.view("v_cost_by_type")}
-        self.assertAlmostEqual(ty2["case-pick"]["holding_eur"], 0.1333, delta=5e-4)
+        self.assertAlmostEqual(ty2["case-pick"]["holding_eur"], 0.1333, delta=TOL)
         self.assertAlmostEqual(ty2["case-pick"]["labour_eur"], ty["case-pick"]["labour_eur"], delta=1e-9)
 
     def test_old_database_gains_the_holding_column_and_the_current_views(self):
@@ -314,9 +321,9 @@ CREATE VIEW v_span_cost AS SELECT 1 AS stale;
         d = c["v_compare_dispatch"][0]
         self.assertEqual((d["pallets_a"], d["pallets_b"], d["delta_pallets"], d["delta_trailers"]), (2, 2, 0, 0))
         cost = {r["archetype"]: r for r in c["v_compare_cost"]}
-        self.assertAlmostEqual(cost["case-pick"]["delta_total_eur"], 6.1656, delta=5e-4)  # 10 more forklift ticks = 1/6 h x (35 + 1.09375 + 0.9)
-        self.assertAlmostEqual(cost["cross-dock"]["delta_total_eur"], 6.1656, delta=5e-4)
-        self.assertAlmostEqual(cost["returns"]["delta_total_eur"], 0.0, delta=5e-4)
+        self.assertAlmostEqual(cost["case-pick"]["delta_total_eur"], 6.1656, delta=TOL)  # 10 more forklift ticks = 1/6 h x (35 + 1.09375 + 0.9)
+        self.assertAlmostEqual(cost["cross-dock"]["delta_total_eur"], 6.1656, delta=TOL)
+        self.assertAlmostEqual(cost["returns"]["delta_total_eur"], 0.0, delta=TOL)
         s = c["v_compare_summary"][0]
         self.assertEqual((s["delta_units"], s["delta_events"], s["delta_delivered"], s["delta_delivered_eaches"]), (0, 0, 0, 0))
         w = {(r["location"], r["op"]): r for r in c["v_compare_wait"]}
@@ -324,7 +331,7 @@ CREATE VIEW v_span_cost AS SELECT 1 AS stale;
         # the reverse pair negates every delta
         r = RL.compare(self.db, run_b, self.run)
         self.assertEqual({x["archetype"]: x["delta_avg_cycle_ticks"] for x in r["v_compare_cycle"]}["case-pick"], -10.0)
-        self.assertAlmostEqual({x["archetype"]: x["delta_total_eur"] for x in r["v_compare_cost"]}["case-pick"], -6.1656, delta=5e-4)
+        self.assertAlmostEqual({x["archetype"]: x["delta_total_eur"] for x in r["v_compare_cost"]}["case-pick"], -6.1656, delta=TOL)
 
     def test_compare_keeps_a_key_seen_in_one_run_only(self):
         b = hand_ledger("RUN-hand-s3-h00000002")
@@ -472,11 +479,11 @@ class RecordedFixture(unittest.TestCase):
             got = by_type[want["archetype"]]
             self.assertEqual((got["units"], got["retired"], got["eaches_in"], got["eaches_out"]), (want["units"], want["retired"], want["eaches_in"], want["eaches_out"]), want["archetype"])
             for key in ("hours", "labour_eur", "equipment_eur", "energy_eur", "holding_eur", "total_eur", "eur_per_unit", "eur_per_received_each"):
-                self.assertAlmostEqual(got[key], want[key], delta=5e-4, msg=f"{want['archetype']} {key}")
+                self.assertAlmostEqual(got[key], want[key], delta=TOL, msg=f"{want['archetype']} {key}")
             if want["eur_per_each"] is None:
                 self.assertIsNone(got["eur_per_each"], want["archetype"])
             else:
-                self.assertAlmostEqual(got["eur_per_each"], want["eur_per_each"], delta=5e-4, msg=want["archetype"])
+                self.assertAlmostEqual(got["eur_per_each"], want["eur_per_each"], delta=TOL, msg=want["archetype"])
         by_loc = {r["location"]: r for r in s["v_cost_by_location"]}
         self.assertEqual(set(by_loc), {r["location"] for r in js["costByLocation"]})
         for want in js["costByLocation"]:
@@ -484,9 +491,46 @@ class RecordedFixture(unittest.TestCase):
             self.assertEqual((got["class"], got["spans"], got["ticks"]), (want["class"], want["spans"], want["ticks"]), want["location"])
             self.assertAlmostEqual(got["charged_ticks"], want["charged_ticks"], delta=1e-6)
             for key in ("hours", "labour_eur", "equipment_eur", "energy_eur", "holding_eur", "total_eur"):
-                self.assertAlmostEqual(got[key], want[key], delta=5e-4, msg=f"{want['location']} {key}")
-        self.assertAlmostEqual(sum(r["total_eur"] for r in s["v_cost_by_type"]), js["costTotal"]["total_eur"], delta=1e-2)
+                self.assertAlmostEqual(got[key], want[key], delta=TOL, msg=f"{want['location']} {key}")
+        # seven per-type totals rounded to 4 dp against one rounded grand total: at most 8 x 5e-5
+        self.assertAlmostEqual(sum(r["total_eur"] for r in s["v_cost_by_type"]), js["costTotal"]["total_eur"], delta=5e-4)
         self.assertGreater(js["costTotal"]["total_eur"], 0)
+
+    def test_service_ticks_round_trip_unrounded(self):
+        """v3.43: a declared-capacity station's service time is stored as recorded, not rounded."""
+        data = hand_ledger("RUN-hand-s1-h0000000c")
+        data["locations"] = [dict(id="face", type="carton-flow", category="storage", service_ticks=1.8237082066869301)]
+        db = fresh()
+        rid = RL.import_ledger(db, data)
+        got = RL.rows(db, "SELECT service_ticks FROM location WHERE run_id = ? AND id = 'face'", (rid,))[0]["service_ticks"]
+        self.assertEqual(got, 1.8237082066869301)
+        charged = RL.rows(db, "SELECT charged_ticks FROM v_span_cost WHERE run_id = ? AND state = 'waiting' AND location = 'face'", (rid,))
+        self.assertTrue(charged and all(r["charged_ticks"] == 1.8237082066869301 for r in charged))
+
+    def test_reconcile_measures_sql_against_javascript_rows(self):
+        """v3.43: the reconcile tool passes on identical rows and fails on a 2e-4 nudge or a missing key."""
+        db = fresh()
+        rid = RL.import_ledger(db, hand_ledger())
+        views = {v: RL.rows(db, f"SELECT * FROM {v} WHERE run_id = ?", (rid,)) for v in RL.RECONCILE_KEYS}
+        for v in views.values():
+            for r in v:
+                r.pop("run_id", None)
+        ok, table = RL.reconcile(db, rid, {"run": rid, "views": views})
+        self.assertTrue(ok, [r for r in table if not r["ok"]])
+        self.assertEqual({r["view"] for r in table}, set(RL.RECONCILE_KEYS))
+        self.assertTrue(all(r["max_abs_delta"] == 0.0 for r in table if r["max_abs_delta"] is not None))
+        nudged = json.loads(json.dumps(views))
+        nudged["v_cost_by_type"][0]["eur_per_each"] = (nudged["v_cost_by_type"][0]["eur_per_each"] or 0) + 2e-4
+        ok, table = RL.reconcile(db, rid, {"views": nudged})
+        self.assertFalse(ok)
+        bad = [r for r in table if not r["ok"]]
+        self.assertEqual([(r["view"], r["column"]) for r in bad], [("v_cost_by_type", "eur_per_each")])
+        self.assertAlmostEqual(bad[0]["max_abs_delta"], 2e-4, delta=1e-9)
+        short = json.loads(json.dumps(views))
+        short["v_cost_by_hu"].pop()
+        ok, table = RL.reconcile(db, rid, {"views": short})
+        self.assertFalse(ok)
+        self.assertIn(("v_cost_by_hu", "<rows>"), [(r["view"], r["column"]) for r in table if not r["ok"]])
 
     def test_sql_flow_links_equal_javascript(self):
         js = json.loads((FIX / "run-ledger.views.json").read_text(encoding="utf-8"))["flowLinks"]
@@ -495,6 +539,34 @@ class RecordedFixture(unittest.TestCase):
         self.assertEqual(sql, js)
         self.assertGreater(len(sql), 10)
         HandLedger.assert_flow_identity(self)
+
+    @unittest.skipUnless(shutil.which("node") and (FIX / "run-ledger-c.json").exists(), "node or fixture C missing")
+    def test_reconcile_every_recorded_fixture_against_javascript(self):
+        """v3.43: the JavaScript rows of every view (node) against SQLite's, for A, B and C."""
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run([shutil.which("node"), str(ROOT / "tools" / "make_run_ledger_fixture.mjs"), "reconcile", tmp], cwd=str(ROOT), check=True, capture_output=True)
+            for base in ("run-ledger", "run-ledger-b", "run-ledger-c"):
+                db = fresh()
+                rid = RL.import_ledger(db, json.loads((FIX / f"{base}.json").read_text(encoding="utf-8")))
+                js = json.loads((Path(tmp) / f"{base}.reconcile.json").read_text(encoding="utf-8"))
+                self.assertEqual(js["run"], rid)
+                ok, table = RL.reconcile(db, rid, js, tolerance=TOL, tolerance_raw=1e-9)
+                self.assertTrue(ok, (base, [r for r in table if not r["ok"]]))
+                self.assertGreaterEqual(sum(1 for r in table if not r["column"].startswith("<")), 60, base)
+
+    @unittest.skipUnless((FIX / "run-ledger-c.json").exists(), "fixture C not generated")
+    def test_fixture_c_serves_at_declared_capacities(self):
+        """v3.43: the library floor's eight stations carry service times from wms capacities, none at the floor rate."""
+        data = json.loads((FIX / "run-ledger-c.json").read_text(encoding="utf-8"))
+        db = fresh()
+        rid = RL.import_ledger(db, data)
+        self.assertTrue(rid.startswith("RUN-ecommerce-multichannel-fc-s6-h"))
+        st = RL.rows(db, "SELECT id, service_ticks FROM location WHERE run_id = ? AND service_ticks IS NOT NULL ORDER BY id", (rid,))
+        self.assertEqual(len(st), 8)
+        self.assertTrue(all(0.5 < r["service_ticks"] < 3 for r in st), st)
+        self.assertEqual(RL.summary(db, rid)["invariants"], {n: 0 for n in RL.INVARIANT_VIEWS})
+        self.assertEqual(data["rates"]["transport"]["class"], "amr")
+        self.assertEqual(RL.rows(db, "SELECT COUNT(*) AS n FROM hu WHERE run_id = ?", (rid,))[0]["n"], len(data["hus"]))
 
     @unittest.skipUnless((FIX / "run-ledger-b.json").exists(), "fixture B not generated")
     def test_compare_the_two_recorded_runs(self):
@@ -516,7 +588,7 @@ class RecordedFixture(unittest.TestCase):
         jb = json.loads((FIX / "run-ledger-b.views.json").read_text(encoding="utf-8"))
         cost_b = {r["archetype"]: r for r in sb["v_cost_by_type"]}
         for t in jb["costByType"]:
-            self.assertAlmostEqual(cost_b[t["archetype"]]["total_eur"], t["total_eur"], delta=5e-4, msg=t["archetype"])
+            self.assertAlmostEqual(cost_b[t["archetype"]]["total_eur"], t["total_eur"], delta=TOL, msg=t["archetype"])
         links_b = [{k: r[k] for k in ("from_op", "to_op", "units", "retired_units", "eaches")} for r in
                    RL.rows(self.db, "SELECT * FROM v_flow_links WHERE run_id = ? ORDER BY from_op, to_op", (run_b,))]
         self.assertEqual(links_b, jb["flowLinks"])

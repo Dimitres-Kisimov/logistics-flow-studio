@@ -53,6 +53,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
       - name: Install tooling (ruff, matplotlib)
         run: python -m pip install --quiet ruff matplotlib
 
@@ -62,16 +66,24 @@ jobs:
       - name: Run SQL, routing and resource-planning tests
         run: python -m unittest discover -s test -p 'test_*.py' -v
 
-      - name: Import the recorded fixtures and write a Markdown report (tools/run_ledger.py report)
+      - name: Import the recorded fixtures, write a Markdown report, reconcile SQLite against the JavaScript rows (tools/run_ledger.py)
         run: |
           set -e
           db="$RUNNER_TEMP/run.sqlite"
           python tools/run_ledger.py import test/fixtures/run-ledger.json --database "$db"
           python tools/run_ledger.py import test/fixtures/run-ledger-b.json --database "$db"
+          python tools/run_ledger.py import test/fixtures/run-ledger-c.json --database "$db"
           python tools/run_ledger.py report --database "$db" --runs RUN-hand-built-s31-hc28a7688 RUN-hand-built-s31-hd35e45d4 --out "$RUNNER_TEMP/report.md"
           grep -q '^Invariant violations: 0' "$RUNNER_TEMP/report.md"
           grep -q '^### v_compare_cost' "$RUNNER_TEMP/report.md"
           python tools/export_viewer_sql.py --check
+          # v3.43: the JavaScript rows of 13 views (node) against SQLite's, column by column;
+          # both sides sum compensated, so the rounded aggregates may differ by one step at most
+          python -c "import sqlite3; print('sqlite', sqlite3.sqlite_version)"
+          node tools/make_run_ledger_fixture.mjs reconcile "$RUNNER_TEMP/rec"
+          for f in run-ledger run-ledger-b run-ledger-c; do
+            python tools/run_ledger.py reconcile "test/fixtures/$f.json" --js "$RUNNER_TEMP/rec/$f.reconcile.json"
+          done
 
       - name: Build the one-pager PDF and check its size
         run: |

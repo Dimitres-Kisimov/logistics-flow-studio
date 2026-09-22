@@ -6,7 +6,9 @@
  * `rl:loaded` signal, and checks what a reader would check: every section
  * rendered, no error text, every SQL block complete, the flow drawn, the
  * cost cards, print and CSV controls, the memo, "Your case" reacting to
- * input, the compare section after B. Same contract as selftest.js:
+ * input, the compare section after B, then example C (v3.43: a library floor
+ * whose stations serve at declared capacities - no floor-rate flag, and the
+ * compare against B names the different scenario). Same contract as selftest.js:
  * console `WT-SELFTEST: PASS n/n`, a #wt-selftest element with
  * data-pass / data-total / data-ok (+ data-page="run-ledger"), and
  * window.__WT_SELFTEST_RESULT__. No eval, no inline script, no network
@@ -94,6 +96,20 @@
         for (var i = 0; i < els.length; i++) seen[els[i].getAttribute("data-view")] = 1;
         var miss = Object.keys(window.RunLedgerSQL).filter(function (k) { return !seen[k]; });
         return { ok: miss.length === 0, detail: miss.length ? "missing " + miss.join(",") : "23/23" };
+      });
+      check("no-errors-after-b", function () { var e = window.__WT_ERRORS__ || []; return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" }; });
+      return clickAndWait("rlDemoC", "a");
+    }).then(function (d) {
+      var exp = R.current(), g = R.glance(exp);
+      check("example-c-declared-capacities-no-floor-flag", function () {
+        var unrounded = (exp.locations || []).some(function (l) { return l.service_ticks != null && l.service_ticks !== Math.round(l.service_ticks * 1e4) / 1e4; });
+        var floor = g.flags.some(function (f) { return f.kind === "floor-rate"; });
+        return { ok: exp.run.id === d.run && exp.run.scenario === "ecommerce-multichannel-fc" && g.stations === 8 && g.atFloor === 0 && !floor && unrounded && !BAD_TEXT.test($("rlGlance").textContent),
+          detail: d.run + " · " + g.stations + " stations, " + g.atFloor + " at the floor rate, flags " + g.flags.map(function (f) { return f.kind; }).join(",") };
+      });
+      check("compare-after-c-names-the-different-scenario", function () {
+        var c = R.compare(exp, R.currentB());
+        return { ok: !!c && c.same_scenario === false && /different scenario or profile/.test($("rlCompare").textContent) && $("rlCompare").querySelectorAll("table").length === 6, detail: "same_scenario " + String(c && c.same_scenario) };
       });
       check("no-errors-after-drive", function () { var e = window.__WT_ERRORS__ || []; return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" }; });
     });

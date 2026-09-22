@@ -1,6 +1,6 @@
 # The run ledger — schema, identities, SQL views
 
-*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.41.*
+*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.43.*
 
 ## 1. One stream, three consumers
 
@@ -34,7 +34,7 @@ Ids never encode a fact that can change: archetype, outcome and location are att
   "run":       { id, scenario, seed, hash, mix, profile, ticks_per_hour, minutes_per_tick, ticks, honesty },
   "profile":   { id, label, box, pallet, eaches_per_case, case_kg, max_stack_mm, eaches_per_parcel,
                  board: { ectKNm, caliperMm, note } | { evaluated: false, note } },   // board: v3.38, synthetic
-  "locations": [ { id, type, category, service_ticks } ],   // the floor's equipment; service_ticks = 1 / the station's service rate (v3.35), null off a station
+  "locations": [ { id, type, category, service_ticks } ],   // the floor's equipment; service_ticks = 1 / the station's service rate (v3.35; unrounded since v3.43: exactly 50 at the simulator's floor rate, the true service time on a floor with declared capacities), null off a station
   "hus":       [ { id, order_id, seq, archetype, outcome, route_id, sscc, gtin13, gtin14, pallet, box,
                    eaches_per_case, cases_per_pallet, received_eaches, spawned_tick, retired_tick,
                    final_kind, final: { pallets, cases, eaches, parcels, form, retained, scrapped } } ],
@@ -49,7 +49,7 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 
 **Event kinds.** `created` (the unit exists; its first operation is done at spawn) · `queued` (reached a station, waiting — quantities not yet changed) · `served` (the station served it — the operation's quantities apply) · `passed` (an operation without a station: dock, wrapper, staging, depalletiser…) · `delivered` / `restocked` / `scrapped` (terminal, by the route's final operation).
 
-**Time.** `tick` is the simulation tick; `minute = tick × 60 / ticks_per_hour`. There is no wall clock anywhere in the file.
+**Time.** `tick` is the simulation tick; `minute = tick × 60 / ticks_per_hour` (unrounded since v3.43; an integer at 60 ticks per hour). There is no wall clock anywhere in the file.
 
 **Spans and costs (v3.35).** A *span* is the time between two consecutive events of one unit: `waiting` when the first is `queued` (queue + service, inseparable in the simulation), `moving` otherwise; the last event of a live unit opens no span, and the spans of a retired unit add up to `retired_tick − spawned_tick`. A waiting span is charged the station's `service_ticks` (1 / its service rate) whatever the unit waited — queue time costs no labour; since v3.40 the *elapsed* wait is charged a holding cost per unit-hour when `rates.holding_per_unit_hour` is set (default 0); a moving span is charged in full at `rates.transport` (the first of AGV, forklift, conveyor present on the floor; none = free). Per span: `hours = charged_ticks × minutes_per_tick / 60`; `held_hours = ticks × minutes_per_tick / 60` for a waiting span; `labour = hours × labour × labour_per_hour`; `equipment = hours × capex / amort_years / hours_per_year`; `energy = hours × power_kw × energy_price_per_kwh`; `holding = held_hours × holding_per_unit_hour`. Per order type the cost is given per unit, per **received** each (every unit) and per **delivered** each (partial while units are in flight). Manned classes: racking (a picker at the face), workstation, forklift; `staging` has no class and is manned. The rates are the planner's Analyze-panel rates (illustrative teaching values); `ledger.js` `costs(exp)` and the SQL views below are the same arithmetic.
 
@@ -76,7 +76,7 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 | `v_cost_by_location` | per station: waiting spans, ticks, charged ticks, hours and their € incl. holding — plus one `transport` row for every moving span (v3.35, v3.40) |
 | `v_flow_links` | per pair of operations: units that moved from the one to the next, retired units, eaches that left (v3.36) |
 
-**Cost views** (v3.35; empty when the run carries no `rates`): `v_spans` pairs each event with the next one of the same unit (`LEAD` over `version`) and names the state; `v_span_cost` charges each span by the rule in §3; `v_cost_by_hu` sums per unit. Rounding happens only at the aggregates (4 dp), so the JavaScript and SQLite sums agree to the tolerance the tests use.
+**Cost views** (v3.35; empty when the run carries no `rates`): `v_spans` pairs each event with the next one of the same unit (`LEAD` over `version`) and names the state; `v_span_cost` charges each span by the rule in §3; `v_cost_by_hu` sums per unit. Rounding happens only at the aggregates (4 dp). Since v3.43 both sides sum with compensated arithmetic — SQLite's `SUM()` has used Kahan-Babuška-Neumaier since 3.43.0 and `ledger.js` sums the same way — so the rounded aggregates agree to at most one step in the fourth decimal. `python tools/run_ledger.py reconcile <export.json> --js <rows.json>` measures the drift column by column over 13 views (the rows come from `node tools/make_run_ledger_fixture.mjs reconcile <dir>`) and fails above 1e-4 (1e-9 on the unrounded span views); measured on the three fixtures: 5.6e-17 (A, B) and 1.1e-13 (C) over 111 columns. The tests use the same tolerance when SQLite is 3.44 or newer.
 
 **Invariant views** — each must return **zero rows**; the tests corrupt one value and watch each fire:
 
@@ -112,7 +112,7 @@ Ad-hoc SQL: `query "SELECT …"` accepts one `SELECT` / `WITH` statement and at 
 | The invariants | the four views that must return zero rows | `v_conservation_violations` … `v_terminal_violations` | `test_run_ledger.py` (deliberate corruption) |
 | Appendix | how to read the page; the reproduce commands filled in for the loaded run | — | the viewer self-test |
 
-Every table carries a CSV button (raw values) and the SQL SQLite runs for it (generated, see §4); minutes beside ticks are display-only derived columns; *Print report* expands every SQL. `?example=a|b` loads an example; the planner hands a run over through *Open in the run-ledger viewer*. `run-ledger.html?selftest=1` drives the real buttons and reports `WT-SELFTEST: PASS n/n`.
+Every table carries a CSV button (raw values) and the SQL SQLite runs for it (generated, see §4); minutes beside ticks are display-only derived columns; *Print report* expands every SQL. `?example=a|b|c` loads an example (C is the library floor *ecommerce-multichannel-fc* recorded at declared capacities, v3.43); the planner hands a run over through *Open in the run-ledger viewer*. `run-ledger.html?selftest=1` drives the real buttons and reports `WT-SELFTEST: PASS n/n`.
 
 ## 5. What the ledger is not
 
@@ -121,7 +121,7 @@ Synthetic events from a synthetic teaching simulation — not telemetry, not a W
 ## 6. Reproduce
 
 ```sh
-node tools/make_run_ledger_fixture.mjs       # regenerates test/fixtures/run-ledger.json and run-ledger-b.json byte for byte ([a|b|all])
+node tools/make_run_ledger_fixture.mjs       # regenerates test/fixtures/run-ledger.json, run-ledger-b.json and run-ledger-c.json byte for byte ([a|b|c|all]; a and b are built before wms.js loads)
 node verify_ledger.js                        # the recorder: identities, exact route walks, conservation, byte-identical sim
 python -m pytest test/test_run_ledger.py -q  # the SQL: hand-built ledger, corruption, SQL == JavaScript stats
 node verify_run_ledger_view.js               # the viewer's model against the same hand ledger and fixture
@@ -129,6 +129,8 @@ node verify_cost_ledger.js                   # spans and money by hand; SQL == J
 node verify_ledger_flow.js                   # flow links, conservation, the layered Sankey geometry (v3.36)
 node verify_run_compare.js                   # two runs paired key by key, deltas B - A (v3.37)
 python tools/export_viewer_sql.py --check    # the SQL the viewer shows is the SQL in this tool (v3.39)
+node verify_precision.js                     # A and B byte-identical under the compensated sums; C at declared capacities (v3.43)
+node tools/make_run_ledger_fixture.mjs reconcile work/rec && python tools/run_ledger.py reconcile test/fixtures/run-ledger-c.json --js work/rec/run-ledger-c.reconcile.json   # SQLite against the JavaScript rows, column by column (v3.43)
 python tools/run_ledger.py import test/fixtures/run-ledger.json --database work/run.sqlite && python tools/run_ledger.py import test/fixtures/run-ledger-b.json --database work/run.sqlite
 python tools/run_ledger.py report --database work/run.sqlite --runs RUN-hand-built-s31-hc28a7688 RUN-hand-built-s31-hd35e45d4 --out docs/examples/run-report.md   # the committed example (v3.41)
 ```

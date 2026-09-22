@@ -16,8 +16,9 @@
 <button id="rlDemo" type="button">Load the recorded example</button>
 <label for="rlFile">Run ledger JSON (factory-run-ledger/v1)</label><input id="rlFile" type="file" accept=".json,application/json">
 <p><button id="rlDemoB" type="button">Compare with recorded example B</button> <span class="note">the same floor and seed, a cross-dock-heavy day</span></p>
+<p><button id="rlDemoC" type="button">Load recorded example C</button> <span class="note">a library floor (the e-commerce fulfilment centre, seed 6, 180 ticks) whose eight stations serve at the floor's declared capacities, not the simulator's floor rate</span></p>
 <label for="rlFileB">Second run (B) to compare against</label><input id="rlFileB" type="file" accept=".json,application/json">
-<p id="rlStatus" role="status">Nothing loaded yet. <code>?example=a</code> or <code>?example=b</code> in the address loads an example directly.</p>
+<p id="rlStatus" role="status">Nothing loaded yet. <code>?example=a</code>, <code>?example=b</code> or <code>?example=c</code> in the address loads an example directly.</p>
 <p class="note">Synthetic events from a synthetic teaching simulation — not telemetry, not a WMS. Quantities are the synthetic order-line quantities of the scenario's packaging profile; GS1 numbers use GS1's documentation prefix.</p></section>
 <div id="rlView" hidden>
 <section id="secGlance" aria-labelledby="hGlance"><h2 id="hGlance">The run at a glance</h2><div id="rlGlance" tabindex="-1"></div></section>

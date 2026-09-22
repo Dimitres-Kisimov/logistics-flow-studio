@@ -23,7 +23,7 @@
  *      the page's ten sections, nav, skip link, print, self-test wiring;
  *      Your case bound once and debounced; the pinwheel search capped.
  *   4. Shipped wiring: page, stylesheet and script exist and are precached
- *      at wt-v122; the planner has the hand-over button; the offline guard
+ *      at wt-v123; the planner has the hand-over button; the offline guard
  *      rules hold (no external references).
  * ===================================================================== */
 "use strict";
@@ -153,9 +153,9 @@ console.log("=".repeat(72));
   const html = read("run-ledger.html"), sw = read("sw.js"), app = read("app.js"), idx = read("index.html"), runall = read("test/run-all.mjs");
   check("4a. the page loads ids.js, pack.js and run-ledger.js and links both stylesheets",
     /<script src="ids\.js">/.test(html) && /<script src="pack\.js">/.test(html) && /<script src="run-ledger\.js">/.test(html) && /run-ledger\.css/.test(html) && /transfer-ledger\.css/.test(html));
-  check("4b. sw.js precaches the page, its script, stylesheet and the recorded example at wt-v122 (previously wt-v121)",
+  check("4b. sw.js precaches the page, its script, stylesheet and the recorded example at wt-v123 (previously wt-v122)",
     /"\.\/run-ledger\.html"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw) && /"\.\/run-ledger\.css"/.test(sw) && /"\.\/test\/fixtures\/run-ledger\.json"/.test(sw) &&
-    /CACHE_VERSION\s*=\s*"wt-v122"/.test(sw) && /Previously wt-v121/.test(sw));
+    /CACHE_VERSION\s*=\s*"wt-v123"/.test(sw) && /Previously wt-v122/.test(sw));
   check("4c. the planner hands a run over to the viewer (button + localStorage hand-over)", /flowLedgerOpen/.test(idx) && /wt-run-ledger/.test(app) && /run-ledger\.html/.test(app));
   check("4d. test/run-all.mjs lists this harness", /verify_run_ledger_view\.js/.test(runall));
   check("4g. the page has the optimisation section", /id="rlOptimise"/.test(html) && /renderOptimise\(exp\)/.test(read("run-ledger.js")));
@@ -201,7 +201,7 @@ console.log("=".repeat(72));
   check("5o. the viewer self-test is inert without ?selftest=1, reports with the WT-SELFTEST contract and data-page, loads last, no eval / inline handler / external reference",
     /selftest=1/.test(st) && /WT-SELFTEST: PASS/.test(st) && /data-page/.test(st) && !/\beval\(/.test(st) && !/https?:\/\//.test(st) && /<script src="run-ledger\.js"><\/script><script src="run-ledger-selftest\.js"><\/script><\/body>/.test(html) && !/\son[a-z]+=/i.test(html));
   check("5p. Your case binds its listeners once and debounces; the pinwheel search is capped at six block thicknesses", /ycBound/.test(js) && /setTimeout\(\(\) => \{ if \(ycDraw\) ycDraw\(\); \}, 150\)/.test(js) && /Math\.min\(6, Math\.floor\(Math\.min\(L, W\) \/ b\)\)/.test(read("pack.js")));
-  check("5q. ?example=a|b loads an example; load() announces rl:loaded and whenLoaded() resolves; the derived minutes columns are display-only", /example=\(a\|b\)/.test(js) && /rl:loaded/.test(js) && /RunLedger\.whenLoaded/.test(js) && /computed for display, not a column of the view/.test(js));
+  check("5q. ?example=a|b|c loads an example; load() announces rl:loaded and whenLoaded() resolves; the derived minutes columns are display-only", /example=\(a\|b\|c\|d\)/.test(js) && /rlDemoC/.test(js) && /rl:loaded/.test(js) && /RunLedger\.whenLoaded/.test(js) && /computed for display, not a column of the view/.test(js));
 })();
 
 console.log("=".repeat(72));

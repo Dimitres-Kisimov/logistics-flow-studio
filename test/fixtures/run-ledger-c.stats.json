@@ -1,0 +1,67 @@
+{
+ "units": 193,
+ "events": 1175,
+ "delivered": 35,
+ "delivered_eaches": 224,
+ "delivered_pallets": 0,
+ "delivered_cases": 35,
+ "delivered_parcels": 51,
+ "types": [
+  {
+   "archetype": "case-pick",
+   "units": 29,
+   "retired": 0,
+   "events": 169,
+   "eaches_in": 16704,
+   "eaches_out": 0,
+   "retained": 0,
+   "scrapped": 0,
+   "cycle_ticks": 0,
+   "avg_cycle_ticks": null,
+   "touches": 5.83,
+   "conserved": true
+  },
+  {
+   "archetype": "piece-pick",
+   "units": 116,
+   "retired": 22,
+   "events": 805,
+   "eaches_in": 66816,
+   "eaches_out": 139,
+   "retained": 12533,
+   "scrapped": 0,
+   "cycle_ticks": 3053,
+   "avg_cycle_ticks": 138.77,
+   "touches": 6.94,
+   "conserved": true
+  },
+  {
+   "archetype": "returns",
+   "units": 29,
+   "retired": 24,
+   "events": 107,
+   "eaches_in": 170,
+   "eaches_out": 0,
+   "retained": 87,
+   "scrapped": 45,
+   "cycle_ticks": 675,
+   "avg_cycle_ticks": 28.13,
+   "touches": 3.69,
+   "conserved": true
+  },
+  {
+   "archetype": "vas",
+   "units": 19,
+   "retired": 13,
+   "events": 94,
+   "eaches_in": 120,
+   "eaches_out": 85,
+   "retained": 0,
+   "scrapped": 0,
+   "cycle_ticks": 715,
+   "avg_cycle_ticks": 55,
+   "touches": 4.95,
+   "conserved": true
+  }
+ ]
+}
