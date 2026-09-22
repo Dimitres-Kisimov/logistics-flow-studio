@@ -8,6 +8,8 @@
 <section class="import" id="rlImport"><h2>Start with the recorded example or your export</h2>
 <button id="rlDemo" type="button">Load the recorded example</button>
 <label for="rlFile">Run ledger JSON (factory-run-ledger/v1)</label><input id="rlFile" type="file" accept=".json,application/json">
+<p><button id="rlDemoB" type="button">Compare with recorded example B</button> <span class="note">the same floor and seed, a cross-dock-heavy day</span></p>
+<label for="rlFileB">Second run (B) to compare against</label><input id="rlFileB" type="file" accept=".json,application/json">
 <p id="rlStatus" role="status">Nothing loaded yet.</p>
 <p class="note">Synthetic events from a synthetic teaching simulation — not telemetry, not a WMS. Quantities are the synthetic order-line quantities of the scenario's packaging profile; GS1 numbers use GS1's documentation prefix.</p></section>
 <section id="rlView" hidden>
@@ -22,6 +24,7 @@
 <h3>Work in progress over the run</h3><div id="rlWip"></div>
 <div id="rlByOp"></div>
 <h2>What a handling unit costs</h2><p class="note">The spans between a unit's events, charged at the rates the run was recorded under (the planner's Analyze panel, defaults from <code>analytics.js</code>): a unit served at a station is charged that station's service time, whatever it waited; a moving unit is charged at the class of mover the floor contains. Cost per span = hours × labour rate (manned classes) + hours × capex ÷ amortisation years ÷ operating hours per year + hours × kW × energy price. Queue time costs nothing: holding cost is not modelled.</p><div id="rlCost"></div>
+<h2>Compare two runs</h2><p class="note">The same tables for two recorded runs, paired key by key: order type, bench and operation. Deltas are B − A. The same six comparisons are SQL views over every ordered pair of runs in one database.</p><div id="rlCompare"></div>
 <h2>Dispatch manifest</h2><div id="rlDispatch"></div>
 <h2>Trace one unit</h2><label for="rlUnit">Handling unit</label><select id="rlUnit"></select><div id="rlTrace"></div>
 <h2>The invariants</h2><p class="note">Each of these views must return zero rows. They are the same views the SQLite tool exposes; a deliberate corruption in the test suite makes every one of them fire.</p><div id="rlInvariants"></div>

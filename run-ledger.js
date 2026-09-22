@@ -16,7 +16,8 @@
  * dispatch manifest with trailers · a unit trace with its timeline · the
  * invariants (must be zero) · the SQL behind each table · (v3.35) what a
  * handling unit costs, from the spans between its events and the rates the
- * run was recorded under (WT.ledger.costs; ledger.js is loaded on the page).
+ * run was recorded under (WT.ledger.costs; ledger.js is loaded on the page) ·
+ * (v3.37) compare two runs key by key, deltas B - A (RunLedger.compare).
  *
  * Pure model (RunLedger.views / ribbon / trace) + DOM rendering. No Date,
  * no Math.random, no network beyond loading the local example file.
@@ -178,6 +179,13 @@
     v_quantities_by_op: "SELECT op, kind, COUNT(*) events, SUM(pallets), SUM(cases), SUM(eaches), SUM(parcels), SUM(retained), SUM(scrapped)\nFROM handling_event GROUP BY op, kind;",
     v_dispatch: "SELECT COUNT(*) delivered_units, SUM(final_pallets) pallets, SUM(final_cases) cases, SUM(final_eaches) eaches,\n       SUM(final_parcels) parcels, MAX(p.trailer_slots) trailer_slots,\n       (SUM(final_pallets) + MAX(p.trailer_slots) - 1) / MAX(p.trailer_slots) trailers\nFROM hu h JOIN pallet_type p ON p.id = COALESCE(h.pallet, 'eur') WHERE final_kind = 'delivered';",
     v_run_summary: "SELECT r.scenario, r.seed, r.profile, r.ticks, (SELECT COUNT(*) FROM hu) units, (SELECT COUNT(*) FROM handling_event) events,\n       (SELECT COUNT(*) FROM hu WHERE final_kind = 'delivered') delivered,\n       (SELECT COALESCE(SUM(final_eaches), 0) FROM hu WHERE final_kind = 'delivered') delivered_eaches,\n       (SELECT COALESCE(SUM(final_pallets), 0) FROM hu WHERE final_kind = 'delivered') delivered_pallets,\n       (SELECT COALESCE(SUM(final_parcels), 0) FROM hu WHERE final_kind = 'delivered') delivered_parcels\nFROM run r;",
+    // v3.37 compare two runs (deltas B - A; one row per ordered pair of runs and key)
+    v_compare_summary: "SELECT a.run_id run_a, b.run_id run_b, a.units units_a, b.units units_b, b.units - a.units delta_units,\n       a.events events_a, b.events events_b, b.events - a.events delta_events, a.delivered delivered_a, b.delivered delivered_b, b.delivered - a.delivered delta_delivered,\n       a.delivered_eaches delivered_eaches_a, b.delivered_eaches delivered_eaches_b, b.delivered_eaches - a.delivered_eaches delta_delivered_eaches\nFROM v_run_summary a JOIN v_run_summary b ON b.run_id <> a.run_id;",
+    v_compare_cycle: "WITH keys AS (SELECT DISTINCT ra.id run_a, rb.id run_b, h.archetype FROM run ra JOIN run rb ON rb.id <> ra.id JOIN hu h ON h.run_id IN (ra.id, rb.id))\nSELECT k.run_a, k.run_b, k.archetype, a.units units_a, b.units units_b, b.units - a.units delta_units, a.retired retired_a, b.retired retired_b, b.retired - a.retired delta_retired,\n       a.avg_cycle_ticks avg_cycle_ticks_a, b.avg_cycle_ticks avg_cycle_ticks_b, ROUND(b.avg_cycle_ticks - a.avg_cycle_ticks, 4) delta_avg_cycle_ticks\nFROM keys k LEFT JOIN v_cycle_time_by_type a ON a.run_id = k.run_a AND a.archetype = k.archetype\n            LEFT JOIN v_cycle_time_by_type b ON b.run_id = k.run_b AND b.archetype = k.archetype;",
+    v_compare_touches: "WITH keys AS (... archetypes of either run ...)\nSELECT k.run_a, k.run_b, k.archetype, a.touches touches_a, b.touches touches_b, ROUND(b.touches - a.touches, 4) delta_touches,\n       a.served_per_unit served_per_unit_a, b.served_per_unit served_per_unit_b, ROUND(b.served_per_unit - a.served_per_unit, 4) delta_served_per_unit\nFROM keys k LEFT JOIN v_touches_by_type a ON ... LEFT JOIN v_touches_by_type b ON ...;",
+    v_compare_wait: "WITH keys AS (SELECT DISTINCT ra.id run_a, rb.id run_b, w.location, w.op FROM run ra JOIN run rb ON rb.id <> ra.id JOIN v_station_wait w ON w.run_id IN (ra.id, rb.id))\nSELECT k.run_a, k.run_b, k.location, k.op, a.waits waits_a, b.waits waits_b, b.waits - a.waits delta_waits,\n       a.avg_wait_ticks avg_wait_ticks_a, b.avg_wait_ticks avg_wait_ticks_b, ROUND(b.avg_wait_ticks - a.avg_wait_ticks, 4) delta_avg_wait_ticks,\n       a.still_waiting still_waiting_a, b.still_waiting still_waiting_b, b.still_waiting - a.still_waiting delta_still_waiting\nFROM keys k LEFT JOIN v_station_wait a ON a.run_id = k.run_a AND a.location = k.location AND a.op = k.op\n            LEFT JOIN v_station_wait b ON b.run_id = k.run_b AND b.location = k.location AND b.op = k.op;",
+    v_compare_dispatch: "SELECT ra.id run_a, rb.id run_b, a.delivered_units delivered_units_a, b.delivered_units delivered_units_b, b.delivered_units - a.delivered_units delta_delivered_units,\n       a.pallets pallets_a, b.pallets pallets_b, b.pallets - a.pallets delta_pallets, a.parcels parcels_a, b.parcels parcels_b, b.parcels - a.parcels delta_parcels,\n       a.trailers trailers_a, b.trailers trailers_b, b.trailers - a.trailers delta_trailers\nFROM run ra JOIN run rb ON rb.id <> ra.id LEFT JOIN v_dispatch a ON a.run_id = ra.id LEFT JOIN v_dispatch b ON b.run_id = rb.id;",
+    v_compare_cost: "WITH keys AS (... archetypes of either run ...)\nSELECT k.run_a, k.run_b, k.archetype, a.total_eur total_eur_a, b.total_eur total_eur_b, ROUND(b.total_eur - a.total_eur, 4) delta_total_eur,\n       a.eur_per_unit eur_per_unit_a, b.eur_per_unit eur_per_unit_b, ROUND(b.eur_per_unit - a.eur_per_unit, 4) delta_eur_per_unit,\n       a.eur_per_each eur_per_each_a, b.eur_per_each eur_per_each_b, ROUND(b.eur_per_each - a.eur_per_each, 4) delta_eur_per_each\nFROM keys k LEFT JOIN v_cost_by_type a ON ... LEFT JOIN v_cost_by_type b ON ...;",
     // v3.36 the flow as recorded
     v_flow_links: "WITH s AS (SELECT e.hu_id, e.op, e.eaches, h.retired_tick, LEAD(e.op) OVER (PARTITION BY e.hu_id ORDER BY e.version) to_op\n  FROM handling_event e JOIN hu h ON h.id = e.hu_id WHERE e.kind <> 'queued')\nSELECT op from_op, to_op, COUNT(*) units, SUM(retired_tick IS NOT NULL) retired_units, SUM(eaches) eaches\nFROM s WHERE to_op IS NOT NULL AND to_op <> op GROUP BY op, to_op;",
     // v3.35 what a handling unit costs
@@ -211,6 +219,41 @@
     };
     return { units: units, eaches: eaches, now: side(opt.current), best: side(opt.best), same: opt.best.pallet === opt.current.pallet && opt.best.cases === opt.current.cases };
   }
+  /* ---------------- compare two runs (v3.37) ------------------------ */
+  // The same tables for two exports, paired key by key (order type; bench +
+  // operation); deltas are B - A and null whenever a side lacks the key, so
+  // a type or bench seen in only one run still appears. Mirrors v_compare_*.
+  function compare(a, b) {
+    const va = views(a), vb = views(b);
+    const cmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
+    const pair = (ra, rb, ks, fields, keysA, keysB) => {
+      const key = (r) => ks.map((k) => r[k]);
+      const map = {};
+      const put = (rows, side) => { for (const r of rows || []) { const k = JSON.stringify(key(r)); const m = map[k] || (map[k] = { k: key(r) }); if (side) m[side] = r; } };
+      put(ra, "a"); put(rb, "b"); put(keysA, null); put(keysB, null);
+      const order = (p, q) => { for (let i = 0; i < ks.length; i++) { const c = cmp(p.k[i], q.k[i]); if (c) return c; } return 0; };
+      return Object.keys(map).map((k) => map[k]).sort(order).map((m) => {
+        const row = {};
+        ks.forEach((kk, i) => { row[kk] = m.k[i]; });
+        for (const f of fields) {
+          const x = m.a && m.a[f] != null ? m.a[f] : null, y = m.b && m.b[f] != null ? m.b[f] : null;
+          row[f + "_a"] = x; row[f + "_b"] = y; row["delta_" + f] = x == null || y == null ? null : r4(y - x);
+        }
+        return row;
+      });
+    };
+    return {
+      run_a: a.run.id, run_b: b.run.id,
+      same_scenario: a.run.scenario === b.run.scenario && a.run.profile === b.run.profile,
+      summary: pair([va.summary], [vb.summary], [], ["units", "events", "delivered", "delivered_eaches"]),
+      cycle: pair(va.cycle, vb.cycle, ["archetype"], ["units", "retired", "avg_cycle_ticks"]),
+      touches: pair(va.touches, vb.touches, ["archetype"], ["touches", "served_per_unit"]),
+      wait: pair(va.wait, vb.wait, ["location", "op"], ["waits", "avg_wait_ticks", "still_waiting"]),
+      dispatch: pair([va.dispatch || {}], [vb.dispatch || {}], [], ["delivered_units", "pallets", "parcels", "trailers"]),
+      cost: pair(va.costByType || [], vb.costByType || [], ["archetype"], ["total_eur", "eur_per_unit", "eur_per_each"], va.cycle, vb.cycle),
+    };
+  }
+  RunLedger.compare = compare;
   RunLedger.whatIf = whatIf;
   RunLedger.TRAILER_SLOTS = TRAILER_SLOTS;
   RunLedger.SQL = SQL;
@@ -226,6 +269,7 @@
   const esc = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const fmt = (v) => (v == null ? "—" : typeof v === "number" ? (Number.isInteger(v) ? String(v) : String(r2(v))) : String(v));
   let EXP = null;
+  let EXP_B = null; // v3.37 the second run to compare against
 
   function table(rows, cols, caption) {
     if (!rows || !rows.length) return "<p class=\"note\">No rows.</p>";
@@ -392,6 +436,32 @@
     draw();
   }
 
+  // v3.37 compare two runs: A (the loaded run) against B, deltas B - A
+  function renderCompare() {
+    const out = $("rlCompare");
+    if (!EXP || !EXP_B) { out.innerHTML = "<p class=\"note\">Load a second run (B) above - the recorded example B, or your own export - to compare it against this one. Deltas are B − A.</p>"; return; }
+    const c = compare(EXP, EXP_B);
+    const mixOf = (r) => (r.mix ? (Array.isArray(r.mix) ? r.mix.map((m) => m.id + " " + Math.round(m.share * 100) + "%").join(" · ") : Object.keys(r.mix).map((k) => k + " " + Math.round(r.mix[k] * 100) + "%").join(" · ")) : "standard spine");
+    const fmtRow = (r, moneyFields) => { const o = Object.assign({}, r); for (const f of moneyFields || []) for (const s of ["_a", "_b"]) o[f + s] = money(r[f + s]); return o; };
+    const head = '<div class="cards"><article><span>A</span><strong class="mono">' + esc(c.run_a) + "</strong><span>" + esc(mixOf(EXP.run)) + "</span></article>" +
+      '<article><span>B</span><strong class="mono">' + esc(c.run_b) + "</strong><span>" + esc(mixOf(EXP_B.run)) + "</span></article>" +
+      '<article class="' + (c.same_scenario ? "good" : "bad") + '"><span>Comparable?</span><strong>' + (c.same_scenario ? "same scenario and profile" : "different scenario or profile") + "</strong><span>" + (c.same_scenario ? "deltas are B − A" : "deltas shown, but the runs are not like for like") + "</span></article></div>";
+    out.innerHTML = head +
+      table(c.summary, ["units_a", "units_b", "delta_units", "events_a", "events_b", "delta_events", "delivered_a", "delivered_b", "delta_delivered", "delivered_eaches_a", "delivered_eaches_b", "delta_delivered_eaches"], "Summary") + sqlBlock("v_compare_summary") +
+      table(c.cycle, ["archetype", "units_a", "units_b", "delta_units", "retired_a", "retired_b", "delta_retired", "avg_cycle_ticks_a", "avg_cycle_ticks_b", "delta_avg_cycle_ticks"], "Cycle time by order type") + sqlBlock("v_compare_cycle") +
+      table(c.touches, ["archetype", "touches_a", "touches_b", "delta_touches", "served_per_unit_a", "served_per_unit_b", "delta_served_per_unit"], "Touches by order type") + sqlBlock("v_compare_touches") +
+      table(c.wait, ["location", "op", "waits_a", "waits_b", "delta_waits", "avg_wait_ticks_a", "avg_wait_ticks_b", "delta_avg_wait_ticks", "still_waiting_a", "still_waiting_b", "delta_still_waiting"], "Waiting at each bench") + sqlBlock("v_compare_wait") +
+      table(c.dispatch, ["delivered_units_a", "delivered_units_b", "delta_delivered_units", "pallets_a", "pallets_b", "delta_pallets", "parcels_a", "parcels_b", "delta_parcels", "trailers_a", "trailers_b", "delta_trailers"], "Dispatch") + sqlBlock("v_compare_dispatch") +
+      table(c.cost.map((r) => fmtRow(r, ["total_eur", "eur_per_unit", "eur_per_each"])), ["archetype", "total_eur_a", "total_eur_b", "delta_total_eur", "eur_per_unit_a", "eur_per_unit_b", "delta_eur_per_unit", "eur_per_each_a", "eur_per_each_b", "delta_eur_per_each"], "Cost by order type (null when a run carries no rates)") + sqlBlock("v_compare_cost") +
+      "<p class=\"note\">A key seen in only one run still appears, with the other side and the delta empty. In SQLite both runs live in one database and the views pair every ordered pair of runs; <code>python tools/run_ledger.py compare --database run.sqlite --runs A B</code> prints them.</p>";
+  }
+  function loadB(exp) {
+    if (!exp || exp.schema !== "factory-run-ledger/v1" || !Array.isArray(exp.hus) || !Array.isArray(exp.events) || !exp.run) { $("rlStatus").textContent = "That file is not a factory-run-ledger/v1 export."; return; }
+    EXP_B = exp;
+    $("rlStatus").textContent = "B: loaded " + exp.hus.length + " units and " + exp.events.length + " events from " + exp.run.id + (EXP ? "; compared against " + EXP.run.id + "." : ". Load run A to compare.");
+    if (EXP) { $("rlView").hidden = false; renderCompare(); }
+  }
+
   // v3.35 what a handling unit costs
   const money = (v) => (v == null ? "—" : "€\u202f" + (Math.round(v * 100) / 100).toFixed(2));
   function renderCost(exp) {
@@ -465,7 +535,7 @@
     EXP = exp;
     $("rlStatus").textContent = "Loaded " + exp.hus.length + " units and " + exp.events.length + " events from " + exp.run.id + ".";
     $("rlView").hidden = false;
-    renderRun(exp); renderPackaging(exp); renderOptimise(exp); renderRibbon(exp); renderFlow(exp); renderViews(exp); renderCost(exp); renderTrace(exp);
+    renderRun(exp); renderPackaging(exp); renderOptimise(exp); renderRibbon(exp); renderFlow(exp); renderViews(exp); renderCost(exp); renderCompare(); renderTrace(exp);
   }
 
   $("rlFile").addEventListener("change", (ev) => {
@@ -478,11 +548,25 @@
   $("rlDemo").addEventListener("click", () => {
     fetch("test/fixtures/run-ledger.json").then((r) => r.json()).then(load).catch((e) => { $("rlStatus").textContent = "Could not load the example: " + e.message; });
   });
+  // v3.37 the second run
+  $("rlFileB").addEventListener("change", (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { try { loadB(JSON.parse(String(rd.result))); } catch (e) { $("rlStatus").textContent = "Could not read that file: " + e.message; } };
+    rd.readAsText(f);
+  });
+  $("rlDemoB").addEventListener("click", () => {
+    const go = () => fetch("test/fixtures/run-ledger-b.json").then((r) => r.json()).then(loadB).catch((e) => { $("rlStatus").textContent = "Could not load example B: " + e.message; });
+    if (EXP) go(); else fetch("test/fixtures/run-ledger.json").then((r) => r.json()).then((a) => { load(a); go(); }).catch((e) => { $("rlStatus").textContent = "Could not load the example: " + e.message; });
+  });
   // handed over from the planner (Simulate -> Live material flow -> Open in the run-ledger viewer)
   try {
     const handed = localStorage.getItem("wt-run-ledger");
     if (handed) { load(JSON.parse(handed)); localStorage.removeItem("wt-run-ledger"); }
   } catch (_) { /* no storage */ }
   RunLedger.load = load;
+  RunLedger.loadB = loadB;
   RunLedger.current = () => EXP;
+  RunLedger.currentB = () => EXP_B;
 })();

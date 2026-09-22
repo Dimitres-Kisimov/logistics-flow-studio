@@ -12,6 +12,7 @@ conservation of eaches, cross-dock never in storage, consecutive versions. Stand
     python tools/run_ledger.py views  --database work/run.sqlite [--run RUN-...]
     python tools/run_ledger.py summary --database work/run.sqlite [--run RUN-...] [--out summary.json]
     python tools/run_ledger.py query  --database work/run.sqlite "SELECT ..."   (read-only, bounded)
+    python tools/run_ledger.py compare --database work/run.sqlite --runs RUN-a RUN-b [--out compare.json]   (v3.37: B - A)
 
 Honesty: the events are synthetic (a teaching simulation, not telemetry, not a WMS);
 the quantities are the synthetic order-line quantities of the scenario's packaging
@@ -244,11 +245,71 @@ SELECT h.run_id, h.id AS hu_id, h.final_kind, h.retired_tick
 FROM hu h
 WHERE (h.retired_tick IS NOT NULL AND h.final_kind NOT IN ('delivered', 'restocked', 'scrapped'))
    OR (h.retired_tick IS NULL AND h.final_kind IS NOT NULL);""",
+    # ---- v3.37 compare two runs: one row per ordered pair (run_a, run_b) and key; deltas are B - A,
+    # NULL whenever a side lacks the key (a type or bench seen in only one run still appears) ----
+    "v_compare_summary": """
+CREATE VIEW IF NOT EXISTS v_compare_summary AS
+SELECT a.run_id AS run_a, b.run_id AS run_b,
+       a.units AS units_a, b.units AS units_b, b.units - a.units AS delta_units,
+       a.events AS events_a, b.events AS events_b, b.events - a.events AS delta_events,
+       a.delivered AS delivered_a, b.delivered AS delivered_b, b.delivered - a.delivered AS delta_delivered,
+       a.delivered_eaches AS delivered_eaches_a, b.delivered_eaches AS delivered_eaches_b, b.delivered_eaches - a.delivered_eaches AS delta_delivered_eaches
+FROM v_run_summary a JOIN v_run_summary b ON b.run_id <> a.run_id;""",
+    "v_compare_cycle": """
+CREATE VIEW IF NOT EXISTS v_compare_cycle AS
+WITH keys AS (SELECT DISTINCT ra.id AS run_a, rb.id AS run_b, h.archetype FROM run ra JOIN run rb ON rb.id <> ra.id JOIN hu h ON h.run_id IN (ra.id, rb.id))
+SELECT k.run_a, k.run_b, k.archetype,
+       a.units AS units_a, b.units AS units_b, b.units - a.units AS delta_units,
+       a.retired AS retired_a, b.retired AS retired_b, b.retired - a.retired AS delta_retired,
+       a.avg_cycle_ticks AS avg_cycle_ticks_a, b.avg_cycle_ticks AS avg_cycle_ticks_b, ROUND(b.avg_cycle_ticks - a.avg_cycle_ticks, 4) AS delta_avg_cycle_ticks
+FROM keys k
+LEFT JOIN v_cycle_time_by_type a ON a.run_id = k.run_a AND a.archetype = k.archetype
+LEFT JOIN v_cycle_time_by_type b ON b.run_id = k.run_b AND b.archetype = k.archetype;""",
+    "v_compare_touches": """
+CREATE VIEW IF NOT EXISTS v_compare_touches AS
+WITH keys AS (SELECT DISTINCT ra.id AS run_a, rb.id AS run_b, h.archetype FROM run ra JOIN run rb ON rb.id <> ra.id JOIN hu h ON h.run_id IN (ra.id, rb.id))
+SELECT k.run_a, k.run_b, k.archetype,
+       a.touches AS touches_a, b.touches AS touches_b, ROUND(b.touches - a.touches, 4) AS delta_touches,
+       a.served_per_unit AS served_per_unit_a, b.served_per_unit AS served_per_unit_b, ROUND(b.served_per_unit - a.served_per_unit, 4) AS delta_served_per_unit
+FROM keys k
+LEFT JOIN v_touches_by_type a ON a.run_id = k.run_a AND a.archetype = k.archetype
+LEFT JOIN v_touches_by_type b ON b.run_id = k.run_b AND b.archetype = k.archetype;""",
+    "v_compare_wait": """
+CREATE VIEW IF NOT EXISTS v_compare_wait AS
+WITH keys AS (SELECT DISTINCT ra.id AS run_a, rb.id AS run_b, w.location, w.op FROM run ra JOIN run rb ON rb.id <> ra.id JOIN v_station_wait w ON w.run_id IN (ra.id, rb.id))
+SELECT k.run_a, k.run_b, k.location, k.op,
+       a.waits AS waits_a, b.waits AS waits_b, b.waits - a.waits AS delta_waits,
+       a.avg_wait_ticks AS avg_wait_ticks_a, b.avg_wait_ticks AS avg_wait_ticks_b, ROUND(b.avg_wait_ticks - a.avg_wait_ticks, 4) AS delta_avg_wait_ticks,
+       a.still_waiting AS still_waiting_a, b.still_waiting AS still_waiting_b, b.still_waiting - a.still_waiting AS delta_still_waiting
+FROM keys k
+LEFT JOIN v_station_wait a ON a.run_id = k.run_a AND a.location = k.location AND a.op = k.op
+LEFT JOIN v_station_wait b ON b.run_id = k.run_b AND b.location = k.location AND b.op = k.op;""",
+    "v_compare_dispatch": """
+CREATE VIEW IF NOT EXISTS v_compare_dispatch AS
+SELECT ra.id AS run_a, rb.id AS run_b,
+       a.delivered_units AS delivered_units_a, b.delivered_units AS delivered_units_b, b.delivered_units - a.delivered_units AS delta_delivered_units,
+       a.pallets AS pallets_a, b.pallets AS pallets_b, b.pallets - a.pallets AS delta_pallets,
+       a.parcels AS parcels_a, b.parcels AS parcels_b, b.parcels - a.parcels AS delta_parcels,
+       a.trailers AS trailers_a, b.trailers AS trailers_b, b.trailers - a.trailers AS delta_trailers
+FROM run ra JOIN run rb ON rb.id <> ra.id
+LEFT JOIN v_dispatch a ON a.run_id = ra.id
+LEFT JOIN v_dispatch b ON b.run_id = rb.id;""",
+    "v_compare_cost": """
+CREATE VIEW IF NOT EXISTS v_compare_cost AS
+WITH keys AS (SELECT DISTINCT ra.id AS run_a, rb.id AS run_b, h.archetype FROM run ra JOIN run rb ON rb.id <> ra.id JOIN hu h ON h.run_id IN (ra.id, rb.id))
+SELECT k.run_a, k.run_b, k.archetype,
+       a.total_eur AS total_eur_a, b.total_eur AS total_eur_b, ROUND(b.total_eur - a.total_eur, 4) AS delta_total_eur,
+       a.eur_per_unit AS eur_per_unit_a, b.eur_per_unit AS eur_per_unit_b, ROUND(b.eur_per_unit - a.eur_per_unit, 4) AS delta_eur_per_unit,
+       a.eur_per_each AS eur_per_each_a, b.eur_per_each AS eur_per_each_b, ROUND(b.eur_per_each - a.eur_per_each, 4) AS delta_eur_per_each
+FROM keys k
+LEFT JOIN v_cost_by_type a ON a.run_id = k.run_a AND a.archetype = k.archetype
+LEFT JOIN v_cost_by_type b ON b.run_id = k.run_b AND b.archetype = k.archetype;""",
 }
 INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations")
 PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
                  "v_cost_by_type", "v_cost_by_location", "v_flow_links")
 COST_VIEWS = ("v_spans", "v_span_cost", "v_cost_by_hu", "v_cost_by_type", "v_cost_by_location")
+COMPARE_VIEWS = ("v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost")
 
 
 def connect(path: str) -> sqlite3.Connection:
@@ -344,6 +405,14 @@ def summary(db: sqlite3.Connection, run_id: str) -> dict:
     return out
 
 
+def compare(db: sqlite3.Connection, run_a: str, run_b: str) -> dict:
+    """The six compare views for one ordered pair of runs (deltas are B - A), as plain JSON."""
+    out = {"run_a": run_a, "run_b": run_b}
+    for name in COMPARE_VIEWS:
+        out[name] = rows(db, f"SELECT * FROM {name} WHERE run_a = ? AND run_b = ? ORDER BY 3, 4", (run_a, run_b))
+    return out
+
+
 def query(db: sqlite3.Connection, sql: str, limit: int = 500) -> list[dict]:
     """Bounded, read-only ad-hoc SQL: one SELECT / WITH statement, at most `limit` rows."""
     text = sql.strip().rstrip(";").strip()
@@ -371,11 +440,12 @@ def render(table: list[dict]) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=("import", "views", "summary", "query"))
+    ap.add_argument("command", choices=("import", "views", "summary", "query", "compare"))
     ap.add_argument("arg", nargs="?", help="export JSON path (import) or SQL text (query)")
     ap.add_argument("--database", required=True)
     ap.add_argument("--run", help="run id (defaults to the only / latest imported run)")
-    ap.add_argument("--out", help="write the summary JSON here")
+    ap.add_argument("--out", help="write the summary / compare JSON here")
+    ap.add_argument("--runs", nargs=2, metavar=("RUN_A", "RUN_B"), help="compare: the two run ids (deltas are B - A)")
     a = ap.parse_args(argv)
     db = connect(a.database)
     initialize(db)
@@ -386,6 +456,19 @@ def main(argv=None) -> int:
         rid = import_ledger(db, data)
         s = rows(db, "SELECT units, events, delivered FROM v_run_summary WHERE run_id = ?", (rid,))[0]
         print(f"imported {rid}: {s['units']} units, {s['events']} events, {s['delivered']} delivered")
+        return 0
+    if a.command == "compare":
+        if not a.runs:
+            ap.error("compare needs --runs RUN_A RUN_B")
+        c = compare(db, a.runs[0], a.runs[1])
+        if a.out:
+            Path(a.out).write_text(json.dumps(c, indent=1) + "\n", encoding="utf-8")
+            print(f"compare written to {a.out}")
+        else:
+            for name in COMPARE_VIEWS:
+                print(f"== {name} (B - A) ==")
+                print(render(c[name]))
+                print()
         return 0
     run_id = a.run or (rows(db, "SELECT id FROM run ORDER BY rowid DESC LIMIT 1") or [{"id": None}])[0]["id"]
     if a.command == "query":

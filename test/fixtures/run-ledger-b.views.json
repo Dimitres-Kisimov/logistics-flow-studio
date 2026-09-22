@@ -1,0 +1,219 @@
+{
+ "costByType": [
+  {
+   "archetype": "case-pick",
+   "units": 6,
+   "retired": 1,
+   "eaches_out": 36,
+   "labour_eur": 116.6667,
+   "equipment_eur": 2.0522,
+   "energy_eur": 2.82,
+   "total_eur": 121.5389,
+   "eur_per_unit": 20.2565,
+   "eur_per_each": 3.3761
+  },
+  {
+   "archetype": "cross-dock",
+   "units": 19,
+   "retired": 13,
+   "eaches_out": 7488,
+   "labour_eur": 0,
+   "equipment_eur": 7.87,
+   "energy_eur": 11.805,
+   "total_eur": 19.675,
+   "eur_per_unit": 1.0355,
+   "eur_per_each": 0.0026
+  },
+  {
+   "archetype": "full-pallet-out",
+   "units": 8,
+   "retired": 2,
+   "eaches_out": 1152,
+   "labour_eur": 116.6667,
+   "equipment_eur": 2.3572,
+   "energy_eur": 3.2775,
+   "total_eur": 122.3014,
+   "eur_per_unit": 15.2877,
+   "eur_per_each": 0.1062
+  },
+  {
+   "archetype": "piece-pick",
+   "units": 4,
+   "retired": 0,
+   "eaches_out": 0,
+   "labour_eur": 29.1667,
+   "equipment_eur": 0.71,
+   "energy_eur": 1.065,
+   "total_eur": 30.9417,
+   "eur_per_unit": 7.7354,
+   "eur_per_each": null
+  },
+  {
+   "archetype": "returns",
+   "units": 2,
+   "retired": 1,
+   "eaches_out": 0,
+   "labour_eur": 0,
+   "equipment_eur": 0.67,
+   "energy_eur": 1.005,
+   "total_eur": 1.675,
+   "eur_per_unit": 0.8375,
+   "eur_per_each": null
+  }
+ ],
+ "costByLocation": [
+  {
+   "location": "face",
+   "class": "racking",
+   "spans": 4,
+   "ticks": 4,
+   "charged_ticks": 200,
+   "labour_eur": 116.6667,
+   "equipment_eur": 0.4444,
+   "energy_eur": 0.15,
+   "total_eur": 117.2611
+  },
+  {
+   "location": "stg",
+   "class": null,
+   "spans": 5,
+   "ticks": 336,
+   "charged_ticks": 250,
+   "labour_eur": 145.8333,
+   "equipment_eur": 0,
+   "energy_eur": 0,
+   "total_eur": 145.8333
+  },
+  {
+   "location": "transport",
+   "class": "conveyor",
+   "spans": 119,
+   "ticks": 2643,
+   "charged_ticks": 2643,
+   "labour_eur": 0,
+   "equipment_eur": 13.215,
+   "energy_eur": 19.8225,
+   "total_eur": 33.0375
+  }
+ ],
+ "costTotal": {
+  "labour_eur": 262.5,
+  "equipment_eur": 13.6594,
+  "energy_eur": 19.9725,
+  "total_eur": 296.1319
+ },
+ "flowLinks": [
+  {
+   "from_op": "case-pick",
+   "to_op": "consolidate",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 36
+  },
+  {
+   "from_op": "consolidate",
+   "to_op": "palletise",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 36
+  },
+  {
+   "from_op": "depalletise",
+   "to_op": "putaway",
+   "units": 3,
+   "retired_units": 1,
+   "eaches": 1728
+  },
+  {
+   "from_op": "inspect",
+   "to_op": "restock",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 9
+  },
+  {
+   "from_op": "pallet-pick",
+   "to_op": "wrap",
+   "units": 2,
+   "retired_units": 2,
+   "eaches": 1152
+  },
+  {
+   "from_op": "palletise",
+   "to_op": "wrap",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 36
+  },
+  {
+   "from_op": "putaway",
+   "to_op": "case-pick",
+   "units": 2,
+   "retired_units": 1,
+   "eaches": 1152
+  },
+  {
+   "from_op": "putaway",
+   "to_op": "pallet-pick",
+   "units": 2,
+   "retired_units": 2,
+   "eaches": 1152
+  },
+  {
+   "from_op": "qc-sample",
+   "to_op": "depalletise",
+   "units": 5,
+   "retired_units": 1,
+   "eaches": 2880
+  },
+  {
+   "from_op": "qc-sample",
+   "to_op": "putaway",
+   "units": 2,
+   "retired_units": 2,
+   "eaches": 1152
+  },
+  {
+   "from_op": "qc-sample",
+   "to_op": "stage-out",
+   "units": 18,
+   "retired_units": 13,
+   "eaches": 10368
+  },
+  {
+   "from_op": "receive",
+   "to_op": "depalletise",
+   "units": 4,
+   "retired_units": 0,
+   "eaches": 2304
+  },
+  {
+   "from_op": "receive",
+   "to_op": "inspect",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 9
+  },
+  {
+   "from_op": "receive",
+   "to_op": "qc-sample",
+   "units": 32,
+   "retired_units": 16,
+   "eaches": 18432
+  },
+  {
+   "from_op": "stage-out",
+   "to_op": "load",
+   "units": 13,
+   "retired_units": 13,
+   "eaches": 7488
+  },
+  {
+   "from_op": "wrap",
+   "to_op": "load",
+   "units": 3,
+   "retired_units": 3,
+   "eaches": 1188
+  }
+ ]
+}

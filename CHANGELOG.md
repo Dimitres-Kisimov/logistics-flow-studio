@@ -1,5 +1,39 @@
 # Changelog
 
+## v3.37 — Compare two runs
+
+**Paired tables.** `RunLedger.compare(A, B)`: the viewer's tables for two exports paired
+key by key (order type; bench + operation) with deltas B - A - summary, cycle time,
+touches, station wait, dispatch, cost. Keys are the union of both runs (a key seen in
+one run only survives with the other side and the delta null); a run without rates
+compares with null cost; a different scenario or profile sets `same_scenario` false.
+
+**SQL.** `v_compare_summary`, `v_compare_cycle`, `v_compare_touches`, `v_compare_wait`,
+`v_compare_dispatch`, `v_compare_cost`: one row per ordered pair of runs in the database
+and key, LEFT JOINs over a unioned key set (no FULL OUTER JOIN, so SQLite 3.12-era CI
+runs them); `compare(db, a, b)` and the CLI `compare --database db --runs A B [--out]`.
+
+**Fixture B.** `tools/make_run_ledger_fixture.mjs [a|b|all]` builds a second recorded run
+on the same floor and seed with a cross-dock-heavy mix (`run-ledger-b.json`, `.stats`,
+`.views`); the run id differs because the hash covers the mix. Precached.
+
+**Viewer.** A second file input and *Compare with recorded example B*; the section
+*Compare two runs* with A / B / delta tables, both runs' ids and mixes, the like-for-like
+flag and the six SQL texts.
+
+**Finding.** On the fixture floor the cross-dock-heavy day delivers 16 units (8,676
+eaches) against 8 (2,461) in the same 300 ticks, at 296 EUR against 350; cross-dock cycle
+time is identical (107 ticks) and case-pick cycle time falls by 62 ticks because the
+single staging pad is less contended. A finding about that floor, not a recommendation.
+
+**Verification.** `verify_run_compare.js` (24 checks: the hand pair with every terminal
+event 10 ticks later - cycle +10, touches and dispatch unchanged, cost +6.1656 per
+delivered unit, the return untouched, the reverse pair negated, a key in one run only,
+no rates, a different profile; the recorded pair - fixture B byte-identical to a fresh
+run, different id, same scenario, invariants, cross-dock the largest type, every row
+the pairing of views(A) and views(B); wiring). Python +3, self-test +1.
+69 harnesses, 87 Python tests, WT-SELFTEST 177/177. Cache wt-v119.
+
 ## v3.36 — The flow, as recorded
 
 **Links from the ledger.** `ledger.js` `flowLinks(exp)`: per pair of operations, the

@@ -24,8 +24,8 @@ import run_ledger as RL  # noqa: E402
 FIX = ROOT / "test" / "fixtures"
 
 
-def hand_ledger():
-    run = "RUN-hand-s1-h00000000"
+def hand_ledger(run="RUN-hand-s1-h00000000", shift=0):
+    """The hand ledger; `shift` moves every terminal event and retirement later (v3.37 compare)."""
     o = lambda n: f"ORD-{run}-{n:06d}"  # noqa: E731
     hu = lambda n: f"HU-{o(n)}-1"  # noqa: E731
     ev = lambda h, v, kind, op, loc, tick, p, c, e, pa, ret=0, scr=0: dict(  # noqa: E731
@@ -61,9 +61,17 @@ def hand_ledger():
         ev(C, 0, "created", "receive", "in", 10, 0, 0, 3, 1),
         ev(C, 1, "queued", "inspect", "ret", 14, 0, 0, 3, 1),
     ]
+    if shift:
+        for h in hus:
+            if h["retired_tick"] is not None:
+                h["retired_tick"] += shift
+        for e in events:
+            if e["kind"] in ("delivered", "restocked", "scrapped"):
+                e["tick"] += shift
+                e["minute"] = e["tick"] * 1.0
     return dict(schema=RL.SCHEMA_ID,
                 run=dict(id=run, scenario="hand", seed=1, hash="00000000", mix={"case-pick": 0.5, "cross-dock": 0.3, "returns": 0.2},
-                         profile="ecommerce", ticks_per_hour=60, minutes_per_tick=1.0, ticks=40, honesty="hand-built test ledger"),
+                         profile="ecommerce", ticks_per_hour=60, minutes_per_tick=1.0, ticks=40 + shift, honesty="hand-built test ledger"),
                 profile=dict(id="ecommerce", label="E-commerce", box="case-400x300x250", pallet="eur", eaches_per_case=12, case_kg=6,
                              max_stack_mm=1800, eaches_per_parcel=6),
                 locations=[dict(id="in", type="dock-in", category="flow", service_ticks=None), dict(id="dep", type="depalletiser", category="flow", service_ticks=None),
@@ -241,6 +249,41 @@ class HandLedger(unittest.TestCase):
         for op, n in at.items():
             self.assertEqual(entering.get(op, 0), n - first.get(op, 0), op)
 
+    # ---- v3.37 compare two runs ----------------------------------------------
+    # B is the same ledger with every terminal event and retirement 10 ticks later.
+    def test_compare_two_runs_by_hand(self):
+        b = hand_ledger("RUN-hand-s2-h00000001", shift=10)
+        run_b = RL.import_ledger(self.db, b)
+        c = RL.compare(self.db, self.run, run_b)
+        cyc = {r["archetype"]: r for r in c["v_compare_cycle"]}
+        self.assertEqual((cyc["case-pick"]["avg_cycle_ticks_a"], cyc["case-pick"]["avg_cycle_ticks_b"], cyc["case-pick"]["delta_avg_cycle_ticks"]), (30.0, 40.0, 10.0))
+        self.assertEqual(cyc["cross-dock"]["delta_avg_cycle_ticks"], 10.0)
+        self.assertEqual((cyc["returns"]["units_a"], cyc["returns"]["units_b"], cyc["returns"]["delta_units"], cyc["returns"]["delta_avg_cycle_ticks"]), (1, 1, 0, None))
+        self.assertEqual({r["archetype"]: r["delta_touches"] for r in c["v_compare_touches"]}, {"case-pick": 0.0, "cross-dock": 0.0, "returns": 0.0})
+        d = c["v_compare_dispatch"][0]
+        self.assertEqual((d["pallets_a"], d["pallets_b"], d["delta_pallets"], d["delta_trailers"]), (2, 2, 0, 0))
+        cost = {r["archetype"]: r for r in c["v_compare_cost"]}
+        self.assertAlmostEqual(cost["case-pick"]["delta_total_eur"], 6.1656, delta=5e-4)  # 10 more forklift ticks = 1/6 h x (35 + 1.09375 + 0.9)
+        self.assertAlmostEqual(cost["cross-dock"]["delta_total_eur"], 6.1656, delta=5e-4)
+        self.assertAlmostEqual(cost["returns"]["delta_total_eur"], 0.0, delta=5e-4)
+        s = c["v_compare_summary"][0]
+        self.assertEqual((s["delta_units"], s["delta_events"], s["delta_delivered"], s["delta_delivered_eaches"]), (0, 0, 0, 0))
+        w = {(r["location"], r["op"]): r for r in c["v_compare_wait"]}
+        self.assertEqual((w[("face", "case-pick")]["delta_waits"], w[("ret", "inspect")]["delta_still_waiting"], w[("ret", "inspect")]["delta_avg_wait_ticks"]), (0, 0, None))
+        # the reverse pair negates every delta
+        r = RL.compare(self.db, run_b, self.run)
+        self.assertEqual({x["archetype"]: x["delta_avg_cycle_ticks"] for x in r["v_compare_cycle"]}["case-pick"], -10.0)
+        self.assertAlmostEqual({x["archetype"]: x["delta_total_eur"] for x in r["v_compare_cost"]}["case-pick"], -6.1656, delta=5e-4)
+
+    def test_compare_keeps_a_key_seen_in_one_run_only(self):
+        b = hand_ledger("RUN-hand-s3-h00000002")
+        b["hus"] = [h for h in b["hus"] if h["archetype"] != "cross-dock"]
+        b["events"] = [e for e in b["events"] if "000002" not in e["hu_id"]]
+        run_b = RL.import_ledger(self.db, b)
+        cyc = {r["archetype"]: r for r in RL.compare(self.db, self.run, run_b)["v_compare_cycle"]}
+        self.assertEqual((cyc["cross-dock"]["units_a"], cyc["cross-dock"]["units_b"], cyc["cross-dock"]["delta_units"]), (1, None, None))
+        self.assertEqual(RL.compare(self.db, self.run, run_b)["v_compare_summary"][0]["delta_units"], -1)
+
     def test_reimport_is_idempotent(self):
         RL.import_ledger(self.db, hand_ledger())
         top = RL.summary(self.db, self.run)["v_run_summary"][0]
@@ -326,6 +369,31 @@ class RecordedFixture(unittest.TestCase):
         self.assertEqual(sql, js)
         self.assertGreater(len(sql), 10)
         HandLedger.assert_flow_identity(self)
+
+    @unittest.skipUnless((FIX / "run-ledger-b.json").exists(), "fixture B not generated")
+    def test_compare_the_two_recorded_runs(self):
+        b = json.loads((FIX / "run-ledger-b.json").read_text(encoding="utf-8"))
+        run_b = RL.import_ledger(self.db, b)
+        self.assertNotEqual(run_b, self.run)
+        sa, sb = RL.summary(self.db, self.run), RL.summary(self.db, run_b)
+        self.assertEqual(sb["invariants"], {n: 0 for n in RL.INVARIANT_VIEWS})
+        ca = {r["archetype"]: r for r in sa["v_cycle_time_by_type"]}
+        cb = {r["archetype"]: r for r in sb["v_cycle_time_by_type"]}
+        c = RL.compare(self.db, self.run, run_b)
+        self.assertEqual({r["archetype"] for r in c["v_compare_cycle"]}, set(ca) | set(cb))
+        for r in c["v_compare_cycle"]:
+            self.assertEqual(r["units_a"], ca[r["archetype"]]["units"] if r["archetype"] in ca else None, r["archetype"])
+            self.assertEqual(r["units_b"], cb[r["archetype"]]["units"] if r["archetype"] in cb else None, r["archetype"])
+        self.assertEqual(c["v_compare_summary"][0]["delta_units"], sb["v_run_summary"][0]["units"] - sa["v_run_summary"][0]["units"])
+        self.assertEqual(max(cb, key=lambda k: cb[k]["units"]), "cross-dock")
+        # B's own views equal its committed JavaScript tables
+        jb = json.loads((FIX / "run-ledger-b.views.json").read_text(encoding="utf-8"))
+        cost_b = {r["archetype"]: r for r in sb["v_cost_by_type"]}
+        for t in jb["costByType"]:
+            self.assertAlmostEqual(cost_b[t["archetype"]]["total_eur"], t["total_eur"], delta=5e-4, msg=t["archetype"])
+        links_b = [{k: r[k] for k in ("from_op", "to_op", "units", "retired_units", "eaches")} for r in
+                   RL.rows(self.db, "SELECT * FROM v_flow_links WHERE run_id = ? ORDER BY from_op, to_op", (run_b,))]
+        self.assertEqual(links_b, jb["flowLinks"])
 
     def test_every_gs1_number_is_unique_and_18_or_14_digits(self):
         ssccs = RL.rows(self.db, "SELECT sscc, gtin14 FROM hu WHERE run_id = ?", (self.run,))

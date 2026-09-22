@@ -1,0 +1,81 @@
+{
+ "units": 39,
+ "events": 167,
+ "delivered": 16,
+ "delivered_eaches": 8676,
+ "delivered_pallets": 16,
+ "delivered_cases": 723,
+ "delivered_parcels": 0,
+ "types": [
+  {
+   "archetype": "case-pick",
+   "units": 6,
+   "retired": 1,
+   "events": 33,
+   "eaches_in": 3456,
+   "eaches_out": 36,
+   "retained": 540,
+   "scrapped": 0,
+   "cycle_ticks": 197,
+   "avg_cycle_ticks": 197,
+   "touches": 5.5,
+   "conserved": true
+  },
+  {
+   "archetype": "cross-dock",
+   "units": 19,
+   "retired": 13,
+   "events": 82,
+   "eaches_in": 10944,
+   "eaches_out": 7488,
+   "retained": 0,
+   "scrapped": 0,
+   "cycle_ticks": 1391,
+   "avg_cycle_ticks": 107,
+   "touches": 4.32,
+   "conserved": true
+  },
+  {
+   "archetype": "full-pallet-out",
+   "units": 8,
+   "retired": 2,
+   "events": 34,
+   "eaches_in": 4608,
+   "eaches_out": 1152,
+   "retained": 0,
+   "scrapped": 0,
+   "cycle_ticks": 360,
+   "avg_cycle_ticks": 180,
+   "touches": 4.25,
+   "conserved": true
+  },
+  {
+   "archetype": "piece-pick",
+   "units": 4,
+   "retired": 0,
+   "events": 13,
+   "eaches_in": 2304,
+   "eaches_out": 0,
+   "retained": 0,
+   "scrapped": 0,
+   "cycle_ticks": 0,
+   "avg_cycle_ticks": null,
+   "touches": 3.25,
+   "conserved": true
+  },
+  {
+   "archetype": "returns",
+   "units": 2,
+   "retired": 1,
+   "events": 5,
+   "eaches_in": 15,
+   "eaches_out": 0,
+   "retained": 9,
+   "scrapped": 0,
+   "cycle_ticks": 134,
+   "avg_cycle_ticks": 134,
+   "touches": 2.5,
+   "conserved": true
+  }
+ ]
+}

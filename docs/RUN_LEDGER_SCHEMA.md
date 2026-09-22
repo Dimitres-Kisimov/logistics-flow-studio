@@ -1,6 +1,6 @@
 # The run ledger — schema, identities, SQL views
 
-*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.36.*
+*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.37.*
 
 ## 1. One stream, three consumers
 
@@ -85,6 +85,8 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 | `v_version_gaps` | a unit whose versions do not run 0 … n−1 |
 | `v_terminal_violations` | a retired unit without a terminal kind, or a live unit with one |
 
+**Compare views** (v3.37): `v_compare_summary`, `v_compare_cycle`, `v_compare_touches`, `v_compare_wait`, `v_compare_dispatch`, `v_compare_cost` — one row per ordered pair of runs in the database and key, deltas B − A, NULL whenever a side lacks the key. `compare --database run.sqlite --runs A B [--out compare.json]` prints or writes them for one pair; the viewer's `RunLedger.compare(A, B)` is the same pairing and the tests equate the two on a hand pair with hand-computed deltas and on the recorded pair (`run-ledger.json` / `run-ledger-b.json`, the same floor and seed with a cross-dock-heavy mix).
+
 Ad-hoc SQL: `query "SELECT …"` accepts one `SELECT` / `WITH` statement and at most 500 rows.
 
 ## 5. What the ledger is not
@@ -94,10 +96,11 @@ Synthetic events from a synthetic teaching simulation — not telemetry, not a W
 ## 6. Reproduce
 
 ```sh
-node tools/make_run_ledger_fixture.mjs       # regenerates test/fixtures/run-ledger.json byte for byte
+node tools/make_run_ledger_fixture.mjs       # regenerates test/fixtures/run-ledger.json and run-ledger-b.json byte for byte ([a|b|all])
 node verify_ledger.js                        # the recorder: identities, exact route walks, conservation, byte-identical sim
 python -m pytest test/test_run_ledger.py -q  # the SQL: hand-built ledger, corruption, SQL == JavaScript stats
 node verify_run_ledger_view.js               # the viewer's model against the same hand ledger and fixture
 node verify_cost_ledger.js                   # spans and money by hand; SQL == JavaScript on the fixture (v3.35)
 node verify_ledger_flow.js                   # flow links, conservation, the layered Sankey geometry (v3.36)
+node verify_run_compare.js                   # two runs paired key by key, deltas B - A (v3.37)
 ```

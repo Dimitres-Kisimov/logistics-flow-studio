@@ -3460,6 +3460,25 @@
       return { ok: !bad && exp.schema === "factory-run-ledger/v1" && exp.hus.length === st.spawned && delivered > 0 && /^RUN-ecommerce-multichannel-fc-s6-h[0-9a-f]{8}$/.test(exp.run.id),
         detail: bad || (exp.hus.length + " units, " + exp.events.length + " events, " + delivered + " delivered, run " + exp.run.id) };
     });
+    // ---- v3.37: two runs on the same floor differ by mix in id and in flow (the viewer compares them).
+    check("run-ledger-two-runs-same-floor-different-mix-differ-in-id-and-flow", function () {
+      var Lg = WT.ledger, F = WT.flowsim, EX2 = WT.examples, P2 = WT.pack;
+      if (!Lg || !F || !EX2 || !P2 || typeof Lg.flowLinks !== "function") return { ok: false, detail: "modules missing" };
+      var b = EX2.build("ecommerce-multichannel-fc");
+      var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
+      var run = function (mix) {
+        var plan = F.spawnPlan(lay, mix ? { seed: 6, mix: mix } : { seed: 6 });
+        var st = F.state(plan);
+        var rec = Lg.create(plan, { scenarioId: "ecommerce-multichannel-fc", seed: 6, mix: mix || null, layout: lay, profile: P2.profileFor("ecommerce-multichannel-fc") });
+        st.hooks = { afterTick: function (s) { Lg.observe(rec, s); } };
+        F.step(st, 200);
+        return Lg.exportJson(rec);
+      };
+      var A2 = run(lay.config.orderMix), B2 = run(null);
+      var la = Lg.flowLinks(A2), lb = Lg.flowLinks(B2);
+      var ok = A2.run.id !== B2.run.id && A2.run.scenario === B2.run.scenario && la.length > lb.length && lb.length >= 1 && !!$("flowLedgerOpen");
+      return { ok: ok, detail: A2.run.id + " (" + la.length + " links) vs " + B2.run.id + " (" + lb.length + " links, standard spine)" };
+    });
     // ---- v3.36: the flow as recorded - a layered, conserving Sankey from the ledger.
     check("ledger-flow-sankey-is-layered-and-conserving", function () {
       var Lg = WT.ledger, F = WT.flowsim, EX2 = WT.examples, P2 = WT.pack, A2 = WT.analytics;

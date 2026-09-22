@@ -711,6 +711,7 @@ const HARNESSES = [
   { name: "The generator places the routing stations on request (verify_gen_stations.js)", args: ["verify_gen_stations.js"] },
   { name: "What a handling unit costs: spans x the recorded rates, hand-checked, SQL == JS (verify_cost_ledger.js)", args: ["verify_cost_ledger.js"] },
   { name: "The flow as recorded: ledger links + layered conserving Sankey, SQL == JS (verify_ledger_flow.js)", args: ["verify_ledger_flow.js"] },
+  { name: "Compare two runs: paired tables, deltas B - A, hand pair + recorded pair, SQL == JS (verify_run_compare.js)", args: ["verify_run_compare.js"] },
   { name: "Timed route playback", args: ["verify_route_playback.js"] },
   { name: "Scheduled resource playback", args: ["verify_resource_playback.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
