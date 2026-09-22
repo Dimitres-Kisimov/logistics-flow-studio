@@ -1,6 +1,6 @@
 # The run ledger — schema, identities, SQL views
 
-*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.35.*
+*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.36.*
 
 ## 1. One stream, three consumers
 
@@ -51,6 +51,8 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 
 **Spans and costs (v3.35).** A *span* is the time between two consecutive events of one unit: `waiting` when the first is `queued` (queue + service, inseparable in the simulation), `moving` otherwise; the last event of a live unit opens no span, and the spans of a retired unit add up to `retired_tick − spawned_tick`. A waiting span is charged the station's `service_ticks` (1 / its service rate) whatever the unit waited — queue time costs nothing, holding cost is not modelled; a moving span is charged in full at `rates.transport` (the first of AGV, forklift, conveyor present on the floor; none = free). Per span: `hours = charged_ticks × minutes_per_tick / 60`; `labour = hours × labour × labour_per_hour`; `equipment = hours × capex / amort_years / hours_per_year`; `energy = hours × power_kw × energy_price_per_kwh`. Manned classes: racking (a picker at the face), workstation, forklift; `staging` has no class and is manned. The rates are the planner's Analyze-panel rates (illustrative teaching values); `ledger.js` `costs(exp)` and the SQL views below are the same arithmetic.
 
+**Flow links (v3.36).** For each unit, consecutive *non-queued* events whose operation changes make one link from the first operation to the second (a queued event is a wait, not a move; the terminal operation's two events collapse). `v_flow_links` counts, per pair of operations, the units, the retired units and the eaches that left the from-operation. Over the retired units every interior operation conserves (in = out); over all units in ≥ out; and for every operation, units entering it = units recorded there − units that started there. `ledger.js` `flowLinks(exp)` is the same definition; `sankeyFromLedger` turns it into the model `analytics.js` draws as a layered Sankey.
+
 **Quantities.** At every event `eaches + retained + scrapped = received_eaches` of its unit. A pallet unit arrives as `cases_per_pallet × eaches_per_case` eaches; a case pick carries the line's cases and books the rest as `retained` (still in stock); a piece pick does the same in eaches; `pack` books `parcels = ⌈eaches / eaches_per_parcel⌉`; `restock` moves everything to `retained`; `scrap` to `scrapped`.
 
 ## 4. The SQL
@@ -70,6 +72,7 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 | `v_dispatch` | delivered units, pallets, cases, eaches, parcels, trailer slots and trailers (⌈pallets / slots⌉) |
 | `v_cost_by_type` | per archetype: units, retired, delivered eaches, labour / equipment / energy / total €, € per unit, € per delivered each (v3.35) |
 | `v_cost_by_location` | per station: waiting spans, ticks, charged ticks and their € — plus one `transport` row for every moving span (v3.35) |
+| `v_flow_links` | per pair of operations: units that moved from the one to the next, retired units, eaches that left (v3.36) |
 
 **Cost views** (v3.35; empty when the run carries no `rates`): `v_spans` pairs each event with the next one of the same unit (`LEAD` over `version`) and names the state; `v_span_cost` charges each span by the rule in §3; `v_cost_by_hu` sums per unit. Rounding happens only at the aggregates (4 dp), so the JavaScript and SQLite sums agree to the tolerance the tests use.
 
@@ -96,4 +99,5 @@ node verify_ledger.js                        # the recorder: identities, exact r
 python -m pytest test/test_run_ledger.py -q  # the SQL: hand-built ledger, corruption, SQL == JavaScript stats
 node verify_run_ledger_view.js               # the viewer's model against the same hand ledger and fixture
 node verify_cost_ledger.js                   # spans and money by hand; SQL == JavaScript on the fixture (v3.35)
+node verify_ledger_flow.js                   # flow links, conservation, the layered Sankey geometry (v3.36)
 ```

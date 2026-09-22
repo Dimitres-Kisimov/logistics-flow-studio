@@ -3,8 +3,8 @@
  * recorded under the default analytics rates (v3.35).
  * Deterministic: the same commit reproduces the same bytes.
  *   node tools/make_run_ledger_fixture.mjs
- * run-ledger.views.json holds the JavaScript cost tables the Python test equates
- * with the SQL views (v_cost_by_type, v_cost_by_location).
+ * run-ledger.views.json holds the JavaScript cost tables and flow links the Python
+ * test equates with the SQL views (v_cost_by_type, v_cost_by_location, v_flow_links).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -47,5 +47,5 @@ const exp = L.exportJson(rec);
 const cost = L.costs(exp);
 fs.writeFileSync(path.join(out, "run-ledger.json"), JSON.stringify(exp, null, 1) + "\n");
 fs.writeFileSync(path.join(out, "run-ledger.stats.json"), JSON.stringify(L.stats(rec), null, 1) + "\n");
-fs.writeFileSync(path.join(out, "run-ledger.views.json"), JSON.stringify({ costByType: cost.byType, costByLocation: cost.byLocation, costTotal: cost.total }, null, 1) + "\n");
+fs.writeFileSync(path.join(out, "run-ledger.views.json"), JSON.stringify({ costByType: cost.byType, costByLocation: cost.byLocation, costTotal: cost.total, flowLinks: L.flowLinks(exp) }, null, 1) + "\n");
 console.log("fixture:", rec.order.length, "units,", rec.events.length, "events, run", rec.run.id, "- cost", cost.total.total_eur, "EUR, transport", exp.rates.transport.class);

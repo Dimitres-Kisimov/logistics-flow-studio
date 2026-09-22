@@ -122,6 +122,7 @@
     const cost = Lg && typeof Lg.costs === "function" ? Lg.costs(exp) : null;
     return { summary, cycle, touches, wait, wip, byOp, dispatch,
       invariants: { v_conservation_violations: conservation, v_cross_dock_violations: crossDock, v_version_gaps: versionGaps, v_terminal_violations: terminals },
+      flowLinks: Lg && typeof Lg.flowLinks === "function" ? Lg.flowLinks(exp) : null, // v3.36
       rates: exp.rates || null, spans: cost ? cost.spans : null, costByHu: cost ? cost.byHu : null,
       costByType: cost ? cost.byType : null, costByLocation: cost ? cost.byLocation : null, costTotal: cost ? cost.total : null };
   }
@@ -177,6 +178,8 @@
     v_quantities_by_op: "SELECT op, kind, COUNT(*) events, SUM(pallets), SUM(cases), SUM(eaches), SUM(parcels), SUM(retained), SUM(scrapped)\nFROM handling_event GROUP BY op, kind;",
     v_dispatch: "SELECT COUNT(*) delivered_units, SUM(final_pallets) pallets, SUM(final_cases) cases, SUM(final_eaches) eaches,\n       SUM(final_parcels) parcels, MAX(p.trailer_slots) trailer_slots,\n       (SUM(final_pallets) + MAX(p.trailer_slots) - 1) / MAX(p.trailer_slots) trailers\nFROM hu h JOIN pallet_type p ON p.id = COALESCE(h.pallet, 'eur') WHERE final_kind = 'delivered';",
     v_run_summary: "SELECT r.scenario, r.seed, r.profile, r.ticks, (SELECT COUNT(*) FROM hu) units, (SELECT COUNT(*) FROM handling_event) events,\n       (SELECT COUNT(*) FROM hu WHERE final_kind = 'delivered') delivered,\n       (SELECT COALESCE(SUM(final_eaches), 0) FROM hu WHERE final_kind = 'delivered') delivered_eaches,\n       (SELECT COALESCE(SUM(final_pallets), 0) FROM hu WHERE final_kind = 'delivered') delivered_pallets,\n       (SELECT COALESCE(SUM(final_parcels), 0) FROM hu WHERE final_kind = 'delivered') delivered_parcels\nFROM run r;",
+    // v3.36 the flow as recorded
+    v_flow_links: "WITH s AS (SELECT e.hu_id, e.op, e.eaches, h.retired_tick, LEAD(e.op) OVER (PARTITION BY e.hu_id ORDER BY e.version) to_op\n  FROM handling_event e JOIN hu h ON h.id = e.hu_id WHERE e.kind <> 'queued')\nSELECT op from_op, to_op, COUNT(*) units, SUM(retired_tick IS NOT NULL) retired_units, SUM(eaches) eaches\nFROM s WHERE to_op IS NOT NULL AND to_op <> op GROUP BY op, to_op;",
     // v3.35 what a handling unit costs
     v_spans: "WITH s AS (SELECT hu_id, version, kind, op, location, tick,\n  LEAD(tick) OVER (PARTITION BY hu_id ORDER BY version) to_tick, LEAD(kind) OVER w to_kind, LEAD(op) OVER w to_op, LEAD(location) OVER w to_location\n  FROM handling_event WINDOW w AS (PARTITION BY hu_id ORDER BY version))\nSELECT hu_id, version, kind from_kind, op, location, tick from_tick, to_kind, to_op, to_location, to_tick, to_tick - tick ticks,\n       CASE WHEN kind = 'queued' THEN 'waiting' ELSE 'moving' END state\nFROM s WHERE to_tick IS NOT NULL;",
     v_span_cost: "-- a waiting span is charged the station's service time (1 / its rate); a moving span in full at the floor's mover class\nWITH c AS (SELECT s.*, CASE WHEN s.state = 'waiting' THEN COALESCE(l.service_ticks, 0) ELSE s.ticks END charged_ticks,\n  CASE WHEN s.state = 'waiting' THEN lc.class ELSE r.transport_class END class,\n  CASE WHEN s.state = 'waiting' THEN COALESCE(lc.labour, 0) ELSE r.transport_labour END labour\n  FROM v_spans s JOIN rate r LEFT JOIN location l ON l.id = s.location LEFT JOIN location_class lc ON lc.type = l.type)\nSELECT c.hu_id, c.version, c.state, c.op, c.location, c.ticks, c.charged_ticks, c.class, c.labour,\n       c.charged_ticks * run.minutes_per_tick / 60.0 hours,\n       hours * c.labour * r.labour_per_hour labour_eur,\n       hours * COALESCE(er.capex / er.amort_years / r.hours_per_year, 0) equipment_eur,\n       hours * COALESCE(er.power_kw, 0) * r.energy_price_per_kwh energy_eur\nFROM c JOIN run JOIN rate r LEFT JOIN equipment_rate er ON er.class = c.class;",
@@ -370,6 +373,25 @@
       sqlBlock("v_conservation_violations") + sqlBlock("v_cross_dock_violations") + sqlBlock("v_version_gaps") + sqlBlock("v_terminal_violations");
   }
 
+  // v3.36 the flow as recorded: a layered Sankey over the recorded links
+  function renderFlow(exp) {
+    const out = $("rlFlow");
+    const Lg = window.WT && window.WT.ledger, An = window.WT && window.WT.analytics;
+    if (!Lg || !An || typeof Lg.sankeyFromLedger !== "function" || typeof An.sankeySvgLayered !== "function") { out.innerHTML = "<p class=\"note\">ledger.js / analytics.js are not loaded on this page.</p>"; return; }
+    out.innerHTML = '<p><label for="rlFlowUnit">Ribbon width:</label> <select id="rlFlowUnit"><option value="units">units, every unit</option><option value="retired">units, retired only (conserving)</option><option value="eaches">eaches</option></select></p><div id="rlFlowSvg"></div><div id="rlFlowTable"></div>';
+    const draw = () => {
+      const mode = $("rlFlowUnit").value;
+      const model = Lg.sankeyFromLedger(exp, { unit: mode === "eaches" ? "eaches" : "units", retiredOnly: mode === "retired" });
+      const geo = An.sankeyLayoutLayered(model);
+      $("rlFlowSvg").innerHTML = '<div class="an-sankey">' + An.sankeySvgLayered(model, "dark") + "</div>";
+      const links = Lg.flowLinks(exp);
+      $("rlFlowTable").innerHTML = table(links, ["from_op", "to_op", "units", "retired_units", "eaches"], "Links between operations (" + links.length + ")") + sqlBlock("v_flow_links") +
+        "<p class=\"note\">" + esc(model.honesty) + (geo && geo.cyclic ? " A cycle was found: back-links are outlined." : "") + "</p>";
+    };
+    $("rlFlowUnit").onchange = draw;
+    draw();
+  }
+
   // v3.35 what a handling unit costs
   const money = (v) => (v == null ? "—" : "€\u202f" + (Math.round(v * 100) / 100).toFixed(2));
   function renderCost(exp) {
@@ -443,7 +465,7 @@
     EXP = exp;
     $("rlStatus").textContent = "Loaded " + exp.hus.length + " units and " + exp.events.length + " events from " + exp.run.id + ".";
     $("rlView").hidden = false;
-    renderRun(exp); renderPackaging(exp); renderOptimise(exp); renderRibbon(exp); renderViews(exp); renderCost(exp); renderTrace(exp);
+    renderRun(exp); renderPackaging(exp); renderOptimise(exp); renderRibbon(exp); renderFlow(exp); renderViews(exp); renderCost(exp); renderTrace(exp);
   }
 
   $("rlFile").addEventListener("change", (ev) => {

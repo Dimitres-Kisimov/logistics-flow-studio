@@ -35,6 +35,12 @@
  *   locations [{ id, type, category, service_ticks }]   (service_ticks: v3.35, null off a station)
  *   rates  (v3.35, optional) the illustrative rates the run was recorded under - see ratesBlock()
  *
+ * FLOW (v3.36) - the flow AS RECORDED: flowLinks(exp) counts, per pair of
+ *   operations, the units whose consecutive non-queued events moved from the
+ *   one to the other (queued events are waits, not moves; a unit's two events
+ *   at its terminal operation collapse); sankeyFromLedger(exp) is the model
+ *   analytics.js draws as a layered Sankey. Same definition as v_flow_links.
+ *
  * COST (v3.35) - "what a handling unit costs", computed from the export alone:
  *   a SPAN is the time between two consecutive events of a unit: WAITING when
  *   the first is `queued` (queue + service at that station, inseparable in the
@@ -455,7 +461,60 @@
       delivered_pallets: pallets, delivered_cases: cases, delivered_parcels: parcels, types: types };
   }
 
+  /* ---------------- the flow as recorded (v3.36) ---------------------- */
+  const FLOW_HONESTY =
+    "The flow as recorded: one link per unit that moved from one operation to the next (a queued event is a wait, " +
+    "not a move; a unit's two events at its terminal operation collapse). In units, every interior operation conserves " +
+    "over the retired units; in eaches it does not, because picks leave stock behind. Synthetic events from a synthetic simulation.";
+  // Links between operations, per unit: consecutive NON-queued events whose
+  // operation changes. units = every unit, retired_units = those that retired,
+  // eaches = what left the from-operation. Sorted by (from_op, to_op) like SQL.
+  function flowLinks(exp) {
+    const byHu = {};
+    for (const e of exp.events) (byHu[e.hu_id] = byHu[e.hu_id] || []).push(e);
+    const agg = {};
+    for (const h of exp.hus) {
+      const evs = (byHu[h.id] || []).filter((e) => e.kind !== "queued").sort((a, b) => a.version - b.version);
+      for (let i = 0; i < evs.length - 1; i++) {
+        const a = evs[i], b = evs[i + 1];
+        if (a.op === b.op) continue;
+        const k = a.op + "\u0000" + b.op;
+        const l = agg[k] || (agg[k] = { from_op: a.op, to_op: b.op, units: 0, retired_units: 0, eaches: 0 });
+        l.units++;
+        if (h.retired_tick != null) l.retired_units++;
+        l.eaches += a.eaches;
+      }
+    }
+    const cmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
+    return Object.keys(agg).map((k) => agg[k]).sort((a, b) => cmp(a.from_op, b.from_op) || cmp(a.to_op, b.to_op));
+  }
+  // The Sankey model analytics.js draws: nodes = the operations seen (in the
+  // catalogue's order), links valued in units (default), retired units only
+  // (conserving) or eaches.
+  function sankeyFromLedger(exp, opts) {
+    const o = opts || {};
+    const unit = o.unit === "eaches" ? "eaches" : "units";
+    const R = WT.routing;
+    const all = flowLinks(exp);
+    const seen = {};
+    for (const e of exp.events) if (e.kind !== "queued") seen[e.op] = 1;
+    const order = R && Array.isArray(R.OPERATION_ORDER) ? R.OPERATION_ORDER : [];
+    const rank = (id) => { const i = order.indexOf(id); return i < 0 ? 1e9 : i; };
+    const ids = Object.keys(seen).sort((a, b) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0));
+    const idx = {};
+    const nodes = ids.map((id, i) => { idx[id] = i; const d = R && R.OPERATIONS ? R.OPERATIONS[id] : null; return { id: id, name: id, label: d ? d.label : id, kind: "op" }; });
+    let maxVolume = 0;
+    const links = all.map((l) => {
+      const value = unit === "eaches" ? l.eaches : (o.retiredOnly ? l.retired_units : l.units);
+      maxVolume = Math.max(maxVolume, value);
+      return { from: l.from_op, to: l.to_op, fromIdx: idx[l.from_op], toIdx: idx[l.to_op], value: value, units: l.units, retired_units: l.retired_units, eaches: l.eaches };
+    });
+    return { mode: "ledger", unit: unit, nodes: nodes, links: links, maxVolume: maxVolume, honesty: FLOW_HONESTY };
+  }
+
   WT.ledger = { SCHEMA, HONESTY, TERMINAL, create, observe, exportJson, stats, minutesPerTick, locationFor,
     // v3.35 what a handling unit costs
-    RATES_HONESTY, CLASS_LABOUR, TRANSPORT_ORDER, classOfType, ratesBlock, spans, costs };
+    RATES_HONESTY, CLASS_LABOUR, TRANSPORT_ORDER, classOfType, ratesBlock, spans, costs,
+    // v3.36 the flow as recorded
+    FLOW_HONESTY, flowLinks, sankeyFromLedger };
 })();

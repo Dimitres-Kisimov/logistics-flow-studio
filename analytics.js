@@ -414,6 +414,123 @@
     return s;
   }
 
+  /* ==================================================================
+   * LAYERED SANKEY (v3.36) - a BRANCHING flow network (the run ledger's
+   * recorded flow: returns split into restock / scrap, cross-dock bypasses
+   * storage). Columns by longest path from the sources over the link DAG,
+   * nodes stacked per column, every ribbon leaving and entering a bar in
+   * its own slice. Pure geometry; the linear sankeyLayout above is
+   * untouched (golden-hashed in verify_analytics.js).
+   * ================================================================== */
+  function sankeyLayoutLayered(model, dims) {
+    if (!model || !Array.isArray(model.nodes) || model.nodes.length < 2) return null;
+    dims = dims || {};
+    const W = num(dims.width, 900), H = num(dims.height, 360);
+    const padL = num(dims.padL, 10), padR = num(dims.padR, 10), padT = num(dims.padT, 30), padB = num(dims.padB, 24);
+    const nodeW = num(dims.nodeW, 12), nodeGap = num(dims.nodeGap, 10), minThick = num(dims.minThick, 1), minH = minThick + 2;
+    const n = model.nodes.length;
+    const links = (model.links || []).filter((l) => l.fromIdx >= 0 && l.fromIdx < n && l.toIdx >= 0 && l.toIdx < n);
+    // columns = longest path from a source (Kahn's order); nodes a cycle
+    // leaves unplaced go after the last column and the model is flagged
+    const indeg = new Array(n).fill(0), col = new Array(n).fill(-1), outs = model.nodes.map(() => []);
+    for (const l of links) { indeg[l.toIdx]++; outs[l.fromIdx].push(l.toIdx); }
+    const queue = [];
+    for (let i = 0; i < n; i++) if (indeg[i] === 0) { col[i] = 0; queue.push(i); }
+    while (queue.length) {
+      const i = queue.shift();
+      for (const j of outs[i]) { col[j] = Math.max(col[j], col[i] + 1); if (--indeg[j] === 0) queue.push(j); }
+    }
+    let cyclic = false, maxCol = 0;
+    for (let i = 0; i < n; i++) if (col[i] > maxCol) maxCol = col[i];
+    for (let i = 0; i < n; i++) if (col[i] < 0) { cyclic = true; col[i] = maxCol + 1; }
+    const nCols = (cyclic ? maxCol + 1 : maxCol) + 1;
+    const columns = [];
+    for (let c = 0; c < nCols; c++) columns.push([]);
+    for (let i = 0; i < n; i++) columns[col[i]].push(i);
+    // the flow through a node = max(in, out); the scale is set by the tightest column
+    const inSum = new Array(n).fill(0), outSum = new Array(n).fill(0);
+    for (const l of links) { outSum[l.fromIdx] += Math.max(0, l.value); inSum[l.toIdx] += Math.max(0, l.value); }
+    const flow = model.nodes.map((_, i) => Math.max(inSum[i], outSum[i]));
+    const chartH = Math.max(1, H - padT - padB), innerW = Math.max(1, W - padL - padR - nodeW);
+    let scale = Infinity;
+    for (const c of columns) {
+      const f = c.reduce((s, i) => s + flow[i], 0);
+      if (f > 0) scale = Math.min(scale, Math.max(1, chartH - nodeGap * (c.length - 1)) / f);
+    }
+    if (!Number.isFinite(scale)) scale = 1;
+    // a small model must not fill the chart: cap the widest ribbon like the linear layout does
+    const maxThick = num(dims.maxThick, 90), maxVal = links.reduce((m, l) => Math.max(m, l.value), 0);
+    if (maxVal > 0) scale = Math.min(scale, maxThick / maxVal);
+    let domIdx = -1, domVal = -1;
+    links.forEach((l, i) => { if (l.value > domVal + 1e-9) { domVal = l.value; domIdx = i; } });
+    // ribbon widths (floored at minThick), then bars tall enough for their slices
+    const w = links.map((l) => (l.value > 0 ? Math.max(minThick, l.value * scale) : 0));
+    const inW = new Array(n).fill(0), outW = new Array(n).fill(0);
+    links.forEach((l, i) => { outW[l.fromIdx] += w[i]; inW[l.toIdx] += w[i]; });
+    const step = nCols > 1 ? innerW / (nCols - 1) : 0;
+    const nodes = model.nodes.map((nd, i) => ({ id: nd.id, name: nd.name, label: nd.label || nd.name, kind: nd.kind, index: i, column: col[i], row: 0,
+      x: padL + step * col[i], w: nodeW, y: 0, h: Math.max(minH, inW[i], outW[i]), inSum: inSum[i], outSum: outSum[i] }));
+    columns.forEach((c) => {
+      const total = c.reduce((s, i) => s + nodes[i].h, 0) + nodeGap * (c.length - 1);
+      let y = padT + Math.max(0, (chartH - total) / 2);
+      c.forEach((i, r) => { nodes[i].row = r; nodes[i].y = y; y += nodes[i].h + nodeGap; });
+    });
+    // slices: a bar's out-links leave it ordered by where they go (column,
+    // then height); its in-links enter ordered by where they come from
+    const outOff = new Array(n).fill(0), inOff = new Array(n).fill(0);
+    const y0 = new Array(links.length).fill(0), y1 = new Array(links.length).fill(0);
+    const byOut = links.map((l, i) => i).sort((a, b) => links[a].fromIdx - links[b].fromIdx || nodes[links[a].toIdx].column - nodes[links[b].toIdx].column || nodes[links[a].toIdx].y - nodes[links[b].toIdx].y || a - b);
+    for (const i of byOut) { const f = links[i].fromIdx; y0[i] = nodes[f].y + outOff[f]; outOff[f] += w[i]; }
+    const byIn = links.map((l, i) => i).sort((a, b) => links[a].toIdx - links[b].toIdx || nodes[links[a].fromIdx].column - nodes[links[b].fromIdx].column || nodes[links[a].fromIdx].y - nodes[links[b].fromIdx].y || a - b);
+    for (const i of byIn) { const t = links[i].toIdx; y1[i] = nodes[t].y + inOff[t]; inOff[t] += w[i]; }
+    const geoLinks = links.map((l, i) => ({ index: i, from: l.from, to: l.to, fromIdx: l.fromIdx, toIdx: l.toIdx, value: l.value, w: w[i],
+      x0: nodes[l.fromIdx].x + nodeW, x1: nodes[l.toIdx].x, y0Top: y0[i], y0Bot: y0[i] + w[i], y1Top: y1[i], y1Bot: y1[i] + w[i],
+      back: nodes[l.toIdx].column <= nodes[l.fromIdx].column, isDominant: i === domIdx && l.value > 0 }));
+    return { width: W, height: H, padT: padT, columns: columns, nodes: nodes, links: geoLinks, maxVolume: model.maxVolume > 0 ? model.maxVolume : 1,
+      unit: model.unit, dominantIndex: domIdx, scale: scale, cyclic: cyclic };
+  }
+
+  function sankeySvgLayered(model, theme, dims) {
+    const th = resolveTheme(theme);
+    const t = th.t;
+    const geo = sankeyLayoutLayered(model, dims);
+    if (!geo) {
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 60" role="img" width="100%">' +
+        '<title>Recorded material flow</title>' +
+        '<text x="12" y="34" font-family="system-ui,sans-serif" font-size="13" fill="' + t.sub + '">No recorded flow to draw yet.</text></svg>';
+    }
+    const W = geo.width, H = geo.height;
+    let s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + r2(W) + ' ' + r2(H) +
+      '" role="img" width="100%" preserveAspectRatio="xMidYMid meet" class="an-sankey-svg">';
+    s += '<title>The flow as recorded, operation by operation</title>';
+    s += '<desc>Layered material-flow Sankey from the run ledger; ribbon widths are proportional to ' + esc(model.unit) +
+      '. Recorded from a synthetic simulation, deterministic.</desc>';
+    for (const l of geo.links) {
+      if (l.w <= 0) continue;
+      const mx = (l.x0 + l.x1) / 2;
+      const d =
+        "M" + r2(l.x0) + " " + r2(l.y0Top) +
+        "C" + r2(mx) + " " + r2(l.y0Top) + " " + r2(mx) + " " + r2(l.y1Top) + " " + r2(l.x1) + " " + r2(l.y1Top) +
+        "L" + r2(l.x1) + " " + r2(l.y1Bot) +
+        "C" + r2(mx) + " " + r2(l.y1Bot) + " " + r2(mx) + " " + r2(l.y0Bot) + " " + r2(l.x0) + " " + r2(l.y0Bot) +
+        "Z";
+      s += '<path d="' + d + '" fill="' + (l.isDominant ? t.flow : t.flowSoft) + '" fill-opacity="' + (l.isDominant ? "0.85" : "0.55") + '"' +
+        (l.back ? ' stroke="' + t.warn + '" stroke-width="1"' : "") + '>' +
+        '<title>' + esc(model.nodes[l.fromIdx].name) + " -> " + esc(model.nodes[l.toIdx].name) + ": " + esc(fmt(l.value)) + " " + esc(model.unit) + '</title></path>';
+    }
+    const lastCol = geo.columns.length - 1;
+    for (const nd of geo.nodes) {
+      s += '<rect x="' + r2(nd.x) + '" y="' + r2(nd.y) + '" width="' + r2(nd.w) + '" height="' + r2(nd.h) + '" rx="2" fill="' + t.node + '">' +
+        '<title>' + esc(nd.label) + ": in " + esc(fmt(nd.inSum)) + ", out " + esc(fmt(nd.outSum)) + " " + esc(model.unit) + '</title></rect>';
+      const right = nd.column < lastCol;
+      s += '<text x="' + r2(right ? nd.x + nd.w + 4 : nd.x - 4) + '" y="' + r2(nd.y + nd.h / 2 + 3.5) + '" font-family="system-ui,-apple-system,sans-serif" ' +
+        'font-size="10" fill="' + t.sub + '" text-anchor="' + (right ? "start" : "end") + '">' + esc(shortName(nd.name)) + '</text>';
+    }
+    if (geo.cyclic) s += '<text x="' + r2(W - 10) + '" y="' + r2(H - 6) + '" font-family="system-ui,sans-serif" font-size="10" fill="' + t.warn + '" text-anchor="end">a cycle was found: back-links are outlined</text>';
+    s += "</svg>";
+    return s;
+  }
+
   function shortName(name) {
     const s = String(name == null ? "" : name);
     return s.length > 22 ? s.slice(0, 21) + "…" : s;
@@ -821,6 +938,9 @@
     sankeyFromWarehouse: sankeyFromWarehouse,
     sankeyLayout: sankeyLayout,
     sankeySvg: sankeySvg,
+    // v3.36 layered (branching) sankey for the run ledger's recorded flow
+    sankeyLayoutLayered: sankeyLayoutLayered,
+    sankeySvgLayered: sankeySvgLayered,
     // v3.2 cost + energy analyzers (read-only, editable illustrative rates)
     COST_HONESTY: COST_HONESTY,
     ENERGY_HONESTY: ENERGY_HONESTY,

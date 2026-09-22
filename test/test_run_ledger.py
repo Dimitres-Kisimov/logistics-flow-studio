@@ -220,6 +220,27 @@ class HandLedger(unittest.TestCase):
         self.assertEqual(RL.rows(db, "SELECT * FROM v_cost_by_location WHERE run_id = ?", (run,)), [])
         self.assertEqual(len(RL.rows(db, "SELECT * FROM v_spans WHERE run_id = ?", (run,))), 8)
 
+    # ---- v3.36 the flow as recorded ------------------------------------------
+    def test_flow_links_by_hand(self):
+        links = [(r["from_op"], r["to_op"], r["units"], r["retired_units"], r["eaches"]) for r in self.view("v_flow_links")]
+        self.assertEqual(links, [("case-pick", "palletise", 1, 1, 48), ("depalletise", "case-pick", 1, 1, 576), ("palletise", "load", 1, 1, 48),
+                                 ("receive", "depalletise", 1, 1, 576), ("receive", "stage-out", 1, 1, 576), ("stage-out", "load", 1, 1, 576)])
+        # C has a single non-queued event -> no link; queued events never link
+
+    def test_flow_links_conserve_units_at_every_operation(self):
+        self.assert_flow_identity()
+
+    def assert_flow_identity(self):
+        """For every operation X: units entering X = units with a non-queued event at X minus those that started there."""
+        entering = {r["to_op"]: r["n"] for r in RL.rows(self.db, "SELECT to_op, SUM(units) AS n FROM v_flow_links WHERE run_id = ? GROUP BY to_op", (self.run,))}
+        at = {r["op"]: r["n"] for r in RL.rows(self.db,
+            "SELECT e.op, COUNT(DISTINCT e.hu_id) AS n FROM handling_event e JOIN hu h ON h.id = e.hu_id WHERE h.run_id = ? AND e.kind <> 'queued' GROUP BY e.op", (self.run,))}
+        first = {r["op"]: r["n"] for r in RL.rows(self.db,
+            "SELECT op, COUNT(*) AS n FROM (SELECT e.hu_id, e.op FROM handling_event e JOIN hu h ON h.id = e.hu_id WHERE h.run_id = ? AND e.kind <> 'queued' "
+            "AND e.version = (SELECT MIN(x.version) FROM handling_event x WHERE x.hu_id = e.hu_id AND x.kind <> 'queued')) GROUP BY op", (self.run,))}
+        for op, n in at.items():
+            self.assertEqual(entering.get(op, 0), n - first.get(op, 0), op)
+
     def test_reimport_is_idempotent(self):
         RL.import_ledger(self.db, hand_ledger())
         top = RL.summary(self.db, self.run)["v_run_summary"][0]
@@ -297,6 +318,14 @@ class RecordedFixture(unittest.TestCase):
                 self.assertAlmostEqual(got[key], want[key], delta=5e-4, msg=f"{want['location']} {key}")
         self.assertAlmostEqual(sum(r["total_eur"] for r in s["v_cost_by_type"]), js["costTotal"]["total_eur"], delta=1e-2)
         self.assertGreater(js["costTotal"]["total_eur"], 0)
+
+    def test_sql_flow_links_equal_javascript(self):
+        js = json.loads((FIX / "run-ledger.views.json").read_text(encoding="utf-8"))["flowLinks"]
+        sql = [{k: r[k] for k in ("from_op", "to_op", "units", "retired_units", "eaches")} for r in
+               RL.rows(self.db, "SELECT * FROM v_flow_links WHERE run_id = ? ORDER BY from_op, to_op", (self.run,))]
+        self.assertEqual(sql, js)
+        self.assertGreater(len(sql), 10)
+        HandLedger.assert_flow_identity(self)
 
     def test_every_gs1_number_is_unique_and_18_or_14_digits(self):
         ssccs = RL.rows(self.db, "SELECT sscc, gtin14 FROM hu WHERE run_id = ?", (self.run,))

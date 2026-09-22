@@ -135,6 +135,21 @@ SELECT r.id AS run_id, r.scenario, r.seed, r.profile, r.ticks,
        (SELECT COALESCE(SUM(h.final_pallets), 0) FROM hu h WHERE h.run_id = r.id AND h.final_kind = 'delivered') AS delivered_pallets,
        (SELECT COALESCE(SUM(h.final_parcels), 0) FROM hu h WHERE h.run_id = r.id AND h.final_kind = 'delivered') AS delivered_parcels
 FROM run r;""",
+    # ---- v3.36 the flow as recorded ---------------------------------------------
+    # One link per unit that moved from one operation to the next: consecutive
+    # non-queued events (a queued event is a wait, not a move) whose operation
+    # changes (a unit's two events at its terminal operation collapse).
+    "v_flow_links": """
+CREATE VIEW IF NOT EXISTS v_flow_links AS
+WITH s AS (
+  SELECT h.run_id, e.hu_id, e.op, e.eaches, h.retired_tick,
+         LEAD(e.op) OVER (PARTITION BY e.hu_id ORDER BY e.version) AS to_op
+  FROM handling_event e JOIN hu h ON h.id = e.hu_id
+  WHERE e.kind <> 'queued')
+SELECT run_id, op AS from_op, to_op, COUNT(*) AS units,
+       SUM(CASE WHEN retired_tick IS NOT NULL THEN 1 ELSE 0 END) AS retired_units, SUM(eaches) AS eaches
+FROM s WHERE to_op IS NOT NULL AND to_op <> op
+GROUP BY run_id, op, to_op;""",
     # ---- v3.35 what a handling unit costs ---------------------------------------
     # A span is the time between two consecutive events of a unit: WAITING when the
     # first is `queued` (queue + service, inseparable), MOVING otherwise.
@@ -232,7 +247,7 @@ WHERE (h.retired_tick IS NOT NULL AND h.final_kind NOT IN ('delivered', 'restock
 }
 INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations")
 PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
-                 "v_cost_by_type", "v_cost_by_location")
+                 "v_cost_by_type", "v_cost_by_location", "v_flow_links")
 COST_VIEWS = ("v_spans", "v_span_cost", "v_cost_by_hu", "v_cost_by_type", "v_cost_by_location")
 
 

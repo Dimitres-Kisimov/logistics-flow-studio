@@ -710,6 +710,7 @@ const HARNESSES = [
   { name: "The run-ledger viewer: every table by the SQL definitions, hand-checked (verify_run_ledger_view.js)", args: ["verify_run_ledger_view.js"] },
   { name: "The generator places the routing stations on request (verify_gen_stations.js)", args: ["verify_gen_stations.js"] },
   { name: "What a handling unit costs: spans x the recorded rates, hand-checked, SQL == JS (verify_cost_ledger.js)", args: ["verify_cost_ledger.js"] },
+  { name: "The flow as recorded: ledger links + layered conserving Sankey, SQL == JS (verify_ledger_flow.js)", args: ["verify_ledger_flow.js"] },
   { name: "Timed route playback", args: ["verify_route_playback.js"] },
   { name: "Scheduled resource playback", args: ["verify_resource_playback.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },

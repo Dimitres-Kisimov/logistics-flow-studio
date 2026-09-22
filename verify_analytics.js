@@ -200,6 +200,18 @@ function sankeyChecks(tag, model, unit) {
   sankeyChecks("warehouse sankey", A.sankeyFromWarehouse(wms), "units");
 }
 
+/* ---- 4b. (v3.36) the LINEAR sankey is frozen: golden hashes of a hand model -- */
+{
+  const crypto = require("crypto");
+  const sha = (s) => crypto.createHash("sha1").update(s).digest("hex");
+  const hand = { mode: "warehouse", unit: "units", nodes: [{ id: "receiving", name: "Receiving", kind: "stage" }, { id: "storage", name: "Storage", kind: "stage" }, { id: "shipping", name: "Shipping", kind: "stage" }],
+    links: [{ from: "receiving", to: "storage", fromIdx: 0, toIdx: 1, value: 10 }, { from: "storage", to: "shipping", fromIdx: 1, toIdx: 2, value: 6 }], maxVolume: 10, honesty: "hand" };
+  check("linear sankey: sankeySvg(hand, light) is byte-identical to v3.35 (sha1 25c555a5...)", sha(A.sankeySvg(hand, "light")) === "25c555a5434113107cdb0faa99d71bc5a1bdc229", sha(A.sankeySvg(hand, "light")));
+  check("linear sankey: sankeySvg(hand, dark) is byte-identical to v3.35 (sha1 a1bbbf8c...)", sha(A.sankeySvg(hand, "dark")) === "a1bbbf8c6820cb119abf3c6557450997a2f59e2c", sha(A.sankeySvg(hand, "dark")));
+  check("linear sankey: sankeyLayout(hand) geometry is byte-identical to v3.35 (sha1 f12ec172...)", sha(JSON.stringify(A.sankeyLayout(hand))) === "f12ec1728898f9021ba1c9cab0a82ce1e507c91e", sha(JSON.stringify(A.sankeyLayout(hand))));
+  check("layered sankey (v3.36) is exported beside it", typeof A.sankeyLayoutLayered === "function" && typeof A.sankeySvgLayered === "function");
+}
+
 /* ---- 5. Bottleneck bar-chart SVG: deterministic, 0-based, proportional -- */
 {
   const fac = G.generateFactoryLayout("assembly-line", { seed: 7 });
@@ -407,8 +419,8 @@ function costEnergyChecks(tag, input) {
   check("index.html ships the Cost + Energy drill-ins in the Analyze card (v3.2)",
     /id="analyzeCost"/.test(idx) && /id="analyzeEnergy"/.test(idx) &&
     /id="analyzeCostDetails"/.test(idx) && /id="analyzeEnergyDetails"/.test(idx));
-  check("sw.js precaches ./analytics.js at the bumped wt-v117 cache",
-    /["']\.\/analytics\.js["']/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v117"/.test(sw));
+  check("sw.js precaches ./analytics.js at the bumped wt-v118 cache",
+    /["']\.\/analytics\.js["']/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v118"/.test(sw));
   check("app.js wires the Analyze button + exposes the self-test hooks (bottleneck + cost + energy)",
     /analyzeBtn"\)\.addEventListener\("click", renderAnalyzePanel\)/.test(app) &&
     /renderAnalyzePanel:\s*renderAnalyzePanel/.test(app) &&

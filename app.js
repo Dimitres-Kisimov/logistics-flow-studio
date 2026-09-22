@@ -7482,6 +7482,16 @@
       }
       html += '<div class="an-sankey">' + WT.analytics.sankeySvg(s, theme) + "</div>";
       html += '<p class="proc-basis">Material-flow Sankey — deterministic, hand-drawn SVG (no plotting library). ' + esc(s.honesty) + "</p>";
+      // v3.36: the flow AS RECORDED by the run ledger (branching, layered), beside the stage model
+      if (state.flow && state.flow.ledger && WT.ledger && typeof WT.ledger.sankeyFromLedger === "function" && typeof WT.analytics.sankeySvgLayered === "function") {
+        const lexp = WT.ledger.exportJson(state.flow.ledger);
+        const lm = WT.ledger.sankeyFromLedger(lexp, { unit: "units" });
+        if (lm.links.length) {
+          html += '<p class="analyze-metric-note"><strong>The flow as recorded by the run ledger</strong> — ' + lexp.hus.length + " units, " + lexp.events.length + " events, tick " + lexp.run.ticks + ". Ribbon width = units that moved from one operation to the next.</p>";
+          html += '<div class="an-sankey">' + WT.analytics.sankeySvgLayered(lm, theme) + "</div>";
+          html += '<p class="proc-basis">' + esc(lm.honesty) + "</p>";
+        }
+      }
       sankeyHost.innerHTML = html;
     }
 

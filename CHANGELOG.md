@@ -1,5 +1,36 @@
 # Changelog
 
+## v3.36 — The flow, as recorded
+
+**Links from the ledger.** `ledger.js` `flowLinks(exp)`: per pair of operations, the
+units whose consecutive NON-queued events moved from the one to the other (a queued
+event is a wait, not a move; a unit's two events at its terminal operation collapse),
+with the retired units and the eaches that left the from-operation; `sankeyFromLedger`
+builds the model (nodes in the operation catalogue's order; links in units, retired
+units only, or eaches). Same definition as the SQL view `v_flow_links` (LEAD over each
+unit's versions), proved equal on the hand ledger (six links) and the recorded fixture
+(26 links), plus the identity units entering X = units recorded at X - units that
+started at X, in JavaScript and in SQL.
+
+**Layered Sankey.** `analytics.js` `sankeyLayoutLayered` / `sankeySvgLayered`: a
+branching network - columns by longest path from the sources (Kahn's order), nodes
+stacked per column with a gap, a bar as tall as the larger of what enters and what
+leaves it, every ribbon in its own slice ordered by where it goes / comes from, the
+scale set by the tightest column, a cycle flagged and its back-links outlined. The
+linear `sankeyLayout` / `sankeySvg` are untouched: `verify_analytics.js` now freezes
+them with golden sha1 hashes of a hand model (light, dark, geometry).
+
+**Viewer and planner.** `run-ledger.html` gains *The flow, as recorded* (units / retired
+only / eaches, the link table, the SQL) and loads `analytics.js`; the planner's Analyze
+card draws the recorded network under the stage-model Sankey once a run has a ledger.
+
+**Verification.** `verify_ledger_flow.js` (34 checks: the hand links and columns,
+geometry - no overlap, slices inside bars, width proportional, one dominant - on hand
+and recorded models, conservation over retired units and in >= out over all, the
+entering identity, no back-links because every route is acyclic, eaches mode, a
+synthetic cycle flagged, wiring). Python +3, self-test +1.
+68 harnesses, 84 Python tests, WT-SELFTEST 176/176. Cache wt-v118.
+
 ## v3.35 — What a handling unit costs
 
 **Spans and costs.** `ledger.js` `spans(exp)` / `costs(exp[, rates])`, computed from the

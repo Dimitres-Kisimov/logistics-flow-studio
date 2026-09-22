@@ -3460,6 +3460,35 @@
       return { ok: !bad && exp.schema === "factory-run-ledger/v1" && exp.hus.length === st.spawned && delivered > 0 && /^RUN-ecommerce-multichannel-fc-s6-h[0-9a-f]{8}$/.test(exp.run.id),
         detail: bad || (exp.hus.length + " units, " + exp.events.length + " events, " + delivered + " delivered, run " + exp.run.id) };
     });
+    // ---- v3.36: the flow as recorded - a layered, conserving Sankey from the ledger.
+    check("ledger-flow-sankey-is-layered-and-conserving", function () {
+      var Lg = WT.ledger, F = WT.flowsim, EX2 = WT.examples, P2 = WT.pack, A2 = WT.analytics;
+      if (!Lg || !F || !EX2 || !P2 || !A2 || typeof Lg.sankeyFromLedger !== "function" || typeof A2.sankeyLayoutLayered !== "function") return { ok: false, detail: "modules missing" };
+      var b = EX2.build("ecommerce-multichannel-fc");
+      var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
+      var plan = F.spawnPlan(lay, { seed: 6, mix: lay.config.orderMix });
+      var st = F.state(plan);
+      var rec = Lg.create(plan, { scenarioId: "ecommerce-multichannel-fc", seed: 6, mix: lay.config.orderMix, layout: lay, profile: P2.profileFor("ecommerce-multichannel-fc") });
+      st.hooks = { afterTick: function (s) { Lg.observe(rec, s); } };
+      F.step(st, 300);
+      var exp = Lg.exportJson(rec);
+      var m = Lg.sankeyFromLedger(exp, { retiredOnly: true });
+      var geo = A2.sankeyLayoutLayered(m);
+      if (!geo) return { ok: false, detail: "no geometry (" + m.nodes.length + " nodes)" };
+      var bad = null, i, j;
+      for (i = 0; i < geo.nodes.length; i++) {
+        var nd = geo.nodes[i];
+        if (nd.inSum > 0 && nd.outSum > 0 && nd.inSum !== nd.outSum) bad = "not conserving at " + nd.id + " (" + nd.inSum + " in, " + nd.outSum + " out)";
+      }
+      for (i = 0; i < geo.columns.length; i++) for (j = 1; j < geo.columns[i].length; j++) {
+        var a = geo.nodes[geo.columns[i][j - 1]], c = geo.nodes[geo.columns[i][j]];
+        if (a.y + a.h > c.y + 1e-9) bad = "overlap in column " + i;
+      }
+      var svg = A2.sankeySvgLayered(m, "light");
+      var paths = (svg.match(/<path /g) || []).length, nonZero = m.links.filter(function (l) { return l.value > 0; }).length;
+      return { ok: !bad && !geo.cyclic && geo.columns.length >= 3 && paths === nonZero && svg === A2.sankeySvgLayered(m, "light") && !!$("analyzeSankey"),
+        detail: bad || (m.nodes.length + " operations in " + geo.columns.length + " columns, " + m.links.length + " links, " + paths + " ribbons") };
+    });
     // ---- v3.35: what a handling unit costs - spans x the Analyze rates.
     check("run-ledger-costs-a-unit-from-its-spans-and-the-analyze-rates", function () {
       var Lg = WT.ledger, F = WT.flowsim, EX2 = WT.examples, P2 = WT.pack, A2 = WT.analytics;

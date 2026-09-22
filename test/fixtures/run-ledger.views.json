@@ -136,5 +136,189 @@
   "equipment_eur": 11.7483,
   "energy_eur": 17.16,
   "total_eur": 349.7417
- }
+ },
+ "flowLinks": [
+  {
+   "from_op": "case-pick",
+   "to_op": "consolidate",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 60
+  },
+  {
+   "from_op": "consolidate",
+   "to_op": "pack",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 4
+  },
+  {
+   "from_op": "consolidate",
+   "to_op": "palletise",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 60
+  },
+  {
+   "from_op": "depalletise",
+   "to_op": "putaway",
+   "units": 4,
+   "retired_units": 2,
+   "eaches": 2304
+  },
+  {
+   "from_op": "inspect",
+   "to_op": "restock",
+   "units": 2,
+   "retired_units": 2,
+   "eaches": 17
+  },
+  {
+   "from_op": "inspect",
+   "to_op": "scrap",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 5
+  },
+  {
+   "from_op": "pack",
+   "to_op": "load",
+   "units": 2,
+   "retired_units": 2,
+   "eaches": 13
+  },
+  {
+   "from_op": "pallet-pick",
+   "to_op": "wrap",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 576
+  },
+  {
+   "from_op": "palletise",
+   "to_op": "wrap",
+   "units": 2,
+   "retired_units": 2,
+   "eaches": 144
+  },
+  {
+   "from_op": "pick",
+   "to_op": "qc-final",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 84
+  },
+  {
+   "from_op": "pick",
+   "to_op": "vas",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 9
+  },
+  {
+   "from_op": "piece-pick",
+   "to_op": "consolidate",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 4
+  },
+  {
+   "from_op": "putaway",
+   "to_op": "case-pick",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 576
+  },
+  {
+   "from_op": "putaway",
+   "to_op": "pallet-pick",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 576
+  },
+  {
+   "from_op": "putaway",
+   "to_op": "replen",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 576
+  },
+  {
+   "from_op": "qc-final",
+   "to_op": "palletise",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 84
+  },
+  {
+   "from_op": "qc-sample",
+   "to_op": "depalletise",
+   "units": 8,
+   "retired_units": 1,
+   "eaches": 4608
+  },
+  {
+   "from_op": "qc-sample",
+   "to_op": "putaway",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 576
+  },
+  {
+   "from_op": "qc-sample",
+   "to_op": "stage-out",
+   "units": 4,
+   "retired_units": 3,
+   "eaches": 2304
+  },
+  {
+   "from_op": "receive",
+   "to_op": "depalletise",
+   "units": 11,
+   "retired_units": 1,
+   "eaches": 6336
+  },
+  {
+   "from_op": "receive",
+   "to_op": "inspect",
+   "units": 3,
+   "retired_units": 3,
+   "eaches": 22
+  },
+  {
+   "from_op": "receive",
+   "to_op": "qc-sample",
+   "units": 20,
+   "retired_units": 5,
+   "eaches": 11520
+  },
+  {
+   "from_op": "replen",
+   "to_op": "piece-pick",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 576
+  },
+  {
+   "from_op": "stage-out",
+   "to_op": "load",
+   "units": 3,
+   "retired_units": 3,
+   "eaches": 1728
+  },
+  {
+   "from_op": "vas",
+   "to_op": "pack",
+   "units": 1,
+   "retired_units": 1,
+   "eaches": 9
+  },
+  {
+   "from_op": "wrap",
+   "to_op": "load",
+   "units": 3,
+   "retired_units": 3,
+   "eaches": 720
+  }
+ ]
 }
