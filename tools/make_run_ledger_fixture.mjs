@@ -95,7 +95,7 @@ export function reconcileRows(exp) {
       v_run_summary: [v.summary], v_cycle_time_by_type: v.cycle, v_touches_by_type: v.touches, v_station_wait: v.wait,
       v_wip_by_tick: v.wip, v_quantities_by_op: v.byOp, v_dispatch: v.dispatch ? [v.dispatch] : [], v_flow_links: v.flowLinks || [],
       v_spans: c ? c.spans : L.spans(exp), v_span_cost: c ? c.spans : [], v_cost_by_hu: c ? c.byHu : [], v_cost_by_type: c ? c.byType : [], v_cost_by_location: c ? c.byLocation : [],
-      v_dispatch_by_order: v.dispatchByOrder || [],
+      v_dispatch_by_order: v.dispatchByOrder || [], v_staffing: v.staffing || [],
     },
   };
 }

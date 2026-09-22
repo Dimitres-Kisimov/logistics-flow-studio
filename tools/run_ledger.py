@@ -35,7 +35,15 @@ DDL = """
 CREATE TABLE IF NOT EXISTS run(
   id TEXT PRIMARY KEY NOT NULL, scenario TEXT NOT NULL, seed INTEGER NOT NULL, hash TEXT, mix TEXT,
   profile TEXT, ticks_per_hour INTEGER NOT NULL, minutes_per_tick REAL NOT NULL, ticks INTEGER NOT NULL, honesty TEXT,
-  dataset_source TEXT, dataset_orders INTEGER, dataset_lines INTEGER, dataset_skus INTEGER);  -- v3.44: the order pool's provenance, NULL for a synthetic stream
+  dataset_source TEXT, dataset_orders INTEGER, dataset_lines INTEGER, dataset_skus INTEGER,
+  policy TEXT);
+-- run.dataset_*: v3.44, the order pool's provenance (NULL for a synthetic stream);
+-- run.policy: v3.45, the adaptive-staffing what-if as JSON (NULL when the run had none).
+-- (No trailing comment before a closing parenthesis: ALTER TABLE ... DROP COLUMN rewrites that text.)
+-- v3.45 the staffing changes the what-if made (one row per change at a bench)
+CREATE TABLE IF NOT EXISTS staffing_event(
+  run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, tick INTEGER NOT NULL CHECK(tick >= 0),
+  location_id TEXT NOT NULL, servers INTEGER NOT NULL CHECK(servers >= 1), PRIMARY KEY(run_id, tick, location_id));
 CREATE TABLE IF NOT EXISTS packaging_profile(
   run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, id TEXT NOT NULL, label TEXT, box TEXT, pallet TEXT,
   eaches_per_case INTEGER, case_kg REAL, max_stack_mm INTEGER, eaches_per_parcel INTEGER, PRIMARY KEY(run_id, id));
@@ -132,7 +140,7 @@ WHERE h.final_kind = 'delivered'
 GROUP BY h.run_id;""",
     "v_run_summary": """
 CREATE VIEW IF NOT EXISTS v_run_summary AS
-SELECT r.id AS run_id, r.scenario, r.seed, r.profile, r.ticks, r.dataset_source, r.dataset_orders, r.dataset_lines,
+SELECT r.id AS run_id, r.scenario, r.seed, r.profile, r.ticks, r.dataset_source, r.dataset_orders, r.dataset_lines, r.policy,
        (SELECT COUNT(*) FROM hu h WHERE h.run_id = r.id) AS units,
        (SELECT COUNT(*) FROM handling_event e JOIN hu h ON h.id = e.hu_id WHERE h.run_id = r.id) AS events,
        (SELECT COUNT(*) FROM hu h WHERE h.run_id = r.id AND h.final_kind = 'delivered') AS delivered,
@@ -337,9 +345,25 @@ SELECT h.run_id, h.order_id, MAX(h.order_ref) AS order_ref, COUNT(*) AS lines,
 FROM hu h GROUP BY h.run_id, h.order_id;"""
 
 
+# ---- v3.45 adaptive staffing: the what-if's change log, per bench ------------------------
+# One row per bench that changed its staffing: how often, the most workers it had, when the
+# first change came, and for how many ticks it ran with more than one worker (each change
+# holds until the next one at that bench, or the end of the run).
+VIEWS["v_staffing"] = """
+CREATE VIEW IF NOT EXISTS v_staffing AS
+WITH ev AS (
+  SELECT s.run_id, s.location_id, s.tick, s.servers,
+         LEAD(s.tick) OVER (PARTITION BY s.run_id, s.location_id ORDER BY s.tick) AS next_tick
+  FROM staffing_event s)
+SELECT ev.run_id, ev.location_id, COUNT(*) AS changes, MAX(ev.servers) AS max_servers, MIN(ev.tick) AS first_change_tick,
+       SUM(CASE WHEN ev.servers > 1 THEN COALESCE(ev.next_tick, r.ticks) - ev.tick ELSE 0 END) AS ticks_with_extra_server
+FROM ev JOIN run r ON r.id = ev.run_id
+GROUP BY ev.run_id, ev.location_id;"""
+
+
 INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations")
 PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
-                 "v_cost_by_type", "v_cost_by_location", "v_flow_links")
+                 "v_cost_by_type", "v_cost_by_location", "v_flow_links", "v_staffing")
 DETAIL_VIEWS = ("v_wip_by_tick", "v_spans", "v_span_cost", "v_cost_by_hu", "v_dispatch_by_order")  # long or per-row views: `views --all`
 COMPARE_VIEWS = ("v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost")
 
@@ -364,6 +388,7 @@ def initialize(db: sqlite3.Connection) -> None:
     for table, column, typ in (  # a database created before v3.44 has no dataset / order-line columns yet
         ("run", "dataset_source", "TEXT"), ("run", "dataset_orders", "INTEGER"), ("run", "dataset_lines", "INTEGER"), ("run", "dataset_skus", "INTEGER"),
         ("hu", "order_ref", "TEXT"), ("hu", "sku", "TEXT"), ("hu", "line_qty", "INTEGER"),
+        ("run", "policy", "TEXT"),  # v3.45
     ):
         try:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {typ}")
@@ -405,11 +430,14 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
         ds = run.get("dataset") or {}
         db.execute(
             "INSERT INTO run(id, scenario, seed, hash, mix, profile, ticks_per_hour, minutes_per_tick, ticks, honesty, "
-            "dataset_source, dataset_orders, dataset_lines, dataset_skus) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+            "dataset_source, dataset_orders, dataset_lines, dataset_skus, policy) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
             run["id"], run["scenario"], int(run["seed"]), run.get("hash"),
             json.dumps(run.get("mix"), sort_keys=True) if run.get("mix") is not None else None,
             run.get("profile"), int(run["ticks_per_hour"]), float(run["minutes_per_tick"]), int(run["ticks"]), run.get("honesty"),
-            ds.get("source"), ds.get("orders"), ds.get("lines"), ds.get("skus")))
+            ds.get("source"), ds.get("orders"), ds.get("lines"), ds.get("skus"),
+            json.dumps(run.get("policy"), sort_keys=True) if run.get("policy") is not None else None))
+        db.executemany("INSERT INTO staffing_event(run_id, tick, location_id, servers) VALUES(?,?,?,?)", [
+            (run["id"], int(s["tick"]), str(s["location_id"]), int(s["servers"])) for s in data.get("staffing") or []])
         prof = data.get("profile")
         if prof:
             db.execute("INSERT INTO packaging_profile VALUES(?,?,?,?,?,?,?,?,?)", (
@@ -586,7 +614,7 @@ RECONCILE_KEYS = {
     "v_station_wait": ("location", "op"), "v_wip_by_tick": ("tick",), "v_quantities_by_op": ("op", "kind"),
     "v_dispatch": (), "v_flow_links": ("from_op", "to_op"), "v_spans": ("hu_id", "version"), "v_span_cost": ("hu_id", "version"),
     "v_cost_by_hu": ("hu_id",), "v_cost_by_type": ("archetype",), "v_cost_by_location": ("location",),
-    "v_dispatch_by_order": ("order_id",),
+    "v_dispatch_by_order": ("order_id",), "v_staffing": ("location_id",),
 }
 RAW_VIEWS = ("v_spans", "v_span_cost")
 

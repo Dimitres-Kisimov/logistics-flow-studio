@@ -1,5 +1,34 @@
 # Changelog
 
+## v3.45 — Adaptive staffing, a what-if
+
+**The policy.** `flowsim.spawnPlan` takes `opts.policy = {kind:"queue-staffing", threshold,
+maxServers, cooldownTicks}` (defaults: the congestion threshold 6, two workers, 30 ticks):
+before serving, a bench whose queue reached the threshold gains a worker, a bench with an
+empty queue and the cool-down elapsed loses one; the serve loop banks the rate x workers.
+Every change is logged {tick, station, element, servers}; `state.maxServers`. Absent -> no
+key, no branch, byte-identical (proved against fixture A and by snapshot). The ledger
+records `run.policy` (with `STAFFING_HONESTY`) and `staffing[]`; the policy joins the run id
+(`ids.inputHash`); the rates honesty text is untouched so every earlier export is unchanged.
+
+**SQL and viewer.** `run.policy` (guarded ALTER), table `staffing_event`, planner view
+`v_staffing` (changes, max workers, first change, ticks with the extra worker; `LEAD` over
+ticks), `v_run_summary.policy`, a reconcile key. The viewer: a *Staffing* glance card, a
+*Workers at each bench* step chart with the table and SQL under the planner tables (25 SQL
+texts now), the compare marking a what-if side. The planner: a *Staffing* picker beside the
+order mix (remembered on the device; a change rebuilds the run), the readout showing
+workers on benches.
+
+**Measured on floor A** (every station at the floor rate): the put-away queue reaches 6 at
+tick 97; with the policy the second worker joins at that tick, the longest queue is 17
+instead of 19, completions 11 = 11. Honest: the what-if adds capacity the declared floor does
+not have; a unit is still charged one worker's service time; idle time is not charged.
+
+**Verification.** +1 harness (`verify_staffing.js`, 25 checks), +3 Python (the view by hand,
+empty without a policy, an old database migrating), app self-test +1 (the picker, a policy
+run's log, no key without), viewer self-test +1 (the section without a policy). 74 harnesses,
+117 Python tests, WT-SELFTEST 180/180 + viewer 29/29. Cache wt-v125.
+
 ## v3.44 — Your own orders, through the ledger
 
 **The pool itself.** `flowsim.spawnPlan` takes `opts.pool` ([{orderId, lines:[{sku, qty}]}]):

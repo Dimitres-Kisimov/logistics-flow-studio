@@ -2510,6 +2510,8 @@
     if (shape) { opts.orders = shape.orders; opts.linesPerOrderMax = shape.linesPerOrderMax; }
     const pool = activeOrderPool(); // v3.44: the pool itself, one unit per order line
     if (pool) opts.pool = pool;
+    // v3.45: the staffing what-if (defaults inside flowsim: the congestion threshold, at most 2 workers, a 30-tick cool-down)
+    if (state.flow.staffing === "adaptive") opts.policy = { kind: "queue-staffing" };
     state.flow.sim = WT.flowsim.state(layout, opts);
     // v3.32 THE RUN LEDGER: a pure observer attached as an after-tick hook.
     // Every unit gets its identities (ids.js) and quantities (pack.js); the
@@ -2824,7 +2826,8 @@
     const hasStations = !!(s.stations && s.stations.length);
     const queueTxt = hasStations
       ? " · queued <strong>" + (s.queued || 0) + "</strong> · max queue <strong>" + (s.maxQueue || 0) +
-        "</strong> · congested " + (s.congestedStations || 0) + "/" + s.stations.length
+        "</strong> · congested " + (s.congestedStations || 0) + "/" + s.stations.length +
+        (s.staffing ? " · workers <strong>" + s.stations.reduce((a, st) => a + (st.servers || 1), 0) + "</strong> on " + s.stations.length + " benches (what-if, max " + (s.maxServers || 1) + " at one bench)" : "")
       : "";
     // v3.24 ANDON. A plant floor tells you its state with three lamps, and
     // it tells you with SHAPE as well as colour. Off the SMOOTHED bands, so
@@ -3001,6 +3004,22 @@
       sel.addEventListener("change", () => {
         state.flow.mixMode = sel.value === "day" || sel.value === "legacy" ? sel.value : "auto";
         try { localStorage.setItem("wt-flow-mix", state.flow.mixMode); } catch (_) { /* ignore */ }
+        state.flow.sig = null;
+        if (state.flow.sim) flowReset();
+      });
+    })();
+    // v3.45: the staffing what-if picker. Remembered on this device; a change
+    // rebuilds the run from tick 0 (the policy is a run input).
+    (function wireStaffing() {
+      const sel = $("flowStaffingSelect");
+      if (!sel) return;
+      let saved = "declared";
+      try { saved = localStorage.getItem("wt-flow-staffing") || "declared"; } catch (_) { /* private mode */ }
+      state.flow.staffing = saved === "adaptive" ? "adaptive" : "declared";
+      sel.value = state.flow.staffing;
+      sel.addEventListener("change", () => {
+        state.flow.staffing = sel.value === "adaptive" ? "adaptive" : "declared";
+        try { localStorage.setItem("wt-flow-staffing", state.flow.staffing); } catch (_) { /* ignore */ }
         state.flow.sig = null;
         if (state.flow.sim) flowReset();
       });

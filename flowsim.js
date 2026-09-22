@@ -927,6 +927,17 @@
     }
     const totalUnits = Math.max(1, Math.round(o.units != null ? o.units : (poolIndex ? poolLines : orders * avgUnits)));
     const loop = o.loop != null ? !!o.loop : true;
+    // v3.45 ADAPTIVE STAFFING - a what-if: {kind:"queue-staffing", threshold, maxServers,
+    // cooldownTicks}. A second worker joins a bench when its queue reaches the threshold
+    // (default: the congestion threshold) and leaves after cooldownTicks with an empty
+    // queue. It ADDS capacity the declared floor does not have - said so wherever it
+    // shows. Absent -> no key, no branch, byte-identical to before.
+    const policy = o.policy && o.policy.kind === "queue-staffing" ? {
+      kind: "queue-staffing",
+      threshold: Math.max(1, Math.round(Number(o.policy.threshold) > 0 ? Number(o.policy.threshold) : PARAMS.congestQueueThreshold)),
+      maxServers: Math.max(1, Math.round(Number(o.policy.maxServers) > 0 ? Number(o.policy.maxServers) : 2)),
+      cooldownTicks: Math.max(0, Math.round(Number(o.policy.cooldownTicks) >= 0 ? Number(o.policy.cooldownTicks) : 30)),
+    } : null;
 
     // Optional what-if arrival override (units/hr). Default = the balanced
     // line rate (bottleneck, tied to WT.wms). Setting it ABOVE a station's
@@ -975,6 +986,7 @@
       dataLabel: SYNTHETIC_LABEL,
     };
     if (poolIndex) { plan.pool = pool; plan.poolIndex = poolIndex; plan.poolLines = poolLines; } // v3.44: keys only with a pool
+    if (policy) plan.policy = policy; // v3.45: key only with a policy
     return plan;
   }
 
@@ -994,6 +1006,7 @@
       x: s.x, y: s.y, serviceRatePerTick: s.serviceRatePerTick,
       serviceAccum: 0, queue: [],
     }));
+    if (plan.policy) for (const st of stations) { st.servers = 1; st.changedAt = 0; } // v3.45: keys only with a policy
     const stationsByWp = {};
     for (const st of stations) {
       (stationsByWp[st.wpIndex] = stationsByWp[st.wpIndex] || []).push(st);
@@ -1020,7 +1033,7 @@
     }
     const spawnShares = plan.spawnShares || [1];
 
-    return {
+    const state = {
       kind: "wt-flowsim-state",
       plan: plan,
       seed: plan.seed,
@@ -1053,6 +1066,8 @@
       done: false,
       dataLabel: plan.dataLabel,
     };
+    if (plan.policy) { state.staffing = []; state.maxServers = 1; } // v3.45: the change log, keys only with a policy
+    return state;
   }
 
   function emptyStageCounts() {
@@ -1164,8 +1179,9 @@
     // --- 2) Serve station queues (before movement, so a served MU can
     // move on the same tick). Each station releases floor(serviceAccum)
     // head-of-line MUs; an idle station banks at most ~1 unit of service.
+    if (plan.policy) staffStations(state, plan.policy); // v3.45: before serving, so a joining worker serves this tick
     for (const st of state.stations) {
-      st.serviceAccum += st.serviceRatePerTick;
+      st.serviceAccum += st.serviceRatePerTick * (st.servers || 1); // v3.45: x 1 exactly without a policy
       while (st.serviceAccum >= 1 && st.queue.length) {
         const mu = st.queue.shift();
         mu.status = "active";
@@ -1270,6 +1286,25 @@
   }
 
   // Roll up per-station queue lengths into the state's congestion scalars.
+  // v3.45 ADAPTIVE STAFFING: before serving, a bench whose queue reached the
+  // threshold gains a worker (up to maxServers); a bench with an empty queue
+  // and cooldownTicks since its last change loses one. Every change is logged
+  // {tick, station, elementId, servers} for the ledger. state.tick is the tick
+  // being advanced (it increments after the movement step), so a logged tick
+  // is the tick at which the queue was first seen at the threshold.
+  function staffStations(state, p) {
+    for (const st of state.stations) {
+      const q = st.queue.length;
+      if (q >= p.threshold && st.servers < p.maxServers) {
+        st.servers++; st.changedAt = state.tick;
+        state.staffing.push({ tick: state.tick, station: st.id, elementId: st.elementId, servers: st.servers });
+      } else if (q === 0 && st.servers > 1 && state.tick - st.changedAt >= p.cooldownTicks) {
+        st.servers--; st.changedAt = state.tick;
+        state.staffing.push({ tick: state.tick, station: st.id, elementId: st.elementId, servers: st.servers });
+      }
+      if (st.servers > state.maxServers) state.maxServers = st.servers;
+    }
+  }
   function refreshQueueStats(state) {
     let queued = 0, maxQ = 0, congested = 0;
     const thr = PARAMS.congestQueueThreshold;

@@ -123,6 +123,20 @@
       if (h.final_kind === "delivered" && h.final) { o.delivered_lines++; o.eaches_out += h.final.eaches; o.cases += h.final.cases; o.parcels += h.final.parcels; }
     }
     const dispatchByOrder = Object.keys(ordMap).sort().map((k) => { const o = ordMap[k]; o.pallets_needed = o.cases_per_pallet > 0 ? Math.floor((o.cases + o.cases_per_pallet - 1) / o.cases_per_pallet) : 0; return o; });
+    // v3.45 staffing: the same aggregates as v_staffing (per bench: changes, the most
+    // workers, the first change, ticks with more than one worker; each change holds
+    // until the next one at that bench, or the end of the run). Empty without a policy.
+    const stMap = {};
+    const log = (exp.staffing || []).slice().sort((a, b) => (a.location_id < b.location_id ? -1 : a.location_id > b.location_id ? 1 : a.tick - b.tick));
+    for (let i = 0; i < log.length; i++) {
+      const s = log[i], next = log[i + 1];
+      const o = stMap[s.location_id] || (stMap[s.location_id] = { location_id: s.location_id, changes: 0, max_servers: 0, first_change_tick: null, ticks_with_extra_server: 0 });
+      o.changes++;
+      if (s.servers > o.max_servers) o.max_servers = s.servers;
+      if (o.first_change_tick == null || s.tick < o.first_change_tick) o.first_change_tick = s.tick;
+      if (s.servers > 1) o.ticks_with_extra_server += (next && next.location_id === s.location_id ? next.tick : exp.run.ticks) - s.tick;
+    }
+    const staffing = Object.keys(stMap).sort().map((k) => stMap[k]);
     // invariants (must all be 0)
     let conservation = 0, crossDock = 0, versionGaps = 0, terminals = 0;
     for (const e of exp.events) {
@@ -143,7 +157,7 @@
     // the SQL views (WT.ledger); computed once per export by model(), null without
     // rates or without ledger.js
     const cost = m.costs;
-    return { summary, cycle, touches, wait, wip, byOp, dispatch, dispatchByOrder,
+    return { summary, cycle, touches, wait, wip, byOp, dispatch, dispatchByOrder, staffing,
       invariants: { v_conservation_violations: conservation, v_cross_dock_violations: crossDock, v_version_gaps: versionGaps, v_terminal_violations: terminals },
       flowLinks: m.flowLinks,
       rates: exp.rates || null, spans: cost ? cost.spans : null, costByHu: cost ? cost.byHu : null,
@@ -327,6 +341,9 @@
       trailers: v.dispatch ? v.dispatch.trailers : 0,
       cost: m.costs ? { total: m.costs.total.total_eur, per_unit: exp.hus.length ? r4(m.costs.total.total_eur / exp.hus.length) : null, per_delivered_each: eachesOut ? r4(m.costs.total.total_eur / eachesOut) : null,
         per_received_each: eachesIn ? r4(m.costs.total.total_eur / eachesIn) : null, holding: m.costs.total.holding_eur || 0 } : null,
+      // v3.45: the staffing what-if, if any
+      policy: r.policy ? { text: "adaptive staffing (what-if)", sub: "a second worker joins a bench when its queue reaches " + r.policy.threshold + " and leaves after " + r.policy.cooldownTicks + " ticks with an empty queue (at most " + r.policy.maxServers + "); this adds capacity the declared floor does not have, and the extra worker's idle time is not charged" }
+        : { text: "declared stations only", sub: "every bench had one worker for the whole run" },
       // v3.44: where the order stream came from
       dataset: r.dataset ? { text: "own data: " + r.dataset.orders + " orders / " + r.dataset.lines + " lines", sub: (r.dataset.source || "pool") + (r.dataset.skus != null ? " · " + r.dataset.skus + " articles" : "") + " · one unit per order line, the line's quantity on the unit; order types from the mix" }
         : { text: "synthetic order stream", sub: "one-line orders numbered in spawn order; quantities drawn by the packaging profile" },
@@ -435,6 +452,7 @@
       { label: "Run", value: r.id, mono: true, sub: r.scenario + " · seed " + r.seed + " · profile " + (r.profile || "—") },
       { label: "Order mix", value: g.mix },
       { label: "Order stream", value: g.dataset.text, sub: g.dataset.sub },
+      { label: "Staffing", value: g.policy.text, sub: g.policy.sub },
       { label: "Simulated", value: r.ticks + " ticks · " + g.minutes + " min", sub: r.minutes_per_tick + " min per tick" },
       { label: "Units · events", value: g.units + " · " + g.events, sub: g.retired + " retired · " + g.inFlight + " in flight" },
       { label: "Delivered", value: g.delivered + " units · " + g.delivered_eaches + " eaches", sub: g.delivered_pallets + " pallets · " + g.delivered_parcels + " parcels · " + g.trailers + " trailer" + (g.trailers === 1 ? "" : "s") },
@@ -608,6 +626,28 @@
   }
 
   /* ---------------- what the planner asks ---------------------------- */
+  // v3.45: the staffing what-if's changes per bench - a step chart of workers over the
+  // run and the same aggregates as v_staffing; a note when the run had no policy.
+  const STAFFING_COLS = ["location_id", "changes", "max_servers", "first_change_tick", "ticks_with_extra_server"];
+  function staffingHtml(exp) {
+    if (!exp.run.policy) return "<p class=\"note\">No staffing policy in this run: every bench had one worker for the whole run.</p>" + sqlBlock("v_staffing");
+    const rows = views(exp).staffing || [], p = exp.run.policy;
+    const log = (exp.staffing || []).slice().sort((a, b) => a.tick - b.tick);
+    const locs = rows.map((r) => r.location_id), T = Math.max(1, exp.run.ticks), maxS = Math.max(1, ...rows.map((r) => r.max_servers));
+    const W = 680, H = 40 + locs.length * 46;
+    let s = '<svg viewBox="0 0 ' + W + " " + H + '" class="staffing" role="img" aria-label="Workers at each bench over the run">';
+    locs.forEach((loc, i) => {
+      const y0 = 20 + i * 46, lane = 26;
+      const ys = (n) => (y0 + lane - ((n - 1) / Math.max(1, maxS - 1)) * lane).toFixed(1);
+      let n = 1, pts = "10," + ys(1);
+      for (const e of log) { if (e.location_id !== loc) continue; const xe = (10 + (e.tick / T) * (W - 20)).toFixed(1); pts += " " + xe + "," + ys(n) + " " + xe + "," + ys(e.servers); n = e.servers; }
+      pts += " " + (W - 10) + "," + ys(n);
+      s += '<polyline points="' + pts + '" class="staff-line"/><text x="10" y="' + (y0 - 4) + '" class="svg-label">' + esc(loc) + "</text>";
+    });
+    s += '<text x="10" y="' + (H - 4) + '" class="svg-label">tick 0</text><text x="' + (W - 10) + '" y="' + (H - 4) + '" class="svg-label" text-anchor="end">tick ' + T + " · 1 to " + maxS + " workers</text></svg>";
+    return "<p class=\"note\">The adaptive-staffing what-if: a second worker joined a bench when its queue reached " + p.threshold + " and left after " + p.cooldownTicks + " ticks with an empty queue (at most " + p.maxServers + " workers). This adds capacity the declared floor does not have; a unit is still charged one worker's service time, and the extra worker's idle time is not charged.</p>" +
+      (rows.length ? s + table(rows, STAFFING_COLS, "Staffing changes by bench") : "<p class=\"note\">The policy never had to act: no bench reached the threshold.</p>") + sqlBlock("v_staffing");
+  }
   function renderPlanner(exp) {
     const v = views(exp), mpt = exp.run.minutes_per_tick;
     $("rlCycle").innerHTML = table(v.cycle, ["archetype", "units", "retired", "avg_cycle_ticks", "avg_cycle_minutes", "min_cycle_ticks", "max_cycle_ticks"], "Cycle time by order type") + sqlBlock("v_cycle_time_by_type");
@@ -620,6 +660,7 @@
     $("rlWip").innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" class="wip" role="img" aria-label="Work in progress over time"><polyline points="' + pts + '" class="wip-line"/>' +
       '<text x="10" y="14" class="svg-label">in flight, peak ' + maxW + '</text><text x="10" y="' + (H - 4) + '" class="svg-label">tick 0</text><text x="' + (W - 10) + '" y="' + (H - 4) + '" class="svg-label" text-anchor="end">tick ' + exp.run.ticks + " (" + r2(exp.run.ticks * mpt) + " min) · " + last.in_flight + " in flight · " + last.retired + " retired</text></svg>" + sqlBlock("v_wip_by_tick");
     $("rlByOp").innerHTML = table(v.byOp, ["op", "kind", "events", "pallets", "cases", "eaches", "parcels", "retained", "scrapped"], "Quantities at each operation") + sqlBlock("v_quantities_by_op");
+    $("rlStaffing").innerHTML = staffingHtml(exp); // v3.45
   }
 
   /* ---------------- dispatch ------------------------------------------ */
@@ -668,8 +709,8 @@
     const c = compare(EXP, EXP_B);
     const mpt = { a: EXP.run.minutes_per_tick, b: EXP_B.run.minutes_per_tick };
     const head = cards([
-      { label: "A", value: c.run_a, mono: true, sub: mixOf(EXP.run) },
-      { label: "B", value: c.run_b, mono: true, sub: mixOf(EXP_B.run) },
+      { label: "A", value: c.run_a, mono: true, sub: mixOf(EXP.run) + (EXP.run.policy ? " · adaptive staffing (what-if)" : "") },
+      { label: "B", value: c.run_b, mono: true, sub: mixOf(EXP_B.run) + (EXP_B.run.policy ? " · adaptive staffing (what-if)" : "") },
       { label: "Comparable?", value: c.same_scenario ? "same scenario and profile" : "different scenario or profile", cls: c.same_scenario ? "good" : "bad", sub: c.same_scenario ? "deltas are B − A" : "deltas shown, but the runs are not like for like" },
     ]);
     out.innerHTML = head +

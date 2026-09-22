@@ -868,6 +868,14 @@
           </select>
           <p id="flowMixHint" class="hint">Synthetic teaching shares, not a forecast. Your choice is remembered on this device.</p>
         </div>
+        <div class="flow-mix-pick">
+          <label for="flowStaffingSelect">Staffing</label>
+          <select id="flowStaffingSelect" aria-describedby="flowStaffingHint">
+            <option value="declared">Declared stations only</option>
+            <option value="adaptive">Adaptive (what-if): a second worker joins a bench when its queue reaches 6</option>
+          </select>
+          <p id="flowStaffingHint" class="hint">A what-if that adds capacity the declared floor does not have; it leaves again after 30 ticks with an empty queue. The ledger charges one worker's service time per unit and does not charge the second worker's idle time. Remembered on this device.</p>
+        </div>
         <section class="route-review" aria-labelledby="routeReviewHeading">
           <div class="route-review-heading"><span class="route-review-kicker">Before you run</span><h3 id="routeReviewHeading">Can this floor handle the order?</h3></div>
           <p class="hint">Review each recipe against the equipment on your floor. Both returns outcomes are listed separately.</p>

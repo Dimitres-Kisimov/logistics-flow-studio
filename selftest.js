@@ -3480,6 +3480,17 @@
       return { ok: plan.poolLines === 3 && numbered && second && !!exp.run.dataset && exp.run.dataset.orders === 2 && exp.run.dataset.lines === 3,
         detail: plan.poolLines + " lines, " + exp.hus.length + " units, dataset " + JSON.stringify(exp.run.dataset) };
     });
+    // ---- v3.45: the staffing what-if picker exists; a policy run carries a change log, a run without has no such key.
+    check("staffing-what-if-picker-and-policy", function () {
+      var sel = $("flowStaffingSelect"), F = WT.flowsim, EX2 = WT.examples;
+      if (!sel || !F || !EX2) return { ok: false, detail: "missing" };
+      var b = EX2.build("ecommerce-multichannel-fc");
+      var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
+      var withP = F.state(F.spawnPlan(lay, { seed: 3, mix: lay.config.orderMix, policy: { kind: "queue-staffing" } }));
+      var without = F.state(F.spawnPlan(lay, { seed: 3, mix: lay.config.orderMix }));
+      return { ok: sel.options.length === 2 && Array.isArray(withP.staffing) && withP.plan.policy.threshold === F.PARAMS.congestQueueThreshold && withP.plan.policy.maxServers === 2 && without.staffing === undefined && !("policy" in without.plan),
+        detail: sel.options.length + " options, threshold " + withP.plan.policy.threshold };
+    });
     // ---- v3.38: stacking strength (simplified McKee) and the pinwheel, hand values.
     check("stacking-strength-and-pinwheel-hand-values", function () {
       var P2 = WT.pack;

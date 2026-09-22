@@ -563,6 +563,45 @@ class RecordedFixture(unittest.TestCase):
         self.assertEqual(RL.rows(db, "SELECT SUM(final_pallets) AS p FROM hu WHERE order_id LIKE '%000001'")[0]["p"], 2)
         self.assertEqual(RL.summary(db, data["run"]["id"])["invariants"], {n: 0 for n in RL.INVARIANT_VIEWS})
 
+    def test_staffing_view_by_hand(self):
+        """v3.45: a bench gains a worker at tick 5 and loses it at tick 20 in a 40-tick run -> 2 changes, max 2, first 5, 15 ticks with the extra worker."""
+        data = hand_ledger("RUN-hand-s1-h0000000e")
+        data["run"]["policy"] = {"kind": "queue-staffing", "threshold": 6, "maxServers": 2, "cooldownTicks": 30}
+        data["run"]["ticks"] = 40
+        data["staffing"] = [{"tick": 5, "location_id": "face", "servers": 2}, {"tick": 20, "location_id": "face", "servers": 1},
+                            {"tick": 30, "location_id": "pack", "servers": 2}]
+        db = fresh_with(data)
+        rows = {r["location_id"]: r for r in RL.rows(db, "SELECT * FROM v_staffing WHERE run_id = ?", (data["run"]["id"],))}
+        self.assertEqual(sorted(rows), ["face", "pack"])
+        f = rows["face"]
+        self.assertEqual((f["changes"], f["max_servers"], f["first_change_tick"], f["ticks_with_extra_server"]), (2, 2, 5, 15))
+        p = rows["pack"]
+        self.assertEqual((p["changes"], p["max_servers"], p["first_change_tick"], p["ticks_with_extra_server"]), (1, 2, 30, 10))
+        top = RL.rows(db, "SELECT policy FROM v_run_summary WHERE run_id = ?", (data["run"]["id"],))[0]
+        self.assertEqual(json.loads(top["policy"]), data["run"]["policy"])
+        self.assertEqual(RL.summary(db, data["run"]["id"])["invariants"], {n: 0 for n in RL.INVARIANT_VIEWS})
+
+    def test_staffing_view_is_empty_without_a_policy(self):
+        db = fresh_with(hand_ledger())
+        self.assertEqual(RL.rows(db, "SELECT * FROM v_staffing"), [])
+        self.assertIsNone(RL.rows(db, "SELECT policy FROM v_run_summary")[0]["policy"])
+        self.assertIn("v_staffing", RL.PLANNER_VIEWS)
+
+    def test_old_database_gains_the_policy_column_and_the_staffing_table(self):
+        """v3.45: a database from before v3.45 gains run.policy and staffing_event on open."""
+        db = fresh()
+        for name in RL.VIEWS:
+            db.execute(f"DROP VIEW IF EXISTS {name}")
+        db.execute("DROP TABLE staffing_event")
+        db.execute("ALTER TABLE run DROP COLUMN policy")
+        RL.initialize(db)
+        self.assertIn("policy", {r["name"] for r in RL.rows(db, "PRAGMA table_info(run)")})
+        self.assertEqual(RL.rows(db, "SELECT name FROM sqlite_master WHERE name = 'staffing_event'")[0]["name"], "staffing_event")
+        data = hand_ledger()
+        data["staffing"] = [{"tick": 1, "location_id": "face", "servers": 2}]
+        RL.import_ledger(db, data)
+        self.assertEqual(RL.rows(db, "SELECT changes FROM v_staffing")[0]["changes"], 1)
+
     def test_service_ticks_round_trip_unrounded(self):
         """v3.43: a declared-capacity station's service time is stored as recorded, not rounded."""
         data = hand_ledger("RUN-hand-s1-h0000000c")

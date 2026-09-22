@@ -23,7 +23,7 @@
  *      the page's ten sections, nav, skip link, print, self-test wiring;
  *      Your case bound once and debounced; the pinwheel search capped.
  *   4. Shipped wiring: page, stylesheet and script exist and are precached
- *      at wt-v124; the planner has the hand-over button; the offline guard
+ *      at wt-v125; the planner has the hand-over button; the offline guard
  *      rules hold (no external references).
  * ===================================================================== */
 "use strict";
@@ -153,9 +153,9 @@ console.log("=".repeat(72));
   const html = read("run-ledger.html"), sw = read("sw.js"), app = read("app.js"), idx = read("index.html"), runall = read("test/run-all.mjs");
   check("4a. the page loads ids.js, pack.js and run-ledger.js and links both stylesheets",
     /<script src="ids\.js">/.test(html) && /<script src="pack\.js">/.test(html) && /<script src="run-ledger\.js">/.test(html) && /run-ledger\.css/.test(html) && /transfer-ledger\.css/.test(html));
-  check("4b. sw.js precaches the page, its script, stylesheet and the recorded example at wt-v124 (previously wt-v123)",
+  check("4b. sw.js precaches the page, its script, stylesheet and the recorded example at wt-v125 (previously wt-v124)",
     /"\.\/run-ledger\.html"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw) && /"\.\/run-ledger\.css"/.test(sw) && /"\.\/test\/fixtures\/run-ledger\.json"/.test(sw) &&
-    /CACHE_VERSION\s*=\s*"wt-v124"/.test(sw) && /Previously wt-v123/.test(sw));
+    /CACHE_VERSION\s*=\s*"wt-v125"/.test(sw) && /Previously wt-v124/.test(sw));
   check("4c. the planner hands a run over to the viewer (button + localStorage hand-over)", /flowLedgerOpen/.test(idx) && /wt-run-ledger/.test(app) && /run-ledger\.html/.test(app));
   check("4d. test/run-all.mjs lists this harness", /verify_run_ledger_view\.js/.test(runall));
   check("4g. the page has the optimisation section", /id="rlOptimise"/.test(html) && /renderOptimise\(exp\)/.test(read("run-ledger.js")));
@@ -167,9 +167,9 @@ console.log("=".repeat(72));
 (function () {
   const SQL_NAMES = ["v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_wip_by_tick", "v_quantities_by_op", "v_dispatch", "v_run_summary", "v_flow_links",
     "v_spans", "v_span_cost", "v_cost_by_hu", "v_cost_by_type", "v_cost_by_location", "v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations",
-    "v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost", "v_dispatch_by_order"];
+    "v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost", "v_dispatch_by_order", "v_staffing"];
   const G = global.RunLedgerSQL, py = read("tools/run_ledger.py").replace(/\r\n/g, "\n"), js = read("run-ledger.js"), html = read("run-ledger.html"), css = read("run-ledger.css"), sw = read("sw.js"), st = read("run-ledger-selftest.js");
-  check("5a. run-ledger-sql.js carries exactly the 24 views in the tool's order", !!G && JSON.stringify(Object.keys(G)) === JSON.stringify(SQL_NAMES), G ? Object.keys(G).length + " keys" : "missing");
+  check("5a. run-ledger-sql.js carries exactly the 25 views in the tool's order", !!G && JSON.stringify(Object.keys(G)) === JSON.stringify(SQL_NAMES), G ? Object.keys(G).length + " keys" : "missing");
   check("5b. every text starts with SELECT/WITH, ends with ';' and carries no '...' placeholder", SQL_NAMES.every((k) => /^(SELECT|WITH)\b/.test(G[k]) && /;\s*$/.test(G[k]) && G[k].indexOf("...") < 0));
   check("5c. every text is verbatim the body of its CREATE VIEW in tools/run_ledger.py", SQL_NAMES.every((k) => py.indexOf("CREATE VIEW IF NOT EXISTS " + k + " AS\n" + G[k]) >= 0));
   check("5d. RunLedger.SQL IS the generated object and run-ledger.js types no SQL by hand", RL.SQL === G && !/CREATE VIEW|FROM hu h JOIN run r/.test(js));

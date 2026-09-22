@@ -114,6 +114,12 @@
     "queue time costs no labour, and a holding cost per unit-hour waiting is charged only if you set one (default 0). Internal transport is charged at the class of mover the " +
     "floor contains (AGV, forklift or conveyor, in that order); a floor without one moves for free. The picking KPI's " +
     "wage (Simulate card) is a different input and is not used here.";
+  // v3.45: recorded on run.policy (only a run that used the what-if carries it), so the
+  // rates text - and every earlier export - stays byte for byte what it was.
+  const STAFFING_HONESTY =
+    "Adaptive staffing is a what-if: a second worker joins a bench when its queue reaches the threshold and leaves after the " +
+    "cool-down with an empty queue. It adds capacity the declared floor does not have. A unit is still charged one worker's " +
+    "service time per unit; the second worker's idle time is not charged - a limit of this model.";
 
   function classOfType(type) {
     if (TYPE_OVERRIDE[type]) return { class: TYPE_OVERRIDE[type].class, labour: TYPE_OVERRIDE[type].labour };
@@ -171,7 +177,8 @@
     // v3.44 YOUR OWN ORDERS: the pool the units were spawned from (flowsim opts.pool) is a run
     // input - it joins the id hash - and its provenance rides in run.dataset.
     const pool = (Array.isArray(m.pool) && m.pool.length ? m.pool : null) || (plan && plan.pool) || null;
-    const runId = I ? I.runId(scenario, seed, layout, mix, pool) : "RUN-" + scenario + "-s" + seed;
+    const policy = (plan && plan.policy) || null; // v3.45: a run input too - it joins the id hash when present
+    const runId = I ? I.runId(scenario, seed, layout, mix, pool, policy) : "RUN-" + scenario + "-s" + seed;
     const dataset = pool ? {
       source: (m.dataset && m.dataset.source) || "pool", orders: pool.length,
       lines: plan && plan.poolLines != null ? plan.poolLines : pool.reduce((a, o) => a + ((o.lines && o.lines.length) || 0), 0),
@@ -209,6 +216,7 @@
       last: {},       // mu.id -> { hu, op, status, tick, stepIndex }
     };
     if (dataset) rec.run.dataset = dataset; // key only when a pool was used (older exports unchanged)
+    if (policy) { rec.run.policy = Object.assign({}, policy, { honesty: STAFFING_HONESTY }); rec.staffing = []; } // v3.45: the what-if and its change log, keys only with a policy
     return rec;
   }
 
@@ -348,6 +356,13 @@
       }
       delete rec.last[key];
     }
+    // v3.45: copy the staffing changes the sim logged since the last observation
+    if (rec.staffing && state.staffing) {
+      for (let i = rec.staffing.length; i < state.staffing.length; i++) {
+        const s = state.staffing[i];
+        rec.staffing.push({ tick: s.tick, location_id: s.elementId != null ? String(s.elementId) : s.station, servers: s.servers });
+      }
+    }
     rec.run.ticks = state.tick;
     return rec;
   }
@@ -371,6 +386,7 @@
       events: rec.events.slice(),
     };
     if (rec.rates) out.rates = JSON.parse(JSON.stringify(rec.rates));
+    if (rec.staffing) out.staffing = rec.staffing.slice(); // v3.45: only when a policy ran
     return out;
   }
 
@@ -551,7 +567,7 @@
 
   WT.ledger = { SCHEMA, HONESTY, TERMINAL, create, observe, exportJson, stats, minutesPerTick, locationFor,
     // v3.35 what a handling unit costs
-    RATES_HONESTY, CLASS_LABOUR, TRANSPORT_ORDER, classOfType, ratesBlock, spans, costs, nsum,
+    RATES_HONESTY, STAFFING_HONESTY, CLASS_LABOUR, TRANSPORT_ORDER, classOfType, ratesBlock, spans, costs, nsum,
     // v3.36 the flow as recorded
     FLOW_HONESTY, flowLinks, sankeyFromLedger };
 })();
