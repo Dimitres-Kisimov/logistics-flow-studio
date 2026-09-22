@@ -25,6 +25,7 @@ WarehouseTwin ships **only original or permissively-licensed open assets**. Ther
 ## Data
 
 - **All data is synthetic and seeded.** No real inventory, orders, telemetry, or personal data. Pallet dimensions, the aisle rule and the Compliance Check guidance values are drawn from public standards/references (EPAL/UIC pallet sizes; ASR A1.8 working-aisle and traffic-route geometry; ASR A1.8 traffic-route and ASR A2.3 escape-route guidance values, with the derivation assumptions written down in `domain.js` and `docs/DOMAIN_NOTES.md`). Referencing a public standard's published guidance numbers is not a use of anyone's proprietary assets, and WarehouseTwin makes **no certification claim** of any kind — the Compliance Check is a design aid, not a certification or a Gefährdungsbeurteilung.
+- **Board grades (v3.47).** The table of ECT box-certificate classes lists the classes commonly printed on cartons and converts them with the exact pound-force and inch definitions - public classification values and unit arithmetic, not any supplier's proprietary board table; the flute calipers are typical values, labelled approximate.
 
 ## Runtime dependencies
 

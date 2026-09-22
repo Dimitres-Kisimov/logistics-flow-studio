@@ -94,7 +94,16 @@
       inp.dispatchEvent(new Event("input", { bubbles: true }));
       return wait(400).then(function () {
         check("your-case-reacts-to-input-debounced", function () { return { ok: out.innerHTML !== before && !BAD_TEXT.test(out.textContent), detail: "length " + before.length + " -> " + out.innerHTML.length }; });
-        return clickAndWait("rlDemoB", "b");
+        var gsel = $("rlYourCase").querySelector('[data-yc="grade"]');
+        gsel.value = "ect32";
+        gsel.dispatchEvent(new Event("change", { bubbles: true }));
+        return wait(400).then(function () {
+          check("grade-select-fills-ect-and-caliper", function () {
+            var e = $("rlYourCase").querySelector('[data-yc="ect"]'), c = $("rlYourCase").querySelector('[data-yc="caliper"]');
+            return { ok: Math.abs(Number(e.value) - 5.6041) < 1e-3 && Number(c.value) === 4 && /32 ECT/.test(out.textContent) && !BAD_TEXT.test(out.textContent), detail: e.value + " kN/m / " + c.value + " mm" };
+          });
+          return clickAndWait("rlDemoB", "b");
+        });
       });
     }).then(function (d) {
       check("compare-renders-after-b", function () { var n = $("rlCompare").querySelectorAll("table").length; return { ok: !!window.RunLedger.currentB() && window.RunLedger.currentB().run.id === d.run && n === 6, detail: d.run + " · " + n + " tables" }; });

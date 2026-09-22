@@ -23,7 +23,7 @@
  *      the page's ten sections, nav, skip link, print, self-test wiring;
  *      Your case bound once and debounced; the pinwheel search capped.
  *   4. Shipped wiring: page, stylesheet and script exist and are precached
- *      at wt-v126; the planner has the hand-over button; the offline guard
+ *      at wt-v127; the planner has the hand-over button; the offline guard
  *      rules hold (no external references).
  * ===================================================================== */
 "use strict";
@@ -153,9 +153,9 @@ console.log("=".repeat(72));
   const html = read("run-ledger.html"), sw = read("sw.js"), app = read("app.js"), idx = read("index.html"), runall = read("test/run-all.mjs");
   check("4a. the page loads ids.js, pack.js and run-ledger.js and links both stylesheets",
     /<script src="ids\.js">/.test(html) && /<script src="pack\.js">/.test(html) && /<script src="run-ledger\.js">/.test(html) && /run-ledger\.css/.test(html) && /transfer-ledger\.css/.test(html));
-  check("4b. sw.js precaches the page, its script, stylesheet and the recorded example at wt-v126 (previously wt-v125)",
+  check("4b. sw.js precaches the page, its script, stylesheet and the recorded example at wt-v127 (previously wt-v126)",
     /"\.\/run-ledger\.html"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw) && /"\.\/run-ledger\.css"/.test(sw) && /"\.\/test\/fixtures\/run-ledger\.json"/.test(sw) &&
-    /CACHE_VERSION\s*=\s*"wt-v126"/.test(sw) && /Previously wt-v125/.test(sw));
+    /CACHE_VERSION\s*=\s*"wt-v127"/.test(sw) && /Previously wt-v126/.test(sw));
   check("4c. the planner hands a run over to the viewer (button + localStorage hand-over)", /flowLedgerOpen/.test(idx) && /wt-run-ledger/.test(app) && /run-ledger\.html/.test(app));
   check("4d. test/run-all.mjs lists this harness", /verify_run_ledger_view\.js/.test(runall));
   check("4g. the page has the optimisation section", /id="rlOptimise"/.test(html) && /renderOptimise\(exp\)/.test(read("run-ledger.js")));

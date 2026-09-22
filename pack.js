@@ -303,6 +303,31 @@
     pattern: { label: "stacking pattern", default: "column", options: {
       column: { label: "column stack, aligned", value: 1.0 }, misaligned: { label: "column stack as found in practice (about 15 % lost)", value: 0.85 }, interlocked: { label: "interlocked (about 50 % lost)", value: 0.5 } } },
   };
+  // v3.47 BOARD GRADES. The ECT box-certificate classes commonly printed on the box
+  // maker's certificate, in lbf/in as printed and converted to kN/m with the exact
+  // definitions of the pound-force (0.45359237 kg x 9.80665 m/s^2 = 4.4482216152605 N)
+  // and the inch (25.4 mm): 1 lbf/in = 0.175127 kN/m. Wall construction and flute
+  // caliper are "as commonly listed" - approximate typical flute heights (E ~ 1.5,
+  // B ~ 3, C ~ 4, BC ~ 7 mm), not a supplier's specification. A starting point for
+  // "Your case"; a real verdict still needs the supplier's board data.
+  const LBF_PER_IN_TO_KN_PER_M = 4.4482216152605 / 25.4;
+  const BOARD_SOURCE = "ECT box-certificate classes as commonly printed on the box maker's certificate (lbf/in), converted with the exact pound-force and inch definitions; wall construction and flute caliper as commonly listed - approximate, not a supplier specification";
+  const BOARD_CLASSES = [
+    [23, "single", "B", 3], [26, "single", "B", 3], [29, "single", "B", 3], [32, "single", "C", 4], [40, "single", "C", 4], [44, "single", "C", 4],
+    [48, "single or double, as listed", "BC", 7], [51, "single or double, as listed", "BC", 7], [61, "double", "BC", 7], [71, "double", "BC", 7], [82, "double", "BC", 7], [90, "double or triple, as listed", "BC", 7],
+  ];
+  const BOARDS = {};
+  for (let i = 0; i < BOARD_CLASSES.length; i++) {
+    const c = BOARD_CLASSES[i], id = "ect" + c[0];
+    BOARDS[id] = { id: id, label: c[0] + " ECT (" + c[1] + " wall, " + c[2] + " flute)", ectLbIn: c[0], ectKNm: c[0] * LBF_PER_IN_TO_KN_PER_M, wall: c[1], flute: c[2], caliperMm: c[3],
+      caliperNote: "approximate typical flute height: E ~ 1.5, B ~ 3, C ~ 4, BC ~ 7 mm", source: BOARD_SOURCE };
+  }
+  // The certificate class nearest an ECT in kN/m (so a synthetic profile value can name the class it sits near).
+  function nearestGrade(ectKNm) {
+    let best = null;
+    for (const k of Object.keys(BOARDS)) { const d = Math.abs(BOARDS[k].ectKNm - ectKNm); if (!best || d < best.d) best = { d: d, g: BOARDS[k] }; }
+    return best ? best.g : null;
+  }
   // The product of the chosen factors; `sel` maps a factor to an option key or to a number.
   function stackFactor(sel) {
     let factor = 1;
@@ -506,6 +531,7 @@
     profileFor, tiFor, tiHi, casesPerPallet, bestPattern, trailerFill,
     bandDP, bestLayer, layerRects, optimizeProfile, // v3.34
     fourBlock, gridOrBands, bct, STACK_FACTORS, stackFactor, stackLoadKg, safeLayers, G_N_PER_KG, // v3.38
+    LBF_PER_IN_TO_KN_PER_M, BOARD_SOURCE, BOARDS, nearestGrade, // v3.47
     hash01, draw, quantitiesAlong,
   };
 })();

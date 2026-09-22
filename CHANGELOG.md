@@ -1,5 +1,32 @@
 # Changelog
 
+## v3.47 — Board grades
+
+**The table.** `pack.js` `BOARDS`: the twelve ECT box-certificate classes (23, 26, 29, 32,
+40, 44, 48, 51, 61, 71, 82, 90 lbf/in) converted with the exact pound-force and inch
+definitions (`LBF_PER_IN_TO_KN_PER_M` = 4.4482216152605 / 25.4 = 0.175127 kN/m per lbf/in;
+every kN/m value computed, never typed), wall construction and typical flute calipers as
+commonly listed (approximate), one `BOARD_SOURCE` string; `nearestGrade(ectKNm)`. The
+profiles' board values are untouched (fixture pin, byte-identical exports).
+
+**Viewer.** *Your case* gains a board-grade select that fills the ECT and caliper inputs
+(explicit values win; `yourCase` reports `grade`); the strength sentence names the nearest
+certificate class (5 kN/m → 29 ECT ≈ 5.08). `docs/PACKAGING_OPTIMISATION.md` §2 has the row
+with its source; `CREDITS.md` says the table is classification values and unit arithmetic,
+not a supplier's board table.
+
+**Verification.** `verify_stacking.js` +6 (the conversion exact, twelve classes increasing
+and computed, the source text, nearest classes, the grade filling blanks and losing to
+explicit values, the profiles untouched), viewer self-test +1. 75 harnesses, 120 Python
+tests, WT-SELFTEST 180/180 + viewer 31/31. Cache wt-v127.
+
+## v3.46.1 — Fix: a harness pinned the planner-view tuple's last entry
+
+`verify_ledger_flow.js` 4c asserted `"v_flow_links")` — v_flow_links as the LAST planner view —
+and v3.45 appended `v_staffing`, so `node test/run-all.mjs` had one red harness in the v3.45 and
+v3.46 pushes (the CI job caught it; the local runs were misread from a background task's exit
+code). The check now asserts membership in the tuple. No product change.
+
 ## v3.46 — Replications over seeds
 
 **The runner.** `node tools/replicate.mjs <scenario-id|hand> --seeds 1-10 --ticks 300 --out <dir>

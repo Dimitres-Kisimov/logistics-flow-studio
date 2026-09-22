@@ -32,7 +32,7 @@
  *      strength verdict present, a custom pallet joins the ranking, bad
  *      inputs return an error.
  *   8. Shipped wiring: the viewer section, the profile board in the export,
- *      sw.js at wt-v126, the runner; no Date / Math.random in pack.js.
+ *      sw.js at wt-v127, the runner; no Date / Math.random in pack.js.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -178,9 +178,30 @@ console.log("=".repeat(72));
   check("8a. the viewer has the 'Your case' section and the strength verdict; the packaging section passes the board", /id="rlYourCase"/.test(html) && /function renderYourCase/.test(js) && /function strengthText/.test(js) && /P\.tiHi\(pallet, box, prof\.max_stack_mm, prof\.case_kg, board\)/.test(js));
   check("8b. the export's profile block carries the board", /board: rec\.profile\.board \|\| null/.test(ledger));
   check("8c. every profile declares a board (values or an honest 'not evaluated' note); the honesty text names McKee and the synthetic values", Object.keys(P.PROFILES).every((id) => P.PROFILES[id].board && (P.PROFILES[id].board.ectKNm > 0 || (P.PROFILES[id].board.evaluated === false && P.PROFILES[id].board.note))) && /McKee/.test(P.HONESTY) && /SYNTHETIC/.test(P.HONESTY) && /not a certification/.test(P.HONESTY));
-  check("8d. sw.js at wt-v126 (previously wt-v125)", /CACHE_VERSION\s*=\s*"wt-v126"/.test(sw) && /Previously wt-v125/.test(sw));
+  check("8d. sw.js at wt-v127 (previously wt-v126)", /CACHE_VERSION\s*=\s*"wt-v127"/.test(sw) && /Previously wt-v126/.test(sw));
   check("8e. test/run-all.mjs lists this harness", /verify_stacking\.js/.test(runall));
   check("8f. no Date / Math.random CALL in pack.js; Steudel and McKee cited in the source", !/new Date\(|Date\.now\(|Math\.random\(/.test(pack) && /Steudel \(1979\)/.test(pack) && /McKee, Gander & Wachuta, 1963/.test(pack));
+})();
+
+/* ---- 8. v3.47 board grades: the certificate classes, exact conversion, approximate calipers ---- */
+(function () {
+  const K = P.LBF_PER_IN_TO_KN_PER_M, ids = Object.keys(P.BOARDS);
+  const fixA = JSON.parse(fs.readFileSync(path.join(__dirname, "test", "fixtures", "run-ledger.json"), "utf8"));
+  check("8a. 1 lbf/in = 4.4482216152605 N / 25.4 mm = 0.175127 kN/m (exact definitions); 32 ECT = 32 x K = 5.6041 kN/m",
+    near(K, 0.175127, 5e-7) && K === 4.4482216152605 / 25.4 && P.BOARDS.ect32.ectKNm === 32 * K && near(P.BOARDS.ect32.ectKNm, 5.6041, 5e-5), K.toFixed(9));
+  check("8b. twelve classes 23..90 lbf/in in strictly increasing order, each computed (never typed), each with wall, flute, a positive caliper and the source",
+    ids.length === 12 && ids[0] === "ect23" && ids[11] === "ect90" && ids.every((k, i) => i === 0 || P.BOARDS[k].ectKNm > P.BOARDS[ids[i - 1]].ectKNm) &&
+    ids.every((k) => P.BOARDS[k].ectKNm === P.BOARDS[k].ectLbIn * K && P.BOARDS[k].wall && P.BOARDS[k].flute && P.BOARDS[k].caliperMm > 0 && P.BOARDS[k].source === P.BOARD_SOURCE && /approximate/.test(P.BOARDS[k].caliperNote)));
+  check("8c. the source says what it is: certificate classes, exact conversion, calipers as commonly listed - not a supplier specification", /not a supplier specification/.test(P.BOARD_SOURCE) && /exact/.test(P.BOARD_SOURCE));
+  check("8d. nearestGrade: the synthetic 5 kN/m sits nearest 29 ECT (5.08), 4 nearest 23, 6 nearest 32 (5.60) over 40 (7.01), 9 nearest 51 (8.93)",
+    P.nearestGrade(5).id === "ect29" && P.nearestGrade(4).id === "ect23" && P.nearestGrade(6).id === "ect32" && P.nearestGrade(9).id === "ect51" && P.nearestGrade(100).id === "ect90");
+  const base = { l: 400, w: 300, h: 250, kg: 5, ect: "", caliper: "", stackMm: 1800, palletsOnTop: 0, humidity: "rh50", duration: "d90", overhang: "none", pattern: "column" };
+  const byGrade = RL.yourCase(Object.assign({}, base, { grade: "ect32" })), explicit = RL.yourCase(Object.assign({}, base, { grade: "ect32", ect: 5, caliper: 4 })), none = RL.yourCase(base);
+  check("8e. Your case: a grade fills blank board inputs (32 ECT -> 5.6041 kN/m, 4 mm), explicit values win over the grade, no grade and no values = no strength check",
+    byGrade.grade === "ect32" && near(byGrade.board.ectKNm, 5.6041, 5e-5) && byGrade.board.caliperMm === 4 && byGrade.rows.every((x) => x.strength) &&
+    explicit.board.ectKNm === 5 && explicit.board.caliperMm === 4 && explicit.grade === "ect32" && none.board === null && none.grade === null);
+  check("8f. the profiles' board values are untouched (fixture A still carries ECT 5, caliper 4) - the grade link is derived, never stored",
+    P.PROFILES.ecommerce.board.ectKNm === 5 && !("grade" in P.PROFILES.ecommerce.board) && fixA.profile.board.ectKNm === 5 && Object.keys(fixA.profile.board).join(",") === "ectKNm,caliperMm,note");
 })();
 
 console.log("=".repeat(72));

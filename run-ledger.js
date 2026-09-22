@@ -330,7 +330,10 @@
     const n = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
     const box = { id: "custom", label: "your case " + n(inp.l, 0) + " × " + n(inp.w, 0) + " × " + n(inp.h, 0), l: n(inp.l, 0), w: n(inp.w, 0), h: n(inp.h, 0) };
     if (!(box.l > 0 && box.w > 0 && box.h > 0)) return { error: "case length, width and height must be positive" };
-    const board = n(inp.ect, 0) > 0 && n(inp.caliper, 0) > 0 ? { ectKNm: n(inp.ect, 0), caliperMm: n(inp.caliper, 0) } : null;
+    // v3.47: a certificate class fills the blanks; explicit values win
+    const g = inp.grade && P.BOARDS && P.BOARDS[inp.grade] ? P.BOARDS[inp.grade] : null;
+    const ect = n(inp.ect, 0) > 0 ? n(inp.ect, 0) : (g ? g.ectKNm : 0), cal = n(inp.caliper, 0) > 0 ? n(inp.caliper, 0) : (g ? g.caliperMm : 0);
+    const board = ect > 0 && cal > 0 ? { ectKNm: ect, caliperMm: cal } : null;
     const factors = { humidity: inp.humidity, duration: inp.duration, overhang: inp.overhang, pattern: inp.pattern };
     const stack = { palletsOnTop: Math.max(0, Math.floor(n(inp.palletsOnTop, 0))) };
     const pallets = { eur: P.PALLETS.eur, ind: P.PALLETS.ind, half: P.PALLETS.half };
@@ -339,7 +342,7 @@
     }
     const rows = Object.keys(pallets).map((id) => Object.assign({ pallet: id, label: pallets[id].label }, P.tiHi(pallets[id], box, n(inp.stackMm, 1800), n(inp.kg, 0), board, factors, stack)));
     rows.sort((a, b) => b.cases - a.cases || b.cubeUtil - a.cubeUtil || (a.pallet < b.pallet ? -1 : a.pallet > b.pallet ? 1 : 0));
-    return { box: box, board: board, factors: P.stackFactor(factors), stack: stack, rows: rows, best: rows[0] || null, pallets: pallets };
+    return { box: box, board: board, grade: g ? g.id : null, factors: P.stackFactor(factors), stack: stack, rows: rows, best: rows[0] || null, pallets: pallets };
   }
 
   /* ---------------- the run at a glance (v3.39) ---------------------- */
@@ -571,7 +574,8 @@
   function strengthText(t, board) {
     if (!board || !(board.ectKNm > 0) || !t.strength) return "<p class=\"note\"><b>Stack strength:</b> not evaluated - " + esc((board && board.note) || "no board values for this case") + ".</p>";
     const s = t.strength, p = s.parts;
-    return "<p><b>Stack strength</b> (simplified McKee on synthetic board values" + (board.note ? ": " + esc(board.note) : "") + "): ECT " + esc(board.ectKNm) + " kN/m × caliper " + esc(board.caliperMm) + " mm × perimeter " + esc(s.perimeterMm) + " mm → BCT ≈ " + Math.round(s.bctN) + " N (" + Math.round(s.bctKgf) + " kgf) per case" + (s.inRange ? "" : " - outside the formula's published range (height ≥ perimeter / 7, footprint ratio ≤ 3 : 1)") +
+    const P = window.WT && window.WT.pack, ng = P && typeof P.nearestGrade === "function" ? P.nearestGrade(board.ectKNm) : null; // v3.47
+    return "<p><b>Stack strength</b> (simplified McKee on synthetic board values" + (board.note ? ": " + esc(board.note) : "") + (ng ? "; nearest certificate class " + ng.ectLbIn + " ECT ≈ " + r2(ng.ectKNm) + " kN/m" : "") + "): ECT " + esc(r4(board.ectKNm)) + " kN/m × caliper " + esc(board.caliperMm) + " mm × perimeter " + esc(s.perimeterMm) + " mm → BCT ≈ " + Math.round(s.bctN) + " N (" + Math.round(s.bctKgf) + " kgf) per case" + (s.inRange ? "" : " - outside the formula's published range (height ≥ perimeter / 7, footprint ratio ≤ 3 : 1)") +
       ". After the factors humidity " + p.humidity + " × time under load " + p.duration + " × overhang " + p.overhang + " × pattern " + p.pattern + " = " + r4(s.factor) + ", the allowable load on a bottom case is " + r2(s.allowableKg).toFixed(2) + " kg" + (s.palletsOnTop ? " with " + s.palletsOnTop + " pallet" + (s.palletsOnTop > 1 ? "s" : "") + " stacked on top" : "") + "; this pattern puts " + r2(s.loadKg).toFixed(2) + " kg on it (" + Math.round((s.utilisation || 0) * 100) + " %) - " +
       (t.strengthLimited ? "<b>the board, not the height, limits the stack to " + t.hi + " layers</b>." : "within the " + s.safeLayers + " layers the board allows.") + "</p>";
   }
@@ -589,6 +593,7 @@
     const sel = (k) => '<label>' + esc(F[k].label) + '<select data-yc="' + k + '">' + Object.keys(F[k].options).map((o) => '<option value="' + o + '"' + (o === F[k].default ? " selected" : "") + ">" + esc(F[k].options[o].label) + " × " + F[k].options[o].value + "</option>").join("") + "</select></label>";
     const num = (k, label, v, step) => '<label>' + esc(label) + '<input data-yc="' + k + '" type="number" step="' + (step || 1) + '" min="0" value="' + esc(v) + '"></label>';
     out.innerHTML = '<div class="yc-form">' + num("l", "case length (mm)", box.l) + num("w", "case width (mm)", box.w) + num("h", "case height (mm)", box.h) + num("kg", "case weight (kg)", prof.caseKg, 0.1) +
+      '<label>board grade (v3.47: fills ECT and caliper; the class values are exact, the calipers approximate)<select data-yc="grade"><option value="">custom values</option>' + Object.keys(P.BOARDS || {}).map((k) => '<option value="' + k + '">' + esc(P.BOARDS[k].label + " ≈ " + r4(P.BOARDS[k].ectKNm) + " kN/m, " + P.BOARDS[k].caliperMm + " mm") + "</option>").join("") + "</select></label>" +
       num("ect", "board ECT (kN/m; 0 = no strength check)", board.ectKNm, 0.1) + num("caliper", "board caliper (mm)", board.caliperMm, 0.1) + num("stackMm", "stack height limit (mm)", prof.maxStackMm, 10) + num("palletsOnTop", "pallets stacked on top", 0) +
       num("palletL", "custom pallet length (mm, 0 = none)", 0, 10) + num("palletW", "custom pallet width (mm)", 0, 10) + num("palletLoad", "custom pallet load limit (kg)", 1500, 10) +
       sel("humidity") + sel("duration") + sel("overhang") + sel("pattern") + '</div><div id="rlYourCaseOut"></div>';
@@ -610,7 +615,14 @@
       ycBound = true;
       const schedule = () => { clearTimeout(ycTimer); ycTimer = setTimeout(() => { if (ycDraw) ycDraw(); }, 150); };
       out.addEventListener("input", (ev) => { if (ev.target && ev.target.tagName === "INPUT") schedule(); });
-      out.addEventListener("change", (ev) => { if (ev.target && ev.target.tagName === "SELECT") schedule(); });
+      out.addEventListener("change", (ev) => {
+        if (!ev.target || ev.target.tagName !== "SELECT") return;
+        if (ev.target.getAttribute("data-yc") === "grade") { // v3.47: the class fills the two board inputs
+          const g = P.BOARDS && P.BOARDS[ev.target.value];
+          if (g) { const e = out.querySelector('[data-yc="ect"]'), c = out.querySelector('[data-yc="caliper"]'); if (e) e.value = String(r4(g.ectKNm)); if (c) c.value = String(g.caliperMm); }
+        }
+        schedule();
+      });
     }
     ycDraw();
   }
