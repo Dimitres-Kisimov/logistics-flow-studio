@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.40 — Cost that answers the question
+
+**Holding cost.** `analytics.defaultRates()` gains `holdingPerUnitHour: 0` (a fourth rate
+row in the Analyze panel; the cost analyzer ignores it and says so); `ledger.ratesBlock`
+carries `holding_per_unit_hour`; `ledger.costs` charges a waiting span's ELAPSED hours x
+the rate as `holding_eur` (labour still charges the station's service time). SQL:
+`rate.holding_per_unit_hour` (guarded migration for older databases, named-column
+insert), `v_span_cost` gains `held_hours` / `holding_eur`, `v_cost_by_hu` /
+`v_cost_by_type` / `v_cost_by_location` gain `hours` and `holding_eur`, the totals
+include it; `v_compare_cost` unchanged (its totals include it). The honesty text now
+reads "queue time costs no labour; a holding cost is charged only if you set one".
+
+**Per received each.** `v_cost_by_type` and `ledger.costs` gain `eaches_in` and
+`eur_per_received_each` beside `eur_per_each`; the viewer's cost section gains a fourth
+card and the columns, the glance shows both, and a flag says when no holding cost is
+set. The planner's flow card shows the run's cost so far (total, per unit, the split),
+recomputed only when the recording grew.
+
+**Verification.** Python +2 (holding by hand: A +0.0667 -> 17.2699, B 0, C 0, face
+1.2393, eaches received 576 / 576 / 3, 0.03 and 0.8221 per received each, linear in the
+rate; an old-schema database gains the column and the current view text); the fixture
+SQL == JS test covers the new columns; `verify_cost_ledger.js` +2 hand checks; viewer
+self-test +1. Fixtures A and B and `run-ledger-sql.js` regenerated (run ids unchanged).
+70 harnesses, 92 Python tests, WT-SELFTEST 178/178 + viewer 23/23. Cache wt-v122.
+
 ## v3.39 — The viewer as one report
 
 **Defects.** The SQL shown under the viewer's tables was hand-typed and had drifted from

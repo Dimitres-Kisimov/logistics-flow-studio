@@ -76,6 +76,7 @@
         return { ok: paths === links && links > 5, detail: paths + " paths / " + links + " links" };
       });
       check("cost-cards-present", function () { return $("rlCost").querySelectorAll(".cards article").length >= 3; });
+      check("cost-per-received-each-and-holding", function () { var t = $("rlCost").textContent; return { ok: $("rlCost").querySelectorAll(".cards article").length >= 4 && /Per received each/.test(t) && /holding/.test(t) && /eur_per_received_each/.test(t), detail: $("rlCost").querySelectorAll(".cards article").length + " cards" }; });
       check("print-and-csv-buttons", function () { var n = $("rlView").querySelectorAll("button.csv").length; return { ok: !!$("rlPrint") && n >= 10 && typeof window.print === "function", detail: n + " CSV buttons" }; });
       check("views-and-model-memoised", function () { return R.views(exp) === R.views(exp) && R.model(exp) === R.model(exp) && R.model(exp).views === R.views(exp); });
       check("derived-minutes-columns", function () { var n = $("rlWait").querySelectorAll("th.derived").length; return { ok: n === 2, detail: n + " derived columns in the wait table" }; });

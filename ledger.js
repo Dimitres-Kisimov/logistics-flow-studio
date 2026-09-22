@@ -49,8 +49,11 @@
  *   nothing; a moving span is charged in full at the class of mover the floor
  *   contains. Cost per span = hours x (labour rate if the class is manned)
  *   + hours x capex / amortisation years / operating hours per year
- *   + hours x kW x energy price. The same arithmetic runs in SQL
- *   (tools/run_ledger.py v_span_cost) and the tests prove both agree.
+ *   + hours x kW x energy price, plus (v3.40) the elapsed hours a unit waited
+ *   x a holding cost per unit-hour when one is set (default 0). Per type
+ *   the cost is also given per received each (v3.40), the honest partner of
+ *   per delivered each while units are still in flight. The same arithmetic
+ *   runs in SQL (tools/run_ledger.py v_span_cost) and the tests prove both agree.
  * ===================================================================== */
 (function () {
   "use strict";
@@ -108,7 +111,7 @@
   const RATES_HONESTY =
     "Illustrative teaching rates (analytics.js defaults, or as edited in the planner's Analyze panel) - not a quote. " +
     "A unit served at a station is charged that station's service time (1 / its service rate), whatever it waited: " +
-    "queue time costs nothing (holding cost is not modelled). Internal transport is charged at the class of mover the " +
+    "queue time costs no labour, and a holding cost per unit-hour waiting is charged only if you set one (default 0). Internal transport is charged at the class of mover the " +
     "floor contains (AGV, forklift or conveyor, in that order); a floor without one moves for free. The picking KPI's " +
     "wage (Simulate card) is a different input and is not used here.";
 
@@ -146,6 +149,7 @@
       energy_price_per_kwh: num(rates.energyPricePerKWh, D.energyPricePerKWh),
       hours_per_year: pos(rates.hoursPerYear, D.hoursPerYear),
       co2_per_kwh: num(rates.co2PerKWh, D.co2PerKWh),
+      holding_per_unit_hour: num(rates.holdingPerUnitHour, D.holdingPerUnitHour == null ? 0 : D.holdingPerUnitHour), // v3.40: EUR per unit-hour waiting, 0 = not charged
       transport: { class: transport, labour: transport && CLASS_LABOUR[transport] ? 1 : 0 },
       equipment: equipment,
       classes: classes,
@@ -379,6 +383,7 @@
       const e = cls ? eq[cls] : null;
       return e ? { equipment: e.capex / e.amort_years / rates.hours_per_year, energy: e.power_kw * rates.energy_price_per_kwh } : { equipment: 0, energy: 0 };
     };
+    const hold = Number(rates.holding_per_unit_hour) > 0 ? Number(rates.holding_per_unit_hour) : 0;
     const sp = spans(exp).map((s) => {
       let charged, cls, labour;
       if (s.state === "waiting") {
@@ -390,46 +395,49 @@
         charged = s.ticks; cls = (rates.transport && rates.transport.class) || null; labour = rates.transport && rates.transport.labour ? 1 : 0;
       }
       const hours = (charged * mpt) / 60;
+      const held = s.state === "waiting" ? (s.ticks * mpt) / 60 : 0; // the ELAPSED wait, for the holding cost
       const ph = perHour(cls);
-      return Object.assign({}, s, { charged_ticks: charged, class: cls, labour: labour, hours: hours,
-        labour_eur: hours * labour * rates.labour_per_hour, equipment_eur: hours * ph.equipment, energy_eur: hours * ph.energy });
+      return Object.assign({}, s, { charged_ticks: charged, class: cls, labour: labour, hours: hours, held_hours: held,
+        labour_eur: hours * labour * rates.labour_per_hour, equipment_eur: hours * ph.equipment, energy_eur: hours * ph.energy, holding_eur: held * hold });
     });
     const huMap = {}, huOrder = [];
     for (const s of sp) {
       let h = huMap[s.hu_id];
-      if (!h) { h = huMap[s.hu_id] = { hu_id: s.hu_id, ticks: 0, waiting_ticks: 0, moving_ticks: 0, charged_ticks: 0, l: 0, q: 0, n: 0 }; huOrder.push(s.hu_id); }
+      if (!h) { h = huMap[s.hu_id] = { hu_id: s.hu_id, ticks: 0, waiting_ticks: 0, moving_ticks: 0, charged_ticks: 0, hr: 0, l: 0, q: 0, n: 0, g: 0 }; huOrder.push(s.hu_id); }
       h.ticks += s.ticks; if (s.state === "waiting") h.waiting_ticks += s.ticks; else h.moving_ticks += s.ticks;
-      h.charged_ticks += s.charged_ticks; h.l += s.labour_eur; h.q += s.equipment_eur; h.n += s.energy_eur;
+      h.charged_ticks += s.charged_ticks; h.hr += s.hours; h.l += s.labour_eur; h.q += s.equipment_eur; h.n += s.energy_eur; h.g += s.holding_eur;
     }
     const byHu = huOrder.map((id) => { const h = huMap[id];
-      return { hu_id: id, ticks: h.ticks, waiting_ticks: h.waiting_ticks, moving_ticks: h.moving_ticks, charged_ticks: h.charged_ticks,
-        labour_eur: r4(h.l), equipment_eur: r4(h.q), energy_eur: r4(h.n), total_eur: r4(h.l + h.q + h.n) }; });
+      return { hu_id: id, ticks: h.ticks, waiting_ticks: h.waiting_ticks, moving_ticks: h.moving_ticks, charged_ticks: h.charged_ticks, hours: r4(h.hr),
+        labour_eur: r4(h.l), equipment_eur: r4(h.q), energy_eur: r4(h.n), holding_eur: r4(h.g), total_eur: r4(h.l + h.q + h.n + h.g) }; });
     const types = {};
     for (const h of exp.hus) {
-      const t = types[h.archetype] || (types[h.archetype] = { archetype: h.archetype, units: 0, retired: 0, eaches_out: 0, l: 0, q: 0, n: 0 });
+      const t = types[h.archetype] || (types[h.archetype] = { archetype: h.archetype, units: 0, retired: 0, eaches_in: 0, eaches_out: 0, hr: 0, l: 0, q: 0, n: 0, g: 0 });
       t.units++;
       if (h.retired_tick != null) t.retired++;
+      t.eaches_in += h.received_eaches || 0;
       if (h.final_kind === "delivered" && h.final) t.eaches_out += h.final.eaches;
       const c = huMap[h.id];
-      if (c) { t.l += c.l; t.q += c.q; t.n += c.n; }
+      if (c) { t.hr += c.hr; t.l += c.l; t.q += c.q; t.n += c.n; t.g += c.g; }
     }
-    const byType = Object.keys(types).sort().map((k) => { const t = types[k], tot = t.l + t.q + t.n;
-      return { archetype: k, units: t.units, retired: t.retired, eaches_out: t.eaches_out, labour_eur: r4(t.l), equipment_eur: r4(t.q), energy_eur: r4(t.n),
-        total_eur: r4(tot), eur_per_unit: r4(tot / t.units), eur_per_each: t.eaches_out ? r4(tot / t.eaches_out) : null }; });
+    const byType = Object.keys(types).sort().map((k) => { const t = types[k], tot = t.l + t.q + t.n + t.g;
+      return { archetype: k, units: t.units, retired: t.retired, eaches_in: t.eaches_in, eaches_out: t.eaches_out, hours: r4(t.hr),
+        labour_eur: r4(t.l), equipment_eur: r4(t.q), energy_eur: r4(t.n), holding_eur: r4(t.g),
+        total_eur: r4(tot), eur_per_unit: r4(tot / t.units), eur_per_received_each: t.eaches_in ? r4(tot / t.eaches_in) : null, eur_per_each: t.eaches_out ? r4(tot / t.eaches_out) : null }; });
     const locAgg = {};
-    const tr = { location: "transport", class: (rates.transport && rates.transport.class) || null, spans: 0, ticks: 0, charged_ticks: 0, l: 0, q: 0, n: 0 };
+    const tr = { location: "transport", class: (rates.transport && rates.transport.class) || null, spans: 0, ticks: 0, charged_ticks: 0, hr: 0, l: 0, q: 0, n: 0, g: 0 };
     for (const s of sp) {
-      const a = s.state === "waiting" ? (locAgg[s.location] || (locAgg[s.location] = { location: s.location, class: s.class, spans: 0, ticks: 0, charged_ticks: 0, l: 0, q: 0, n: 0 })) : tr;
-      a.spans++; a.ticks += s.ticks; a.charged_ticks += s.charged_ticks; a.l += s.labour_eur; a.q += s.equipment_eur; a.n += s.energy_eur;
+      const a = s.state === "waiting" ? (locAgg[s.location] || (locAgg[s.location] = { location: s.location, class: s.class, spans: 0, ticks: 0, charged_ticks: 0, hr: 0, l: 0, q: 0, n: 0, g: 0 })) : tr;
+      a.spans++; a.ticks += s.ticks; a.charged_ticks += s.charged_ticks; a.hr += s.hours; a.l += s.labour_eur; a.q += s.equipment_eur; a.n += s.energy_eur; a.g += s.holding_eur;
     }
-    const row = (a) => ({ location: a.location, class: a.class, spans: a.spans, ticks: a.ticks, charged_ticks: a.charged_ticks,
-      labour_eur: r4(a.l), equipment_eur: r4(a.q), energy_eur: r4(a.n), total_eur: r4(a.l + a.q + a.n) });
+    const row = (a) => ({ location: a.location, class: a.class, spans: a.spans, ticks: a.ticks, charged_ticks: a.charged_ticks, hours: r4(a.hr),
+      labour_eur: r4(a.l), equipment_eur: r4(a.q), energy_eur: r4(a.n), holding_eur: r4(a.g), total_eur: r4(a.l + a.q + a.n + a.g) });
     const byLocation = Object.keys(locAgg).sort().map((k) => row(locAgg[k]));
     if (tr.spans) byLocation.push(row(tr));
-    let L = 0, Q = 0, N = 0;
-    for (const s of sp) { L += s.labour_eur; Q += s.equipment_eur; N += s.energy_eur; }
+    let L = 0, Q = 0, N = 0, G = 0;
+    for (const s of sp) { L += s.labour_eur; Q += s.equipment_eur; N += s.energy_eur; G += s.holding_eur; }
     return { rates: rates, spans: sp, byHu: byHu, byType: byType, byLocation: byLocation,
-      total: { labour_eur: r4(L), equipment_eur: r4(Q), energy_eur: r4(N), total_eur: r4(L + Q + N) } };
+      total: { labour_eur: r4(L), equipment_eur: r4(Q), energy_eur: r4(N), holding_eur: r4(G), total_eur: r4(L + Q + N + G) } };
   }
   // The same aggregates the SQL views compute (tools/run_ledger.py) - kept
   // here so the readout and the database can be proved to agree.

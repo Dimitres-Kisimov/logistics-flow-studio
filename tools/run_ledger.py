@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS rate(
   run_id TEXT PRIMARY KEY NOT NULL REFERENCES run(id) ON DELETE CASCADE, currency TEXT NOT NULL DEFAULT 'EUR',
   labour_per_hour REAL NOT NULL CHECK(labour_per_hour >= 0), energy_price_per_kwh REAL NOT NULL CHECK(energy_price_per_kwh >= 0),
   hours_per_year REAL NOT NULL CHECK(hours_per_year > 0), co2_per_kwh REAL,
-  transport_class TEXT, transport_labour INTEGER NOT NULL DEFAULT 0 CHECK(transport_labour IN (0, 1)), source TEXT, honesty TEXT);
+  transport_class TEXT, transport_labour INTEGER NOT NULL DEFAULT 0 CHECK(transport_labour IN (0, 1)), source TEXT, honesty TEXT,
+  holding_per_unit_hour REAL NOT NULL DEFAULT 0 CHECK(holding_per_unit_hour >= 0));
 CREATE TABLE IF NOT EXISTS equipment_rate(
   run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, class TEXT NOT NULL,
   capex REAL NOT NULL CHECK(capex >= 0), amort_years REAL NOT NULL CHECK(amort_years > 0), power_kw REAL NOT NULL CHECK(power_kw >= 0),
@@ -178,48 +179,56 @@ WITH c AS (
          CASE WHEN s.state = 'waiting' THEN lc.class ELSE r.transport_class END AS class,
          CASE WHEN s.state = 'waiting' THEN COALESCE(lc.labour, 0) ELSE r.transport_labour END AS labour,
          (CASE WHEN s.state = 'waiting' THEN COALESCE(l.service_ticks, 0) ELSE s.ticks END) * ru.minutes_per_tick / 60.0 AS hours,
-         r.labour_per_hour, r.energy_price_per_kwh, r.hours_per_year
+         CASE WHEN s.state = 'waiting' THEN s.ticks * ru.minutes_per_tick / 60.0 ELSE 0 END AS held_hours,
+         r.labour_per_hour, r.energy_price_per_kwh, r.hours_per_year, r.holding_per_unit_hour
   FROM v_spans s
   JOIN run ru ON ru.id = s.run_id
   JOIN rate r ON r.run_id = s.run_id
   LEFT JOIN location l ON l.run_id = s.run_id AND l.id = s.location
   LEFT JOIN location_class lc ON lc.run_id = s.run_id AND lc.type = l.type)
-SELECT c.run_id, c.hu_id, c.version, c.state, c.op, c.location, c.ticks, c.charged_ticks, c.class, c.labour, c.hours,
+SELECT c.run_id, c.hu_id, c.version, c.state, c.op, c.location, c.ticks, c.charged_ticks, c.class, c.labour, c.hours, c.held_hours,
        c.hours * c.labour * c.labour_per_hour                              AS labour_eur,
        c.hours * COALESCE(er.capex / er.amort_years / c.hours_per_year, 0) AS equipment_eur,
-       c.hours * COALESCE(er.power_kw, 0) * c.energy_price_per_kwh         AS energy_eur
+       c.hours * COALESCE(er.power_kw, 0) * c.energy_price_per_kwh         AS energy_eur,
+       c.held_hours * c.holding_per_unit_hour                              AS holding_eur
 FROM c LEFT JOIN equipment_rate er ON er.run_id = c.run_id AND er.class = c.class;""",
     "v_cost_by_hu": """
 CREATE VIEW IF NOT EXISTS v_cost_by_hu AS
 SELECT run_id, hu_id, SUM(ticks) AS ticks,
        SUM(CASE WHEN state = 'waiting' THEN ticks ELSE 0 END) AS waiting_ticks,
        SUM(CASE WHEN state = 'moving' THEN ticks ELSE 0 END) AS moving_ticks,
-       SUM(charged_ticks) AS charged_ticks,
+       SUM(charged_ticks) AS charged_ticks, ROUND(SUM(hours), 4) AS hours,
        ROUND(SUM(labour_eur), 4) AS labour_eur, ROUND(SUM(equipment_eur), 4) AS equipment_eur, ROUND(SUM(energy_eur), 4) AS energy_eur,
-       ROUND(SUM(labour_eur + equipment_eur + energy_eur), 4) AS total_eur
+       ROUND(SUM(holding_eur), 4) AS holding_eur,
+       ROUND(SUM(labour_eur + equipment_eur + energy_eur + holding_eur), 4) AS total_eur
 FROM v_span_cost GROUP BY run_id, hu_id;""",
     "v_cost_by_type": """
 CREATE VIEW IF NOT EXISTS v_cost_by_type AS
-WITH c AS (SELECT hu_id, SUM(labour_eur) AS l, SUM(equipment_eur) AS q, SUM(energy_eur) AS n FROM v_span_cost GROUP BY hu_id)
+WITH c AS (SELECT hu_id, SUM(hours) AS hr, SUM(labour_eur) AS l, SUM(equipment_eur) AS q, SUM(energy_eur) AS n, SUM(holding_eur) AS g FROM v_span_cost GROUP BY hu_id)
 SELECT h.run_id, h.archetype, COUNT(*) AS units,
        SUM(CASE WHEN h.retired_tick IS NOT NULL THEN 1 ELSE 0 END) AS retired,
+       SUM(h.received_eaches) AS eaches_in,
        COALESCE(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_eaches END), 0) AS eaches_out,
+       ROUND(COALESCE(SUM(c.hr), 0), 4) AS hours,
        ROUND(COALESCE(SUM(c.l), 0), 4) AS labour_eur, ROUND(COALESCE(SUM(c.q), 0), 4) AS equipment_eur, ROUND(COALESCE(SUM(c.n), 0), 4) AS energy_eur,
-       ROUND(COALESCE(SUM(c.l + c.q + c.n), 0), 4) AS total_eur,
-       ROUND(COALESCE(SUM(c.l + c.q + c.n), 0) / COUNT(*), 4) AS eur_per_unit,
-       ROUND(COALESCE(SUM(c.l + c.q + c.n), 0) / NULLIF(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_eaches END), 0), 4) AS eur_per_each
+       ROUND(COALESCE(SUM(c.g), 0), 4) AS holding_eur,
+       ROUND(COALESCE(SUM(c.l + c.q + c.n + c.g), 0), 4) AS total_eur,
+       ROUND(COALESCE(SUM(c.l + c.q + c.n + c.g), 0) / COUNT(*), 4) AS eur_per_unit,
+       ROUND(COALESCE(SUM(c.l + c.q + c.n + c.g), 0) / NULLIF(SUM(h.received_eaches), 0), 4) AS eur_per_received_each,
+       ROUND(COALESCE(SUM(c.l + c.q + c.n + c.g), 0) / NULLIF(SUM(CASE WHEN h.final_kind = 'delivered' THEN h.final_eaches END), 0), 4) AS eur_per_each
 FROM hu h JOIN rate r ON r.run_id = h.run_id
 LEFT JOIN c ON c.hu_id = h.id
 GROUP BY h.run_id, h.archetype;""",
     "v_cost_by_location": """
 CREATE VIEW IF NOT EXISTS v_cost_by_location AS
-SELECT run_id, location, MAX(class) AS class, COUNT(*) AS spans, SUM(ticks) AS ticks, SUM(charged_ticks) AS charged_ticks,
-       ROUND(SUM(labour_eur), 4) AS labour_eur, ROUND(SUM(equipment_eur), 4) AS equipment_eur, ROUND(SUM(energy_eur), 4) AS energy_eur,
-       ROUND(SUM(labour_eur + equipment_eur + energy_eur), 4) AS total_eur
+SELECT run_id, location, MAX(class) AS class, COUNT(*) AS spans, SUM(ticks) AS ticks, SUM(charged_ticks) AS charged_ticks, ROUND(SUM(hours), 4) AS hours,
+       ROUND(SUM(labour_eur), 4) AS labour_eur, ROUND(SUM(equipment_eur), 4) AS equipment_eur, ROUND(SUM(energy_eur), 4) AS energy_eur, ROUND(SUM(holding_eur), 4) AS holding_eur,
+       ROUND(SUM(labour_eur + equipment_eur + energy_eur + holding_eur), 4) AS total_eur
 FROM v_span_cost WHERE state = 'waiting' GROUP BY run_id, location
 UNION ALL
-SELECT run_id, 'transport' AS location, MAX(class), COUNT(*), SUM(ticks), SUM(charged_ticks),
-       ROUND(SUM(labour_eur), 4), ROUND(SUM(equipment_eur), 4), ROUND(SUM(energy_eur), 4), ROUND(SUM(labour_eur + equipment_eur + energy_eur), 4)
+SELECT run_id, 'transport' AS location, MAX(class), COUNT(*), SUM(ticks), SUM(charged_ticks), ROUND(SUM(hours), 4),
+       ROUND(SUM(labour_eur), 4), ROUND(SUM(equipment_eur), 4), ROUND(SUM(energy_eur), 4), ROUND(SUM(holding_eur), 4),
+       ROUND(SUM(labour_eur + equipment_eur + energy_eur + holding_eur), 4)
 FROM v_span_cost WHERE state = 'moving' GROUP BY run_id;""",
     # ---- the invariants: every one of these must return ZERO rows --------------
     "v_conservation_violations": """
@@ -325,6 +334,10 @@ def initialize(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE location ADD COLUMN service_ticks REAL")
     except sqlite3.OperationalError:
         pass
+    try:  # a database created before v3.40 has no holding rate yet
+        db.execute("ALTER TABLE rate ADD COLUMN holding_per_unit_hour REAL NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # views are dropped and recreated on every open, so a database created by an
     # older version always runs the current text (v3.39) - the text the viewer shows
     for name in VIEWS:
@@ -373,10 +386,12 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
         rates = data.get("rates")
         if rates:
             tr = rates.get("transport") or {}
-            db.execute("INSERT INTO rate VALUES(?,?,?,?,?,?,?,?,?,?)", (
-                run["id"], rates.get("currency", "EUR"), float(rates["labour_per_hour"]), float(rates["energy_price_per_kwh"]),
-                float(rates["hours_per_year"]), rates.get("co2_per_kwh"), tr.get("class"), 1 if tr.get("labour") else 0,
-                rates.get("source"), rates.get("honesty")))
+            db.execute(
+                "INSERT INTO rate(run_id, currency, labour_per_hour, energy_price_per_kwh, hours_per_year, co2_per_kwh, "
+                "transport_class, transport_labour, source, honesty, holding_per_unit_hour) VALUES(?,?,?,?,?,?,?,?,?,?,?)", (
+                    run["id"], rates.get("currency", "EUR"), float(rates["labour_per_hour"]), float(rates["energy_price_per_kwh"]),
+                    float(rates["hours_per_year"]), rates.get("co2_per_kwh"), tr.get("class"), 1 if tr.get("labour") else 0,
+                    rates.get("source"), rates.get("honesty"), float(rates.get("holding_per_unit_hour") or 0)))
             for cls, e in sorted((rates.get("equipment") or {}).items()):
                 db.execute("INSERT INTO equipment_rate VALUES(?,?,?,?,?,?)", (
                     run["id"], cls, float(e["capex"]), float(e["amort_years"]), float(e["power_kw"]), 1 if e.get("labour") else 0))

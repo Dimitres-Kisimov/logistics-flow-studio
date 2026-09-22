@@ -13,6 +13,7 @@ Two layers of proof:
      units, rates linear, empty without rates, and SQL == JavaScript on the fixture.
 """
 import json
+import sqlite3
 import sys
 import unittest
 from pathlib import Path
@@ -90,7 +91,7 @@ def hand_rates():
     cls = {"dock-in": ("dock", 0), "depalletiser": ("depalletiser", 0), "carton-flow": ("racking", 1), "stretch-wrap": ("wrapper", 0),
            "staging": (None, 1), "dock-out": ("dock", 0), "returns-station": ("workstation", 1)}
     return dict(source="hand", currency="EUR", labour_per_hour=35, energy_price_per_kwh=0.3, hours_per_year=4000, co2_per_kwh=0.3,
-                transport={"class": "forklift", "labour": 1},
+                holding_per_unit_hour=0, transport={"class": "forklift", "labour": 1},
                 equipment={k: dict(capex=c, amort_years=a, power_kw=w, labour=lab) for k, (c, a, w, lab) in eq.items()},
                 classes={k: {"class": c, "labour": lab} for k, (c, lab) in cls.items()}, honesty="hand-built test rates")
 
@@ -219,6 +220,55 @@ class HandLedger(unittest.TestCase):
         ty = {r["archetype"]: r for r in self.view("v_cost_by_type")}
         self.assertAlmostEqual(ty["case-pick"]["equipment_eur"], 0.4784 / 2, delta=5e-4)
         self.assertAlmostEqual(ty["case-pick"]["labour_eur"], 16.3333, delta=5e-4)
+
+    # ---- v3.40 holding cost, cost per received each, hours -----------------------
+    # With 1 EUR per unit-hour waiting, A's 4 waiting ticks cost 4/60 = 0.0667 more;
+    # B never waited; C's open wait opens no span. Hours are the CHARGED hours.
+    def test_holding_cost_by_hand(self):
+        self.db.execute("UPDATE rate SET holding_per_unit_hour = 1 WHERE run_id = ?", (self.run,))
+        hu = {r["hu_id"][-8:]: r for r in self.view("v_cost_by_hu")}
+        self.assertAlmostEqual(hu["000001-1"]["holding_eur"], 0.0667, delta=5e-4)
+        self.assertAlmostEqual(hu["000001-1"]["total_eur"], 17.2699, delta=5e-4)
+        self.assertAlmostEqual(hu["000001-1"]["hours"], 0.4667, delta=5e-4)
+        self.assertEqual((hu["000002-1"]["holding_eur"], hu["000003-1"]["holding_eur"]), (0, 0))
+        self.assertAlmostEqual(hu["000002-1"]["hours"], 0.25, delta=5e-4)
+        loc = {r["location"]: r for r in self.view("v_cost_by_location")}
+        self.assertAlmostEqual(loc["face"]["holding_eur"], 0.0667, delta=5e-4)
+        self.assertAlmostEqual(loc["face"]["total_eur"], 1.2393, delta=5e-4)
+        self.assertEqual(loc["transport"]["holding_eur"], 0)
+        ty = {r["archetype"]: r for r in self.view("v_cost_by_type")}
+        self.assertEqual((ty["case-pick"]["eaches_in"], ty["cross-dock"]["eaches_in"], ty["returns"]["eaches_in"]), (576, 576, 3))
+        self.assertAlmostEqual(ty["case-pick"]["holding_eur"], 0.0667, delta=5e-4)
+        self.assertAlmostEqual(ty["case-pick"]["eur_per_received_each"], 0.03, delta=5e-4)  # 17.2699 / 576
+        self.assertAlmostEqual(ty["returns"]["eur_per_received_each"], 0.8221, delta=5e-4)  # 2.4663 / 3
+        self.assertIsNone(ty["returns"]["eur_per_each"])
+        self.db.execute("UPDATE rate SET holding_per_unit_hour = 2 WHERE run_id = ?", (self.run,))
+        ty2 = {r["archetype"]: r for r in self.view("v_cost_by_type")}
+        self.assertAlmostEqual(ty2["case-pick"]["holding_eur"], 0.1333, delta=5e-4)
+        self.assertAlmostEqual(ty2["case-pick"]["labour_eur"], ty["case-pick"]["labour_eur"], delta=1e-9)
+
+    def test_old_database_gains_the_holding_column_and_the_current_views(self):
+        db = sqlite3.connect(":memory:")
+        db.row_factory = sqlite3.Row
+        db.executescript("""
+CREATE TABLE run(id TEXT PRIMARY KEY NOT NULL, scenario TEXT NOT NULL, seed INTEGER NOT NULL, hash TEXT, mix TEXT,
+  profile TEXT, ticks_per_hour INTEGER NOT NULL, minutes_per_tick REAL NOT NULL, ticks INTEGER NOT NULL, honesty TEXT);
+CREATE TABLE rate(
+  run_id TEXT PRIMARY KEY NOT NULL REFERENCES run(id) ON DELETE CASCADE, currency TEXT NOT NULL DEFAULT 'EUR',
+  labour_per_hour REAL NOT NULL CHECK(labour_per_hour >= 0), energy_price_per_kwh REAL NOT NULL CHECK(energy_price_per_kwh >= 0),
+  hours_per_year REAL NOT NULL CHECK(hours_per_year > 0), co2_per_kwh REAL,
+  transport_class TEXT, transport_labour INTEGER NOT NULL DEFAULT 0 CHECK(transport_labour IN (0, 1)), source TEXT, honesty TEXT);
+CREATE VIEW v_span_cost AS SELECT 1 AS stale;
+""")
+        RL.initialize(db)
+        RL.initialize(db)  # idempotent
+        cols = [r["name"] for r in db.execute("PRAGMA table_info(rate)").fetchall()]
+        self.assertIn("holding_per_unit_hour", cols)
+        sql = db.execute("SELECT sql FROM sqlite_master WHERE name = 'v_span_cost'").fetchone()["sql"]
+        self.assertIn("holding_eur", sql)
+        self.assertNotIn("stale", sql)
+        RL.import_ledger(db, hand_ledger())
+        self.assertEqual(len(RL.rows(db, "SELECT * FROM v_cost_by_type")), 3)
 
     def test_cost_views_are_empty_without_rates(self):
         d = hand_ledger()
@@ -381,8 +431,8 @@ class RecordedFixture(unittest.TestCase):
         self.assertEqual(set(by_type), {t["archetype"] for t in js["costByType"]})
         for want in js["costByType"]:
             got = by_type[want["archetype"]]
-            self.assertEqual((got["units"], got["retired"], got["eaches_out"]), (want["units"], want["retired"], want["eaches_out"]), want["archetype"])
-            for key in ("labour_eur", "equipment_eur", "energy_eur", "total_eur", "eur_per_unit"):
+            self.assertEqual((got["units"], got["retired"], got["eaches_in"], got["eaches_out"]), (want["units"], want["retired"], want["eaches_in"], want["eaches_out"]), want["archetype"])
+            for key in ("hours", "labour_eur", "equipment_eur", "energy_eur", "holding_eur", "total_eur", "eur_per_unit", "eur_per_received_each"):
                 self.assertAlmostEqual(got[key], want[key], delta=5e-4, msg=f"{want['archetype']} {key}")
             if want["eur_per_each"] is None:
                 self.assertIsNone(got["eur_per_each"], want["archetype"])
@@ -394,7 +444,7 @@ class RecordedFixture(unittest.TestCase):
             got = by_loc[want["location"]]
             self.assertEqual((got["class"], got["spans"], got["ticks"]), (want["class"], want["spans"], want["ticks"]), want["location"])
             self.assertAlmostEqual(got["charged_ticks"], want["charged_ticks"], delta=1e-6)
-            for key in ("labour_eur", "equipment_eur", "energy_eur", "total_eur"):
+            for key in ("hours", "labour_eur", "equipment_eur", "energy_eur", "holding_eur", "total_eur"):
                 self.assertAlmostEqual(got[key], want[key], delta=5e-4, msg=f"{want['location']} {key}")
         self.assertAlmostEqual(sum(r["total_eur"] for r in s["v_cost_by_type"]), js["costTotal"]["total_eur"], delta=1e-2)
         self.assertGreater(js["costTotal"]["total_eur"], 0)

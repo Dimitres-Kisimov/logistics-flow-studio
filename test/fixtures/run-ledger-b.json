@@ -4222,6 +4222,7 @@
   "energy_price_per_kwh": 0.3,
   "hours_per_year": 4000,
   "co2_per_kwh": 0.3,
+  "holding_per_unit_hour": 0,
   "transport": {
    "class": "conveyor",
    "labour": 0
@@ -4344,6 +4345,6 @@
     "labour": 1
    }
   },
-  "honesty": "Illustrative teaching rates (analytics.js defaults, or as edited in the planner's Analyze panel) - not a quote. A unit served at a station is charged that station's service time (1 / its service rate), whatever it waited: queue time costs nothing (holding cost is not modelled). Internal transport is charged at the class of mover the floor contains (AGV, forklift or conveyor, in that order); a floor without one moves for free. The picking KPI's wage (Simulate card) is a different input and is not used here."
+  "honesty": "Illustrative teaching rates (analytics.js defaults, or as edited in the planner's Analyze panel) - not a quote. A unit served at a station is charged that station's service time (1 / its service rate), whatever it waited: queue time costs no labour, and a holding cost per unit-hour waiting is charged only if you set one (default 0). Internal transport is charged at the class of mover the floor contains (AGV, forklift or conveyor, in that order); a floor without one moves for free. The picking KPI's wage (Simulate card) is a different input and is not used here."
  }
 }

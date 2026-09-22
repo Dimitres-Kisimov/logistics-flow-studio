@@ -297,8 +297,10 @@
     const retired = exp.hus.filter((h) => h.retired_tick != null).length;
     const inFlight = exp.hus.length - retired;
     const eachesOut = v.summary.delivered_eaches;
+    const eachesIn = exp.hus.reduce((a, h) => a + (h.received_eaches || 0), 0);
     const flags = [];
     if (!exp.rates) flags.push({ kind: "no-rates", text: "This file carries no rates: the cost section is empty. Export it from the planner (v3.35 or later) to cost its units." });
+    else if (!(Number(exp.rates.holding_per_unit_hour) > 0)) flags.push({ kind: "no-holding", text: "No holding cost is set (0 per unit-hour): the time units spend waiting at a bench costs nothing in this file. Set one in the planner's Analyze panel to charge it." });
     if (stations.length && atFloor.length === stations.length) {
       flags.push({ kind: "floor-rate", text: "Every station on this floor (" + stations.length + ") serves at the simulator's floor rate: a service time of " + FLOOR_SERVICE_TICKS + " ticks per unit (1 / 0.02 per tick), because the floor declares no station capacities. Waits and costs are disclosed as recorded, not tuned." });
     } else if (atFloor.length) {
@@ -310,7 +312,8 @@
       run: r, mix: mixOf(r), minutes: r2(r.ticks * r.minutes_per_tick), units: exp.hus.length, events: exp.events.length, retired: retired, inFlight: inFlight,
       delivered: v.summary.delivered, delivered_eaches: eachesOut, delivered_pallets: v.summary.delivered_pallets, delivered_parcels: v.summary.delivered_parcels,
       trailers: v.dispatch ? v.dispatch.trailers : 0,
-      cost: m.costs ? { total: m.costs.total.total_eur, per_unit: exp.hus.length ? r4(m.costs.total.total_eur / exp.hus.length) : null, per_delivered_each: eachesOut ? r4(m.costs.total.total_eur / eachesOut) : null } : null,
+      cost: m.costs ? { total: m.costs.total.total_eur, per_unit: exp.hus.length ? r4(m.costs.total.total_eur / exp.hus.length) : null, per_delivered_each: eachesOut ? r4(m.costs.total.total_eur / eachesOut) : null,
+        per_received_each: eachesIn ? r4(m.costs.total.total_eur / eachesIn) : null, holding: m.costs.total.holding_eur || 0 } : null,
       invariantsOk: bad.length === 0, invariantsBad: bad, flags: flags, stations: stations.length, atFloor: atFloor.length,
     };
   }
@@ -418,7 +421,7 @@
       { label: "Simulated", value: r.ticks + " ticks · " + g.minutes + " min", sub: r.minutes_per_tick + " min per tick" },
       { label: "Units · events", value: g.units + " · " + g.events, sub: g.retired + " retired · " + g.inFlight + " in flight" },
       { label: "Delivered", value: g.delivered + " units · " + g.delivered_eaches + " eaches", sub: g.delivered_pallets + " pallets · " + g.delivered_parcels + " parcels · " + g.trailers + " trailer" + (g.trailers === 1 ? "" : "s") },
-      g.cost ? { label: "Cost of this run", value: money(g.cost.total), sub: money(g.cost.per_unit) + " per unit · " + (g.cost.per_delivered_each == null ? "—" : money(g.cost.per_delivered_each, 4)) + " per delivered each" } : { label: "Cost of this run", value: "—", sub: "no rates in this file" },
+      g.cost ? { label: "Cost of this run", value: money(g.cost.total), sub: money(g.cost.per_unit) + " per unit · " + (g.cost.per_received_each == null ? "—" : money(g.cost.per_received_each, 4)) + " per received each · " + (g.cost.per_delivered_each == null ? "—" : money(g.cost.per_delivered_each, 4)) + " per delivered each" } : { label: "Cost of this run", value: "—", sub: "no rates in this file" },
       { label: "Invariants", value: g.invariantsOk ? "all four hold" : g.invariantsBad.length + " broken", cls: g.invariantsOk ? "good" : "bad", sub: g.invariantsOk ? "conservation, cross-dock, versions, terminals" : g.invariantsBad.join(", ") },
     ];
     const flags = g.flags.length ? '<ul class="flags">' + g.flags.map((f) => '<li class="flag-' + esc(f.kind) + '">' + esc(f.text) + "</li>").join("") + "</ul>" : "<p class=\"note\">No data-quality flags: rates present, every station has a declared capacity, every unit retired.</p>";
@@ -660,20 +663,21 @@
     if (!exp.rates || !m.costs) { out.innerHTML = "<p class=\"note\">This file carries no rates: export it from the planner (v3.35 or later) to cost its units.</p>" + sqlBlock("v_cost_by_type"); return; }
     const c = m.costs, r = c.rates;
     const units = exp.hus.length;
-    const eachesOut = c.byType.reduce((a, t) => a + t.eaches_out, 0);
+    const eachesOut = c.byType.reduce((a, t) => a + t.eaches_out, 0), eachesIn = c.byType.reduce((a, t) => a + t.eaches_in, 0);
     const head = cards([
-      { label: "This run", value: money(c.total.total_eur), sub: "labour " + money(c.total.labour_eur) + " · equipment " + money(c.total.equipment_eur) + " · energy " + money(c.total.energy_eur) },
+      { label: "This run", value: money(c.total.total_eur), sub: "labour " + money(c.total.labour_eur) + " · equipment " + money(c.total.equipment_eur) + " · energy " + money(c.total.energy_eur) + " · holding " + money(c.total.holding_eur || 0) },
       { label: "Per handling unit", value: money(units ? c.total.total_eur / units : null), sub: units + " units, delivered or in flight" },
-      { label: "Per delivered each", value: eachesOut ? money(c.total.total_eur / eachesOut, 4) : "—", sub: eachesOut + " eaches delivered" },
+      { label: "Per received each", value: eachesIn ? money(c.total.total_eur / eachesIn, 4) : "—", sub: eachesIn + " eaches received - every unit, retired or not" },
+      { label: "Per delivered each", value: eachesOut ? money(c.total.total_eur / eachesOut, 4) : "—", sub: eachesOut + " eaches delivered - partial while units are in flight" },
     ]);
     const locRows = c.byLocation.map((l) => Object.assign({}, l, { class: l.class || "—" }));
     const rateRows = Object.keys(r.equipment).map((k) => { const e = r.equipment[k];
       return { class: k, capex: e.capex, amort_years: e.amort_years, eur_per_hour: r4(e.capex / e.amort_years / r.hours_per_year), power_kw: e.power_kw, manned: e.labour ? "yes" : "no" }; });
     const classList = Object.keys(r.classes).map((t) => t + " → " + (r.classes[t].class || "no class") + (r.classes[t].labour ? " (manned)" : "")).join(" · ");
     out.innerHTML = head +
-      table(c.byType, ["archetype", "units", "retired", "eaches_out", "labour_eur", "equipment_eur", "energy_eur", "total_eur", "eur_per_unit", "eur_per_each"], "Cost by order type") + sqlBlock("v_cost_by_type") +
-      table(locRows, ["location", "class", "spans", "ticks", "charged_ticks", "labour_eur", "equipment_eur", "energy_eur", "total_eur"], "Cost by location: waiting spans charged at the station's service time, and internal transport") + sqlBlock("v_cost_by_location") + sqlBlock("v_spans") + sqlBlock("v_span_cost") +
-      "<p><b>Rates in this file:</b> labour " + money(r.labour_per_hour) + "/h · energy " + money(r.energy_price_per_kwh) + "/kWh · " + r.hours_per_year + " operating hours per year · internal transport: " + (r.transport.class ? esc(r.transport.class) + (r.transport.labour ? " (manned)" : " (unmanned)") : "no mover on this floor, movement is free") + ".</p>" +
+      table(c.byType, ["archetype", "units", "retired", "eaches_in", "eaches_out", "hours", "labour_eur", "equipment_eur", "energy_eur", "holding_eur", "total_eur", "eur_per_unit", "eur_per_received_each", "eur_per_each"], "Cost by order type") + sqlBlock("v_cost_by_type") +
+      table(locRows, ["location", "class", "spans", "ticks", "charged_ticks", "hours", "labour_eur", "equipment_eur", "energy_eur", "holding_eur", "total_eur"], "Cost by location: waiting spans charged at the station's service time, and internal transport") + sqlBlock("v_cost_by_location") + sqlBlock("v_spans") + sqlBlock("v_span_cost") +
+      "<p><b>Rates in this file:</b> labour " + money(r.labour_per_hour) + "/h · energy " + money(r.energy_price_per_kwh) + "/kWh · " + r.hours_per_year + " operating hours per year · holding " + money(r.holding_per_unit_hour || 0) + " per unit-hour waiting" + (Number(r.holding_per_unit_hour) > 0 ? "" : " (0: not charged)") + " · internal transport: " + (r.transport.class ? esc(r.transport.class) + (r.transport.labour ? " (manned)" : " (unmanned)") : "no mover on this floor, movement is free") + ".</p>" +
       table(rateRows, ["class", "capex", "amort_years", "eur_per_hour", "power_kw", "manned"], "Equipment classes (illustrative)") +
       "<p class=\"note\">Location types on this floor: " + esc(classList) + ".</p><p class=\"note\">" + esc(r.honesty) + "</p>";
   }
@@ -713,7 +717,7 @@
         { label: "SSCC · GTIN-14", value: esc(h.sscc) + "<br>" + esc(h.gtin14), mono: true, html: true },
         { label: "Received", value: h.received_eaches + " eaches · " + h.cases_per_pallet + " cases × " + h.eaches_per_case + " on " + h.pallet },
       ];
-      if (cost) items.push({ label: "Cost so far", value: money(cost.total_eur), sub: cost.charged_ticks + " charged ticks: labour " + money(cost.labour_eur) + " · equipment " + money(cost.equipment_eur) + " · energy " + money(cost.energy_eur) });
+      if (cost) items.push({ label: "Cost so far", value: money(cost.total_eur), sub: cost.charged_ticks + " charged ticks (" + (cost.hours == null ? "—" : cost.hours.toFixed(2)) + " h): labour " + money(cost.labour_eur) + " · equipment " + money(cost.equipment_eur) + " · energy " + money(cost.energy_eur) + (cost.holding_eur ? " · holding " + money(cost.holding_eur) : "") });
       $("rlTrace").innerHTML = cards(items) + g +
         table(t.events, ["version", "tick", "minute", "kind", "op", "location", "form", "pallets", "cases", "eaches", "parcels", "retained", "scrapped"], "Recorded events") + sqlBlock("v_cost_by_hu");
     };

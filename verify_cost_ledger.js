@@ -25,7 +25,7 @@
  *      "retired" fallback is unreachable).
  *   4. Shipped wiring: the app passes the Analyze rates at create; the viewer
  *      page loads ledger.js and shows the cost section; RunLedger.SQL carries
- *      every view the SQLite tool defines; sw.js at wt-v121; the runner.
+ *      every view the SQLite tool defines; sw.js at wt-v122; the runner.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -171,6 +171,18 @@ console.log("=".repeat(72));
   const v = RL.views(exp);
   check("1l. the viewer's views(exp) cost tables ARE WT.ledger.costs (same definition, same numbers)",
     JSON.stringify(v.costByType) === JSON.stringify(c.byType) && JSON.stringify(v.costByLocation) === JSON.stringify(c.byLocation) && JSON.stringify(v.costTotal) === JSON.stringify(c.total) && v.rates === exp.rates);
+  // v3.40 holding cost, hours, cost per received each
+  const rG = JSON.parse(JSON.stringify(exp.rates)); rG.holding_per_unit_hour = 1;
+  const cG = L.costs(exp, rG);
+  const hG = {}; for (const h of cG.byHu) hG[h.hu_id.slice(-8)] = h;
+  check("1m. holding 1 EUR per unit-hour waiting: A +0.0667 (its 4 waiting ticks) -> 17.2699, B 0 (never waited), C 0 (its open wait opens no span); the face books 0.0667, transport 0; x2 doubles holding only",
+    near(hG["000001-1"].holding_eur, 0.0667) && near(hG["000001-1"].total_eur, 17.2699) && hG["000002-1"].holding_eur === 0 && hG["000003-1"].holding_eur === 0 &&
+    near(cG.byLocation.find((l) => l.location === "face").holding_eur, 0.0667) && cG.byLocation.find((l) => l.location === "transport").holding_eur === 0 && near(cG.total.holding_eur, 0.0667) &&
+    near(L.costs(exp, Object.assign({}, rG, { holding_per_unit_hour: 2 })).total.holding_eur, 0.1333) && near(L.costs(exp, Object.assign({}, rG, { holding_per_unit_hour: 2 })).total.labour_eur, c.total.labour_eur) && c.total.holding_eur === 0);
+  const tG = {}; for (const t of cG.byType) tG[t.archetype] = t;
+  check("1n. hours are the CHARGED hours (A 28 ticks = 0.4667 h, B 0.25, C 0.0667); eaches received per type 576 / 576 / 3; cost per received each case-pick 17.2699 / 576 = 0.03, returns 2.4663 / 3 = 0.8221 while per delivered each stays null",
+    near(hG["000001-1"].hours, 0.4667) && near(hG["000002-1"].hours, 0.25) && near(hG["000003-1"].hours, 0.0667) && tG["case-pick"].eaches_in === 576 && tG["cross-dock"].eaches_in === 576 && tG.returns.eaches_in === 3 &&
+    near(tG["case-pick"].eur_per_received_each, 0.03) && near(tG.returns.eur_per_received_each, 0.8221) && tG.returns.eur_per_each === null && near(tG["case-pick"].hours, 0.4667));
 })();
 
 /* ---- 2. the recorded run ------------------------------------------------ */
@@ -179,7 +191,7 @@ console.log("=".repeat(72));
   const exp = withR.exp;
   check("2a. the export carries the rates block: transport is the conveyor on this floor (unmanned), every location type is classified, the honesty line is present",
     exp.rates && exp.rates.transport.class === "conveyor" && exp.rates.transport.labour === 0 && Object.keys(exp.rates.classes).length === 12 && exp.rates.classes.staging.class === null && exp.rates.classes.staging.labour === 1 &&
-    exp.rates.classes["carton-flow"].class === "racking" && exp.rates.classes["pack-station"].class === "workstation" && /queue time costs nothing/.test(exp.rates.honesty));
+    exp.rates.classes["carton-flow"].class === "racking" && exp.rates.classes["pack-station"].class === "workstation" && /queue time costs no labour/.test(exp.rates.honesty));
   const st = exp.locations.filter((l) => l.service_ticks != null).map((l) => l.id + "=" + l.service_ticks).join(",");
   check("2b. the three stations carry their service time (1 / rate = 50 ticks: this floor declares no capacities, so every station serves at the floor rate)", st === "stg=50,face=50,pack=50", st);
   const c = L.costs(exp);
@@ -217,7 +229,7 @@ console.log("=".repeat(72));
     "v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations"];
   check("4c. RunLedger.SQL carries every view the SQLite tool defines (" + want.length + ")", want.every((k) => typeof RL.SQL[k] === "string" && RL.SQL[k].length > 20) && want.every((k) => py.indexOf("CREATE VIEW IF NOT EXISTS " + k + " AS") >= 0), Object.keys(RL.SQL).length + " keys");
   check("4d. analytics.js exports TYPE_TO_CLASS and the python tool has the rate tables", !!A.TYPE_TO_CLASS && A.TYPE_TO_CLASS["carton-flow"] === "racking" && /CREATE TABLE IF NOT EXISTS rate\(/.test(py) && /CREATE TABLE IF NOT EXISTS equipment_rate\(/.test(py) && /CREATE TABLE IF NOT EXISTS location_class\(/.test(py));
-  check("4e. sw.js at wt-v121 (previously wt-v120) still precaches ledger.js and the viewer", /CACHE_VERSION\s*=\s*"wt-v121"/.test(sw) && /Previously wt-v120/.test(sw) && /"\.\/ledger\.js"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw));
+  check("4e. sw.js at wt-v122 (previously wt-v121) still precaches ledger.js and the viewer", /CACHE_VERSION\s*=\s*"wt-v122"/.test(sw) && /Previously wt-v121/.test(sw) && /"\.\/ledger\.js"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw));
   check("4f. test/run-all.mjs lists this harness", /verify_cost_ledger\.js/.test(runall));
   check("4g. no Date / Math.random CALL in ledger.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(read("ledger.js")));
 })();

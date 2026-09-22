@@ -674,6 +674,7 @@
       co2PerKWh: 0.30,         // kg CO2e / kWh (illustrative grid factor)
       labourPerHour: 35,       // EUR / labour-hour (fully loaded, illustrative)
       hoursPerYear: 4000,      // operating hours / year (amortisation basis, ~2 shifts)
+      holdingPerUnitHour: 0,   // EUR per unit-hour WAITING at a bench - the run ledger only; 0 = not charged unless you set it (v3.40)
       equipment: equip,
     };
   }

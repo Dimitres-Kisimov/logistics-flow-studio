@@ -2433,13 +2433,28 @@
     return (state.flow && state.flow.scenarioId) || "custom";
   }
   let ledgerTraceCache = "";
+  let ledgerCostCache = { key: null, total: null }; // v3.40: the run's cost so far, recomputed only when the recording grew
   function ledgerStatsHtml(rec) {
     const s = WT.ledger.stats(rec);
     const types = s.types.map((t) => '<span class="flow-chip">' + t.archetype + " <strong>" + t.units + "</strong>" +
       (t.retired ? " · done " + t.retired + " · ~" + t.avg_cycle_ticks + " ticks" : "") + "</span>").join("");
+    let costLine = "";
+    if (rec.rates && typeof WT.ledger.costs === "function") {
+      const key = rec.run.id + ":" + rec.events.length + ":" + rec.order.length;
+      if (ledgerCostCache.key !== key) {
+        const c = WT.ledger.costs(WT.ledger.exportJson(rec));
+        ledgerCostCache = { key: key, total: c ? c.total : null };
+      }
+      const t = ledgerCostCache.total;
+      if (t) {
+        costLine = "<br>Cost so far <strong>" + moneyFmt(t.total_eur) + " " + CURRENCY + "</strong> · " + moneyFmt(s.units ? t.total_eur / s.units : 0) + " " + CURRENCY + " per unit (labour " +
+          moneyFmt(t.labour_eur) + " · equipment " + moneyFmt(t.equipment_eur) + " · energy " + moneyFmt(t.energy_eur) + (t.holding_eur ? " · holding " + moneyFmt(t.holding_eur) : "") +
+          ") - illustrative rates, service time charged, queue time free; the viewer breaks it down by order type and bench";
+      }
+    }
     return '<p class="flow-pool-stats"><code>' + rec.run.id + "</code><br>Units <strong>" + s.units + "</strong> · events <strong>" + s.events +
       "</strong> · delivered <strong>" + s.delivered + "</strong> (" + s.delivered_eaches + " eaches · " + s.delivered_pallets + " pallets · " +
-      s.delivered_parcels + " parcels) · profile " + (rec.run.profile || "-") + "</p>" + (types ? '<div class="flow-chips">' + types + "</div>" : "");
+      s.delivered_parcels + " parcels) · profile " + (rec.run.profile || "-") + costLine + "</p>" + (types ? '<div class="flow-chips">' + types + "</div>" : "");
   }
   function updateLedgerReadout() {
     const out = $("flowLedgerStats"), sel = $("flowLedgerUnit"), trace = $("flowLedgerTrace");
@@ -7549,7 +7564,9 @@
       rateInput("an-rate-kwh", "Energy price", r.energyPricePerKWh, CURRENCY + "/kWh", 'data-rate="energyPricePerKWh"') +
       rateInput("an-rate-labour", "Labour rate", r.labourPerHour, CURRENCY + "/h", 'data-rate="labourPerHour"') +
       rateInput("an-rate-hpy", "Amortisation basis", r.hoursPerYear, "h/yr", 'data-rate="hoursPerYear"') +
-      "</div>";
+      rateInput("an-rate-holding", "Holding cost (run ledger)", r.holdingPerUnitHour == null ? 0 : r.holdingPerUnitHour, CURRENCY + "/unit·h", 'data-rate="holdingPerUnitHour"') +
+      "</div>" +
+      '<p class="proc-basis">Holding cost is charged by the run ledger on the time a unit waits at a bench (0 = not charged); the cost analyzer above does not use it.</p>';
     // Per-class capex + amortisation for the classes actually present.
     let rows = "";
     for (const grp of c.equipmentByClass) {

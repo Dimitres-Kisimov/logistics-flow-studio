@@ -1,6 +1,6 @@
 # The run ledger — schema, identities, SQL views
 
-*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.39.*
+*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.40.*
 
 ## 1. One stream, three consumers
 
@@ -41,6 +41,7 @@ Ids never encode a fact that can change: archetype, outcome and location are att
   "events":    [ { id, hu_id, version, kind, op, anchor, location, tick, minute, stage, form,
                    pallets, cases, eaches, parcels, retained, scrapped } ],
   "rates":     { source, currency, labour_per_hour, energy_price_per_kwh, hours_per_year, co2_per_kwh,   // v3.35, optional
+                 holding_per_unit_hour,                                                             // v3.40: EUR per unit-hour waiting, 0 = not charged
                  transport: { class, labour }, equipment: { <class>: { capex, amort_years, power_kw, labour } },
                  classes: { <element type>: { class, labour } }, honesty }
 }
@@ -50,7 +51,7 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 
 **Time.** `tick` is the simulation tick; `minute = tick × 60 / ticks_per_hour`. There is no wall clock anywhere in the file.
 
-**Spans and costs (v3.35).** A *span* is the time between two consecutive events of one unit: `waiting` when the first is `queued` (queue + service, inseparable in the simulation), `moving` otherwise; the last event of a live unit opens no span, and the spans of a retired unit add up to `retired_tick − spawned_tick`. A waiting span is charged the station's `service_ticks` (1 / its service rate) whatever the unit waited — queue time costs nothing, holding cost is not modelled; a moving span is charged in full at `rates.transport` (the first of AGV, forklift, conveyor present on the floor; none = free). Per span: `hours = charged_ticks × minutes_per_tick / 60`; `labour = hours × labour × labour_per_hour`; `equipment = hours × capex / amort_years / hours_per_year`; `energy = hours × power_kw × energy_price_per_kwh`. Manned classes: racking (a picker at the face), workstation, forklift; `staging` has no class and is manned. The rates are the planner's Analyze-panel rates (illustrative teaching values); `ledger.js` `costs(exp)` and the SQL views below are the same arithmetic.
+**Spans and costs (v3.35).** A *span* is the time between two consecutive events of one unit: `waiting` when the first is `queued` (queue + service, inseparable in the simulation), `moving` otherwise; the last event of a live unit opens no span, and the spans of a retired unit add up to `retired_tick − spawned_tick`. A waiting span is charged the station's `service_ticks` (1 / its service rate) whatever the unit waited — queue time costs no labour; since v3.40 the *elapsed* wait is charged a holding cost per unit-hour when `rates.holding_per_unit_hour` is set (default 0); a moving span is charged in full at `rates.transport` (the first of AGV, forklift, conveyor present on the floor; none = free). Per span: `hours = charged_ticks × minutes_per_tick / 60`; `held_hours = ticks × minutes_per_tick / 60` for a waiting span; `labour = hours × labour × labour_per_hour`; `equipment = hours × capex / amort_years / hours_per_year`; `energy = hours × power_kw × energy_price_per_kwh`; `holding = held_hours × holding_per_unit_hour`. Per order type the cost is given per unit, per **received** each (every unit) and per **delivered** each (partial while units are in flight). Manned classes: racking (a picker at the face), workstation, forklift; `staging` has no class and is manned. The rates are the planner's Analyze-panel rates (illustrative teaching values); `ledger.js` `costs(exp)` and the SQL views below are the same arithmetic.
 
 **Flow links (v3.36).** For each unit, consecutive *non-queued* events whose operation changes make one link from the first operation to the second (a queued event is a wait, not a move; the terminal operation's two events collapse). `v_flow_links` counts, per pair of operations, the units, the retired units and the eaches that left the from-operation. Over the retired units every interior operation conserves (in = out); over all units in ≥ out; and for every operation, units entering it = units recorded there − units that started there. `ledger.js` `flowLinks(exp)` is the same definition; `sankeyFromLedger` turns it into the model `analytics.js` draws as a layered Sankey.
 
@@ -71,8 +72,8 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 | `v_wip_by_tick` | in flight and retired at every tick (recursive CTE over the run's ticks) |
 | `v_quantities_by_op` | per operation and event kind: events and the pallets / cases / eaches / parcels / retained / scrapped carried |
 | `v_dispatch` | delivered units, pallets, cases, eaches, parcels, trailer slots and trailers (⌈pallets / slots⌉) |
-| `v_cost_by_type` | per archetype: units, retired, delivered eaches, labour / equipment / energy / total €, € per unit, € per delivered each (v3.35) |
-| `v_cost_by_location` | per station: waiting spans, ticks, charged ticks and their € — plus one `transport` row for every moving span (v3.35) |
+| `v_cost_by_type` | per archetype: units, retired, eaches received and delivered, charged hours, labour / equipment / energy / holding / total €, € per unit, per received each, per delivered each (v3.35, v3.40) |
+| `v_cost_by_location` | per station: waiting spans, ticks, charged ticks, hours and their € incl. holding — plus one `transport` row for every moving span (v3.35, v3.40) |
 | `v_flow_links` | per pair of operations: units that moved from the one to the next, retired units, eaches that left (v3.36) |
 
 **Cost views** (v3.35; empty when the run carries no `rates`): `v_spans` pairs each event with the next one of the same unit (`LEAD` over `version`) and names the state; `v_span_cost` charges each span by the rule in §3; `v_cost_by_hu` sums per unit. Rounding happens only at the aggregates (4 dp), so the JavaScript and SQLite sums agree to the tolerance the tests use.
