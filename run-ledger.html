@@ -1,34 +1,44 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Run ledger · from start to finish · Logistics Flow Studio</title><link rel="stylesheet" href="transfer-ledger.css"><link rel="stylesheet" href="run-ledger.css"></head>
-<body><main>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-src 'none'">
+<script src="errors.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Run ledger · the whole run, start to finish · Logistics Flow Studio</title><link rel="stylesheet" href="transfer-ledger.css"><link rel="stylesheet" href="run-ledger.css"></head>
+<body><a class="skip" href="#secGlance">Skip to the run</a><main>
 <a href="index.html">← Factory planner</a>
 <p><a href="transfer-ledger.html">Package transfer evidence →</a> · <a href="resource-view.html">Scheduled resource movement →</a></p>
 <header><p class="eyebrow">Operations / Run ledger</p><h1>The whole run, from the inbound trailer to the outbound one.</h1>
-<p>Open a run ledger the simulator recorded (<em>Simulate → Live material flow → Export run ledger</em>). Every table on this page is a query over that one file: the same definitions <code>tools/run_ledger.py</code> runs in SQLite, and the test suite proves the two agree. Nothing here is measured off a drawing.</p></header>
+<p>Open a run ledger the simulator recorded (<em>Simulate → Live material flow → Export run ledger</em>). Every table on this page is a query over that one file, computed once, shown with the SQL that <code>tools/run_ledger.py</code> runs in SQLite - generated from the tool itself, so the two cannot drift - and the test suite proves the results agree. Nothing here is measured off a drawing.</p></header>
+<nav id="rlNav" aria-label="Sections" hidden>
+<a href="#secGlance">At a glance</a><a href="#secStart">Start to finish</a><a href="#secPlanner">Planner tables</a><a href="#secCost">Cost</a><a href="#secDispatch">Dispatch</a><a href="#secPack">Packaging</a><a href="#secTrace">Trace</a><a href="#secCompare">Compare</a><a href="#secInvariants">Invariants</a><a href="#secAppendix">Appendix</a>
+<button id="rlPrint" type="button">Print report</button>
+</nav>
 <section class="import" id="rlImport"><h2>Start with the recorded example or your export</h2>
 <button id="rlDemo" type="button">Load the recorded example</button>
 <label for="rlFile">Run ledger JSON (factory-run-ledger/v1)</label><input id="rlFile" type="file" accept=".json,application/json">
 <p><button id="rlDemoB" type="button">Compare with recorded example B</button> <span class="note">the same floor and seed, a cross-dock-heavy day</span></p>
 <label for="rlFileB">Second run (B) to compare against</label><input id="rlFileB" type="file" accept=".json,application/json">
-<p id="rlStatus" role="status">Nothing loaded yet.</p>
+<p id="rlStatus" role="status">Nothing loaded yet. <code>?example=a</code> or <code>?example=b</code> in the address loads an example directly.</p>
 <p class="note">Synthetic events from a synthetic teaching simulation — not telemetry, not a WMS. Quantities are the synthetic order-line quantities of the scenario's packaging profile; GS1 numbers use GS1's documentation prefix.</p></section>
-<section id="rlView" hidden>
-<h2>The run</h2><div id="rlRun"></div>
-<h2>The packaging hierarchy</h2><p class="note">Each → case → layer → pallet → trailer, from the scenario's packaging profile. The pallet pattern is the ti-hi the optimiser computes: cases per layer in the better orientation, layers under the stack-height limit, reduced until the pallet's load limit holds.</p><div id="rlPack"></div>
-<h2>Optimise the pallet pattern</h2><p class="note">Every candidate pallet for this profile's case, ranked by cases per pallet: the single-orientation grid, or a band layout when strips of mixed orientation pack more (the one-dimensional knapsack of Smith &amp; De Cani, 1980). Then the what-if on this run's own volumes: how many inbound pallets and trailers the same eaches would need. Partial dispatch pallets do not change; racking, handling and stability for a different pallet type are not modelled.</p><div id="rlOptimise"></div>
-<h2>Your case</h2><p class="note">A case of your own on the EUR, industrial and half pallets and on a custom pallet: the best layer (grid, bands or pinwheel), the layers under the height, load and <em>strength</em> limits, and the verdict for the bottom case - the simplified McKee formula (BCT = 5.874 × ECT × √(caliper × perimeter)) with the published derating factors for humidity, time under load, overhang and stacking pattern. Prefilled from this run's profile. Informed by packaging practice, not a certification: a real load plan needs the board supplier's data.</p><div id="rlYourCase"></div>
-<h2>Start to finish, per order type</h2><div id="rlRibbon" class="ribbon-wrap"></div>
-<h2>The flow, as recorded</h2><p class="note">A layered Sankey over the recorded links: one link per unit that moved from one operation to the next, so returns split into restock and scrap and cross-dock bypasses storage. Columns are the longest path from goods-in; a bar's height is the larger of what entered and what left it. In units (retired only) every interior operation conserves; in eaches it does not, because picks leave stock behind.</p><div id="rlFlow"></div>
-<h2>What the planner asks</h2><div id="rlSummary"></div>
-<div class="grid2"><div id="rlCycle"></div><div id="rlTouches"></div></div>
-<div id="rlWait"></div>
+<div id="rlView" hidden>
+<section id="secGlance" aria-labelledby="hGlance"><h2 id="hGlance">The run at a glance</h2><div id="rlGlance" tabindex="-1"></div></section>
+<section id="secStart" aria-labelledby="hStart"><h2 id="hStart">Start to finish</h2>
+<h3>Per order type</h3><div id="rlRibbon" class="ribbon-wrap"></div>
+<h3>The flow, as recorded</h3><p class="note">A layered Sankey over the recorded links: one link per unit that moved from one operation to the next, so returns split into restock and scrap and cross-dock bypasses storage. Columns are the longest path from goods-in; a bar's height is the larger of what entered and what left it. In units (retired only) every interior operation conserves; in eaches it does not, because picks leave stock behind.</p><div id="rlFlow"></div></section>
+<section id="secPlanner" aria-labelledby="hPlanner"><h2 id="hPlanner">What the planner asks</h2>
+<div class="grid2"><div><h3>Cycle time</h3><div id="rlCycle"></div></div><div><h3>Touches</h3><div id="rlTouches"></div></div></div>
+<h3>Waiting at each bench</h3><div id="rlWait"></div>
 <h3>Work in progress over the run</h3><div id="rlWip"></div>
-<div id="rlByOp"></div>
-<h2>What a handling unit costs</h2><p class="note">The spans between a unit's events, charged at the rates the run was recorded under (the planner's Analyze panel, defaults from <code>analytics.js</code>): a unit served at a station is charged that station's service time, whatever it waited; a moving unit is charged at the class of mover the floor contains. Cost per span = hours × labour rate (manned classes) + hours × capex ÷ amortisation years ÷ operating hours per year + hours × kW × energy price. Queue time costs nothing: holding cost is not modelled.</p><div id="rlCost"></div>
-<h2>Compare two runs</h2><p class="note">The same tables for two recorded runs, paired key by key: order type, bench and operation. Deltas are B − A. The same six comparisons are SQL views over every ordered pair of runs in one database.</p><div id="rlCompare"></div>
-<h2>Dispatch manifest</h2><div id="rlDispatch"></div>
-<h2>Trace one unit</h2><label for="rlUnit">Handling unit</label><select id="rlUnit"></select><div id="rlTrace"></div>
-<h2>The invariants</h2><p class="note">Each of these views must return zero rows. They are the same views the SQLite tool exposes; a deliberate corruption in the test suite makes every one of them fire.</p><div id="rlInvariants"></div>
-</section>
-<footer>Deterministic: the same scenario, seed and order mix reproduce this file byte for byte. The viewer computes every table in the browser by the definitions shown under <em>SQL</em>; <code>python tools/run_ledger.py import &lt;file&gt; --database run.sqlite</code> then <code>views</code> runs them in SQLite. Unit-load dimensions follow DIN EN 13698 and VDA 4500; the 33 / 26 pallets per 13.6 m trailer are planning figures; everything about the goods themselves is a synthetic teaching value.</footer>
-</main><script src="ids.js"></script><script src="pack.js"></script><script src="ledger.js"></script><script src="analytics.js"></script><script src="run-ledger.js"></script></body></html>
+<h3>Quantities at each operation</h3><div id="rlByOp"></div></section>
+<section id="secCost" aria-labelledby="hCost"><h2 id="hCost">What a handling unit costs</h2><p class="note">The spans between a unit's events, charged at the rates the run was recorded under (the planner's Analyze panel, defaults from <code>analytics.js</code>): a unit served at a station is charged that station's service time, whatever it waited; a moving unit is charged at the class of mover the floor contains. Cost per span = hours × labour rate (manned classes) + hours × capex ÷ amortisation years ÷ operating hours per year + hours × kW × energy price. Queue time costs nothing: holding cost is not modelled.</p><div id="rlCost"></div></section>
+<section id="secDispatch" aria-labelledby="hDispatch"><h2 id="hDispatch">Dispatch manifest</h2><div id="rlDispatch"></div></section>
+<section id="secPack" aria-labelledby="hPack"><h2 id="hPack">Packaging</h2>
+<h3>The packaging hierarchy</h3><p class="note">Each → case → layer → pallet → trailer, from the scenario's packaging profile. The pallet pattern is the ti-hi the optimiser computes: cases per layer in the best layer, layers under the stack-height limit, reduced until the pallet's load limit and the board's strength hold.</p><div id="rlPack"></div>
+<h3>Optimise the pallet pattern</h3><p class="note">Every candidate pallet for this profile's case, ranked by cases per pallet: the single-orientation grid, a band layout when strips of mixed orientation pack more (the one-dimensional knapsack of Smith &amp; De Cani, 1980), or a four-block pinwheel when it packs more than both. Then the what-if on this run's own volumes: how many inbound pallets and trailers the same eaches would need. Partial dispatch pallets do not change; racking, handling and stability for a different pallet type are not modelled.</p><div id="rlOptimise"></div>
+<h3>Your case</h3><p class="note">A case of your own on the EUR, industrial and half pallets and on a custom pallet: the best layer (grid, bands or pinwheel), the layers under the height, load and <em>strength</em> limits, and the verdict for the bottom case - the simplified McKee formula (BCT = 5.874 × ECT × √(caliper × perimeter)) with the published derating factors for humidity, time under load, overhang and stacking pattern. Prefilled from this run's profile. Informed by packaging practice, not a certification: a real load plan needs the board supplier's data.</p><div id="rlYourCase"></div></section>
+<section id="secTrace" aria-labelledby="hTrace"><h2 id="hTrace">Trace one unit</h2><label for="rlUnit">Handling unit</label><select id="rlUnit"></select><div id="rlTrace"></div></section>
+<section id="secCompare" aria-labelledby="hCompare"><h2 id="hCompare">Compare two runs</h2><p class="note">The same tables for two recorded runs, paired key by key: order type, bench and operation. Deltas are B − A. The same six comparisons are SQL views over every ordered pair of runs in one database.</p><div id="rlCompare"></div></section>
+<section id="secInvariants" aria-labelledby="hInvariants"><h2 id="hInvariants">The invariants</h2><p class="note">Each of these views must return zero rows. They are the same views the SQLite tool exposes; a deliberate corruption in the test suite makes every one of them fire.</p><div id="rlInvariants"></div></section>
+<section id="secAppendix" aria-labelledby="hAppendix"><h2 id="hAppendix">Appendix: how to read this page</h2><div id="rlAppendix"></div></section>
+</div>
+<footer>Deterministic: the same scenario, seed and order mix reproduce this file byte for byte. The viewer computes every table in the browser once, by the definitions shown under <em>SQL</em>; <code>python tools/run_ledger.py import &lt;file&gt; --database run.sqlite</code> then <code>views</code> runs them in SQLite. Unit-load dimensions follow DIN EN 13698 and VDA 4500; the 33 / 26 pallets per 13.6 m trailer are planning figures; everything about the goods themselves is a synthetic teaching value.</footer>
+</main><script src="run-ledger-sql.js"></script><script src="ids.js"></script><script src="pack.js"></script><script src="ledger.js"></script><script src="analytics.js"></script><script src="run-ledger.js"></script><script src="run-ledger-selftest.js"></script></body></html>

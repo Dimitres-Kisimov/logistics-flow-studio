@@ -15,8 +15,15 @@
  *      has consecutive versions and non-negative spans.
  *   3. Corruption surfaces: one each off by one -> conservation violation;
  *      a cross-dock unit at a storage element -> cross-dock violation.
+ *   5. (v3.39) ONE REPORT: the SQL under every table is generated from
+ *      tools/run_ledger.py (23 views, verbatim, runnable, no placeholder);
+ *      views()/model() are memoised per export; the glance model (mix text,
+ *      totals, invariants, the data-quality flags incl. the floor-rate
+ *      detection against flowsim's constant); csv (RFC 4180) and fmtCell;
+ *      the page's ten sections, nav, skip link, print, self-test wiring;
+ *      Your case bound once and debounced; the pinwheel search capped.
  *   4. Shipped wiring: page, stylesheet and script exist and are precached
- *      at wt-v120; the planner has the hand-over button; the offline guard
+ *      at wt-v121; the planner has the hand-over button; the offline guard
  *      rules hold (no external references).
  * ===================================================================== */
 "use strict";
@@ -24,7 +31,7 @@ const fs = require("fs");
 const path = require("path");
 
 global.window = global;
-(0, eval)(fs.readFileSync(path.join(__dirname, "run-ledger.js"), "utf8"));
+for (const f of ["run-ledger-sql.js", "run-ledger.js"]) (0, eval)(fs.readFileSync(path.join(__dirname, f), "utf8"));
 const RL = global.RunLedger;
 const read = (f) => fs.readFileSync(path.join(__dirname, f), "utf8");
 
@@ -146,14 +153,55 @@ console.log("=".repeat(72));
   const html = read("run-ledger.html"), sw = read("sw.js"), app = read("app.js"), idx = read("index.html"), runall = read("test/run-all.mjs");
   check("4a. the page loads ids.js, pack.js and run-ledger.js and links both stylesheets",
     /<script src="ids\.js">/.test(html) && /<script src="pack\.js">/.test(html) && /<script src="run-ledger\.js">/.test(html) && /run-ledger\.css/.test(html) && /transfer-ledger\.css/.test(html));
-  check("4b. sw.js precaches the page, its script, stylesheet and the recorded example at wt-v120 (previously wt-v119)",
+  check("4b. sw.js precaches the page, its script, stylesheet and the recorded example at wt-v121 (previously wt-v120)",
     /"\.\/run-ledger\.html"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw) && /"\.\/run-ledger\.css"/.test(sw) && /"\.\/test\/fixtures\/run-ledger\.json"/.test(sw) &&
-    /CACHE_VERSION\s*=\s*"wt-v120"/.test(sw) && /Previously wt-v119/.test(sw));
+    /CACHE_VERSION\s*=\s*"wt-v121"/.test(sw) && /Previously wt-v120/.test(sw));
   check("4c. the planner hands a run over to the viewer (button + localStorage hand-over)", /flowLedgerOpen/.test(idx) && /wt-run-ledger/.test(app) && /run-ledger\.html/.test(app));
   check("4d. test/run-all.mjs lists this harness", /verify_run_ledger_view\.js/.test(runall));
   check("4g. the page has the optimisation section", /id="rlOptimise"/.test(html) && /renderOptimise\(exp\)/.test(read("run-ledger.js")));
   check("4e. no external references in the page or its script (offline guard rule)", !/(src|href)\s*=\s*["']https?:/i.test(html) && !/https?:\/\//.test(read("run-ledger.js")));
   check("4f. no Date / Math.random CALL in run-ledger.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(read("run-ledger.js")));
+})();
+
+/* ---- 5. v3.39 one report ------------------------------------------------ */
+(function () {
+  const SQL_NAMES = ["v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_wip_by_tick", "v_quantities_by_op", "v_dispatch", "v_run_summary", "v_flow_links",
+    "v_spans", "v_span_cost", "v_cost_by_hu", "v_cost_by_type", "v_cost_by_location", "v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations",
+    "v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost"];
+  const G = global.RunLedgerSQL, py = read("tools/run_ledger.py").replace(/\r\n/g, "\n"), js = read("run-ledger.js"), html = read("run-ledger.html"), css = read("run-ledger.css"), sw = read("sw.js"), st = read("run-ledger-selftest.js");
+  check("5a. run-ledger-sql.js carries exactly the 23 views in the tool's order", !!G && JSON.stringify(Object.keys(G)) === JSON.stringify(SQL_NAMES), G ? Object.keys(G).length + " keys" : "missing");
+  check("5b. every text starts with SELECT/WITH, ends with ';' and carries no '...' placeholder", SQL_NAMES.every((k) => /^(SELECT|WITH)\b/.test(G[k]) && /;\s*$/.test(G[k]) && G[k].indexOf("...") < 0));
+  check("5c. every text is verbatim the body of its CREATE VIEW in tools/run_ledger.py", SQL_NAMES.every((k) => py.indexOf("CREATE VIEW IF NOT EXISTS " + k + " AS\n" + G[k]) >= 0));
+  check("5d. RunLedger.SQL IS the generated object and run-ledger.js types no SQL by hand", RL.SQL === G && !/CREATE VIEW|FROM hu h JOIN run r/.test(js));
+  check("5e. the page loads run-ledger-sql.js first and errors.js in the head; sw.js precaches both new files",
+    /<script src="run-ledger-sql\.js"><\/script><script src="ids\.js">/.test(html) && html.indexOf('<script src="errors.js">') > 0 && html.indexOf('<script src="errors.js">') < html.indexOf("<body") &&
+    /"\.\/run-ledger-sql\.js"/.test(sw) && /"\.\/run-ledger-selftest\.js"/.test(sw));
+  const e1 = handLedger();
+  check("5f. views(exp) and model(exp) are memoised per export object; a fresh object computes afresh", RL.views(e1) === RL.views(e1) && RL.model(e1).views === RL.views(e1) && RL.views(handLedger()) !== RL.views(e1));
+  const g = RL.glance(handLedger());
+  check("5g. glance on the hand ledger: mix text from an object mix, 40 min, 3 units / 2 retired / 1 in flight, invariants hold, no cost, flags no-rates + in-flight, no station carries a service time",
+    g.mix === "case-pick 50% · cross-dock 30% · returns 20%" && g.minutes === 40 && g.units === 3 && g.retired === 2 && g.inFlight === 1 && g.invariantsOk && g.cost === null &&
+    g.flags.map((f) => f.kind).join(",") === "no-rates,in-flight" && g.stations === 0, g.flags.map((f) => f.kind).join(","));
+  const withSt = handLedger(); withSt.locations.forEach((l) => { if (l.id === "face" || l.id === "stg") l.service_ticks = 50; });
+  const g2 = RL.glance(withSt);
+  check("5h. glance flags the floor rate when every station carries 50 service ticks (= 1 / flowsim's minStationServicePerTick 0.02)",
+    g2.flags.some((f) => f.kind === "floor-rate" && /Every station/.test(f.text)) && g2.atFloor === 2 && g2.stations === 2 && RL.FLOOR_SERVICE_TICKS === 50 && /minStationServicePerTick:\s*0\.02\b/.test(read("flowsim.js")));
+  check("5i. mixOf: an array mix, an object mix, none", RL.mixOf({ mix: [{ id: "cross-dock", share: 0.5 }, { id: "returns", share: 0.05 }] }) === "cross-dock 50% · returns 5%" && RL.mixOf({ mix: { "case-pick": 0.25 } }) === "case-pick 25%" && RL.mixOf({}) === "standard spine (no mix)");
+  check("5j. csv is RFC 4180 with raw values", RL.csv([{ a: 1, b: 'x,"y"' }, { a: null, b: "z" }], ["a", "b"]) === 'a,b\n1,"x,""y"""\n,z\n' && RL.csv([], ["a"]) === "a\n");
+  check("5k. fmtCell: money 2 dp for *_eur (deltas too), 4 dp for eur_per_*, capex as money, hours 2 dp, ticks 2 dp, integers plain, null a dash",
+    RL.fmtCell("total_eur", 17.20324) === "€ 17.20" && RL.fmtCell("delta_total_eur", -6.1656) === "€ -6.17" && RL.fmtCell("eur_per_each", 0.0161) === "€ 0.0161" && RL.fmtCell("delta_eur_per_unit", 8.62) === "€ 8.6200" &&
+    RL.fmtCell("capex", 8000) === "€ 8000.00" && RL.fmtCell("hours", 0.43333) === "0.43" && RL.fmtCell("avg_wait_ticks", 122.444) === "122.44" && RL.fmtCell("units", 8) === "8" && RL.fmtCell("x", null) === "—");
+  const secs = ["secGlance", "secStart", "secPlanner", "secCost", "secDispatch", "secPack", "secTrace", "secCompare", "secInvariants", "secAppendix"];
+  check("5l. the page has the ten sections in order, a nav anchor for each, the skip link, the print button and a focusable glance",
+    secs.every((s, i) => html.indexOf('id="' + s + '"') > 0 && (i === 0 || html.indexOf('id="' + s + '"') > html.indexOf('id="' + secs[i - 1] + '"'))) && secs.every((s) => html.indexOf('href="#' + s + '"') > 0) &&
+    /id="rlNav"/.test(html) && /id="rlPrint"/.test(html) && /class="skip"/.test(html) && /id="rlGlance" tabindex="-1"/.test(html));
+  check("5m. run-ledger.js renders glance / planner / dispatch / invariants / appendix as their own functions, emits th scope=col and data-view; renderViews and renderRun are gone",
+    /function renderGlance/.test(js) && /function renderPlanner/.test(js) && /function renderDispatch/.test(js) && /function renderInvariants/.test(js) && /function renderAppendix/.test(js) && !/function renderViews/.test(js) && !/function renderRun\b/.test(js) && /<th scope="col">/.test(js) && /data-view=/.test(js));
+  check("5n. run-ledger.css has the print block, the auto-fit card grid, the sticky nav and the derived-column style", /@media print/.test(css) && /repeat\(auto-fit,minmax\(220px,1fr\)\)/.test(css) && /#rlNav\{position:sticky/.test(css) && /th\.derived/.test(css));
+  check("5o. the viewer self-test is inert without ?selftest=1, reports with the WT-SELFTEST contract and data-page, loads last, no eval / inline handler / external reference",
+    /selftest=1/.test(st) && /WT-SELFTEST: PASS/.test(st) && /data-page/.test(st) && !/\beval\(/.test(st) && !/https?:\/\//.test(st) && /<script src="run-ledger\.js"><\/script><script src="run-ledger-selftest\.js"><\/script><\/body>/.test(html) && !/\son[a-z]+=/i.test(html));
+  check("5p. Your case binds its listeners once and debounces; the pinwheel search is capped at six block thicknesses", /ycBound/.test(js) && /setTimeout\(\(\) => \{ if \(ycDraw\) ycDraw\(\); \}, 150\)/.test(js) && /Math\.min\(6, Math\.floor\(Math\.min\(L, W\) \/ b\)\)/.test(read("pack.js")));
+  check("5q. ?example=a|b loads an example; load() announces rl:loaded and whenLoaded() resolves; the derived minutes columns are display-only", /example=\(a\|b\)/.test(js) && /rl:loaded/.test(js) && /RunLedger\.whenLoaded/.test(js) && /computed for display, not a column of the view/.test(js));
 })();
 
 console.log("=".repeat(72));

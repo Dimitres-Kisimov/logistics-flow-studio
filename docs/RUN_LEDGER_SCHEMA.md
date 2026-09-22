@@ -1,6 +1,6 @@
 # The run ledger — schema, identities, SQL views
 
-*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.38.*
+*The contract between the simulator, the SQLite tool and the viewer. Written 2026-09-22 for v3.32–v3.39.*
 
 ## 1. One stream, three consumers
 
@@ -10,7 +10,7 @@ The material-flow simulation is observed by `ledger.js` after every tick. It wri
 2. imported by `tools/run_ledger.py` into SQLite, where the planner's questions are **views**;
 3. drawn by `run-ledger.html` from start to finish, by the same definitions.
 
-`RunLedger.views()` in the viewer and the SQL views are proved equal on a hand-built ledger with hand-computed answers and on the recorded fixture (`verify_run_ledger_view.js`, `test/test_run_ledger.py`).
+`RunLedger.views()` in the viewer and the SQL views are proved equal on a hand-built ledger with hand-computed answers and on the recorded fixture (`verify_run_ledger_view.js`, `test/test_run_ledger.py`). Since v3.39 the SQL the viewer shows under each table is **generated from this tool** (`tools/export_viewer_sql.py` → `run-ledger-sql.js`): a test fails when the file is stale and another proves every shown text runs in SQLite as shown. The viewer computes everything once per file (`RunLedger.model`), opens with the run at a glance and its data-quality flags, and tests itself at `run-ledger.html?selftest=1`.
 
 ## 2. Identities
 
@@ -88,6 +88,8 @@ Ids never encode a fact that can change: archetype, outcome and location are att
 
 **Compare views** (v3.37): `v_compare_summary`, `v_compare_cycle`, `v_compare_touches`, `v_compare_wait`, `v_compare_dispatch`, `v_compare_cost` — one row per ordered pair of runs in the database and key, deltas B − A, NULL whenever a side lacks the key. `compare --database run.sqlite --runs A B [--out compare.json]` prints or writes them for one pair; the viewer's `RunLedger.compare(A, B)` is the same pairing and the tests equate the two on a hand pair with hand-computed deltas and on the recorded pair (`run-ledger.json` / `run-ledger-b.json`, the same floor and seed with a cross-dock-heavy mix).
 
+**Detail views** (`views --all`): `v_wip_by_tick`, `v_spans`, `v_span_cost`, `v_cost_by_hu`. Views are dropped and recreated on every open, so a database created by an older version always runs the current text.
+
 Ad-hoc SQL: `query "SELECT …"` accepts one `SELECT` / `WITH` statement and at most 500 rows.
 
 ## 5. What the ledger is not
@@ -104,4 +106,7 @@ node verify_run_ledger_view.js               # the viewer's model against the sa
 node verify_cost_ledger.js                   # spans and money by hand; SQL == JavaScript on the fixture (v3.35)
 node verify_ledger_flow.js                   # flow links, conservation, the layered Sankey geometry (v3.36)
 node verify_run_compare.js                   # two runs paired key by key, deltas B - A (v3.37)
+python tools/export_viewer_sql.py --check    # the SQL the viewer shows is the SQL in this tool (v3.39)
 ```
+
+The viewer's own self-test: serve the folder and open `run-ledger.html?selftest=1`; it drives the real buttons and prints `WT-SELFTEST: PASS n/n`.

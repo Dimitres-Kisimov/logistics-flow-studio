@@ -19,6 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
+import export_viewer_sql as XV  # noqa: E402
 import run_ledger as RL  # noqa: E402
 
 FIX = ROOT / "test" / "fixtures"
@@ -307,6 +308,42 @@ class HandLedger(unittest.TestCase):
         bad["events"][0]["hu_id"] = "HU-nope"
         with self.assertRaises(ValueError):
             RL.import_ledger(fresh(), bad)
+
+
+class ViewerSql(unittest.TestCase):
+    """run-ledger-sql.js (v3.39): the SQL the viewer shows IS the SQL the tool runs."""
+
+    @staticmethod
+    def parts():
+        text = XV.render()
+        end = text.index("};")  # the object literal ends at the first "};" (no SQL body contains a brace)
+        obj = json.loads(text[text.index("{"):end + 1])
+        marker = "window.RunLedgerSQLMeta = "
+        meta = json.loads(text[text.index(marker) + len(marker):].rstrip().rstrip(";"))
+        return text, obj, meta
+
+    def test_committed_viewer_sql_is_fresh(self):
+        committed = (ROOT / "run-ledger-sql.js").read_text(encoding="utf-8")
+        self.assertEqual(committed, XV.render(), "stale: python tools/export_viewer_sql.py")
+
+    def test_viewer_sql_is_every_view_minus_the_prefix(self):
+        _text, obj, meta = self.parts()
+        self.assertEqual(list(obj), list(RL.VIEWS))
+        for name, body in obj.items():
+            self.assertTrue(RL.VIEWS[name].lstrip().startswith(f"CREATE VIEW IF NOT EXISTS {name} AS"), name)
+            self.assertTrue(RL.VIEWS[name].endswith(body), name)
+            self.assertIn(body.split(None, 1)[0].upper(), ("SELECT", "WITH"), name)
+            self.assertNotIn("...", body, name)
+        for group in ("planner", "invariant", "detail", "compare"):
+            self.assertTrue(set(meta[group]) <= set(obj), group)
+        self.assertEqual(meta["views"], len(RL.VIEWS))
+
+    def test_viewer_sql_text_runs_in_sqlite_as_shown(self):
+        db = fresh()
+        RL.import_ledger(db, hand_ledger())
+        _text, obj, _meta = self.parts()
+        for _name, body in obj.items():
+            db.execute("SELECT * FROM (" + body.rstrip().rstrip(";") + ") LIMIT 1").fetchall()
 
 
 @unittest.skipUnless((FIX / "run-ledger.json").exists(), "fixture not generated")

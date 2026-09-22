@@ -27,14 +27,14 @@
  *   4. Shipped wiring: the viewer loads analytics.js and has the section;
  *      the planner's Analyze card draws the recorded flow beside the stage
  *      model; RunLedger.SQL and tools/run_ledger.py carry v_flow_links;
- *      sw.js at wt-v120; the runner.
+ *      sw.js at wt-v121; the runner.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
 const path = require("path");
 
 global.window = global;
-for (const f of ["domain.js", "iso.js", "shapes.js", "routing.js", "ids.js", "pack.js", "flowsim.js", "goods.js", "analytics.js", "ledger.js", "run-ledger.js"]) {
+for (const f of ["domain.js", "iso.js", "shapes.js", "routing.js", "ids.js", "pack.js", "flowsim.js", "goods.js", "analytics.js", "ledger.js", "run-ledger-sql.js", "run-ledger.js"]) {
   (0, eval)(fs.readFileSync(path.join(__dirname, f), "utf8"));
 }
 const R = global.WT.routing, F = global.WT.flowsim, L = global.WT.ledger, A = global.WT.analytics, P = global.WT.pack, RL = global.RunLedger;
@@ -199,7 +199,7 @@ console.log("=".repeat(72));
   check("4b. the planner's Analyze card draws the recorded flow beside the stage model, gated on a live ledger", /state\.flow\.ledger && WT\.ledger && typeof WT\.ledger\.sankeyFromLedger === "function"/.test(app) && /WT\.analytics\.sankeySvgLayered\(lm, theme\)/.test(app));
   check("4c. RunLedger.SQL and tools/run_ledger.py carry v_flow_links, and summary() includes it", typeof RL.SQL.v_flow_links === "string" && /CREATE VIEW IF NOT EXISTS v_flow_links AS/.test(py) && /"v_flow_links"\)/.test(py));
   check("4d. the linear sankey is frozen by golden hashes in verify_analytics.js", /25c555a5434113107cdb0faa99d71bc5a1bdc229/.test(va) && /a1bbbf8c6820cb119abf3c6557450997a2f59e2c/.test(va) && /f12ec1728898f9021ba1c9cab0a82ce1e507c91e/.test(va));
-  check("4e. sw.js at wt-v120 (previously wt-v119) precaches analytics.js and the viewer", /CACHE_VERSION\s*=\s*"wt-v120"/.test(sw) && /Previously wt-v119/.test(sw) && /"\.\/analytics\.js"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw));
+  check("4e. sw.js at wt-v121 (previously wt-v120) precaches analytics.js and the viewer", /CACHE_VERSION\s*=\s*"wt-v121"/.test(sw) && /Previously wt-v120/.test(sw) && /"\.\/analytics\.js"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw));
   check("4f. test/run-all.mjs lists this harness", /verify_ledger_flow\.js/.test(runall));
   check("4g. no Date / Math.random CALL in the layered layout or ledger.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(read("ledger.js")) && !/Math\.random\(/.test(read("analytics.js")));
 })();

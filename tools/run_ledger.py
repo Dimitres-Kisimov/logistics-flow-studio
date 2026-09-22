@@ -9,7 +9,7 @@ events charged at the rates the run was recorded under), and the invariants that
 conservation of eaches, cross-dock never in storage, consecutive versions. Standard library only.
 
     python tools/run_ledger.py import run-ledger.json --database work/run.sqlite
-    python tools/run_ledger.py views  --database work/run.sqlite [--run RUN-...]
+    python tools/run_ledger.py views  --database work/run.sqlite [--run RUN-...] [--all]
     python tools/run_ledger.py summary --database work/run.sqlite [--run RUN-...] [--out summary.json]
     python tools/run_ledger.py query  --database work/run.sqlite "SELECT ..."   (read-only, bounded)
     python tools/run_ledger.py compare --database work/run.sqlite --runs RUN-a RUN-b [--out compare.json]   (v3.37: B - A)
@@ -308,7 +308,7 @@ LEFT JOIN v_cost_by_type b ON b.run_id = k.run_b AND b.archetype = k.archetype;"
 INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations")
 PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
                  "v_cost_by_type", "v_cost_by_location", "v_flow_links")
-COST_VIEWS = ("v_spans", "v_span_cost", "v_cost_by_hu", "v_cost_by_type", "v_cost_by_location")
+DETAIL_VIEWS = ("v_wip_by_tick", "v_spans", "v_span_cost", "v_cost_by_hu")  # long or per-row views: `views --all`
 COMPARE_VIEWS = ("v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost")
 
 
@@ -325,6 +325,10 @@ def initialize(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE location ADD COLUMN service_ticks REAL")
     except sqlite3.OperationalError:
         pass
+    # views are dropped and recreated on every open, so a database created by an
+    # older version always runs the current text (v3.39) - the text the viewer shows
+    for name in VIEWS:
+        db.execute(f"DROP VIEW IF EXISTS {name}")
     for ddl in VIEWS.values():
         db.executescript(ddl)
     for pid, slots in TRAILER_SLOTS.items():
@@ -446,6 +450,7 @@ def main(argv=None) -> int:
     ap.add_argument("--run", help="run id (defaults to the only / latest imported run)")
     ap.add_argument("--out", help="write the summary / compare JSON here")
     ap.add_argument("--runs", nargs=2, metavar=("RUN_A", "RUN_B"), help="compare: the two run ids (deltas are B - A)")
+    ap.add_argument("--all", action="store_true", help="views: also print the detail views (WIP by tick, spans, span cost, cost by unit)")
     a = ap.parse_args(argv)
     db = connect(a.database)
     initialize(db)
@@ -480,7 +485,7 @@ def main(argv=None) -> int:
         print("no run imported yet", file=sys.stderr)
         return 1
     if a.command == "views":
-        for name in PLANNER_VIEWS + INVARIANT_VIEWS:
+        for name in PLANNER_VIEWS + INVARIANT_VIEWS + (DETAIL_VIEWS if a.all else ()):
             print(f"== {name} ==")
             print(render(rows(db, f"SELECT * FROM {name} WHERE run_id = ? ORDER BY 2, 3", (run_id,))))
             print()

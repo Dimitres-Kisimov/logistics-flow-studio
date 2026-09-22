@@ -25,14 +25,14 @@
  *      "retired" fallback is unreachable).
  *   4. Shipped wiring: the app passes the Analyze rates at create; the viewer
  *      page loads ledger.js and shows the cost section; RunLedger.SQL carries
- *      every view the SQLite tool defines; sw.js at wt-v120; the runner.
+ *      every view the SQLite tool defines; sw.js at wt-v121; the runner.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
 const path = require("path");
 
 global.window = global;
-for (const f of ["domain.js", "iso.js", "shapes.js", "routing.js", "ids.js", "pack.js", "flowsim.js", "goods.js", "analytics.js", "ledger.js", "run-ledger.js"]) {
+for (const f of ["domain.js", "iso.js", "shapes.js", "routing.js", "ids.js", "pack.js", "flowsim.js", "goods.js", "analytics.js", "ledger.js", "run-ledger-sql.js", "run-ledger.js"]) {
   (0, eval)(fs.readFileSync(path.join(__dirname, f), "utf8"));
 }
 const R = global.WT.routing, F = global.WT.flowsim, L = global.WT.ledger, A = global.WT.analytics, P = global.WT.pack, RL = global.RunLedger;
@@ -217,7 +217,7 @@ console.log("=".repeat(72));
     "v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations"];
   check("4c. RunLedger.SQL carries every view the SQLite tool defines (" + want.length + ")", want.every((k) => typeof RL.SQL[k] === "string" && RL.SQL[k].length > 20) && want.every((k) => py.indexOf("CREATE VIEW IF NOT EXISTS " + k + " AS") >= 0), Object.keys(RL.SQL).length + " keys");
   check("4d. analytics.js exports TYPE_TO_CLASS and the python tool has the rate tables", !!A.TYPE_TO_CLASS && A.TYPE_TO_CLASS["carton-flow"] === "racking" && /CREATE TABLE IF NOT EXISTS rate\(/.test(py) && /CREATE TABLE IF NOT EXISTS equipment_rate\(/.test(py) && /CREATE TABLE IF NOT EXISTS location_class\(/.test(py));
-  check("4e. sw.js at wt-v120 (previously wt-v119) still precaches ledger.js and the viewer", /CACHE_VERSION\s*=\s*"wt-v120"/.test(sw) && /Previously wt-v119/.test(sw) && /"\.\/ledger\.js"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw));
+  check("4e. sw.js at wt-v121 (previously wt-v120) still precaches ledger.js and the viewer", /CACHE_VERSION\s*=\s*"wt-v121"/.test(sw) && /Previously wt-v120/.test(sw) && /"\.\/ledger\.js"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw));
   check("4f. test/run-all.mjs lists this harness", /verify_cost_ledger\.js/.test(runall));
   check("4g. no Date / Math.random CALL in ledger.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(read("ledger.js")));
 })();

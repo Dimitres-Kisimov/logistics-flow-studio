@@ -1,5 +1,49 @@
 # Changelog
 
+## v3.39 — The viewer as one report
+
+**Defects.** The SQL shown under the viewer's tables was hand-typed and had drifted from
+the SQLite views in nine places (two compare texts were `...` placeholders, `v_span_cost`
+was not runnable, `v_cost_by_hu` named a column that does not exist, two views left
+columns unaliased, the invariant views had another shape, `v_cost_by_hu` was never
+shown). The run card printed the order mix as `NaN %` (the recorder's mix is a list).
+"Your case" could hang the browser on a transient keystroke (a case side of 4 mm gave
+~10^9 pinwheel combinations), fired twice per change and accumulated listeners on every
+load. `views()` ran three times per load and the cost model up to five. The SQLite tool
+kept old view text in an existing database (`CREATE VIEW IF NOT EXISTS`). All fixed.
+
+**Generated SQL.** `tools/export_viewer_sql.py` writes `run-ledger-sql.js` from
+`run_ledger.VIEWS` - every text the statement SQLite runs, minus the CREATE VIEW
+prefix - loaded first on the page; `RunLedger.SQL` is that object. Tests: the committed
+file equals a fresh render (stale = red), every key is a view and every body its DDL
+minus the prefix with no placeholder, and every text RUNS in SQLite as shown. The tool
+drops and recreates its views on every open; `views --all` prints `DETAIL_VIEWS`.
+
+**One report.** `run-ledger.html` restructured into ten sections with a sticky nav, a
+skip link and an appendix (how to read the page; reproduce commands filled in for the
+loaded run). New *The run at a glance* (`RunLedger.glance`): identity, mix, totals,
+cost, invariants and the data-quality flags - no rates; stations at the floor rate
+(`FLOOR_SERVICE_TICKS` = 1 / flowsim's `minStationServicePerTick`, asserted); units
+still in flight. `RunLedger.model(exp)` memoises views / ribbon / flow links / costs /
+Sankey per export object. One `fmtCell` for every cell (money 2 dp, per-each 4 dp,
+capex as money); minutes beside ticks as display-only derived columns (no view gains a
+column). `<th scope="col">`, focus to the glance after a load, `aria-label` on the
+flow figure, an auto-fit card grid, a print stylesheet with SQL expanded on
+`beforeprint`, a CSV button on every table (`RunLedger.csv`, RFC 4180, raw values),
+`?example=a|b`, an `rl:loaded` event and `RunLedger.whenLoaded()`. `errors.js` and the
+app's CSP now guard the page. "Your case" debounced (150 ms) and bound once; `pack.js`
+`fourBlock` caps block thickness at six (7^4 combinations at most; the ten profiles
+unaffected, asserted).
+
+**Viewer self-test.** `run-ledger-selftest.js`, inert unless `run-ledger.html?selftest=1`:
+drives the real buttons, waits for `rl:loaded`, checks every section, no error text,
+every SQL block complete, one flow path per link, the cost cards, print + CSV, the memo,
+the derived columns, "Your case" reacting to input, the compare after B and all 23 SQL
+blocks; reports with the `WT-SELFTEST` contract and `data-page="run-ledger"`.
+
+**Verification.** `verify_run_ledger_view.js` +17 (section 5). Python +3. Viewer self-test
+22/22. 70 harnesses, 90 Python tests, WT-SELFTEST 178/178 + viewer 22/22. Cache wt-v121.
+
 ## v3.38 — Stacking strength, the pinwheel and your case
 
 **Stacking strength.** `pack.js` `bct(ect, caliper, perimeter)` - the simplified McKee

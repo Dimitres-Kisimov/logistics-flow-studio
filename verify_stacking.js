@@ -32,14 +32,14 @@
  *      strength verdict present, a custom pallet joins the ranking, bad
  *      inputs return an error.
  *   8. Shipped wiring: the viewer section, the profile board in the export,
- *      sw.js at wt-v120, the runner; no Date / Math.random in pack.js.
+ *      sw.js at wt-v121, the runner; no Date / Math.random in pack.js.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
 const path = require("path");
 
 global.window = global;
-for (const f of ["domain.js", "compliance.js", "generate.js", "nlcommands.js", "examples.js", "routing.js", "ids.js", "pack.js", "run-ledger.js"]) {
+for (const f of ["domain.js", "compliance.js", "generate.js", "nlcommands.js", "examples.js", "routing.js", "ids.js", "pack.js", "run-ledger-sql.js", "run-ledger.js"]) {
   (0, eval)(fs.readFileSync(path.join(__dirname, f), "utf8"));
 }
 const P = global.WT.pack;
@@ -178,7 +178,7 @@ console.log("=".repeat(72));
   check("8a. the viewer has the 'Your case' section and the strength verdict; the packaging section passes the board", /id="rlYourCase"/.test(html) && /function renderYourCase/.test(js) && /function strengthText/.test(js) && /P\.tiHi\(pallet, box, prof\.max_stack_mm, prof\.case_kg, board\)/.test(js));
   check("8b. the export's profile block carries the board", /board: rec\.profile\.board \|\| null/.test(ledger));
   check("8c. every profile declares a board (values or an honest 'not evaluated' note); the honesty text names McKee and the synthetic values", Object.keys(P.PROFILES).every((id) => P.PROFILES[id].board && (P.PROFILES[id].board.ectKNm > 0 || (P.PROFILES[id].board.evaluated === false && P.PROFILES[id].board.note))) && /McKee/.test(P.HONESTY) && /SYNTHETIC/.test(P.HONESTY) && /not a certification/.test(P.HONESTY));
-  check("8d. sw.js at wt-v120 (previously wt-v119)", /CACHE_VERSION\s*=\s*"wt-v120"/.test(sw) && /Previously wt-v119/.test(sw));
+  check("8d. sw.js at wt-v121 (previously wt-v120)", /CACHE_VERSION\s*=\s*"wt-v121"/.test(sw) && /Previously wt-v120/.test(sw));
   check("8e. test/run-all.mjs lists this harness", /verify_stacking\.js/.test(runall));
   check("8f. no Date / Math.random CALL in pack.js; Steudel and McKee cited in the source", !/new Date\(|Date\.now\(|Math\.random\(/.test(pack) && /Steudel \(1979\)/.test(pack) && /McKee, Gander & Wachuta, 1963/.test(pack));
 })();

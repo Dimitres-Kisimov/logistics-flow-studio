@@ -207,7 +207,10 @@
     const a = Math.max(bl, bw), b = Math.min(bl, bw);
     const none = { count: 0, k: null, rects: [], hole: null, pattern: "pinwheel" };
     if (!(a > 0) || L < a || W < a) return none;
-    const kmax = Math.floor(Math.min(L, W) / b);
+    // block thickness in case short sides: capped at 6 - thicker edge blocks are
+    // not a pinwheel in practice, and the cap bounds the search at 7^4 = 2,401
+    // combinations whatever the case size (v3.39; the ten profiles are unaffected)
+    const kmax = Math.min(6, Math.floor(Math.min(L, W) / b));
     let best = null;
     for (let kb = 0; kb <= kmax; kb++) for (let kr = 0; kr <= kmax; kr++) for (let kt = 0; kt <= kmax; kt++) for (let kl = 0; kl <= kmax; kl++) {
       const tb = kb * b, tr = kr * b, tt = kt * b, tl = kl * b;
