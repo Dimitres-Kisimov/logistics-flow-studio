@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.52 — The deep dive: what a factory digital twin is still missing
+
+**The document.** `docs/DIGITAL_TWIN_DEEP_DIVE.md` (about 11 700 words, twelve chapters):
+what a factory digital twin is by the standards (ISO 23247's definition and observable
+manufacturing elements, Kritzinger's model / shadow / twin ladder, the Asset Administration
+Shell, GS1 EPCIS 2.0 / CBV 2.0, ISO 22400, VDI 3633 / 4499 / 5200), what this app already
+has (an OME coverage table; the run ledger, the SQLite twin, the routing model's own known
+limits quoted), a list of twelve gaps with the standard each violates and the cost of
+leaving it open, three chapters on keeping the approach human (Grosse et al.'s human
+factors, Rasmussen's SRK and Reason's latent conditions, the SPAR-H performance-shaping
+factors read as design levers, BetrVG § 87(1)6 and GDPR Art. 88 as design constraints:
+errors belong to a step, never to a person), and four design contracts with acceptance
+gates named after the harnesses that will prove them: the tracking database (EPCIS-shaped
+events derived from the ledger, persisted across runs), human error (declared shares per
+step, quota-dispatched, teaching values anchored on HEART / SPAR-H, an unrolled rework),
+delivery and shipping times in between (dock and carrier windows whose lateness shape comes
+from a public USAID delivery dataset, OTIF), and a control tower that proposes from
+aggregates with a human in the loop. A "what is real, with sources" table, a register with
+editions and explicit non-claims, a "not modelled" list and a "reproduce" section close it.
+Every number is cited or labelled a teaching value; the app is placed honestly as a digital
+model with one measured shadow.
+
+**Verification.** Docs only: no new harness; 77 harnesses, 129 Python tests, WT-SELFTEST
+185/185 + viewer 31/31. Cache wt-v131 (unchanged).
+
 ## v3.51 — Detail: standards chips on the group headers, the screenshots, the driver
 
 **Detail.** The *Machines (DIN 8580)* and *Production / Assembly* group headers of the Class
