@@ -1,5 +1,38 @@
 # Changelog
 
+## v3.59 — The plant's own rates: a site profile fitted from recorded events
+
+**The tool.** `tools/fit_rates.py fit --document <epcis.json> ... [--deliveries <trailers.csv>] --out
+site-profile.json` (or `--database run.sqlite [--run EPCIS-...]`) reads a RECORDED event set - documents
+mapped by the return path, or the `source = imported` rows of a database; derived twins are refused with
+the reason - and writes a `wt-site-profile/v1`: per business step the events, objects, non-in_progress
+and error-disposition events with their shares and the dispositions counted; the three error shares as
+the app's own error kind at its own step (`hf.error.mis-pick` = mismatch_class at picking ÷ picking
+events, `hf.error.wrong-putaway` = sellable_not_accessible at storing ÷ storing events,
+`hf.error.damage` = damaged at unpacking + packing ÷ those events), fitted only where n ≥ 1 and listed
+under `not_fitted` with the reason otherwise; the trailer log's lateness (arrived − scheduled in whole
+minutes) as nearest-rank quantiles min / p10 / median / p90 / max by the SCMS tool's own `nearest_rank`
+and the shares late / early / on time, into six new `delivery.site.*` knowledge-base entries (ticks =
+minutes). Every value is labelled `measured on <source>, n = ... <what> (<numerator> <disposition>);
+tools/fit_rates.py (v3.59)`. The multipliers are not fitted. `check` validates a profile. Deterministic.
+
+**The knowledge base.** `WT.kb.applyProfile(profile)` (and `importJson`, which routes the schema) is
+an OVERLAY: only fittable entries (`hf.error.*`, `delivery.site.*`) change, each stamped `measured`
+{ label, n, source }; a value outside the entry's range, a label not starting with `measured on` or a
+non-fittable id is skipped with the reason; `reset(id)` / `reset()` restore the teaching value and drop
+the stamp; the stamp survives export / import and a reload; `profile()` reports what was applied. The
+card shows a *measured* badge and the label above the teaching default. `readDeliveryLevers` uses the
+site quantiles (scale 1, mode `site`) when `delivery.site.n > 0`; the error levers read the measured
+shares as they always read the knowledge base.
+
+**Verification.** `verify_fit_rates.js` (the fit on the hand-designed fixture: 0.04 / 0.05 / 0.05 with
+their n, the quantiles −30 / −30 / 0 / 45 / 90 and the shares; a step without events not fitted; the
+derived-only database refused; the committed profile fresh; the knowledge base's labels, skips, resets
+and round trip; the site quantiles through `windowLateness`; the wiring), `test/test_fit_rates.py`
+(+7 → 169), the in-app self-test `site-profile-measured-labels` (191/191). Fixtures
+`test/fixtures/fit-rates.events.json` (synthetic, hand-designed), `fit-rates.deliveries.csv`,
+`site-profile.json`. `docs/SITE_PROFILE.md`. Cache `wt-v138`.
+
 ## v3.58 — The return path: a recorded EPCIS 2.0 document into the tracking database
 
 **The mapping.** `tracking.js fromEpcis(document)` reads an EPCIS 2.0 capture document (JSON / JSON-LD,

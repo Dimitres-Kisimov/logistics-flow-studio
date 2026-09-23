@@ -1347,6 +1347,8 @@ input:focus, select:focus { outline: 2px solid var(--accent-ink); outline-offset
 .kb-cat { font-size: 0.66rem; text-transform: uppercase; letter-spacing: var(--track-label); color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; }
 .kb-badge { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: var(--track-label); color: var(--accent-ink); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 999px; padding: 1px 6px; }
 .kb-badge.custom { color: var(--ok-ink); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.kb-badge.measured { color: var(--ok-ink); background: color-mix(in srgb, var(--ok) 14%, transparent); border-color: color-mix(in srgb, var(--ok) 55%, transparent); } /* v3.59 a value from the plant's own record */
+.kb-source.kb-measured { color: var(--ok-ink); }
 .kb-edit { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
 .kb-input { flex: 1 1 90px; min-width: 60px; padding: 4px 8px; font-size: 0.8rem; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
 .kb-unit { font-size: 0.74rem; color: var(--text-dim); min-width: 34px; }

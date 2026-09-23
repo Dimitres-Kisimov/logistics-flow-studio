@@ -1,0 +1,159 @@
+{
+ "schema": "wt-site-profile/v1",
+ "tool": "tools/fit_rates.py (v3.59)",
+ "site": "example plant",
+ "honesty": "A site profile fitted from the plant's own records: aggregates per business step and per trailer, never per person (BetrVG 87(1)6, GDPR Art. 88). The values are what the record says for the period it covers - not a validated error model, not a forecast; a step that recorded nothing measures nothing and keeps its teaching value. The performance-shaping multipliers are not fitted (a measured share already contains the plant's conditions). Loaded into the knowledge base, each value is labelled 'measured on <source>, n = ...' instead of 'teaching value'.",
+ "fitted_from": {
+  "documents": [
+   "urn:wt:doc:fit-rates-example-1"
+  ],
+  "earliest": "2026-09-22T06:00:00+02:00",
+  "latest": "2026-09-22T09:38:00+02:00",
+  "deliveries": "fit-rates.deliveries.csv",
+  "events": 100,
+  "objects": 40
+ },
+ "values": {
+  "hf.error.mis-pick": {
+   "value": 0.04,
+   "n": 50,
+   "numerator": 2,
+   "disposition": "mismatch_class",
+   "steps": [
+    "picking"
+   ],
+   "label": "measured on urn:wt:doc:fit-rates-example-1, n = 50 picking events (2 mismatch_class); tools/fit_rates.py (v3.59)"
+  },
+  "hf.error.wrong-putaway": {
+   "value": 0.05,
+   "n": 20,
+   "numerator": 1,
+   "disposition": "sellable_not_accessible",
+   "steps": [
+    "storing"
+   ],
+   "label": "measured on urn:wt:doc:fit-rates-example-1, n = 20 storing events (1 sellable_not_accessible); tools/fit_rates.py (v3.59)"
+  },
+  "hf.error.damage": {
+   "value": 0.05,
+   "n": 20,
+   "numerator": 1,
+   "disposition": "damaged",
+   "steps": [
+    "unpacking",
+    "packing"
+   ],
+   "label": "measured on urn:wt:doc:fit-rates-example-1, n = 20 unpacking + packing events (1 damaged); tools/fit_rates.py (v3.59)"
+  },
+  "delivery.site.n": {
+   "value": 10,
+   "n": 10,
+   "label": "measured on fit-rates.deliveries.csv, n = 10 trailers; tools/fit_rates.py (v3.59)"
+  },
+  "delivery.site.latenessMin": {
+   "value": -30,
+   "n": 10,
+   "label": "measured on fit-rates.deliveries.csv, n = 10 trailers (lateness in minutes, nearest rank); tools/fit_rates.py (v3.59)"
+  },
+  "delivery.site.latenessP10": {
+   "value": -30,
+   "n": 10,
+   "label": "measured on fit-rates.deliveries.csv, n = 10 trailers (lateness in minutes, nearest rank); tools/fit_rates.py (v3.59)"
+  },
+  "delivery.site.latenessMedian": {
+   "value": 0,
+   "n": 10,
+   "label": "measured on fit-rates.deliveries.csv, n = 10 trailers (lateness in minutes, nearest rank); tools/fit_rates.py (v3.59)"
+  },
+  "delivery.site.latenessP90": {
+   "value": 45,
+   "n": 10,
+   "label": "measured on fit-rates.deliveries.csv, n = 10 trailers (lateness in minutes, nearest rank); tools/fit_rates.py (v3.59)"
+  },
+  "delivery.site.latenessMax": {
+   "value": 90,
+   "n": 10,
+   "label": "measured on fit-rates.deliveries.csv, n = 10 trailers (lateness in minutes, nearest rank); tools/fit_rates.py (v3.59)"
+  }
+ },
+ "not_fitted": {},
+ "steps": [
+  {
+   "biz_step": "packing",
+   "events": 10,
+   "objects": 10,
+   "non_in_progress": 0,
+   "non_in_progress_share": 0.0,
+   "errors": 0,
+   "error_share": 0.0,
+   "dispositions": {
+    "in_progress": 10
+   }
+  },
+  {
+   "biz_step": "picking",
+   "events": 50,
+   "objects": 20,
+   "non_in_progress": 2,
+   "non_in_progress_share": 0.04,
+   "errors": 2,
+   "error_share": 0.04,
+   "dispositions": {
+    "in_progress": 48,
+    "mismatch_class": 2
+   }
+  },
+  {
+   "biz_step": "receiving",
+   "events": 10,
+   "objects": 10,
+   "non_in_progress": 0,
+   "non_in_progress_share": 0.0,
+   "errors": 0,
+   "error_share": 0.0,
+   "dispositions": {
+    "in_progress": 10
+   }
+  },
+  {
+   "biz_step": "storing",
+   "events": 20,
+   "objects": 20,
+   "non_in_progress": 20,
+   "non_in_progress_share": 1.0,
+   "errors": 1,
+   "error_share": 0.05,
+   "dispositions": {
+    "sellable_accessible": 19,
+    "sellable_not_accessible": 1
+   }
+  },
+  {
+   "biz_step": "unpacking",
+   "events": 10,
+   "objects": 10,
+   "non_in_progress": 1,
+   "non_in_progress_share": 0.1,
+   "errors": 1,
+   "error_share": 0.1,
+   "dispositions": {
+    "damaged": 1,
+    "in_progress": 9
+   }
+  }
+ ],
+ "deliveries": {
+  "n": 10,
+  "lateness_minutes": {
+   "latenessMin": -30,
+   "latenessP10": -30,
+   "latenessMedian": 0,
+   "latenessP90": 45,
+   "latenessMax": 90
+  },
+  "share_late": 0.5,
+  "share_early": 0.3,
+  "share_on_time": 0.2,
+  "source": "fit-rates.deliveries.csv"
+ }
+}

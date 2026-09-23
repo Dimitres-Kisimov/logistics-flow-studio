@@ -295,6 +295,17 @@
   seed({ id: "delivery.otif.target", category: "delivery", label: "On-time-in-full target (share of delivered orders)", value: 0.95, unit: "share",
     source: "A commonly quoted OTIF target in logistics guides - not a standard, not a measurement; the control tower (v3.56) compares against it.", note: DL_NOTE, editable: true, kind: "number", min: 0, max: 1 });
 
+  /* ---- v3.59 the plant's own rates: the site's trailer log (a site profile from tools/fit_rates.py sets these;
+   * 0 trailers = not measured, the SCMS shape applies). Ticks: the simulation's tick is one minute at 60 ticks per hour. */
+  const SITE_NOTE = "Set by a site profile (tools/fit_rates.py) from the plant's own trailer log - nearest-rank quantiles of arrived minus scheduled in minutes; aggregates per trailer, never per person. With delivery.site.n = 0 the delivery what-if uses the USAID SCMS lateness shape instead.";
+  const SITE_SRC = "Not measured (0): the delivery what-if uses the USAID SCMS lateness shape (data/scms-delivery.json) until a site profile sets this from the plant's own trailer log.";
+  seed({ id: "delivery.site.n", category: "delivery", label: "Site trailer log: trailers measured (0 = not measured, the SCMS shape applies)", value: 0, unit: "trailers", source: SITE_SRC, note: SITE_NOTE, editable: true, kind: "number", min: 0, max: 1000000000 });
+  seed({ id: "delivery.site.latenessMin", category: "delivery", label: "Site lateness, minimum (ticks = minutes; negative = early)", value: 0, unit: "ticks", source: SITE_SRC, note: SITE_NOTE, editable: true, kind: "number", min: -1000000, max: 1000000 });
+  seed({ id: "delivery.site.latenessP10", category: "delivery", label: "Site lateness, 10th percentile (ticks)", value: 0, unit: "ticks", source: SITE_SRC, note: SITE_NOTE, editable: true, kind: "number", min: -1000000, max: 1000000 });
+  seed({ id: "delivery.site.latenessMedian", category: "delivery", label: "Site lateness, median (ticks)", value: 0, unit: "ticks", source: SITE_SRC, note: SITE_NOTE, editable: true, kind: "number", min: -1000000, max: 1000000 });
+  seed({ id: "delivery.site.latenessP90", category: "delivery", label: "Site lateness, 90th percentile (ticks)", value: 0, unit: "ticks", source: SITE_SRC, note: SITE_NOTE, editable: true, kind: "number", min: -1000000, max: 1000000 });
+  seed({ id: "delivery.site.latenessMax", category: "delivery", label: "Site lateness, maximum (ticks)", value: 0, unit: "ticks", source: SITE_SRC, note: SITE_NOTE, editable: true, kind: "number", min: -1000000, max: 1000000 });
+
   /* ---- v3.56 control tower: the rules' thresholds (teaching values; control.js DEFAULTS hold the same numbers) ---- */
   const CT_NOTE = "Teaching threshold for a control-tower rule; the tower proposes, a person decides. Edit it and the next run evaluates with it.";
   seed({ id: "control.evalEveryTicks", category: "control", label: "Evaluate every n ticks", value: 10, unit: "ticks", source: "WarehouseTwin choice: ten ticks between evaluations.", note: CT_NOTE, editable: true, kind: "number", min: 1, max: 10000 });
@@ -327,13 +338,15 @@
   // ------------------------------------------------------------------
   function num(v, dflt) { return typeof v === "number" && isFinite(v) ? v : dflt; }
   function cloneEntry(e) {
-    return {
+    const out = {
       id: e.id, category: e.category, label: e.label, value: e.value, unit: e.unit,
       source: e.source, note: e.note, editable: e.editable !== false,
       kind: e.kind || "number",
       min: typeof e.min === "number" ? e.min : undefined,
       max: typeof e.max === "number" ? e.max : undefined,
     };
+    if (e.measured && typeof e.measured.label === "string") out.measured = { label: e.measured.label, n: e.measured.n, source: e.measured.source == null ? null : e.measured.source }; // v3.59
+    return out;
   }
   function isSeed(id) { return Object.prototype.hasOwnProperty.call(seedIndex, id); }
 
@@ -430,6 +443,7 @@
     if (id == null) {
       for (const sid of seedOrder) store[sid] = cloneEntry(seeds[seedIndex[sid]]);
       for (const cid of customOrder.splice(0)) delete store[cid];
+      profileInfo = null; // v3.59
       persist();
       return true;
     }
@@ -457,12 +471,13 @@
   // exportJson() / importJson() - round-trip the whole KB so the user can
   // save / share / version it. Deterministic: no timestamps, stable order.
   function exportJson() {
-    return JSON.stringify({ version: KB_VERSION, entries: list() }, null, 2);
+    return JSON.stringify(profileInfo ? { version: KB_VERSION, entries: list(), profile: profileInfo } : { version: KB_VERSION, entries: list() }, null, 2); // v3.59: the applied site profile rides along
   }
   function importJson(str) {
     let data;
     try { data = typeof str === "string" ? JSON.parse(str) : str; }
     catch (err) { return { ok: false, error: "not valid JSON: " + err.message, applied: 0, added: 0 }; }
+    if (data && data.schema === PROFILE_SCHEMA) return applyProfile(data); // v3.59: a site profile is an overlay, not a replacement
     if (!data || !Array.isArray(data.entries)) {
       return { ok: false, error: "missing an 'entries' array", applied: 0, added: 0 };
     }
@@ -472,7 +487,7 @@
     for (const e of data.entries) {
       if (!e || typeof e.id !== "string") { errors.push("skipped an entry with no id"); continue; }
       if (isSeed(e.id)) {
-        if (set(e.id, e.value)) applied++;
+        if (set(e.id, e.value)) { applied++; if (e.measured && typeof e.measured.label === "string") store[e.id].measured = { label: e.measured.label, n: e.measured.n, source: e.measured.source == null ? null : e.measured.source }; }
         else errors.push("rejected value for " + e.id);
       } else {
         const id = addRule(e);
@@ -480,9 +495,42 @@
         else errors.push("could not add rule " + e.id);
       }
     }
+    if (data.profile && typeof data.profile === "object" && data.profile.schema === PROFILE_SCHEMA) { profileInfo = data.profile; persist(); } // v3.59
     return { ok: errors.length === 0, applied: applied, added: added, errors: errors };
   }
 
+
+  // ------------------------------------------------------------------
+  // v3.59 the plant's own rates: a SITE PROFILE (wt-site-profile/v1, written by
+  // tools/fit_rates.py from recorded events and a trailer log) is an OVERLAY:
+  // only the fitted human-factors and delivery.site entries change, each
+  // stamped `measured` with its label "measured on <source>, n = ..." (shown
+  // above the teaching default); everything else stays; reset(id) / reset()
+  // restore the teaching value and drop the stamp. Aggregates per step and
+  // per trailer, never per person - the tool cannot be pointed at one.
+  // ------------------------------------------------------------------
+  const PROFILE_SCHEMA = "wt-site-profile/v1";
+  let profileInfo = null;
+  const fittable = (id) => isSeed(id) && (id.indexOf("hf.error.") === 0 || id.indexOf("delivery.site.") === 0);
+  function applyProfile(p) {
+    if (!p || typeof p !== "object" || p.schema !== PROFILE_SCHEMA || !p.values || typeof p.values !== "object") {
+      return { ok: false, error: "not a " + PROFILE_SCHEMA + " document", applied: 0, added: 0, measured: 0, skipped: [] };
+    }
+    const skipped = [];
+    let measured = 0;
+    for (const id of Object.keys(p.values)) {
+      const v = p.values[id];
+      if (!fittable(id)) { skipped.push(id + ": not a fittable entry (hf.error.* or delivery.site.*)"); continue; }
+      if (!v || typeof v.value !== "number" || !(v.n >= 1) || typeof v.label !== "string" || v.label.indexOf("measured on ") !== 0) { skipped.push(id + ": needs a numeric value, n >= 1 and a label starting with 'measured on'"); continue; }
+      if (!set(id, v.value)) { skipped.push(id + ": value " + v.value + " rejected (" + (validate(id, v.value).error || "out of range") + ")"); continue; }
+      store[id].measured = { label: v.label, n: v.n, source: typeof p.site === "string" && p.site ? p.site : (p.fitted_from && Array.isArray(p.fitted_from.documents) ? p.fitted_from.documents.join(", ") : null) };
+      measured++;
+    }
+    if (measured) profileInfo = { schema: p.schema, site: typeof p.site === "string" ? p.site : null, tool: typeof p.tool === "string" ? p.tool : null, fitted_from: p.fitted_from || null, measured: measured };
+    persist();
+    return { ok: skipped.length === 0 && measured > 0, applied: measured, added: 0, measured: measured, skipped: skipped, error: measured ? undefined : "no value applied" };
+  }
+  function profile() { return profileInfo ? JSON.parse(JSON.stringify(profileInfo)) : null; }
   // ------------------------------------------------------------------
   // Optional persistence (guarded). In Node harnesses window.localStorage
   // is absent, so the KB is purely in-memory there. In the browser, user
@@ -493,9 +541,9 @@
       const ls = window.localStorage;
       if (!ls) return;
       // Only persist a DELTA from defaults (edited seeds + custom rules).
-      const changed = list().filter((e) => !isSeed(e.id) || e.value !== defaults[e.id]);
-      if (!changed.length) { ls.removeItem(STORAGE_KEY); return; }
-      ls.setItem(STORAGE_KEY, JSON.stringify({ version: KB_VERSION, entries: changed }));
+      const changed = list().filter((e) => !isSeed(e.id) || e.value !== defaults[e.id] || e.measured); // v3.59: a measured value equal to the default keeps its stamp
+      if (!changed.length && !profileInfo) { ls.removeItem(STORAGE_KEY); return; }
+      ls.setItem(STORAGE_KEY, JSON.stringify(profileInfo ? { version: KB_VERSION, entries: changed, profile: profileInfo } : { version: KB_VERSION, entries: changed }));
     } catch (_) { /* storage unavailable / full - stay in-memory */ }
   }
   function loadPersisted() {
@@ -508,9 +556,10 @@
       if (!data || !Array.isArray(data.entries)) return;
       for (const e of data.entries) {
         if (!e || typeof e.id !== "string") continue;
-        if (isSeed(e.id)) set(e.id, e.value);
+        if (isSeed(e.id)) { if (set(e.id, e.value) && e.measured && typeof e.measured.label === "string") store[e.id].measured = { label: e.measured.label, n: e.measured.n, source: e.measured.source == null ? null : e.measured.source }; } // v3.59: the stamp survives a reload
         else addRule(e);
       }
+      if (data.profile && typeof data.profile === "object" && data.profile.schema === PROFILE_SCHEMA) profileInfo = data.profile;
     } catch (_) { /* ignore corrupt persisted state */ }
   }
 
@@ -535,6 +584,9 @@
     list: list,
     exportJson: exportJson,
     importJson: importJson,
+    applyProfile: applyProfile, // v3.59 the plant's own rates
+    profile: profile,
+    PROFILE_SCHEMA: PROFILE_SCHEMA,
     categories: meta.categories,
     // internal helpers exposed for the panel/tests
     isSeed: isSeed,

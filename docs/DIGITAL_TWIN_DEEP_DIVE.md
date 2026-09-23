@@ -306,7 +306,7 @@ What would move the app up Kritzinger's ladder, in the order it would have to ha
 3. **Asset identities (gap 7).** Registered GS1 prefixes instead of 4012345; element ids that survive a layout edit; an Asset Administration Shell submodel per machine with its nameplate and its measured cycle times as operational data. This needs an owner of the prefixes and of the register, which is not a software task.
 4. **Environment and documents.** Lighting and temperature as observable elements rather than as levers; work instructions and delivery notes as the documents ISO 23247 lists.
 5. **The graph.** Promote the routing model's operation lists to a directed graph, so that loops (replenishment, rework, re-slotting) are loops; then hold-and-release for blocked stock, the four grades of a return, and the empties counter-flow, each of which the routing model already names as not modelled.
-6. **People, still without persons.** Learning curves and fatigue per step and per shift, the remaining SPAR-H factors as levers, and — only with a works council's agreement and a legal basis — the day a real scanner's aggregate is allowed to replace a teaching value.
+6. **People, still without persons.** Learning curves and fatigue per step and per shift, the remaining SPAR-H factors as levers, and — only with a works council's agreement and a legal basis — the day a real scanner's aggregate is allowed to replace a teaching value. *The mechanics of that day shipped in v3.59 (`tools/fit_rates.py`, [SITE_PROFILE.md](SITE_PROFILE.md)): a site profile fitted from recorded events - aggregates per step and per trailer, labelled* measured on …, n = … *- loads as an overlay of the knowledge base; whether a plant may record such aggregates is still the works council's and the legal basis's question, not the tool's.*
 
 Nothing in that list requires abandoning the discipline of this repository: each step is a key that is absent by default, a harness that proves the collapse, and a label that says what is measured.
 
@@ -354,6 +354,7 @@ node verify_errors.js            # v3.54 human error, honestly
 node verify_delivery.js          # v3.55 delivery and shipping times in between
 node verify_control.js           # v3.56 the control tower
 node verify_epcis_import.js      # v3.58 the return path: a recorded EPCIS 2.0 document
+node verify_fit_rates.js         # v3.59 the plant's own rates: a site profile from recorded events
 node test/run-all.mjs            # every harness (ALL n HARNESSES PASSED)
 python -m unittest discover -s test -p 'test_*.py' -v
 python tools/scms_delivery.py --offline-check     # v3.55 the delivery aggregates agree with their twins

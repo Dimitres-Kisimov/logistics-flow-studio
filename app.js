@@ -2551,12 +2551,17 @@
     const g = (id, d) => { const v = WT.kb ? WT.kb.get(id) : undefined; return typeof v === "number" && isFinite(v) ? v : d; };
     const ds = WT.datasets && WT.datasets.scmsDelivery ? WT.datasets.scmsDelivery : null;
     const modes = ds ? ds.modes : [];
-    const mode = modes[Math.max(0, Math.min(modes.length - 1, Math.round(g("delivery.inbound.modeIndex", 3))))] || null;
-    const q = ds && mode ? ds.by_mode[mode].lateness_days : { min: 0, p10: 0, median: 0, p90: 0, max: 0 };
-    const scale = g("delivery.scaleTicksPerDay", 60);
+    // v3.59: a site profile (delivery.site.n > 0) replaces the dataset shape with the plant's own quantiles, in ticks (minutes)
+    const siteN = g("delivery.site.n", 0);
+    const site = siteN > 0 ? { min: g("delivery.site.latenessMin", 0), p10: g("delivery.site.latenessP10", 0), median: g("delivery.site.latenessMedian", 0), p90: g("delivery.site.latenessP90", 0), max: g("delivery.site.latenessMax", 0) } : null;
+    const mode = site ? "site" : modes[Math.max(0, Math.min(modes.length - 1, Math.round(g("delivery.inbound.modeIndex", 3))))] || null;
+    const q = site ? site : ds && mode ? ds.by_mode[mode].lateness_days : { min: 0, p10: 0, median: 0, p90: 0, max: 0 };
+    const scale = site ? 1 : g("delivery.scaleTicksPerDay", 60);
     const late = WT.flowsim.windowLateness(q, scale, 16);
     const nominal = g("delivery.transitTicks", 120);
-    const source = ds ? "USAID SCMS delivery history (aggregates, data/scms-delivery.json), mode " + mode + ", scaled " + scale + " ticks per day" : "no dataset loaded: every trailer on time";
+    const siteEntry = site && WT.kb ? WT.kb.entry("delivery.site.n") : null;
+    const source = site ? "site profile: " + (siteEntry && siteEntry.measured ? siteEntry.measured.label : "the site's trailer log, " + siteN + " trailers") + " (lateness in ticks = minutes, nearest-rank quantiles)"
+      : ds ? "USAID SCMS delivery history (aggregates, data/scms-delivery.json), mode " + mode + ", scaled " + scale + " ticks per day" : "no dataset loaded: every trailer on time";
     return {
       inbound: { periodTicks: g("delivery.inbound.periodTicks", 120), openTicks: g("delivery.inbound.openTicks", 30), lateness: late, mode: mode, scaleTicksPerDay: scale, source: source },
       outbound: { periodTicks: g("delivery.outbound.periodTicks", 240), promisedLeadTicks: g("delivery.promisedLeadTicks", 480), transit: late.map((v) => Math.max(0, nominal + v)), mode: mode, scaleTicksPerDay: scale, source: source + "; nominal transit " + nominal + " ticks plus the same lateness shape" },
@@ -5673,6 +5678,7 @@
           `<div class="kb-head"><span class="kb-label">${esc(e.label)}</span>` +
           `<span class="kb-cat">${esc(e.category)}</span>` +
           (edited ? '<span class="kb-badge">edited</span>' : "") +
+          (e.measured ? '<span class="kb-badge measured">measured</span>' : "") +
           (isSeed ? "" : '<span class="kb-badge custom">custom</span>') +
           "</div>" +
           '<div class="kb-edit">' +
@@ -5681,7 +5687,8 @@
           `<button class="btn small" id="kb-save-${i}" type="button">Save</button>` +
           `<button class="btn small ghost" id="kb-reset-${i}" type="button">Reset</button>` +
           "</div>" +
-          `<div class="kb-source"><span class="kb-src-label">Source:</span> ${esc(e.source)}</div>` +
+          (e.measured ? `<div class="kb-source kb-measured"><span class="kb-src-label">Measured:</span> ${esc(e.measured.label)}</div>` : "") +
+          `<div class="kb-source"><span class="kb-src-label">${e.measured ? "Teaching default:" : "Source:"}</span> ${esc(e.source)}</div>` +
           `<div class="kb-note">${esc(e.note)}</div>` +
           "</div>"
         );
@@ -5759,6 +5766,10 @@
           const res = WT.kb.importJson(text);
           if (!res.ok && !res.applied && !res.added) {
             toast("Import failed: " + (res.error || "unrecognised file") + ".", "warn");
+            return;
+          }
+          if (typeof res.measured === "number") { // v3.59: a site profile (an overlay; the fitted entries carry their measured label)
+            afterKbChange(`Site profile applied: ${res.measured} value(s) now measured on the plant's own record${res.skipped && res.skipped.length ? "; skipped " + res.skipped.join("; ") : ""}. The error and delivery what-ifs read them on the next run.`);
             return;
           }
           afterKbChange(`Imported knowledge base: ${res.applied} value(s) applied, ${res.added} custom rule(s) added${res.errors && res.errors.length ? ", " + res.errors.length + " skipped" : ""}.`);
@@ -10276,6 +10287,8 @@
       loadExample: loadExample,
       // v3.53: the tracking database (the live tracker and the store)
       tracking: { store: trackingStore, current: () => state.flow.track },
+      levers: { error: readErrorLevers, delivery: readDeliveryLevers }, // v3.59: the what-ifs' inputs as the knowledge base holds them
+      renderKnowledgeBase: renderKnowledgeBase,
       // v3.56: the control tower (the live tower and the audit log across runs)
       control: { current: () => state.flow.control, log: () => state.flow.controlLog, render: renderControlTower, revert: revertLastAccepted, lastRevertable: lastRevertable },
       runWmsOps: runWmsOps,

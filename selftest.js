@@ -3808,6 +3808,37 @@
         WT.kb && WT.kb.get("delivery.inbound.periodTicks") === 120 && WT.kb.get("delivery.otif.target") === 0.95;
       return { ok: ok, detail: "lateness " + late.join(",") + "; modes " + (DS ? DS.modes.length : 0) };
     });
+    // ---- v3.59 the plant's own rates: a site profile through the shipped import path (WT.kb.importJson) is an
+    // overlay - the fitted entries carry a measured label, the error what-if reads the measured share, the
+    // delivery what-if switches to the site quantiles (ticks = minutes; the first Weyl point is the minimum);
+    // reset restores the teaching values and the SCMS mode.
+    function renderKnowledgeBaseForTest() { if (API && typeof API.renderKnowledgeBase === "function") API.renderKnowledgeBase(); }
+    check("site-profile-measured-labels", function () {
+      if (!WT.kb || typeof WT.kb.applyProfile !== "function" || !API || !API.levers) return { ok: false, detail: "missing" };
+      var L = function (n, what) { return "measured on self-test plant, n = " + n + " " + what; };
+      var prof = { schema: "wt-site-profile/v1", site: "self-test plant", values: {
+        "hf.error.mis-pick": { value: 0.04, n: 50, label: L(50, "picking events (2 mismatch_class)") },
+        "delivery.site.n": { value: 10, n: 10, label: L(10, "trailers") }, "delivery.site.latenessMin": { value: -30, n: 10, label: L(10, "trailers") },
+        "delivery.site.latenessP10": { value: -30, n: 10, label: L(10, "trailers") }, "delivery.site.latenessMedian": { value: 0, n: 10, label: L(10, "trailers") },
+        "delivery.site.latenessP90": { value: 45, n: 10, label: L(10, "trailers") }, "delivery.site.latenessMax": { value: 90, n: 10, label: L(10, "trailers") } } };
+      var snapKb = WT.kb.exportJson(); // the user's own knowledge base is restored at the end of this check
+      WT.kb.reset();
+      var before = API.levers.delivery().inbound.mode;
+      var r = WT.kb.importJson(JSON.stringify(prof));
+      var e = WT.kb.entry("hf.error.mis-pick"), lev = API.levers.delivery(), err = API.levers.error();
+      var want = WT.flowsim.windowLateness({ min: -30, p10: -30, median: 0, p90: 45, max: 90 }, 1, 16);
+      var okApplied = r.ok && r.measured === 7 && !!e.measured && e.measured.label.indexOf("measured on self-test plant") === 0 && WT.kb.get("hf.error.mis-pick") === 0.04 && err["mis-pick"] === 0.04 &&
+        lev.inbound.mode === "site" && lev.inbound.scaleTicksPerDay === 1 && JSON.stringify(lev.inbound.lateness) === JSON.stringify(want) && lev.inbound.lateness[0] === -30 && /site profile: measured on self-test plant/.test(lev.inbound.source) &&
+        !!WT.kb.profile() && WT.kb.profile().site === "self-test plant";
+      renderKnowledgeBaseForTest();
+      var badge = $("kbList") && $("kbList").querySelector(".kb-badge.measured");
+      WT.kb.reset();
+      var after = WT.kb.entry("hf.error.mis-pick"), lev2 = API.levers.delivery();
+      var okReset = !after.measured && WT.kb.get("hf.error.mis-pick") === 0.02 && lev2.inbound.mode === before && before === "Truck" && WT.kb.profile() === null;
+      WT.kb.importJson(snapKb);
+      renderKnowledgeBaseForTest();
+      return { ok: okApplied && okReset && !!badge, detail: "applied " + r.measured + ", mode " + lev.inbound.mode + " -> " + lev2.inbound.mode + ", lateness[0] " + lev.inbound.lateness[0] + ", badge " + (badge ? "shown" : "missing") };
+    });
     // ---- v3.56: the control tower - on the hand floor (seed 31, the default mix; here the stations serve at the
     // floor's DECLARED capacities because wms.js is loaded, so the tick-140 fact of verify_control.js does not
     // apply) a threshold-1 tower proposes at the first evaluation that sees a queue, naming the element; declining

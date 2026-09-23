@@ -727,6 +727,7 @@ const HARNESSES = [
   { name: "Delivery and shipping times in between: dock and carrier windows, the Weyl / quantile lateness by hand, OTIF, the SCMS dataset twin, SQL == JS (verify_delivery.js)", args: ["verify_delivery.js"] },
   { name: "The control tower: four rules over the ledger by hand (tick 140 at stg; 0.22 -> 0.02; trailer 3 at 460; OTIF after 20), decisions and the audit, purity, SQL == JS (verify_control.js)", args: ["verify_control.js"] },
   { name: "The return path: a recorded EPCIS 2.0 document onto the twins' shape by hand (10 -> 11 events, ticks in minutes, the three CBV forms), refusals that say which, the store, Python twin lists equal (verify_epcis_import.js)", args: ["verify_epcis_import.js"] },
+  { name: "The plant's own rates: tools/fit_rates.py on a hand-designed record (0.04 / 0.05 / 0.05; nearest-rank -30 / 0 / 45 / 90), refusals, the knowledge base's measured labels and the site quantiles in the delivery what-if (verify_fit_rates.js)", args: ["verify_fit_rates.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 
