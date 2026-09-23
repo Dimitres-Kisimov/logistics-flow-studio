@@ -1,5 +1,34 @@
 # Changelog
 
+## v3.61 — The optional model mode: a language model beside the app, off by default
+
+**The runtime decision.** The page is offline by contract (`connect-src 'self'`, the offline guard, the
+service worker), so a model never runs inside it. `tools/ask_model.py` runs BESIDE the app over any
+OpenAI-compatible chat endpoint: a local server (Ollama, llama.cpp - the answer never leaves the
+machine) or a hosted API (the user's choice; the key from an environment variable, never on the
+command line, never stored or printed; a `NETWORK:` banner whenever the endpoint's host is not
+localhost). `tools/ask_cli.mjs` is the deterministic layer of v3.60 on the command line - the same
+modules the app loads, so its JSON is byte-identical to the drawer's and the viewer's answer; `--all`
+prints the twelve catalogue answers.
+
+**The two rules.** (1) The model never produces a number the deterministic layer did not: the evidence
+pack is the deterministic answer (text, the view rows it read, the sources) and, for a question outside
+the catalogue, every catalogue answer, so the model answers from the same views; the system prompt
+forbids any number of its own and any person; after the call a number guard checks every number in the
+prose against the evidence (as written, rounded no finer, the percent form of a share, without a sign)
+and REFUSES a prose with any other number - the deterministic answer is printed instead with the
+offending numbers named. (2) Every answer carries its evidence block: the output JSON holds the
+deterministic answer beside the prose, the mode (`model` or `deterministic`), the endpoint host and the
+network flag; the printed answer ends with the `Evidence:` and `Source:` lines. Off by default: without
+`--endpoint` nothing is called.
+
+**Verification.** `verify_model_mode.js` (the CLI equals `WT.ask`, `--all`, the usage; the dry run;
+the guard on a spawned Python; the page unchanged - CSP, no fetch, the cache pin unmoved, the v3.60
+answers; the rules written down), `test/test_ask_model.py` (+8 → 177: the guard by hand, the evidence
+pack and the prompt, the dry run, a mocked OpenAI-compatible endpoint on localhost accepted when it keeps
+to the evidence and refused when it invents a number, the key from the environment, the network flag and
+banner). `docs/MODEL_MODE.md`. No shipped app file changed; cache `wt-v139` stays.
+
 ## v3.60 — Ask the ledger: a deterministic question box over the views and the knowledge base
 
 **The module.** `ask.js` (`WT.ask.answer(question, { exp, kb })`): a rule-based matcher over a FIXED
