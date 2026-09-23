@@ -689,6 +689,7 @@ const HARNESSES = [
   { name: "Story Mode: cinematic guided tour plan + camera math (verify_story.js)", args: ["verify_story.js"] },
   { name: "User-definable object library (verify_library.js)", args: ["verify_library.js"] },
   { name: "The library shows what you place (verify_library_preview.js)", args: ["verify_library_preview.js"] },
+  { name: "A factory from an actual dataset: the NIST box-assembly cell (verify_nist_factory.js)", args: ["verify_nist_factory.js"] },
   { name: "Factory process model + deterministic line sim (verify_process.js)", args: ["verify_process.js"] },
   { name: "Multi-way proportional-flow routing (verify_flownet.js)", args: ["verify_flownet.js"] },
   { name: "Generated multi-way network + RPW balance on effective loads (verify_flowbalance.js)", args: ["verify_flowbalance.js"] },

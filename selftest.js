@@ -621,6 +621,21 @@
       var forms = !!G2 && G2.FORMS.indexOf("klt") >= 0 && G2.FORMS.indexOf("workpiece") >= 0 && types.every(function (t) { return G2.formForType(t) === "workpiece"; });
       return { ok: dom && din && reg && grp && ops && forms, detail: "domain=" + dom + " din=" + din + " registry=" + reg + " group=" + grp + " ops=" + ops + " forms=" + forms };
     });
+    // ---- v3.50: the dataset-backed example loads with its two measured cycle times.
+    check("nist-cell-example-loads-with-measured-cycles", function () {
+      if (!haveApi) return { ok: false, detail: "no test API" };
+      var DS = WT.datasets && WT.datasets.nistBoxAssembly;
+      if (!DS) return { ok: false, detail: "dataset twin not loaded" };
+      API.loadExample("nist-box-assembly-cell");
+      var p = API.state.process;
+      var measured = p ? p.operations.filter(function (o) { return /^measured:/.test(String(o.source)); }) : [];
+      var box = Math.round(DS.derived.hurco02_box_sum_of_medians_s), cp = Math.round(DS.derived.hurco04_cover_plus_plate_sum_of_medians_s);
+      var ok = !!p && p.operations.length === 6 && measured.length === 2 && measured[0].cycleSec === box && measured[1].cycleSec === cp;
+      var head = $("procHeadline");
+      var basis = head ? /Cycle times: 2 measured \(/.test(head.textContent) : false;
+      API.render();
+      return { ok: ok && basis, detail: p ? p.operations.map(function (o) { return o.kind + ":" + o.cycleSec; }).join(" ") + " basis=" + basis : "no process" };
+    });
     check("class-library-search-filters", function () {
       if (!haveApi || !API.library || typeof API.library.setSearch !== "function") return { ok: false, detail: "no setSearch API" };
       API.library.setSearch("conveyor");

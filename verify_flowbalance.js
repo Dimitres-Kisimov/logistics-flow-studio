@@ -83,8 +83,8 @@ console.log("Generated multi-way network + balance-on-effective-loads verificati
 console.log("");
 
 /* ---- 1. The new archetype exists, ADDITIVELY ---------------------------- */
-check("factoryProfiles gains " + QA_KEY + " (4 factory keys; the 4 warehouse keys untouched)",
-  !!G.factoryProfiles[QA_KEY] && Object.keys(G.factoryProfiles).length === 4 &&
+check("factoryProfiles gains " + QA_KEY + " (5 factory keys since v3.50; the 4 warehouse keys untouched)",
+  !!G.factoryProfiles[QA_KEY] && Object.keys(G.factoryProfiles).length === 5 &&
   Object.keys(G.plantProfiles).length === 4,
   Object.keys(G.factoryProfiles).join(", "));
 check(QA_KEY + " declares the flowNetwork recipe (60/40 split; named branches)",

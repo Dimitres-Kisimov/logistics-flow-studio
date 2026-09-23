@@ -306,6 +306,20 @@
       config: { factory: true, profile: "assembly-line", seed: 2606 },
       dataProfile: { skuCount: 40, dailyOrderLines: 900, throughputPerHour: 120, storagePositions: 60, dockCount: 2, automation: "conveyor-linked assembly line: machining feed -> assembly join -> QA/inspection -> pack; ~60 line-side WIP buffer positions", staffingFte: 24, peakFactor: 1.5 },
     },
+    {
+      // v3.50 A FACTORY FROM AN ACTUAL DATASET. The generated machining cell
+      // whose two machining cycle times are MEASURED on the NIST SMS Test Bed
+      // Box Assembly package (see docs/NIST_BOX_ASSEMBLY.md); everything else
+      // is a labelled teaching value. Not a real company; NIST implies no
+      // endorsement. Additive: every other scenario stays byte-identical.
+      id: "nist-box-assembly-cell",
+      name: "NIST box-assembly cell (measured machining run times)",
+      industry: "Discrete manufacturing / machining (public dataset)",
+      description:
+        "A machining cell whose two machining cycle times are measured on a public dataset: the NIST Smart Manufacturing Systems Test Bed's Box Assembly package (with the Manufacturing Technology Centre, UK) - twenty instances of a box, a cover and a plate machined on two Hurco VMX 24 vertical machining centres (test-bed ids Hurco02 and Hurco04). The layout is generated: a KLT source, the two machining centres, an assembly bench, a CMM first-article inspection station, a pack bench and a drain, conveyor-linked. The Box cycle and the Cover + Plate cycle are the medians of the usable MTConnect program run times per operation, summed per machine (the reduction rule is stated in the dataset file); assembly, inspection, demand and staffing are labelled teaching values. The two machines work in parallel in reality; the line model chains them, which overstates lead time but not throughput (the Box machine is the bottleneck either way). Acknowledgment to NIST; no endorsement is implied and the NIST logo is not used.",
+      config: { factory: true, profile: "nist-box-assembly", seed: 2017 },
+      dataProfile: { skuCount: 3, dailyOrderLines: 4, throughputPerHour: 0.5, storagePositions: 12, dockCount: 2, staffingFte: 3, peakFactor: 1.2, automation: "conveyor-linked machining cell: KLT source -> two Hurco VMX 24 machining centres (Box; Cover + Plate) -> assembly -> CMM first-article inspection -> pack (teaching values except the two measured machining cycles)", source: "NIST SMS Test Bed, github.com/usnistgov/smstestbed tdp/mtc (public-service notice; acknowledgment appreciated; no NIST logo)" },
+    },
   ];
 
   const BY_ID = {};
@@ -705,8 +719,12 @@
       syntheticLabel: SYNTHETIC_LABEL,
       complianceLabel: COMPLIANCE_LABEL,
     };
-
-    return { elements: els, config: config, meta: meta, gridW: W, gridH: H };
+    // v3.50: a dataset-backed profile's emitted process block and its provenance
+    // ride along (absent on every other example -> byte-identical builds).
+    if (gen.meta && gen.meta.dataset) meta.dataset = gen.meta.dataset;
+    const out = { elements: els, config: config, meta: meta, gridW: W, gridH: H };
+    if (gen.process) out.process = gen.process;
+    return out;
   }
 
   /* ------------------------------------------------------------------
@@ -812,7 +830,7 @@
    * ------------------------------------------------------------------ */
   function exportData(id) {
     const b = build(id);
-    return {
+    const obj = {
       version: SERIALIZE_VERSION,
       gridW: b.gridW,
       gridH: b.gridH,
@@ -827,6 +845,10 @@
         label: SYNTHETIC_LABEL,
       },
     };
+    // v3.50: the measured process block travels with the export (only a
+    // dataset-backed scenario has one; every other export is byte-identical).
+    if (b.process && window.WT && WT.process && typeof WT.process.embedInto === "function") WT.process.embedInto(obj, b.process);
+    return obj;
   }
 
   /* ------------------------------------------------------------------

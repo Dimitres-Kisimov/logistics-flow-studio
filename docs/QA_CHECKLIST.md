@@ -111,6 +111,12 @@ Convention below: `[ ]` to tick, **command** lines are copy-pasteable.
       engine / not a measurement" appear where relevant (About panel, reports,
       overlays).
 
+- [ ] **Dataset reduction fresh (v3.50)** — `python tools/nist_box_assembly.py --offline-check`
+      passes in the tests; before a release that touches the reduction, run
+      `python tools/nist_box_assembly.py --check` by hand (it fetches ~62 MB from
+      GitHub; never in CI) and commit what `reduce` writes. The NIST notice stays
+      verbatim; no NIST logo.
+
 ## 8. Licensing
 
 - [ ] **Proprietary license intact** — `LICENSE` is the "all rights reserved,

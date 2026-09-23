@@ -93,6 +93,7 @@
     drag: null, // {id, offsetX, offsetY, moved}
     preview: null, // optimizer proposal: [{id,type,x,y,w,d}] shown as ghosts
     hover: null, // v3.48 placement ghost: {type,x,y,w,d,ok,problem} while a tool is armed or dragged; never serialised
+    dataset: null, // v3.50 provenance of a dataset-backed generated line ({id,title,repo,commit,retrieved,rule}); never serialised
     complianceHighlight: null, // element ids highlighted from a Compliance Check finding
     showHeat: false, // pick-traffic heatmap overlay toggle
     // v1.12 realistic floor: the "Measurements" layer (edge scale ruler +
@@ -4673,7 +4674,21 @@
     if (def.standard && WT.library && typeof WT.library.standardText === "function") behaviour.push(row("Standard", WT.library.standardText(def.standard))); // v3.49
     // v3.48: what the type handles and its cycle - the same descriptor the Class Library card reads
     if (WT.goods && typeof WT.goods.formForType === "function") { const hf = WT.goods.formForType(el.type); if (hf) behaviour.push(row("Handles", String(hf).replace(/-/g, " "))); }
-    if (def.category !== "storage" && def.cycleSec > 0) behaviour.push(row("Cycle time", def.cycleSec + " s × " + (def.servers > 0 ? def.servers : 1) + " server" + ((def.servers > 0 ? def.servers : 1) > 1 ? "s" : "") + " (teaching value)"));
+    // v3.50: the operation this element carries in the factory line, with its provenance (measured on a dataset, or
+    // modelled). When an element is bound to an operation, the LINE cycle is the one that counts, so the type's
+    // default teaching cycle is not repeated above it.
+    const boundOp = state.process && Array.isArray(state.process.operations) ? state.process.operations.find((o) => o.elementId === el.id) : null;
+    if (!boundOp && def.category !== "storage" && def.cycleSec > 0) behaviour.push(row("Cycle time", def.cycleSec + " s × " + (def.servers > 0 ? def.servers : 1) + " server" + ((def.servers > 0 ? def.servers : 1) > 1 ? "s" : "") + " (teaching value)"));
+    if (boundOp) {
+      const op = boundOp;
+      if (op && op.kind !== "source" && op.kind !== "sink") {
+        const measured = /^measured:/.test(String(op.source || ""));
+        behaviour.push(row("Operation", op.name));
+        behaviour.push(row("Line cycle", op.cycleSec + " s × " + op.servers + " — " + (measured ? "measured" : "modelled")));
+        if (op.source) behaviour.push(row("Provenance", op.source));
+        if (measured && state.dataset) behaviour.push(row("Dataset", state.dataset.title + " (retrieved " + state.dataset.retrieved + ", commit " + String(state.dataset.commit).slice(0, 12) + ")"));
+      }
+    }
 
     // v3.20 FLUIDS-PERSIST: editable per-element fluid rate overrides in the
     // EXISTING Behaviour group (the grouped-Inspector pattern - no new
@@ -6148,6 +6163,7 @@
     }
     // v2.7 FACTORY-C: rebuild the optional `process` block from the layout
     // (present only for factory layouts; null for a warehouse layout).
+    state.dataset = null; // v3.50: a loaded file carries per-operation provenance (op.source), not a dataset
     state.process = (WT.process && typeof WT.process.rebuild === "function")
       ? WT.process.rebuild(obj) : null;
     state.procPreview = null; // v2.8 FACTORY-D: drop any stale optimiser preview
@@ -6932,6 +6948,7 @@
     state.preview = null;
     state.complianceHighlight = null;
     state.process = null; // drop any factory process block so it reads empty
+    state.dataset = null; // v3.50
     if (state.flow && state.flow.on) flowPause(); // cleanly stop any running flow anim (cancels its rAF)
     setFloorSize(w, h); // normalises, re-fits, syncs inputs, saves, renders
     renderProps();
@@ -7236,6 +7253,7 @@
       : (WT.process && typeof WT.process.derive === "function")
         ? WT.process.derive({ elements: state.elements, gridW: GRID_W, gridH: GRID_H, config: state.config }) : null;
     state.lastOptimize = null; // v3.3 A3: a freshly (re)built line has no accepted optimisation yet
+    state.dataset = gen.meta && gen.meta.dataset ? Object.assign({}, gen.meta.dataset) : null; // v3.50
     pushConfigToUI();
     syncFloorInputs();
     renderProps();
@@ -7322,6 +7340,17 @@
   }
   function procPct(v) { return Math.round((Number(v) || 0) * 100) + "%"; }
 
+  // v3.50: the factory panel's basis line. Byte-identical for every process
+  // without a measured operation; a dataset-backed line says how many cycle
+  // times are measured and on what, and how many are modelled.
+  function procBasisLine(block, m) {
+    const ops = (block && block.operations) || [];
+    const timed = ops.filter((o) => o.kind !== "source" && o.kind !== "sink");
+    const measured = timed.filter((o) => /^measured:/.test(String(o.source || "")));
+    if (!measured.length) return '<p class="proc-basis">Modelled, not measured; deterministic, teaching-scale. Basis: ' + esc(m.basis) + '.</p>';
+    const on = state.dataset && state.dataset.title ? state.dataset.title : "a public dataset";
+    return '<p class="proc-basis">Cycle times: ' + measured.length + ' measured (' + esc(on) + '), ' + (timed.length - measured.length) + ' modelled — line metrics modelled, deterministic, teaching-scale. Basis: ' + esc(m.basis) + '.</p>';
+  }
   function renderProcessPanel() {
     // v3.19 FLUIDS-FLOW: the fluids steady-state read-out lives in the SAME
     // card and refreshes with it (empty markup for a layout with no
@@ -7364,9 +7393,10 @@
       '<p class="proc-sub">Takt ' + procFmt(m.taktSec) + ' s · line efficiency ' + procPct(m.lineEfficiency) +
         ' · ' + m.stationsUsed + ' stations (theoretical min ' + m.theoreticalMinStations + ') · ' +
         (m.demandMet ? 'meets demand pace' : 'below demand pace') + '</p>' +
-      '<p class="proc-basis">Modelled, not measured; deterministic, teaching-scale. Basis: ' + esc(m.basis) + '.</p>';
+      procBasisLine(block, m);
 
     if (detail) {
+      const srcOf = (id) => { const o = block.operations.find((x) => x.id === id); return o && o.source ? String(o.source) : ""; }; // v3.50
       const bars = m.stations.map((s) => {
         const w = Math.max(0, Math.min(100, Math.round(s.utilisation * 100)));
         return '<div class="proc-bar-row' + (s.isBottleneck ? ' is-bottleneck' : '') + '">' +
@@ -7374,7 +7404,8 @@
           '<span class="proc-bar-track" title="Utilisation ' + w + '% (busy/available at the line pace)">' +
             '<span class="proc-bar-fill" style="width:' + w + '%"></span></span>' +
           '<span class="proc-bar-pct">' + w + '%</span>' +
-          '<label class="proc-cycle" title="Cycle time (s) per part — editable, modelled">' +
+          '<span class="proc-src" title="' + esc(srcOf(s.opId) || "modelled (editable)") + '">' + (/^measured:/.test(srcOf(s.opId)) ? "measured" : "modelled") + '</span>' + // v3.50
+          '<label class="proc-cycle" title="Cycle time (s) per part — editable">' +
             '<input type="number" min="1" max="3600" step="1" value="' + s.cycleSec + '" ' +
             'data-op="' + esc(s.opId) + '" class="proc-cycle-inp" ' +
             'aria-label="Cycle time in seconds for ' + esc(s.name) + '" /> s ×' + s.servers + '</label>' +

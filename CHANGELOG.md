@@ -1,5 +1,43 @@
 # Changelog
 
+## v3.50 — A factory from an actual dataset: the NIST box-assembly cell
+
+**The data.** `tools/nist_box_assembly.py` fetches the public NIST Smart Manufacturing
+Systems Test Bed *Box Assembly* logs (github.com/usnistgov/smstestbed, `tdp/mtc/Split`,
+184 MTConnect logs: Box, Cover, Plate × 20 instances on two Hurco VMX 24 machining centres)
+into a git-ignored cache and reduces them with ONE stated rule (leading stale samples
+dropped; the run time is the maximum of `Program_Runtime_Seconds`; a wall-clock span
+cross-check; unusable logs counted, never filled) into `data/nist-box-assembly.json`, its
+JS twin and `docs/NIST_BOX_ASSEMBLY.md`. `--check` re-fetches and compares (manual);
+`--offline-check` runs in the tests. The NIST notice is kept verbatim; no logo.
+
+**The cell.** Generator profile `nist-box-assembly` (`laneTypes`: two `cnc-mill`,
+`mfg-assembly` + `cmm-inspection`, `pack-station`; `dataset: "nistBoxAssembly"`) and
+`buildDatasetProcess`: a six-operation chain whose two machining cycles are the measured
+medians summed per machine (Box on Hurco02; Cover + Plate on Hurco04), with sources that
+name the dataset, the machine and the rule; assembly (240 s) and CMM inspection (600 s)
+are labelled teaching estimates, demand 4 boxes per shift a teaching value. Without the
+dataset twin the same geometry builds with no process block (the app derives its
+teaching chain). Example `nist-box-assembly-cell`; `buildFactory` and `exportData` carry
+the block and its provenance (`meta.dataset`). The four legacy profiles emit no
+`laneTypes` / `dataset` and build byte-identically (digests pinned).
+
+**The app.** `state.dataset` (never serialised); Inspector rows *Operation*, *Line
+cycle* (measured | modelled), *Provenance*, *Dataset*; the factory panel's basis line
+says "Cycle times: 2 measured (…), 2 modelled" and each row carries a measured /
+modelled chip with the source as its title. `data/nist-box-assembly.js` loads before
+`generate.js` and is precached.
+
+**Verification.** New `verify_nist_factory.js` (23 checks: the committed file's schema,
+notice, rule, ordered statistics, derived sums and JS twin; the profile, build,
+geometry, determinism, block, provenance strings, sanitize round-trip, metrics, dataset
+meta and the honest fallback; the example and its export; the ten unchanged digests;
+wiring) and `test/test_nist_box_assembly.py` (+9: the rule on inline samples and logs,
+the committed reduction, the renders, the offline check; the online check only with
+`WT_NIST_NETWORK`). Pins named: `verify_factory.js` and `verify_flowbalance.js` count
+five factory keys. App self-test +1 (`nist-cell-example-loads-with-measured-cycles`).
+77 harnesses, 129 Python tests, WT-SELFTEST 185/185 + viewer 31/31. Cache wt-v130.
+
 ## v3.49 — Standard types: a typed machine catalogue
 
 **The catalogue.** Nine machine types, each named by public standards: `cnc-mill` (3-axis

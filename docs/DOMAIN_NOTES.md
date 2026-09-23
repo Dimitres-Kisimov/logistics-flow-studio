@@ -327,3 +327,21 @@ specification and not a capacity claim; the one-MU-one-unit rule of the goods la
 - **Cycle times.** Every `cycleSec` of the catalogue is a labelled teaching value (editable
   in the Factory panel), never a vendor specification. Measured cycle times enter only
   through a dataset-backed scenario (see the run-ledger and dataset notes).
+
+## 11. The NIST box-assembly cell — a factory from an actual dataset (v3.50)
+
+**Dataset.** NIST Smart Manufacturing Systems Test Bed, *Box Assembly* package with the Manufacturing Technology Centre (UK): github.com/usnistgov/smstestbed, folder `tdp/mtc`; the `Split` folder holds one MTConnect log per part instance and operation (`Box-OP1-Hurco02-01of20.txt` …), pipe-delimited `timestamp|item|value`. Three parts (Box, Cover, Plate), twenty instances each, on two Hurco VMX 24 three-axis vertical machining centres (test-bed device ids Hurco02 and Hurco04; models as documented by NIST in AMS 200-2, not a vendor claim). Public-service notice kept verbatim in `data/nist-box-assembly.json` and `CREDITS.md`; acknowledgment appreciated; the NIST logo is not used.
+
+**Reduction rule** (`tools/nist_box_assembly.py`; recorded in the data file's `rule` field; the same text everywhere):
+
+1. Per log, take the `Program_Runtime_Seconds` samples in file order.
+2. Drop leading stale samples — a leading sample larger than its successor is the previous program's counter, still displayed before the new program started counting (`1500` then `0`; `1081` then `1`).
+3. The run time is the **maximum** of the remaining samples. The controller shows a single `0` at the 60 s mark and continues (`59, 0, 60, 61 …`); feed holds pause the counter, not the wall clock. The count of mid-run zeros and of logs with holds is recorded.
+4. Cross-check only: the wall-clock span from the first `ACTIVE` to the last `PROGRAM_COMPLETED` status must be ≥ run time − 5 s (the two are sampled independently). A log without that status pair, without a run-time sample, or failing the span check is **unusable** — counted with its reason, never filled in.
+5. Per (part, operation, machine): files, usable, min / median / max / mean, the worst span slack. The **median** is what the app uses; the two machining cycles of the cell are the medians summed per machine (`derived` in the file).
+
+**What the cell is.** The `nist-box-assembly` generator profile names its lanes (`laneTypes`: two `cnc-mill`; `mfg-assembly` + `cmm-inspection`; `pack-station`) and its dataset; `buildDatasetProcess` emits the six-operation chain Source → Hurco02 (Box OP1–OP5) → Hurco04 (Cover Op1–Op3 + Plate Op1–Op2) → assembly → CMM → Drain with the two measured cycles and two modelled ones (assembly 240 s, CMM 600 s — teaching estimates: the dataset has no assembly timing and its QIF inspection records carry no timings). Demand is a labelled teaching value (4 boxes per 8 h shift → takt 7 200 s; the Box machine's measured cycle is longer, so the panel honestly says the pace is not met). The assembly element is emitted as a plain *station* operation (one finished box per cycle); a later structural edit re-derives the chain with the domain's teaching cycles and the generic assembly semantics — the Inspector then reads *modelled*.
+
+**Honest limits.** Only the machining programs are timed; the run time is the program's running time, not a cycle with load / unload, set-up or tool changes between programs. The two machines run in parallel in reality and in sequence in this chain (lead time overstated, throughput not). The bed's other machines are named for context and not modelled. Nothing here is an endorsement by NIST, a benchmark of the machines, or a claim about any real plant.
+
+Register row: source NIST SMS Test Bed *Box Assembly* (public domain, public-service notice); use: measured machining run times as cycle times of two operations; reviewer: the author; date 2026-09-23.

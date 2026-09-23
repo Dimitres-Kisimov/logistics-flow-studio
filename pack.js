@@ -132,6 +132,7 @@
     "food-production-raw-finished": "cold-chain", "media-book-distribution": "ecommerce", "tools-hardware-branch": "spare-parts",
     "chemical-drum-store": "chemical", "tyre-storage-dc": "tyres", "mega-automated-fulfilment-plant": "ecommerce",
     "assembly-line-factory": "automotive",
+    "nist-box-assembly-cell": "automotive", // v3.50: a machined box in KLTs on an industrial pallet - the same generic industrial profile
   };
   const DEFAULT_PROFILE = "grocery-ambient";
   function profileFor(scenarioId) {

@@ -67,7 +67,9 @@ function check(name, ok, detail) {
 // pinned set and runs the SAME battery below (components/geometry/compliance/
 // determinism/part-flow); its emitted process block is covered in depth by
 // verify_flowbalance.js.
-const FACTORY_KEYS = ["assembly-line", "machining-shop", "general-factory", "machining-qa-split"];
+// v3.50: nist-box-assembly (the dataset-backed cell) joins the pinned set; its
+// measured process block is covered in depth by verify_nist_factory.js.
+const FACTORY_KEYS = ["assembly-line", "machining-shop", "general-factory", "machining-qa-split", "nist-box-assembly"];
 const ZONES = ["receiving", "storage", "picking", "packing", "shipping"];
 
 function overlapFree(els) {
@@ -102,8 +104,8 @@ console.log("");
 
 /* ---- 1. factoryProfiles has the 4 keys, SEPARATE from the 4 warehouse ---- */
 const fkeys = Object.keys(G.factoryProfiles || {});
-check("factoryProfiles has exactly the 4 pinned factory keys",
-  FACTORY_KEYS.every((k) => fkeys.indexOf(k) !== -1) && fkeys.length === 4, fkeys.join(", "));
+check("factoryProfiles has exactly the 5 pinned factory keys",
+  FACTORY_KEYS.every((k) => fkeys.indexOf(k) !== -1) && fkeys.length === 5, fkeys.join(", "));
 check("warehouse plantProfiles stays exactly the 4 keys (factory is a SEPARATE path)",
   Object.keys(G.plantProfiles).length === 4);
 check("generateFactoryLayout is exposed", typeof G.generateFactoryLayout === "function");

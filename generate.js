@@ -252,6 +252,28 @@
       summary:
         "a machining shop with a QA split: a machining/process feed lane, then the flow DIVIDES 60/40 into a QA fast lane and a QA deep-test lane and MERGES again into a pack-and-finish step to the Drain - the one factory baseline whose process block declares genuine multi-way routing (split ratios + merge), resolved and validated by the proportional-flow model",
     },
+    // v3.50 A FACTORY FROM AN ACTUAL DATASET: the NIST Smart Manufacturing
+    // Systems Test Bed "Box Assembly" cell. `laneTypes` names the components
+    // per lane (the four profiles above keep their machining / parallel /
+    // assembly / ... counts and stay byte-identical); `dataset` names the
+    // WT.datasets entry (data/nist-box-assembly.js, reduced by
+    // tools/nist_box_assembly.py) whose measured medians become the two
+    // machining cycle times in buildDatasetProcess. Without the dataset the
+    // build carries no process block and the app derives its teaching chain.
+    "nist-box-assembly": {
+      key: "nist-box-assembly",
+      label: "NIST box-assembly cell (measured machining run times)",
+      keywords: ["nist", "box assembly", "measured cycle times", "smstestbed", "hurco", "public dataset", "machining cell"],
+      machining: 0, parallel: 0, assembly: 1, dismantle: 0, qa: 0, packing: 1,
+      laneTypes: [["cnc-mill", "cnc-mill"], ["mfg-assembly", "cmm-inspection"], ["pack-station"]],
+      dataset: "nistBoxAssembly",
+      docksIn: 1, docksOut: 1,
+      gridW: 44, gridH: 26,
+      strategy: "batch", orders: 12, skuCount: 3, flowMode: "pull", demandSkew: 1.0,
+      automation: "conveyor-linked machining cell: KLT source -> two Hurco VMX 24 machining centres (Box; Cover + Plate) -> assembly -> CMM first-article inspection -> pack",
+      summary:
+        "a machining cell modelled on the NIST Smart Manufacturing Systems Test Bed Box Assembly: blanks arrive in a KLT at a Source, a Box is machined on one Hurco VMX 24 (Box OP1-OP5) and a Cover and a Plate on a second (Cover Op1-Op3, Plate Op1-Op2), the three parts are assembled, first-article inspected on a CMM and packed, then leave at a Drain",
+    },
   };
 
   /* ------------------------------------------------------------------
@@ -655,7 +677,10 @@
     // Lane 1: machining / process feed (+ a parallel station for the slow
     // step). Zone "storage" (early-line processing; the flow spine's storage
     // waypoint). Leave the right 3 cols for the right turn.
-    const machiningTypes = repeatTypes("mfg-station", profile.machining)
+    // v3.50: a profile that NAMES its lane components (laneTypes) uses them as
+    // they are; the count-based profiles take the exact legacy path below.
+    const laneTypes = Array.isArray(profile.laneTypes) && profile.laneTypes.length === 3 ? profile.laneTypes : null;
+    const machiningTypes = laneTypes ? laneTypes[0].slice() : repeatTypes("mfg-station", profile.machining)
       .concat(repeatTypes("mfg-parallel-station", profile.parallel));
     const lane1Els = layLane(machiningTypes, pad, gridW - pad - 3, lane0Band, lane0Spine, "storage");
     // Right turn: a curved conveyor (belt from the left turns down).
@@ -667,7 +692,7 @@
     // v3.18 FLOW-GEN: a profile with `qaBranch` lays that many plain QA
     // branch stations here instead (the two arms of the declared split);
     // absent on the 3 legacy profiles -> their lane is byte-identical.
-    const assemblyTypes = repeatTypes("mfg-assembly", profile.assembly)
+    const assemblyTypes = laneTypes ? laneTypes[1].slice() : repeatTypes("mfg-assembly", profile.assembly)
       .concat(repeatTypes("mfg-dismantle", profile.dismantle))
       .concat(repeatTypes("mfg-station", profile.qaBranch || 0));
     const lane2Els = layLane(assemblyTypes, pad + 3, gridW - pad, lane1Band, lane1Spine, "picking");
@@ -678,7 +703,7 @@
     // Lane 3: QA/inspection (a process station) + pack stations. Zone
     // "packing" (the flow spine's packing waypoint). Leave the right cols
     // clear for the Drain + shipping dock.
-    const finishTypes = repeatTypes("mfg-station", profile.qa)
+    const finishTypes = laneTypes ? laneTypes[2].slice() : repeatTypes("mfg-station", profile.qa)
       .concat(repeatTypes("pack-station", profile.packing));
     const lane3Els = layLane(finishTypes, pad, gridW - pad - 4, lane2Band, lane2Spine, "packing");
 
@@ -706,6 +731,12 @@
         drain: drainEl,
       });
     }
+
+    // v3.50: a dataset-backed profile emits its block from the measured medians.
+    if (!procBlock && profile.dataset) {
+      procBlock = buildDatasetProcess(profile, { source: srcEl, lane1: lane1Els, lane2: lane2Els, drain: drainEl });
+    }
+    const dsMeta = procBlock && profile.dataset ? datasetMeta(profile.dataset) : null;
 
     // Zones (bounding boxes; reuse the shared builder) + safety asserts.
     const zones = buildZones(els, gridW, gridH, reserve);
@@ -744,12 +775,13 @@
       reserved: reserve.slice(),
       counts: counts,
       stationCount: stations,
-      summary: plainFactorySummary(profile, seed, gridW, gridH, reserve, counts, stations, !!procBlock),
+      summary: plainFactorySummary(profile, seed, gridW, gridH, reserve, counts, stations, !!procBlock && !!profile.flowNetwork, dsMeta),
     };
+    if (dsMeta) meta.dataset = dsMeta; // v3.50: provenance rides with the build (absent on every other profile)
     // v3.18 FLOW-GEN: `process` + `meta.multiway` appear ONLY when the
     // profile emitted a flow-network block - a legacy build's JSON carries
     // neither key, so it stays byte-identical to pre-v3.18 output.
-    if (procBlock) meta.multiway = true;
+    if (procBlock && profile.flowNetwork) meta.multiway = true; // v3.50: a dataset block is a plain chain, not multi-way
 
     const out = { elements: els, config: config, meta: meta, gridW: gridW, gridH: gridH };
     if (procBlock) out.process = procBlock;
@@ -853,6 +885,65 @@
     return block;
   }
 
+
+  /* ==================================================================
+   * v3.50 buildDatasetProcess(profile, refs) - the process block of a
+   * DATASET-BACKED profile. The two machining operations take their cycle
+   * times from the measured medians the reduction tool committed
+   * (WT.datasets[profile.dataset].derived); assembly, inspection and demand
+   * have no timing in the dataset and are labelled teaching values. Pure;
+   * null when the dataset twin is not loaded or an element is missing (the
+   * app then derives its teaching chain honestly). The two machines work in
+   * parallel in reality; this chain models them in sequence, which overstates
+   * lead time but not throughput (the bottleneck is the larger cycle either
+   * way) - said so in the summary and the docs.
+   * ================================================================== */
+  function datasetOf(name) {
+    const DS = (typeof WT !== "undefined" && WT.datasets) ? WT.datasets[name] : null;
+    return DS && DS.schema === "wt-dataset-1" && DS.derived && DS.source ? DS : null;
+  }
+  function datasetMeta(name) {
+    const DS = datasetOf(name);
+    if (!DS) return null;
+    return { id: DS.id, title: DS.title, repo: DS.source.repo, commit: String(DS.source.commit), retrieved: String(DS.source.retrieved), rule: DS.rule };
+  }
+  function buildDatasetProcess(profile, refs) {
+    const DS = profile && profile.dataset ? datasetOf(profile.dataset) : null;
+    if (!DS || !refs || !refs.source || !refs.drain) return null;
+    const mills = (refs.lane1 || []).filter((e) => e.type === "cnc-mill");
+    const asm = (refs.lane2 || []).find((e) => e.type === "mfg-assembly") || null;
+    const cmm = (refs.lane2 || []).find((e) => e.type === "cmm-inspection") || null;
+    const box = Number(DS.derived.hurco02_box_sum_of_medians_s);
+    const cp = Number(DS.derived.hurco04_cover_plus_plate_sum_of_medians_s);
+    if (mills.length !== 2 || !asm || !cmm || !(box > 0) || !(cp > 0)) return null;
+    const cite = "measured: " + DS.title + " (" + DS.source.repo + ", " + DS.source.path + ", commit " + String(DS.source.commit).slice(0, 12) + ", retrieved " + DS.source.retrieved + ") - ";
+    const mkOp = (el, name, kind, cycle, source) => ({
+      id: "op-" + el.id, name: name, elementId: el.id, kind: kind,
+      cycleSec: kind === "station" ? Math.max(1, Math.round(cycle)) : 0, servers: 1, source: source,
+    });
+    const operations = [
+      mkOp(refs.source, "Blanks in (KLT)", "source", 0, "endpoint (not timed)"),
+      mkOp(mills[0], "Hurco02 - Box OP1-OP5", "station", box, cite + "Box OP1-OP5 on Hurco02 (Hurco VMX 24 #2): median run time of the usable logs per operation, summed"),
+      mkOp(mills[1], "Hurco04 - Cover Op1-Op3 + Plate Op1-Op2", "station", cp, cite + "Cover Op1-Op3 and Plate Op1-Op2 on Hurco04 (Hurco VMX 24 #4): median run time of the usable logs per operation, summed"),
+      mkOp(asm, "Box assembly (Box + Cover + Plate)", "station", 240, "modelled (teaching estimate: the dataset has no assembly timing; one finished box per cycle; editable)"),
+      mkOp(cmm, "First-article inspection (CMM)", "station", 600, "modelled (teaching estimate: the dataset holds QIF inspection records without timings; editable)"),
+      mkOp(refs.drain, "Finished boxes out", "sink", 0, "endpoint (not timed)"),
+    ];
+    const precedence = [], routing = [];
+    for (let i = 0; i < operations.length - 1; i++) {
+      precedence.push([operations[i].id, operations[i + 1].id]);
+      routing.push({ from: operations[i].id, to: operations[i + 1].id, unitsPerHr: 1 });
+    }
+    return {
+      version: "wt-proc-1",
+      shiftSec: 28800,   // an 8 h shift (editable)
+      demandPerShift: 4, // a labelled TEACHING demand: four boxes per shift -> takt 7 200 s (editable)
+      operations: operations,
+      precedence: precedence,
+      routing: routing,
+    };
+  }
+
   function assertInBounds(els, gridW, gridH) {
     for (const e of els) {
       if (e.x < 0 || e.y < 0 || e.x + e.w > gridW || e.y + e.d > gridH) {
@@ -861,7 +952,7 @@
     }
   }
 
-  function plainFactorySummary(profile, seed, gridW, gridH, reserve, counts, stations, multiway) {
+  function plainFactorySummary(profile, seed, gridW, gridH, reserve, counts, stations, multiway, dataset) {
     let s =
       "Generated " + profile.summary + " on a " + gridW + "x" + gridH + " m floor " +
       "(seed " + seed + "). Automation: " + profile.automation + ". " +
@@ -880,6 +971,10 @@
     s += " Illustrative synthetic production layout - a deterministic procedural build, " +
       "NOT a validated process plan and NOT CAD/BIM. Checked against the same ASR/DIN " +
       "guidance as the rest of the app (informed by, NOT certified).";
+    // v3.50: only a dataset-backed profile ever passes `dataset`, so every other summary is byte-identical.
+    if (dataset) {
+      s += " Machining cycle times MEASURED on a public dataset (" + dataset.title + ", retrieved " + dataset.retrieved + "); assembly, inspection, demand and staffing are labelled teaching values; the two machines run in parallel in reality and in sequence in this chain (lead time overstated, throughput not).";
+    }
     return s;
   }
 
@@ -1073,6 +1168,8 @@
   }
 
   WT.generate = {
+    buildDatasetProcess: buildDatasetProcess, // v3.50
+    datasetMeta: datasetMeta, // v3.50
     VERSION: GENERATOR_VERSION,
     SERIALIZE_VERSION: SERIALIZE_VERSION,
     ZONE_KEYS: ZONE_KEYS,
