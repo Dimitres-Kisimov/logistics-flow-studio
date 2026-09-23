@@ -45,7 +45,7 @@
  *  10.  NO INPUT MUTATION: resolving, planning and stepping never touch
  *       the caller's layout, mix or opts.
  *  11.  SHIPPED WIRING: routing.js is loaded by index.html before
- *       flowsim.js, precached by sw.js at the bumped wt-v132 cache, and
+ *       flowsim.js, precached by sw.js at the bumped wt-v133 cache, and
  *       listed by test/run-all.mjs.
  *
  * Deterministic + ASCII-only. Exit code 0 = all green.
@@ -691,9 +691,9 @@ const BARE = bareFloor();
   const iApp = INDEX_SRC.indexOf('<script src="app.js">');
   check("11a. index.html loads routing.js BEFORE flowsim.js and before app.js",
     iRouting > 0 && iFlow > iRouting && iApp > iFlow);
-  check("11b. sw.js precaches ./routing.js at the bumped wt-v132 cache (trail preserved: previously wt-v131)",
-    /["']\.\/routing\.js["']/.test(SW_SRC) && /CACHE_VERSION\s*=\s*"wt-v132"/.test(SW_SRC) &&
-    /Previously wt-v131/.test(SW_SRC));
+  check("11b. sw.js precaches ./routing.js at the bumped wt-v133 cache (trail preserved: previously wt-v132)",
+    /["']\.\/routing\.js["']/.test(SW_SRC) && /CACHE_VERSION\s*=\s*"wt-v133"/.test(SW_SRC) &&
+    /Previously wt-v132/.test(SW_SRC));
   check("11c. test/run-all.mjs lists verify_routing.js",
     /verify_routing\.js/.test(RUNALL_SRC));
   check("11d. the in-browser self-test covers the routing engine",

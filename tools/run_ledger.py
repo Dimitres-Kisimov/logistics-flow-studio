@@ -37,9 +37,10 @@ CREATE TABLE IF NOT EXISTS run(
   id TEXT PRIMARY KEY NOT NULL, scenario TEXT NOT NULL, seed INTEGER NOT NULL, hash TEXT, mix TEXT,
   profile TEXT, ticks_per_hour INTEGER NOT NULL, minutes_per_tick REAL NOT NULL, ticks INTEGER NOT NULL, honesty TEXT,
   dataset_source TEXT, dataset_orders INTEGER, dataset_lines INTEGER, dataset_skus INTEGER,
-  policy TEXT);
+  policy TEXT, errors TEXT);
 -- run.dataset_*: v3.44, the order pool's provenance (NULL for a synthetic stream);
--- run.policy: v3.45, the adaptive-staffing what-if as JSON (NULL when the run had none).
+-- run.policy: v3.45, the adaptive-staffing what-if as JSON (NULL when the run had none);
+-- run.errors: v3.54, the human-error what-if as JSON (NULL when the run had none).
 -- (No trailing comment before a closing parenthesis: ALTER TABLE ... DROP COLUMN rewrites that text.)
 -- v3.45 the staffing changes the what-if made (one row per change at a bench)
 CREATE TABLE IF NOT EXISTS staffing_event(
@@ -61,6 +62,7 @@ CREATE TABLE IF NOT EXISTS hu(
   final_pallets INTEGER, final_cases INTEGER, final_eaches INTEGER, final_parcels INTEGER, final_form TEXT,
   final_retained INTEGER, final_scrapped INTEGER,
   order_ref TEXT, sku TEXT, line_qty INTEGER,  -- v3.44: the order line as the file gave it, NULL for a synthetic stream
+  error_kind TEXT, error_op TEXT, error_outcome TEXT, error_latent TEXT,  -- v3.54: the declared error this unit's branch realised (NULL on a perfect route)
   CHECK(retired_tick IS NULL OR retired_tick >= spawned_tick), UNIQUE(run_id, sscc));
 CREATE TABLE IF NOT EXISTS handling_event(
   id TEXT PRIMARY KEY NOT NULL, hu_id TEXT NOT NULL REFERENCES hu(id) ON DELETE CASCADE,
@@ -97,7 +99,7 @@ CREATE TABLE IF NOT EXISTS tracking_event(
   biz_step TEXT NOT NULL, disposition TEXT NOT NULL, read_point TEXT, read_element TEXT NOT NULL, biz_location TEXT,
   biz_transaction_type TEXT NOT NULL, biz_transaction TEXT NOT NULL, epc TEXT, parent_id TEXT, epc_class TEXT NOT NULL,
   quantity INTEGER NOT NULL, uom TEXT NOT NULL DEFAULT 'EA', wt_kind TEXT NOT NULL, wt_op TEXT NOT NULL,
-  error_kind TEXT, error_step TEXT, error_latent TEXT);
+  error_kind TEXT, error_step TEXT, error_latent TEXT, error_detected INTEGER);
 CREATE INDEX IF NOT EXISTS ix_tracking_hu ON tracking_event(hu_id, version);
 CREATE INDEX IF NOT EXISTS ix_tracking_step ON tracking_event(run_id, biz_step);
 """
@@ -482,6 +484,26 @@ UNION ALL
 SELECT t.run_id, t.handling_event_id, 'disposition ' || t.disposition FROM tracking_event t
 WHERE t.disposition NOT IN ('in_progress','returned','in_transit','sellable_accessible','sellable_not_accessible','non_sellable_other','mismatch_class','damaged');"""
 TRACKING_VIEWS = ("v_epcis_events", "v_unit_history", "v_bizstep_dwell", "v_tracking_gaps")
+
+# ---- v3.54 quality by step (ISO 22400-2 names) ----------------------------------------------
+# Per operation: units through = distinct units with a non-queued handling event at the step;
+# errors = those whose declared error (hu.error_op) is this step - realised when they passed it;
+# reworked / scrapped by the error's outcome; first pass yield = (through - errors) / through,
+# rework ratio, scrap ratio. The same definition as ledger.js qualityByStep (reconciled). Rows
+# for every operation with a unit through; errors 0 on a run without the what-if. The shares
+# belong to a step, never to a person: no column here names one.
+VIEWS["v_quality_by_step"] = """
+CREATE VIEW IF NOT EXISTS v_quality_by_step AS
+WITH t AS (SELECT h.run_id, e.op, e.hu_id FROM handling_event e JOIN hu h ON h.id = e.hu_id WHERE e.kind <> 'queued' GROUP BY h.run_id, e.op, e.hu_id),
+     u AS (SELECT t.run_id, t.op, t.hu_id, h.error_op, h.error_outcome FROM t JOIN hu h ON h.id = t.hu_id)
+SELECT run_id, op, COUNT(*) AS units_through,
+       SUM(CASE WHEN error_op = op THEN 1 ELSE 0 END) AS errors,
+       SUM(CASE WHEN error_op = op AND error_outcome = 'rework' THEN 1 ELSE 0 END) AS reworked,
+       SUM(CASE WHEN error_op = op AND error_outcome = 'scrap' THEN 1 ELSE 0 END) AS scrapped_for_damage,
+       ROUND((COUNT(*) - SUM(CASE WHEN error_op = op THEN 1 ELSE 0 END)) * 1.0 / COUNT(*), 4) AS first_pass_yield,
+       ROUND(SUM(CASE WHEN error_op = op AND error_outcome = 'rework' THEN 1 ELSE 0 END) * 1.0 / COUNT(*), 4) AS rework_ratio,
+       ROUND(SUM(CASE WHEN error_op = op AND error_outcome = 'scrap' THEN 1 ELSE 0 END) * 1.0 / COUNT(*), 4) AS scrap_ratio
+FROM u GROUP BY run_id, op;"""
 # Student's t, two-sided 95 % (0.975 quantile) for df 1..30 - standard tables; df > 30 uses 1.960.
 T975 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
         11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086,
@@ -490,7 +512,7 @@ T975 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8
 
 INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations", "v_tracking_gaps")
 PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
-                 "v_cost_by_type", "v_cost_by_location", "v_flow_links", "v_staffing", "v_bizstep_dwell")
+                 "v_cost_by_type", "v_cost_by_location", "v_flow_links", "v_staffing", "v_bizstep_dwell", "v_quality_by_step")
 DETAIL_VIEWS = ("v_wip_by_tick", "v_spans", "v_span_cost", "v_cost_by_hu", "v_dispatch_by_order", "v_epcis_events", "v_unit_history")  # long or per-row views: `views --all`
 COMPARE_VIEWS = ("v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost")
 
@@ -520,6 +542,8 @@ def initialize(db: sqlite3.Connection) -> None:
         ("run", "dataset_source", "TEXT"), ("run", "dataset_orders", "INTEGER"), ("run", "dataset_lines", "INTEGER"), ("run", "dataset_skus", "INTEGER"),
         ("hu", "order_ref", "TEXT"), ("hu", "sku", "TEXT"), ("hu", "line_qty", "INTEGER"),
         ("run", "policy", "TEXT"),  # v3.45
+        ("run", "errors", "TEXT"), ("hu", "error_kind", "TEXT"), ("hu", "error_op", "TEXT"), ("hu", "error_outcome", "TEXT"), ("hu", "error_latent", "TEXT"),  # v3.54
+        ("tracking_event", "error_detected", "INTEGER"),  # v3.54
     ):
         try:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {typ}")
@@ -562,12 +586,13 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
         ds = run.get("dataset") or {}
         db.execute(
             "INSERT INTO run(id, scenario, seed, hash, mix, profile, ticks_per_hour, minutes_per_tick, ticks, honesty, "
-            "dataset_source, dataset_orders, dataset_lines, dataset_skus, policy) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+            "dataset_source, dataset_orders, dataset_lines, dataset_skus, policy, errors) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
             run["id"], run["scenario"], int(run["seed"]), run.get("hash"),
             json.dumps(run.get("mix"), sort_keys=True) if run.get("mix") is not None else None,
             run.get("profile"), int(run["ticks_per_hour"]), float(run["minutes_per_tick"]), int(run["ticks"]), run.get("honesty"),
             ds.get("source"), ds.get("orders"), ds.get("lines"), ds.get("skus"),
-            json.dumps(run.get("policy"), sort_keys=True) if run.get("policy") is not None else None))
+            json.dumps(run.get("policy"), sort_keys=True) if run.get("policy") is not None else None,
+            json.dumps(run.get("errors"), sort_keys=True) if run.get("errors") is not None else None))
         db.executemany("INSERT INTO staffing_event(run_id, tick, location_id, servers) VALUES(?,?,?,?)", [
             (run["id"], int(s["tick"]), str(s["location_id"]), int(s["servers"])) for s in data.get("staffing") or []])
         prof = data.get("profile")
@@ -597,12 +622,14 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
             db.execute(
                 "INSERT INTO hu(id, run_id, order_id, seq, archetype, outcome, route_id, sscc, gtin13, gtin14, pallet, box, eaches_per_case, "
                 "cases_per_pallet, received_eaches, spawned_tick, retired_tick, final_kind, final_pallets, final_cases, final_eaches, final_parcels, "
-                "final_form, final_retained, final_scrapped, order_ref, sku, line_qty) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+                "final_form, final_retained, final_scrapped, order_ref, sku, line_qty, error_kind, error_op, error_outcome, error_latent) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
                 h["id"], run["id"], h["order_id"], int(h["seq"]), h["archetype"], h.get("outcome"), h["route_id"],
                 h["sscc"], h["gtin13"], h["gtin14"], h.get("pallet"), h.get("box"), h.get("eaches_per_case"), h.get("cases_per_pallet"),
                 int(h["received_eaches"]), int(h["spawned_tick"]), h.get("retired_tick"), h.get("final_kind"),
                 f.get("pallets"), f.get("cases"), f.get("eaches"), f.get("parcels"), f.get("form"), f.get("retained"), f.get("scrapped"),
-                h.get("order_ref"), h.get("sku"), h.get("line_qty")))
+                h.get("order_ref"), h.get("sku"), h.get("line_qty"),
+                h.get("error_kind"), h.get("error_op"), h.get("error_outcome"), json.dumps(h.get("error_latent")) if h.get("error_latent") is not None else None))
         db.executemany("INSERT INTO handling_event VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [(
             e["id"], e["hu_id"], int(e["version"]), e["kind"], e["op"], e.get("anchor"), e["location"], int(e["tick"]), float(e["minute"]),
             e.get("stage"), e.get("form"), int(e["pallets"]), int(e["cases"]), int(e["eaches"]), int(e["parcels"]), int(e["retained"]), int(e["scrapped"]))
@@ -637,6 +664,9 @@ TRACK_OPS = {
 }
 TRACK_TERMINAL = {"delivered": ("shipping", "in_transit", "OBSERVE"), "restocked": ("stocking", "sellable_accessible", "OBSERVE"),
                   "scrapped": ("destroying", "non_sellable_other", "DELETE")}
+# v3.54 the declared error of a unit: the disposition its kind names (tracking.js ERROR_DISPOSITION) and the detection steps
+ERROR_DISPOSITION = {"mis-pick": "mismatch_class", "wrong-putaway": "sellable_not_accessible", "damage": "damaged"}
+VERIFY_OPS = ("verify-pick", "verify-put")
 
 
 def fnv1a(text: str) -> int:
@@ -699,8 +729,18 @@ def _track_twin(e: dict, h: dict, st: dict) -> dict:
     elif e["kind"] != "queued":
         if aggregation:
             event_type, action, agg = "AggregationEvent", aggregation, True
-        if arrival_disp:
+        if arrival_disp and st["disposition"] != "damaged":  # a damaged unit stays damaged until it is destroyed
             disp = arrival_disp
+    error = None
+    if h.get("error_op") and e["kind"] != "queued" and not term:
+        if not st["errored"] and e["op"] == h["error_op"]:
+            st["errored"] = True
+            disp = ERROR_DISPOSITION.get(h.get("error_kind"), "non_sellable_other")
+            error = {"kind": h.get("error_kind"), "step": h["error_op"], "detected": h.get("error_outcome") == "scrap", "latent": list(h.get("error_latent") or [])}
+        elif st["errored"] and not st["detected"] and e["op"] in VERIFY_OPS:
+            st["detected"] = True
+            disp = "in_progress"
+            error = {"kind": h.get("error_kind"), "step": h["error_op"], "detected": True, "latent": list(h.get("error_latent") or [])}
     st["disposition"] = disp
     ev: dict = {"eventID": f"urn:wt:evt:{e['id']}", "type": event_type, "action": action, "eventTime": None,
                 "wt:tick": e["tick"], "wt:minute": e["minute"], "wt:kind": e["kind"], "wt:op": e["op"], "wt:hu_id": e["hu_id"], "wt:version": e["version"]}
@@ -724,7 +764,7 @@ def _track_twin(e: dict, h: dict, st: dict) -> dict:
     ev["bizTransactionList"] = [{"type": "rma" if h["archetype"] == "returns" else "po", "bizTransaction": h["order_id"]}]
     if h.get("order_ref") is not None:
         ev["bizTransactionList"].append({"type": "wt:order_ref", "bizTransaction": str(h["order_ref"])})
-    ev["wt:error"] = None
+    ev["wt:error"] = error
     ev["wt:delivery"] = None
     return ev
 
@@ -738,7 +778,7 @@ def track_events(data: dict) -> list[dict]:
         h = hus.get(e["hu_id"])
         if h is None:
             continue
-        st = state.setdefault(h["id"], {"disposition": "returned" if h["archetype"] == "returns" else "in_progress"})
+        st = state.setdefault(h["id"], {"disposition": "returned" if h["archetype"] == "returns" else "in_progress", "errored": False, "detected": False})
         out.append(_track_twin(e, h, st))
     return out
 
@@ -754,13 +794,14 @@ def tracking_row(run_id: str, ev: dict) -> tuple:
             ev["type"], ev["action"], ev["bizStep"], ev["disposition"], rp.get("id"), rp.get("wt:element") or f"zone:{rp.get('wt:zone')}",
             ev["bizLocation"]["id"] if ev.get("bizLocation") else None, bt["type"], bt["bizTransaction"],
             None if agg else ev["epcList"][0], ev.get("parentID") if agg else None, q["epcClass"], int(q["quantity"]), q.get("uom") or "EA",
-            ev["wt:kind"], ev["wt:op"], err.get("kind"), err.get("step"), json.dumps(err.get("latent"), sort_keys=True) if err.get("latent") is not None else None)
+            ev["wt:kind"], ev["wt:op"], err.get("kind"), err.get("step"), json.dumps(err.get("latent"), sort_keys=True) if err.get("latent") is not None else None,
+            (1 if err.get("detected") else 0) if err else None)
 
 
 def derive_tracking(db: sqlite3.Connection, run_id: str, data: dict) -> int:
     """Insert the run's tracking twins (the handling events must already be in). Returns the count."""
     rows_ = [tracking_row(run_id, ev) for ev in track_events(data)]
-    db.executemany("INSERT INTO tracking_event VALUES(" + ",".join("?" * 26) + ")", rows_)
+    db.executemany("INSERT INTO tracking_event VALUES(" + ",".join("?" * 27) + ")", rows_)
     return len(rows_)
 
 
@@ -902,6 +943,7 @@ RECONCILE_KEYS = {
     "v_cost_by_hu": ("hu_id",), "v_cost_by_type": ("archetype",), "v_cost_by_location": ("location",),
     "v_dispatch_by_order": ("order_id",), "v_staffing": ("location_id",),
     "v_bizstep_dwell": ("biz_step",),  # v3.53
+    "v_quality_by_step": ("op",),  # v3.54
 }
 RAW_VIEWS = ("v_spans", "v_span_cost")
 

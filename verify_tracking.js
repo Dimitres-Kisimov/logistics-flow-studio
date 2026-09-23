@@ -32,7 +32,7 @@
  *   7. HUMAN + NO CLOCK: no worker / roster reference, no Date / Math.random;
  *      HONESTY names step-not-person, BetrVG and GDPR, and "not conformant".
  *   8. SHIPPED WIRING: index.html + run-ledger.html load tracking.js after
- *      ledger.js; sw.js precaches it at wt-v132; run-all lists this file; the
+ *      ledger.js; sw.js precaches it at wt-v133; run-all lists this file; the
  *      app's after-tick multiplexer, the save / export buttons, the joined
  *      scene snapshot, the assistant's text; the viewer section; the fresh
  *      committed fixture; the Python twin's table, views and reconcile key.
@@ -294,15 +294,15 @@ async function storeChecks() {
   check("8a. index.html and run-ledger.html load tracking.js after ledger.js (and before app.js / run-ledger.js)",
     html.indexOf('<script src="tracking.js"></script>') > html.indexOf('<script src="ledger.js"></script>') && html.indexOf('<script src="tracking.js"></script>') < html.indexOf('<script src="app.js"></script>') &&
     rl.indexOf('<script src="tracking.js"></script>') > rl.indexOf('<script src="ledger.js"></script>') && rl.indexOf('<script src="tracking.js"></script>') < rl.indexOf('<script src="run-ledger.js"></script>'));
-  check("8b. sw.js precaches ./tracking.js at wt-v132 (trail preserved: previously wt-v131)", /"\.\/tracking\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v132"/.test(sw) && /Previously wt-v131/.test(sw));
+  check("8b. sw.js precaches ./tracking.js at wt-v133 (trail preserved: previously wt-v132)", /"\.\/tracking\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v133"/.test(sw) && /Previously wt-v132/.test(sw));
   check("8c. test/run-all.mjs lists verify_tracking.js", /verify_tracking\.js/.test(runall));
   check("8d. app.js: the after-tick multiplexer observes the ledger first and then the tracker; the save and export buttons; the store opened by name",
     /afterTick: \(st\) => \{ WT\.ledger\.observe\(state\.flow\.ledger, st\); if \(state\.flow\.track\) WT\.tracking\.observe\(state\.flow\.track, state\.flow\.ledger\);/.test(app) &&
     /WT\.tracking\.create\(state\.flow\.ledger\)/.test(app) && /flowTrackingSave/.test(app) && /flowTrackingExport/.test(app) && /openStore\(\{ name: "wt-tracking-v1", maxRuns: 20 \}\)/.test(app) && /id="flowTrackingSave"/.test(html) && /id="flowTrackingExport"/.test(html));
   check("8e. the scene snapshot joins every package to its handling unit (hu, sscc, order_id, order_ref) and the assistant no longer says the identities are not connected",
     /hu: last \? last\.hu : null/.test(app) && /sscc: hu \? hu\.sscc : null/.test(app) && /order_ref: hu && hu\.order_ref != null/.test(app) && !/not connected yet/.test(sa) && /handling unit/i.test(sa) && /chosen\.hu/.test(sa));
-  check("8f. selftest.js has the tracking check; the viewer self-test drives the tracking section and pins 33 SQL texts",
-    /tracking-maps-ledger-and-persists-across-runs/.test(st) && /tracking-section-bizstep-dwell-and-unit-history/.test(rlst) && /"rlTracking"/.test(rlst) && /Object\.keys\(R\.SQL\)\.length === 33/.test(rlst));
+  check("8f. selftest.js has the tracking check; the viewer self-test drives the tracking section and pins the SQL text count (33 at v3.53, one more per later view)",
+    /tracking-maps-ledger-and-persists-across-runs/.test(st) && /tracking-section-bizstep-dwell-and-unit-history/.test(rlst) && /"rlTracking"/.test(rlst) && /Object\.keys\(R\.SQL\)\.length === (3[3-9]|[4-9]\d)/.test(rlst));
   check("8g. the viewer: a Tracking section with its nav anchor, renderTracking in load(), biz_step and disposition on the trace, the gaps invariant",
     /id="secTracking"/.test(rl) && /href="#secTracking"/.test(rl) && /id="rlTracking"/.test(rl) && /renderTracking\(exp\)/.test(rljs) && /v_bizstep_dwell/.test(rljs) && /v_unit_history/.test(rljs) && /v_tracking_gaps/.test(rljs) && /v_epcis_events/.test(rljs) && /biz_step/.test(rljs));
   const fixture = lf(read(path.join("test", "fixtures", "run-ledger.tracking.json")));

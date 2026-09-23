@@ -71,6 +71,8 @@
       desc: "Per storage-system capacity/height assumptions (order-of-magnitude teaching values)." },
     { key: "automation", label: "Automation throughput params",
       desc: "Per automation-system cycle-time / throughput assumptions the automation model (WT.automation) and the WMS capacity layer read (informed by VDI 4480 / VDI 2510)." },
+    { key: "human-factors", label: "Human factors (error what-if)",
+      desc: "Per-step error shares and performance-shaping multipliers the flow's error what-if reads (Simulate -> Live material flow -> Human error). Errors belong to a process step and a latent condition, never to a person; nothing here is keyed to a worker (BetrVG § 87(1)6, GDPR Art. 88). Anchored on HEART / SPAR-H generic values - teaching values, not warehouse measurements." },
   ];
 
   // ------------------------------------------------------------------
@@ -251,6 +253,24 @@
   seed({ id: "auto.conveyor.unitsPerHr", category: "automation",
     label: "Conveyor segment - units per hour", value: fieldRate("conveyor", "unitsPerHr", 180), unit: "units/hr",
     source: AUTO_SOURCE_CONVEYOR, note: AUTO_NOTE, editable: true, kind: "number", min: 1, max: 100000 });
+
+  /* ---- v3.54 human factors: the error what-if's levers. Teaching values; routing.js
+     ERROR_KINDS / PSF hold the same numbers (pinned equal in verify_errors.js). ---- */
+  const HF_NOTE = "Teaching value anchored on a generic human-error probability from the nuclear / process industries (HEART, Williams 1986, consolidated 2017; SPAR-H, NUREG/CR-6883) - not a warehouse measurement. It belongs to a process step, never to a person; a site replaces it with its own step-level rate.";
+  seed({ id: "hf.error.mis-pick", category: "human-factors", label: "Mis-pick share per pick (wrong item or quantity)", value: 0.02, unit: "share",
+    source: "HEART generic task type: routine, highly practised, rapid task involving relatively low level of skill - nominal unreliability 0.02 (Williams 1986; consolidated 2017).", note: HF_NOTE, editable: true, kind: "number", min: 0, max: 0.5 });
+  seed({ id: "hf.error.wrong-putaway", category: "human-factors", label: "Wrong-slot share per put-away", value: 0.003, unit: "share",
+    source: "HEART generic task type: restore or shift a system to original or new state following procedures, with some checking - nominal unreliability 0.003.", note: HF_NOTE, editable: true, kind: "number", min: 0, max: 0.5 });
+  seed({ id: "hf.error.damage", category: "human-factors", label: "Handling-damage share per depalletise / pack / palletise", value: 0.005, unit: "share",
+    source: "Teaching value: no generic human-error probability covers handling damage (HEART and SPAR-H give none); a placeholder for a site's own damage log.", note: HF_NOTE, editable: true, kind: "number", min: 0, max: 0.5 });
+  seed({ id: "hf.psf.timePressure", category: "human-factors", label: "Time pressure multiplier (1 = none)", value: 1, unit: "x",
+    source: "HEART error-producing condition: a shortage of time available for error detection and correction - maximum effect x11.", note: HF_NOTE, editable: true, kind: "number", min: 1, max: 11 });
+  seed({ id: "hf.psf.signalToNoise", category: "human-factors", label: "Low signal-to-noise multiplier (label contrast, lighting, look-alike articles; 1 = none)", value: 1, unit: "x",
+    source: "HEART error-producing condition: a low signal-to-noise ratio - maximum effect x10.", note: HF_NOTE, editable: true, kind: "number", min: 1, max: 10 });
+  seed({ id: "hf.psf.familiarity", category: "human-factors", label: "Unfamiliarity multiplier (training, a novel or infrequent task; 1 = none)", value: 1, unit: "x",
+    source: "HEART error-producing condition: unfamiliarity with a situation which is potentially important but which only occurs infrequently or which is novel - maximum effect x17.", note: HF_NOTE, editable: true, kind: "number", min: 1, max: 17 });
+  seed({ id: "hf.error.cap", category: "human-factors", label: "Cap on any effective error share", value: 0.5, unit: "share",
+    source: "WarehouseTwin choice: the levers' product cannot push a step's share above one in two; when the cap binds the readout says so.", note: HF_NOTE, editable: true, kind: "number", min: 0.01, max: 1 });
 
   // ------------------------------------------------------------------
   // Build the store. `defaults` is a frozen id -> default-value map;

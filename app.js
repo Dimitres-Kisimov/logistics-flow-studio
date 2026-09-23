@@ -161,7 +161,7 @@
     // ring for the sparkline; `poolDemandFactor` sets the synthetic arrival
     // (order-generation) rate as a multiple of the modelled pick capacity so a
     // live backlog is visible (honest what-if, documented in the readout).
-    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15 },
+    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15, errors: "none" },
   };
 
   // ---------------- DOM refs ----------------
@@ -2477,9 +2477,17 @@
           ") - illustrative rates, service time charged, queue time free; the viewer breaks it down by order type and bench";
       }
     }
+    let qualityLine = "";
+    if (s.quality) { // v3.54: the what-if ran - ISO 22400-2 names per step, shares per step and never per person
+      const rows = s.quality.filter((q) => q.errors > 0 || /^(pick|case-pick|piece-pick|pallet-pick|putaway|depalletise|pack|palletise)$/.test(q.op));
+      const binds = rec.plan && rec.plan.errors && rec.plan.errors.kinds.some((k) => k.effective >= rec.plan.errors.cap);
+      qualityLine = "<br>Human error (what-if, teaching shares x levers" + (rec.plan.errors.multiplier > 1 ? " " + rec.plan.errors.multiplier + "x: " + rec.plan.errors.latent.join(", ") : "") + (binds ? "; the cap binds" : "") + "): " +
+        rows.map((q) => q.op + " FPY <strong>" + q.first_pass_yield + "</strong> (" + q.errors + " of " + q.units_through + (q.reworked ? ", reworked " + q.reworked : "") + (q.scrapped_for_damage ? ", scrapped " + q.scrapped_for_damage : "") + ")").join(" · ") +
+        " - first pass yield per step; errors belong to a step and a latent condition, never to a person";
+    }
     return '<p class="flow-pool-stats"><code>' + rec.run.id + "</code><br>Units <strong>" + s.units + "</strong> · events <strong>" + s.events +
       "</strong> · delivered <strong>" + s.delivered + "</strong> (" + s.delivered_eaches + " eaches · " + s.delivered_pallets + " pallets · " +
-      s.delivered_parcels + " parcels) · profile " + (rec.run.profile || "-") + costLine + "</p>" + (types ? '<div class="flow-chips">' + types + "</div>" : "");
+      s.delivered_parcels + " parcels) · profile " + (rec.run.profile || "-") + costLine + qualityLine + "</p>" + (types ? '<div class="flow-chips">' + types + "</div>" : "");
   }
   function updateLedgerReadout() {
     const out = $("flowLedgerStats"), sel = $("flowLedgerUnit"), trace = $("flowLedgerTrace");
@@ -2523,6 +2531,13 @@
       "</tbody></table>";
   }
 
+  // v3.54: the error what-if's levers as the knowledge base holds them (teaching values;
+  // the defaults equal routing.js ERROR_KINDS / PSF). Shares per STEP, never per person.
+  function readErrorLevers() {
+    const g = (id, d) => { const v = WT.kb ? WT.kb.get(id) : undefined; return typeof v === "number" && isFinite(v) ? v : d; };
+    return { "mis-pick": g("hf.error.mis-pick", 0.02), "wrong-putaway": g("hf.error.wrong-putaway", 0.003), damage: g("hf.error.damage", 0.005),
+      psf: { timePressure: g("hf.psf.timePressure", 1), signalToNoise: g("hf.psf.signalToNoise", 1), familiarity: g("hf.psf.familiarity", 1) }, cap: g("hf.error.cap", 0.5) };
+  }
   function flowBuild() {
     if (!WT.flowsim) return false;
     readConfigFromUI();
@@ -2547,6 +2562,8 @@
     if (pool) opts.pool = pool;
     // v3.45: the staffing what-if (defaults inside flowsim: the congestion threshold, at most 2 workers, a 30-tick cool-down)
     if (state.flow.staffing === "adaptive") opts.policy = { kind: "queue-staffing" };
+    // v3.54: the human-error what-if - the knowledge base's per-step shares and levers (routing.js normalises them)
+    if (state.flow.errors === "declared") opts.errors = readErrorLevers();
     state.flow.sim = WT.flowsim.state(layout, opts);
     // v3.32 THE RUN LEDGER: a pure observer attached as an after-tick hook.
     // Every unit gets its identities (ids.js) and quantities (pack.js); the
@@ -3077,6 +3094,22 @@
       sel.addEventListener("change", () => {
         state.flow.staffing = sel.value === "adaptive" ? "adaptive" : "declared";
         try { localStorage.setItem("wt-flow-staffing", state.flow.staffing); } catch (_) { /* ignore */ }
+        state.flow.sig = null;
+        if (state.flow.sim) flowReset();
+      });
+    })();
+    // v3.54: the human-error what-if picker. Remembered on this device; a change
+    // rebuilds the run from tick 0 (the error shares are a run input).
+    (function wireErrors() {
+      const sel = $("flowErrorsSelect");
+      if (!sel) return;
+      let saved = "none";
+      try { saved = localStorage.getItem("wt-flow-errors") || "none"; } catch (_) { /* private mode */ }
+      state.flow.errors = saved === "declared" ? "declared" : "none";
+      sel.value = state.flow.errors;
+      sel.addEventListener("change", () => {
+        state.flow.errors = sel.value === "declared" ? "declared" : "none";
+        try { localStorage.setItem("wt-flow-errors", state.flow.errors); } catch (_) { /* ignore */ }
         state.flow.sig = null;
         if (state.flow.sim) flowReset();
       });

@@ -881,6 +881,14 @@
           </select>
           <p id="flowStaffingHint" class="hint">A what-if that adds capacity the declared floor does not have; it leaves again after 30 ticks with an empty queue. The ledger charges one worker's service time per unit and does not charge the second worker's idle time. Remembered on this device.</p>
         </div>
+        <div class="flow-mix-pick">
+          <label for="flowErrorsSelect">Human error</label>
+          <select id="flowErrorsSelect" aria-describedby="flowErrorsHint">
+            <option value="none">Every step perfect (as before)</option>
+            <option value="declared">Declared error shares (what-if): mis-pick 2 %, wrong put-away 0.3 %, damage 0.5 % - from the knowledge base</option>
+          </select>
+          <p id="flowErrorsHint" class="hint">Errors are attributed to a process step and a latent condition (the knowledge base's time-pressure, signal-to-noise and unfamiliarity levers), never to a person. Teaching values anchored on HEART / SPAR-H generic probabilities, not warehouse measurements; dispatched by quota, so a run replays exactly. A mis-pick or a wrong put-away is caught at a verification step and done again once; a damage is written off at the returns bench. Needs a declared order mix. Remembered on this device.</p>
+        </div>
         <section class="route-review" aria-labelledby="routeReviewHeading">
           <div class="route-review-heading"><span class="route-review-kicker">Before you run</span><h3 id="routeReviewHeading">Can this floor handle the order?</h3></div>
           <p class="hint">Review each recipe against the equipment on your floor. Both returns outcomes are listed separately.</p>

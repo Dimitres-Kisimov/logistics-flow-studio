@@ -870,7 +870,7 @@ class Tracking(unittest.TestCase):
         self.assertIn("v_tracking_gaps", RL.INVARIANT_VIEWS)
         self.assertTrue({"v_epcis_events", "v_unit_history"} <= set(RL.DETAIL_VIEWS))
         self.assertTrue(set(RL.TRACKING_VIEWS) <= set(RL.VIEWS))
-        self.assertEqual(len(RL.VIEWS), 33)
+        self.assertEqual(len(RL.VIEWS), 34)
         self.assertEqual(RL.RECONCILE_KEYS["v_bizstep_dwell"], ("biz_step",))
         data = json.loads((FIX / "run-ledger.json").read_text(encoding="utf-8"))
         js = json.loads((FIX / "run-ledger.tracking.views.json").read_text(encoding="utf-8"))
@@ -891,6 +891,90 @@ class Tracking(unittest.TestCase):
         self.assertEqual(disp, js["dispositionCounts"])
         ok, table = RL.reconcile(db, run, {"run": run, "views": {"v_bizstep_dwell": js["bizstepDwell"]}})
         self.assertTrue(ok, [r for r in table if not r["ok"]])
+
+
+def hand_ledger_with_a_rework():
+    """The hand ledger with unit A on a mis-pick branch: case-pick, verify-pick, case-pick again (v3.54)."""
+    data = hand_ledger()
+    run = data["run"]["id"]
+    a = data["hus"][0]
+    a.update(route_id="case-pick:mis-pick@case-pick", error_kind="mis-pick", error_op="case-pick", error_outcome="rework", error_latent=["timePressure"])
+    ev = lambda v, kind, op, loc, tick, p, c, e, pa, ret=0, scr=0: dict(  # noqa: E731
+        id=f"EVT-{a['id']}-{v}", hu_id=a["id"], version=v, kind=kind, op=op, anchor=None, location=loc, tick=tick, minute=tick * 1.0,
+        stage=None, form=None, pallets=p, cases=c, eaches=e, parcels=pa, retained=ret, scrapped=scr)
+    others = [e for e in data["events"] if e["hu_id"] != a["id"]]
+    data["events"] = [
+        ev(0, "created", "receive", "in", 0, 1, 48, 576, 0),
+        ev(1, "passed", "depalletise", "dep", 4, 0, 48, 576, 0),
+        ev(2, "queued", "case-pick", "face", 8, 0, 48, 576, 0),
+        ev(3, "served", "case-pick", "face", 12, 0, 4, 48, 0, ret=528),
+        ev(4, "passed", "verify-pick", "face", 13, 0, 4, 48, 0, ret=528),
+        ev(5, "queued", "case-pick", "face", 14, 0, 4, 48, 0, ret=528),
+        ev(6, "served", "case-pick", "face", 16, 0, 4, 48, 0, ret=528),
+        ev(7, "passed", "palletise", "wrap", 20, 1, 4, 48, 0, ret=528),
+        ev(8, "delivered", "load", "out", 30, 1, 4, 48, 0, ret=528),
+    ] + others
+    data["run"]["errors"] = {"kind": "human-error", "kinds": [{"kind": "mis-pick", "ops": ["pick", "case-pick", "piece-pick", "pallet-pick"], "share": 0.02, "effective": 0.04,
+                                                              "disposition": "mismatch_class", "rework": True, "source": "hand"}],
+                             "psf": {"timePressure": 2, "signalToNoise": 1, "familiarity": 1}, "multiplier": 2, "latent": ["timePressure"], "cap": 0.5, "honesty": "hand"}
+    assert run in a["id"]
+    return data
+
+
+class Quality(unittest.TestCase):
+    """v3.54 human error: the quality view by hand, the columns, the tracking twin's error and its detection."""
+
+    def test_quality_by_step_by_hand(self):
+        db = fresh_with(hand_ledger_with_a_rework())
+        rows_ = {r["op"]: r for r in RL.rows(db, "SELECT * FROM v_quality_by_step WHERE run_id = ?", ("RUN-hand-s1-h00000000",))}
+        # A (rework at case-pick), B (cross-dock), C (a return, queued only at inspect - not through)
+        self.assertEqual(set(rows_), {"receive", "depalletise", "case-pick", "verify-pick", "palletise", "stage-out", "load"})
+        cp = rows_["case-pick"]
+        self.assertEqual((cp["units_through"], cp["errors"], cp["reworked"], cp["scrapped_for_damage"], cp["first_pass_yield"], cp["rework_ratio"], cp["scrap_ratio"]), (1, 1, 1, 0, 0.0, 1.0, 0.0))
+        self.assertEqual((rows_["receive"]["units_through"], rows_["receive"]["errors"], rows_["receive"]["first_pass_yield"]), (3, 0, 1.0))
+        self.assertEqual((rows_["verify-pick"]["units_through"], rows_["verify-pick"]["errors"]), (1, 0))
+        self.assertEqual((rows_["load"]["units_through"], rows_["load"]["errors"], rows_["load"]["first_pass_yield"]), (2, 0, 1.0))
+        hu = RL.rows(db, "SELECT error_kind, error_op, error_outcome, error_latent FROM hu WHERE id = ?", ("HU-ORD-RUN-hand-s1-h00000000-000001-1",))[0]
+        self.assertEqual(hu, {"error_kind": "mis-pick", "error_op": "case-pick", "error_outcome": "rework", "error_latent": '["timePressure"]'})
+        self.assertIn('"kind": "human-error"', RL.rows(db, "SELECT errors FROM run")[0]["errors"])
+        self.assertEqual(RL.summary(db, "RUN-hand-s1-h00000000")["invariants"], {n: 0 for n in RL.INVARIANT_VIEWS})
+
+    def test_quality_on_the_recorded_fixture_is_perfect_and_grouped(self):
+        data = json.loads((FIX / "run-ledger.json").read_text(encoding="utf-8"))
+        db = fresh_with(data)
+        rows_ = RL.rows(db, "SELECT * FROM v_quality_by_step WHERE run_id = ?", (data["run"]["id"],))
+        self.assertGreaterEqual(len(rows_), 10)
+        self.assertTrue(all(r["errors"] == 0 and r["first_pass_yield"] == 1.0 and r["rework_ratio"] == 0.0 and r["scrap_ratio"] == 0.0 for r in rows_))
+        self.assertIsNone(RL.rows(db, "SELECT errors FROM run")[0]["errors"])
+        self.assertIn("v_quality_by_step", RL.PLANNER_VIEWS)
+        self.assertEqual(RL.RECONCILE_KEYS["v_quality_by_step"], ("op",))
+
+    def test_old_database_gains_the_error_columns(self):
+        db = fresh()
+        for name in RL.VIEWS:
+            db.execute(f"DROP VIEW IF EXISTS {name}")
+        for table, col in (("run", "errors"), ("hu", "error_kind"), ("hu", "error_op"), ("hu", "error_outcome"), ("hu", "error_latent"), ("tracking_event", "error_detected")):
+            db.execute(f"ALTER TABLE {table} DROP COLUMN {col}")
+        RL.initialize(db)
+        RL.initialize(db)  # idempotent
+        self.assertIn("errors", {r["name"] for r in RL.rows(db, "PRAGMA table_info(run)")})
+        self.assertTrue({"error_kind", "error_op", "error_outcome", "error_latent"} <= {r["name"] for r in RL.rows(db, "PRAGMA table_info(hu)")})
+        self.assertIn("error_detected", {r["name"] for r in RL.rows(db, "PRAGMA table_info(tracking_event)")})
+        RL.import_ledger(db, hand_ledger_with_a_rework())
+        self.assertEqual(RL.rows(db, "SELECT errors FROM v_quality_by_step WHERE op = 'case-pick'")[0]["errors"], 1)
+
+    def test_tracking_twin_marks_the_error_at_the_step_and_its_detection(self):
+        data = hand_ledger_with_a_rework()
+        db = fresh_with(data)
+        a = [e for e in RL.track_events(data) if e["wt:hu_id"].endswith("000001-1")]
+        self.assertEqual([e["bizStep"] for e in a], ["receiving", "unpacking", "picking", "picking", "inspecting", "picking", "picking", "packing", "shipping"])
+        self.assertEqual([e["disposition"] for e in a], ["in_progress", "in_progress", "in_progress", "mismatch_class", "in_progress", "in_progress", "in_progress", "in_progress", "in_transit"])
+        self.assertEqual(a[3]["wt:error"], {"kind": "mis-pick", "step": "case-pick", "detected": False, "latent": ["timePressure"]})
+        self.assertEqual(a[4]["wt:error"], {"kind": "mis-pick", "step": "case-pick", "detected": True, "latent": ["timePressure"]})
+        self.assertTrue(all(e["wt:error"] is None for i, e in enumerate(a) if i not in (3, 4)))
+        sql = RL.rows(db, "SELECT version, disposition, error_kind, error_step, error_detected FROM tracking_event WHERE hu_id LIKE '%000001-1' ORDER BY version")
+        self.assertEqual([(r["version"], r["disposition"], r["error_kind"], r["error_detected"]) for r in sql if r["error_kind"]], [(3, "mismatch_class", "mis-pick", 0), (4, "in_progress", "mis-pick", 1)])
+        self.assertEqual(RL.rows(db, "SELECT * FROM v_tracking_gaps"), [])
 
 
 if __name__ == "__main__":

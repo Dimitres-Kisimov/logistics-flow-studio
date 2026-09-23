@@ -170,7 +170,16 @@
   function parcelSscc(h) { return String(h.sscc).charAt(0) === "0" || !WT.ids ? h.sscc : WT.ids.sscc(0, h.seq); }
 
   /* ---------------- the mapping ------------------------------------------ */
+  // v3.54 the declared error of a unit (ledger hu.error_*): realised at the first
+  // non-queued event at its step (the disposition the kind names, wt:error with
+  // detected false - true for a damage, which is seen at the step), detected at the
+  // verification step (inspecting, back to in_progress, wt:error.detected true); the
+  // redo is an ordinary event. routing.js ERROR_KINDS names the same dispositions
+  // (pinned equal in verify_errors.js); tools/run_ledger.py mirrors this.
+  const ERROR_DISPOSITION = { "mis-pick": "mismatch_class", "wrong-putaway": "sellable_not_accessible", damage: "damaged" };
+  const VERIFY_OPS = { "verify-pick": 1, "verify-put": 1 };
   const initialDisposition = (h) => (h.archetype === "returns" ? "returned" : "in_progress");
+  const initialState = (h) => ({ disposition: initialDisposition(h), errored: false, detected: false });
   // One handling event -> its twin. `st` is the unit's running state (its
   // disposition after the previous event); `ctx` caches read points.
   function twin(e, h, st, ctx) {
@@ -181,7 +190,19 @@
     else if (term) { step = term.step; disp = term.disposition; if (term.action) action = term.action; }
     else if (e.kind !== "queued") {
       if (def.aggregation) { type = "AggregationEvent"; action = def.aggregation; agg = def; }
-      if (def.disposition) disp = def.disposition;
+      if (def.disposition && st.disposition !== "damaged") disp = def.disposition; // a damaged unit stays damaged until it is destroyed
+    }
+    let error = null;
+    if (h.error_op && e.kind !== "queued" && !term) {
+      if (!st.errored && e.op === h.error_op) {
+        st.errored = true;
+        disp = ERROR_DISPOSITION[h.error_kind] || "non_sellable_other";
+        error = { kind: h.error_kind, step: h.error_op, detected: h.error_outcome === "scrap", latent: (h.error_latent || []).slice() };
+      } else if (st.errored && !st.detected && VERIFY_OPS[e.op]) {
+        st.detected = true;
+        disp = "in_progress";
+        error = { kind: h.error_kind, step: h.error_op, detected: true, latent: (h.error_latent || []).slice() };
+      }
     }
     st.disposition = disp;
     const ev = { eventID: "urn:wt:evt:" + e.id, type: type, action: action, eventTime: null,
@@ -199,7 +220,7 @@
     ev.bizLocation = disp === "in_transit" ? null : { id: "urn:wt:zone:" + def.stage };
     ev.bizTransactionList = [{ type: h.archetype === "returns" ? "rma" : "po", bizTransaction: h.order_id }];
     if (h.order_ref != null) ev.bizTransactionList.push({ type: "wt:order_ref", bizTransaction: String(h.order_ref) });
-    ev["wt:error"] = null;
+    ev["wt:error"] = error;
     ev["wt:delivery"] = null;
     return ev;
   }
@@ -218,7 +239,7 @@
     for (const e of exp.events || []) {
       const h = hus[e.hu_id];
       if (!h) continue;
-      const st = state[h.id] || (state[h.id] = { disposition: initialDisposition(h) });
+      const st = state[h.id] || (state[h.id] = initialState(h));
       out.push(twin(e, h, st, ctx));
     }
     return makeDocument(exp.run, out);
@@ -233,7 +254,7 @@
     for (let i = track.cursor; i < rec.events.length; i++) {
       const e = rec.events[i], h = rec.hus[e.hu_id];
       if (!h) continue;
-      const st = track.state[h.id] || (track.state[h.id] = { disposition: initialDisposition(h) });
+      const st = track.state[h.id] || (track.state[h.id] = initialState(h));
       track.events.push(twin(e, h, st, track.ctx));
     }
     track.cursor = rec.events.length;
@@ -489,6 +510,7 @@
   }
 
   WT.tracking = { SCHEMA, STORE_SCHEMA, HONESTY, NOTES, VOCAB_SOURCE, BIZ_STEPS, DISPOSITIONS, BIZ_TRANSACTION_TYPES, EVENT_TYPES, ACTIONS, OPS, TERMINAL,
+    ERROR_DISPOSITION, VERIFY_OPS, // v3.54
     ssccUrn, sgtinPattern, sglnUrn, glnFor, twin, fromLedger, create, observe, exportJson,
     historyOf, dwellByBizStep, dispositionCounts, gaps, validate, openStore, deleteStore };
 })();

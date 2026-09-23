@@ -671,7 +671,7 @@
   }
 
   function makeRoute(index, res, waypoints, byKind) {
-    return {
+    const route = {
       index: index,
       routeId: res.routeId,
       archetype: res.id,
@@ -693,6 +693,8 @@
       conveyorRouted: !!(waypoints && waypoints.conveyorRouted),
       stationSegs: waypoints ? stationSegsOf(waypoints, byKind) : {},
     };
+    if (res.error) route.error = res.error; // v3.54: key only on an error branch
+    return route;
   }
 
   // The legacy route described WITHOUT routing.js, so the animation never
@@ -713,7 +715,7 @@
    *   of a branching archetype) becomes its own route with its own polyline.
    * Returns the routes plus the SPAWN vector (fulfillable routes + shares)
    * and the honest report of what this floor cannot do. */
-  function buildRoutes(layout, A, waypoints, specs, mixSpec) {
+  function buildRoutes(layout, A, waypoints, specs, mixSpec, errors) {
     const byKind = stationIndexByKind(specs || []);
     const routes = [makeRoute(0, legacyRouteRes(), waypoints, byKind)];
     const R = WT.routing;
@@ -734,14 +736,18 @@
       // One route per OUTCOME branch: a return that is restocked and a return
       // that is scrapped are two different paths through the building.
       const arch = R.ARCHETYPE_BY_ID[ent.id];
-      const branches = arch && arch.outcomes && arch.outcomes.length
-        ? arch.outcomes.map((o) => ({ outcome: o.id, share: o.share }))
-        : [{ outcome: null, share: 1 }];
+      // v3.54 HUMAN ERROR: with the what-if, routing.js synthesises one extra branch per
+      // (error kind, step) - an unrolled rework or a write-off - and hands the base branch
+      // the rest of the demand. Without it the static outcome list, exactly as before.
+      const branches = errors && typeof R.branchesFor === 'function' ? R.branchesFor(ent.id, errors)
+        : arch && arch.outcomes && arch.outcomes.length
+          ? arch.outcomes.map((o) => ({ outcome: o.id, share: o.share }))
+          : [{ outcome: null, share: 1 }];
       let bTotal = 0;
       for (const b of branches) bTotal += b.share > 0 ? b.share : 0;
       if (!(bTotal > 0)) bTotal = branches.length;
       for (const b of branches) {
-        const res = R.resolveRoute(ent.id, A, { outcome: b.outcome });
+        const res = R.resolveRoute(ent.id, A, b.error ? { outcome: b.outcome, ops: b.ops, error: b.error } : { outcome: b.outcome });
         let idx = -1;
         if (ent.id === LEGACY_ROUTE_ID) {
           idx = 0; // reuse the spine object; never build it twice
@@ -752,7 +758,9 @@
         }
         const share = ent.share * ((b.share > 0 ? b.share : 0) / bTotal);
         const ok = routes[idx].ok;
-        mix.push({ id: ent.id, outcome: b.outcome, routeId: routes[idx].routeId, routeIndex: idx, share: share, ok: ok });
+        const entry = { id: ent.id, outcome: b.outcome, routeId: routes[idx].routeId, routeIndex: idx, share: share, ok: ok };
+        if (b.error) entry.error = b.error; // v3.54
+        mix.push(entry);
         if (ok) { spawnRoutes.push(idx); spawnShares.push(share); }
         else {
           unfulfillable.push({ routeId: routes[idx].routeId, label: routes[idx].label, share: share, missing: routes[idx].missing, message: routes[idx].message });
@@ -907,8 +915,12 @@
     const waypoints = buildWaypoints(layout, anchors);
     const tp = throughputOf(layout, seed);
     const stations = buildStationSpecs(layout, waypoints, tp);
+    // v3.54 HUMAN ERROR - a what-if: declared shares per step, normalised by routing.js
+    // (teaching values, quota-dispatched, never keyed to a person). Absent -> no key, no
+    // branch, byte-identical to before. It needs a declared mix: the legacy spine never branches.
+    const errors = o.errors && WT.routing && typeof WT.routing.normalizeErrors === "function" ? WT.routing.normalizeErrors(o.errors) : null;
     // v3.25: per-order-type routes. `o.mix` absent -> the single legacy spine.
-    const rb = buildRoutes(layout, anchors, waypoints, stations, o.mix != null ? o.mix : null);
+    const rb = buildRoutes(layout, anchors, waypoints, stations, o.mix != null ? o.mix : null, errors);
 
     const orders = Math.max(1, Math.round(o.orders != null ? o.orders : PARAMS.defaultOrders));
     const avgUnits = (1 + (o.linesPerOrderMax || cfg.linesPerOrderMax || PARAMS.linesPerOrderMax)) / 2;
@@ -987,6 +999,7 @@
     };
     if (poolIndex) { plan.pool = pool; plan.poolIndex = poolIndex; plan.poolLines = poolLines; } // v3.44: keys only with a pool
     if (policy) plan.policy = policy; // v3.45: key only with a policy
+    if (errors) plan.errors = errors; // v3.54: key only with the error what-if
     return plan;
   }
 

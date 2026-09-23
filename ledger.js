@@ -116,6 +116,17 @@
     "wage (Simulate card) is a different input and is not used here.";
   // v3.45: recorded on run.policy (only a run that used the what-if carries it), so the
   // rates text - and every earlier export - stays byte for byte what it was.
+  // v3.54: recorded on run.errors (only a run that used the error what-if carries it).
+  const ERRORS_HONESTY =
+    "Human error is a what-if: declared shares per process step, realised as branches dispatched by quota (exact to " +
+    "within one unit, replayable) - never a random draw and never a person. The shares are teaching values anchored on " +
+    "generic human-error probabilities from the nuclear industry (HEART, SPAR-H), not warehouse measurements. A rework " +
+    "is one detection and one redo (charged as one more service at the bench), a damage a write-off; a unit errs at most " +
+    "once. Errors belong to a step and a latent condition, and nothing here is keyed to a worker (BetrVG § 87(1)6, GDPR Art. 88).";
+  function errorsBlock(errors) {
+    return { kind: errors.kind, kinds: errors.kinds.map((k) => ({ kind: k.kind, ops: k.ops.slice(), share: k.share, effective: k.effective, disposition: k.disposition, rework: !!k.rework, source: k.source })),
+      psf: Object.assign({}, errors.psf), multiplier: errors.multiplier, latent: errors.latent.slice(), cap: errors.cap, honesty: ERRORS_HONESTY };
+  }
   const STAFFING_HONESTY =
     "Adaptive staffing is a what-if: a second worker joins a bench when its queue reaches the threshold and leaves after the " +
     "cool-down with an empty queue. It adds capacity the declared floor does not have. A unit is still charged one worker's " +
@@ -178,7 +189,8 @@
     // input - it joins the id hash - and its provenance rides in run.dataset.
     const pool = (Array.isArray(m.pool) && m.pool.length ? m.pool : null) || (plan && plan.pool) || null;
     const policy = (plan && plan.policy) || null; // v3.45: a run input too - it joins the id hash when present
-    const runId = I ? I.runId(scenario, seed, layout, mix, pool, policy) : "RUN-" + scenario + "-s" + seed;
+    const errors = (plan && plan.errors) || null; // v3.54: the error what-if joins the id hash too (only when present)
+    const runId = I ? I.runId(scenario, seed, layout, mix, pool, policy, errors) : "RUN-" + scenario + "-s" + seed;
     const dataset = pool ? {
       source: (m.dataset && m.dataset.source) || "pool", orders: pool.length,
       lines: plan && plan.poolLines != null ? plan.poolLines : pool.reduce((a, o) => a + ((o.lines && o.lines.length) || 0), 0),
@@ -217,6 +229,7 @@
     };
     if (dataset) rec.run.dataset = dataset; // key only when a pool was used (older exports unchanged)
     if (policy) { rec.run.policy = Object.assign({}, policy, { honesty: STAFFING_HONESTY }); rec.staffing = []; } // v3.45: the what-if and its change log, keys only with a policy
+    if (errors) rec.run.errors = errorsBlock(errors); // v3.54: the error what-if, key only when it ran
     return rec;
   }
 
@@ -227,9 +240,11 @@
     const arch = route.legacy ? "legacy-spine" : route.archetype;
     return P.quantitiesAlong(rec.profile, arch, route.ops, huId, line || null); // v3.44: the order line's quantity, when the unit carries one
   }
-  function quantityAt(q, route, op, before) {
+  // v3.54: the op INDEX resolves a repeated operation (a rework lists the same op twice);
+  // without one the first occurrence, which is identical on every route without a rework.
+  function quantityAt(q, route, op, before, opIndex) {
     if (!q) return { pallets: 0, cases: 0, eaches: 0, parcels: 0, form: null, retained: 0, scrapped: 0 };
-    let i = route.ops.indexOf(op);
+    let i = opIndex != null && opIndex >= 0 ? opIndex : route.ops.indexOf(op);
     if (i < 0) i = 0;
     if (before) i = i - 1;
     if (i < 0) {
@@ -240,10 +255,10 @@
     const s = q.steps[Math.min(i, q.steps.length - 1)];
     return { pallets: s.pallets, cases: s.cases, eaches: s.eaches, parcels: s.parcels, form: s.form, retained: s.retained, scrapped: s.scrapped };
   }
-  function push(rec, hu, kind, op, mu, state, before, stationEl) {
+  function push(rec, hu, kind, op, mu, state, before, stationEl, opIndex) {
     const I = WT.ids, G = WT.goods;
     const route = rec.plan.routes[hu.__route] || rec.plan.routes[0];
-    const q = quantityAt(hu.__q, route, op, before);
+    const q = quantityAt(hu.__q, route, op, before, opIndex);
     const version = hu.__version++;
     const ev = {
       id: I ? I.eventId(hu.id, version) : hu.id + "-" + version,
@@ -301,11 +316,14 @@
           hu.sku = line && line.sku != null ? String(line.sku) : null;
           hu.line_qty = line && Number(line.qty) > 0 ? Math.round(Number(line.qty)) : null;
         }
+        if (route.error) { // v3.54: the declared error this unit's branch realises (keys only on an error branch)
+          hu.error_kind = route.error.kind; hu.error_op = route.error.op; hu.error_outcome = route.error.rework ? "rework" : "scrap"; hu.error_latent = (route.error.latent || []).slice();
+        }
         rec.hus[id] = hu;
         rec.order.push(id);
         const op0 = mu.op || route.ops[0];
-        push(rec, hu, "created", op0, mu, state, false);
-        rec.last[mu.id] = { hu: id, op: op0, opIndex: Math.max(0, route.ops.indexOf(op0)), status: mu.status, tick: state.tick, stationEl: null };
+        push(rec, hu, "created", op0, mu, state, false, null, Math.max(0, route.ops.indexOf(op0)));
+        rec.last[mu.id] = { hu: id, op: op0, opIndex: Math.max(0, route.ops.indexOf(op0)), status: mu.status, tick: state.tick, stationEl: null, seg: mu.seg };
         continue;
       }
       const last = rec.last[mu.id];
@@ -316,24 +334,43 @@
         // several short waypoints in one tick. Record what actually happened,
         // in order: the service it was waiting for, every operation it passed
         // on the way, then where it is now (waiting at a station, or past it).
-        if (last.status === "queued") push(rec, hu, "served", last.op, mu, state, false, last.stationEl);
+        if (last.status === "queued") push(rec, hu, "served", last.op, mu, state, false, last.stationEl, last.opIndex);
         let to = ops.indexOf(mu.op, last.opIndex + 1);
         if (to < 0) to = ops.indexOf(mu.op);
-        for (let i = last.opIndex + 1; i >= 0 && i < to; i++) push(rec, hu, "passed", ops[i], null, state, false);
+        for (let i = last.opIndex + 1; i >= 0 && i < to; i++) push(rec, hu, "passed", ops[i], null, state, false, null, i);
         if (mu.status === "queued") {
           last.stationEl = (mu.station && mu.station.elementId) || mu.stationId || null;
-          push(rec, hu, "queued", mu.op, mu, state, true);
+          push(rec, hu, "queued", mu.op, mu, state, true, null, to >= 0 ? to : null);
         } else {
           last.stationEl = null;
-          push(rec, hu, "passed", mu.op, mu, state, false);
+          push(rec, hu, "passed", mu.op, mu, state, false, null, to >= 0 ? to : null);
         }
         if (to >= 0) last.opIndex = to;
       } else if (last.status === "queued" && mu.status !== "queued") {
         // the station served it: the operation's quantities apply now, at the
         // bench it waited at (the sim has already released the station handle)
-        push(rec, hu, "served", mu.op, mu, state, false, last.stationEl);
+        push(rec, hu, "served", mu.op, mu, state, false, last.stationEl, last.opIndex);
+      } else if (mu.status === "queued" && last.status === "queued" && mu.seg !== last.seg && ops.indexOf(mu.op, last.opIndex + 1) > last.opIndex) {
+        // v3.54: served at one occurrence of the op and queued at its NEXT occurrence within
+        // the same tick (the rework's redo at the same bench: the waypoint moved, op and
+        // status did not). Record the service, the steps between, then the new wait.
+        push(rec, hu, "served", last.op, mu, state, false, last.stationEl, last.opIndex);
+        const to = ops.indexOf(mu.op, last.opIndex + 1);
+        for (let i = last.opIndex + 1; i < to; i++) push(rec, hu, "passed", ops[i], null, state, false, null, i);
+        last.stationEl = (mu.station && mu.station.elementId) || mu.stationId || null;
+        push(rec, hu, "queued", mu.op, mu, state, true, null, to);
+        last.opIndex = to;
+      } else if (mu.status === "queued" && last.status !== "queued" && ops.indexOf(mu.op, last.opIndex + 1) > last.opIndex) {
+        // v3.54: the SAME operation again (a rework's redo lists it twice): the unit passed
+        // the steps in between - its verification - and queues at the op's next occurrence.
+        // A route without a repeated operation never enters here (no later occurrence).
+        const to = ops.indexOf(mu.op, last.opIndex + 1);
+        for (let i = last.opIndex + 1; i < to; i++) push(rec, hu, "passed", ops[i], null, state, false, null, i);
+        last.stationEl = (mu.station && mu.station.elementId) || mu.stationId || null;
+        push(rec, hu, "queued", mu.op, mu, state, true, null, to);
+        last.opIndex = to;
       }
-      last.op = mu.op; last.status = mu.status; last.tick = state.tick;
+      last.op = mu.op; last.status = mu.status; last.tick = state.tick; last.seg = mu.seg;
     }
     // ---- retired: present last tick, gone now ----
     for (const key of Object.keys(rec.last)) {
@@ -345,11 +382,11 @@
         // between the last observation and the end is recorded first
         const route = plan.routes[hu.__route] || plan.routes[0];
         const ops = route.ops || [];
-        if (last.status === "queued") push(rec, hu, "served", last.op, null, state, false, last.stationEl);
-        for (let i = last.opIndex + 1; i < ops.length - 1; i++) push(rec, hu, "passed", ops[i], null, state, false);
+        if (last.status === "queued") push(rec, hu, "served", last.op, null, state, false, last.stationEl, last.opIndex);
+        for (let i = last.opIndex + 1; i < ops.length - 1; i++) push(rec, hu, "passed", ops[i], null, state, false, null, i);
         const finalOp = ops.length ? ops[ops.length - 1] : last.op;
         const kind = TERMINAL[finalOp] || "retired";
-        const ev = push(rec, hu, kind, finalOp, null, state, false);
+        const ev = push(rec, hu, kind, finalOp, null, state, false, null, ops.length ? ops.length - 1 : null);
         hu.retired_tick = state.tick;
         hu.final_kind = kind;
         hu.final = { pallets: ev.pallets, cases: ev.cases, eaches: ev.eaches, parcels: ev.parcels, form: ev.form, retained: ev.retained, scrapped: ev.scrapped };
@@ -510,8 +547,33 @@
         touches: t.units ? Math.round((t.events / t.units) * 100) / 100 : 0,
         conserved: t.retired === 0 || true });
     });
-    return { units: rec.order.length, events: rec.events.length, delivered: delivered, delivered_eaches: deliveredEaches,
+    const out = { units: rec.order.length, events: rec.events.length, delivered: delivered, delivered_eaches: deliveredEaches,
       delivered_pallets: pallets, delivered_cases: cases, delivered_parcels: parcels, types: types };
+    if (rec.plan && rec.plan.errors) out.quality = qualityByStep({ hus: rec.order.map((id) => rec.hus[id]), events: rec.events }); // v3.54: only when the what-if ran
+    return out;
+  }
+
+  /* ---------------- quality by step (v3.54) ------------------------------- */
+  // ISO 22400-2's names, per operation, over an EXPORT (or the live record's hus +
+  // events): units through = distinct units with a non-queued event at the step;
+  // errors = those whose declared error is at this step (realised when they passed
+  // it); reworked / scrapped by the error's outcome; first pass yield = (through -
+  // errors) / through; rework ratio; scrap ratio. The same definition as
+  // v_quality_by_step. Rows for every operation with a unit through, errors 0 on a
+  // run without the what-if.
+  function qualityByStep(exp) {
+    const err = {};
+    for (const h of exp.hus || []) if (h.error_op) err[h.id] = h;
+    const through = {};
+    for (const e of exp.events || []) { if (e.kind === "queued") continue; (through[e.op] = through[e.op] || {})[e.hu_id] = 1; }
+    return Object.keys(through).sort().map((op) => {
+      const ids = Object.keys(through[op]);
+      let errors = 0, reworked = 0, scrapped = 0;
+      for (const id of ids) { const h = err[id]; if (h && h.error_op === op) { errors++; if (h.error_outcome === "scrap") scrapped++; else reworked++; } }
+      const n = ids.length;
+      return { op: op, units_through: n, errors: errors, reworked: reworked, scrapped_for_damage: scrapped,
+        first_pass_yield: n ? r4((n - errors) / n) : null, rework_ratio: n ? r4(reworked / n) : null, scrap_ratio: n ? r4(scrapped / n) : null };
+    });
   }
 
   /* ---------------- the flow as recorded (v3.36) ---------------------- */
@@ -568,6 +630,8 @@
   WT.ledger = { SCHEMA, HONESTY, TERMINAL, create, observe, exportJson, stats, minutesPerTick, locationFor,
     // v3.35 what a handling unit costs
     RATES_HONESTY, STAFFING_HONESTY, CLASS_LABOUR, TRANSPORT_ORDER, classOfType, ratesBlock, spans, costs, nsum,
+    // v3.54 human error, honestly
+    ERRORS_HONESTY, qualityByStep,
     // v3.36 the flow as recorded
     FLOW_HONESTY, flowLinks, sankeyFromLedger };
 })();

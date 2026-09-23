@@ -161,6 +161,7 @@
     if (m.tracking) invariants.v_tracking_gaps = m.trackGaps; // v3.53: a handling event without a twin, or a twin outside the vocabulary
     return { summary, cycle, touches, wait, wip, byOp, dispatch, dispatchByOrder, staffing,
       bizstepDwell: m.dwell || null, dispositionCounts: m.dispositions || null, // v3.53: the same rows as v_bizstep_dwell (reconciled)
+      quality: m.quality || null, // v3.54: first pass yield, rework and scrap ratios per operation (reconciled)
       invariants: invariants,
       flowLinks: m.flowLinks,
       rates: exp.rates || null, spans: cost ? cost.spans : null, costByHu: cost ? cost.byHu : null,
@@ -182,6 +183,7 @@
     m.dwell = m.tracking ? T.dwellByBizStep(m.tracking.events) : null;
     m.dispositions = m.tracking ? T.dispositionCounts(m.tracking.events) : null;
     m.trackGaps = m.tracking ? T.gaps(exp, m.tracking) : null;
+    m.quality = Lg && typeof Lg.qualityByStep === "function" ? Lg.qualityByStep(exp) : null; // v3.54: the same rows as v_quality_by_step
     m.views = computeViews(exp, m);
     m.ribbon = ribbon(exp);
     m.costByHu = {};
@@ -391,6 +393,10 @@
       // v3.45: the staffing what-if, if any
       policy: r.policy ? { text: "adaptive staffing (what-if)", sub: "a second worker joins a bench when its queue reaches " + r.policy.threshold + " and leaves after " + r.policy.cooldownTicks + " ticks with an empty queue (at most " + r.policy.maxServers + "); this adds capacity the declared floor does not have, and the extra worker's idle time is not charged" }
         : { text: "declared stations only", sub: "every bench had one worker for the whole run" },
+      // v3.54: the human-error what-if, if any
+      errors: r.errors ? { text: "declared error shares (what-if)", sub: (r.errors.kinds || []).map((k) => k.kind + " " + k.effective).join(" · ") + (r.errors.multiplier > 1 ? " · levers x" + r.errors.multiplier : "") + " · teaching values per step, never per person" }
+        : { text: "every step perfect", sub: "no error what-if ran: first pass yield 1 at every operation" },
+      invariantCount: Object.keys(v.invariants).length,
       // v3.44: where the order stream came from
       dataset: r.dataset ? { text: "own data: " + r.dataset.orders + " orders / " + r.dataset.lines + " lines", sub: (r.dataset.source || "pool") + (r.dataset.skus != null ? " · " + r.dataset.skus + " articles" : "") + " · one unit per order line, the line's quantity on the unit; order types from the mix" }
         : { text: "synthetic order stream", sub: "one-line orders numbered in spawn order; quantities drawn by the packaging profile" },
@@ -502,11 +508,12 @@
       { label: "Order mix", value: g.mix },
       { label: "Order stream", value: g.dataset.text, sub: g.dataset.sub },
       { label: "Staffing", value: g.policy.text, sub: g.policy.sub },
+      { label: "Human error", value: g.errors.text, sub: g.errors.sub },
       { label: "Simulated", value: r.ticks + " ticks · " + g.minutes + " min", sub: r.minutes_per_tick + " min per tick" },
       { label: "Units · events", value: g.units + " · " + g.events, sub: g.retired + " retired · " + g.inFlight + " in flight" },
       { label: "Delivered", value: g.delivered + " units · " + g.delivered_eaches + " eaches", sub: g.delivered_pallets + " pallets · " + g.delivered_parcels + " parcels · " + g.trailers + " trailer" + (g.trailers === 1 ? "" : "s") },
       g.cost ? { label: "Cost of this run", value: money(g.cost.total), sub: money(g.cost.per_unit) + " per unit · " + (g.cost.per_received_each == null ? "—" : money(g.cost.per_received_each, 4)) + " per received each · " + (g.cost.per_delivered_each == null ? "—" : money(g.cost.per_delivered_each, 4)) + " per delivered each" } : { label: "Cost of this run", value: "—", sub: "no rates in this file" },
-      { label: "Invariants", value: g.invariantsOk ? "all four hold" : g.invariantsBad.length + " broken", cls: g.invariantsOk ? "good" : "bad", sub: g.invariantsOk ? "conservation, cross-dock, versions, terminals" : g.invariantsBad.join(", ") },
+      { label: "Invariants", value: g.invariantsOk ? "all " + g.invariantCount + " hold" : g.invariantsBad.length + " broken", cls: g.invariantsOk ? "good" : "bad", sub: g.invariantsOk ? "conservation, cross-dock, versions, terminals" : g.invariantsBad.join(", ") },
     ];
     const flags = g.flags.length ? '<ul class="flags">' + g.flags.map((f) => '<li class="flag-' + esc(f.kind) + '">' + esc(f.text) + "</li>").join("") + "</ul>" : "<p class=\"note\">No data-quality flags: rates present, every station has a declared capacity, every unit retired.</p>";
     $("rlGlance").innerHTML = cards(items) + flags + sqlBlock("v_run_summary") + "<p class=\"note\">" + esc(r.honesty || "") + "</p>";
@@ -687,6 +694,17 @@
   // v3.45: the staffing what-if's changes per bench - a step chart of workers over the
   // run and the same aggregates as v_staffing; a note when the run had no policy.
   const STAFFING_COLS = ["location_id", "changes", "max_servers", "first_change_tick", "ticks_with_extra_server"];
+  // v3.54 quality by step: ISO 22400-2's names per operation; a note names the what-if
+  // or says every step was perfect. Shares belong to a step, never to a person.
+  const QUALITY_COLS = ["op", "units_through", "errors", "reworked", "scrapped_for_damage", "first_pass_yield", "rework_ratio", "scrap_ratio"];
+  function qualityHtml(exp) {
+    const rows = views(exp).quality || [], er = exp.run.errors;
+    const note = er
+      ? "<p class=\"note\">The human-error what-if ran: " + esc((er.kinds || []).map((k) => k.kind + " " + k.effective + " per " + k.ops.join(" / ")).join("; ")) + (er.multiplier > 1 ? " (levers x" + er.multiplier + ": " + esc((er.latent || []).join(", ")) + ")" : "") +
+        ". First pass yield = units through without an error over units through; rework ratio and scrap ratio the same way (ISO 22400-2 names). Errors belong to a process step and a latent condition, never to a person; the shares are teaching values, dispatched by quota.</p>"
+      : "<p class=\"note\">Every step was perfect in this run (no error what-if): first pass yield is 1 at every operation. Switch on <em>Human error - Declared</em> in the planner's flow card to record errors as branches.</p>";
+    return note + table(rows, QUALITY_COLS, "Quality by step (ISO 22400-2 names)") + sqlBlock("v_quality_by_step");
+  }
   function staffingHtml(exp) {
     if (!exp.run.policy) return "<p class=\"note\">No staffing policy in this run: every bench had one worker for the whole run.</p>" + sqlBlock("v_staffing");
     const rows = views(exp).staffing || [], p = exp.run.policy;
@@ -719,6 +737,7 @@
       '<text x="10" y="14" class="svg-label">in flight, peak ' + maxW + '</text><text x="10" y="' + (H - 4) + '" class="svg-label">tick 0</text><text x="' + (W - 10) + '" y="' + (H - 4) + '" class="svg-label" text-anchor="end">tick ' + exp.run.ticks + " (" + r2(exp.run.ticks * mpt) + " min) · " + last.in_flight + " in flight · " + last.retired + " retired</text></svg>" + sqlBlock("v_wip_by_tick");
     $("rlByOp").innerHTML = table(v.byOp, ["op", "kind", "events", "pallets", "cases", "eaches", "parcels", "retained", "scrapped"], "Quantities at each operation") + sqlBlock("v_quantities_by_op");
     $("rlStaffing").innerHTML = staffingHtml(exp); // v3.45
+    $("rlQuality").innerHTML = qualityHtml(exp); // v3.54
   }
 
   /* ---------------- dispatch ------------------------------------------ */

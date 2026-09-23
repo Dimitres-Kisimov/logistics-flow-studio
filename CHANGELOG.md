@@ -1,5 +1,59 @@
 # Changelog
 
+## v3.54 — Human error, honestly: declared shares per step, quota-dispatched branches, an unrolled rework
+
+**The model.** `flowsim.spawnPlan` takes `opts.errors` - `true` for the three kinds at their defaults,
+or `{ "mis-pick": 0.02, "wrong-putaway": 0.003, damage: 0.005, psf: { timePressure, signalToNoise,
+familiarity }, cap }` - and `routing.normalizeErrors` turns it into effective shares: share × the
+product of the levers (HEART's error-producing conditions: time pressure ×11 at most, low
+signal-to-noise ×10, unfamiliarity ×17), capped at 0.5, the levers above 1 recorded as the latent
+conditions. `routing.branchesFor` then hands `flowsim.buildRoutes` one extra branch per (kind,
+step) of every base branch, the way the returns split already works: the rework spliced in
+(`… piece-pick, verify-pick, piece-pick …`; `… putaway, verify-put, putaway …`) or the write-off
+appended (`… pack, scrap`), the base branch keeping the rest of the demand, all dispatched by the
+existing quota rule (a 2 % share over 100 units errs at indices 25 and 75, by hand). Two new
+operations after the twenty, `verify-pick` (pick face) and `verify-put` (storage), no station, no
+new anchor; the route id and label name the kind and the step. Without `opts.errors` nothing
+changes: the plan JSON, the route count, the run id hash and fixture A are byte for byte what they
+were; the legacy spine never branches. The shares are TEACHING VALUES anchored on HEART (Williams
+1986; consolidated 2017) and SPAR-H (NUREG/CR-6883) generic probabilities - nuclear-industry
+anchors, not warehouse measurements - and the knowledge base carries them as a `human-factors`
+category (seven seeds, pinned equal to routing's defaults) that says so.
+
+**The ledger.** Two observer fixes the rework needed and every existing route is indifferent to:
+`quantityAt` takes the op INDEX (the queued event at the second pick carries the picked quantity,
+not the pallet), and a unit served at one occurrence of an operation and queued at its next
+occurrence within the same tick - the same bench, the waypoint moved, op and status did not - is
+recorded as served, passed (the verification), queued. Units on an error branch carry
+`error_kind / error_op / error_outcome / error_latent`; `run.errors` records the kinds, the levers
+and the ledger's honesty and joins the run id; `stats().quality` (only when the what-if ran) and
+the pure `qualityByStep(export)` give ISO 22400-2's names per operation: units through, errors,
+reworked, scrapped for damage, first pass yield, rework ratio, scrap ratio.
+
+**The tracking twins.** At the erring step the disposition the kind names (`mismatch_class`,
+`sellable_not_accessible`, `damaged`) with `wt:error` (kind, step, detected, latent); at the
+verification `inspecting`, back to `in_progress`, `wt:error.detected` true; a damaged unit stays
+damaged while held at the returns bench and is destroyed `non_sellable_other`. The Python twin
+mirrors it (`tracking_event.error_detected`).
+
+**SQL, viewer, app.** `run.errors`, the four `hu.error_*` columns and `tracking_event.error_detected`
+with guarded ALTERs; `v_quality_by_step` (a planner view, reconciled against the JavaScript rows);
+the viewer's *Quality by step* table with a note that names the what-if or says every step was
+perfect, a *Human error* glance card, the invariant count spelled out instead of "all four"; the
+planner's *Human error* picker (none | declared, remembered on this device) and a quality line in
+the flow readout.
+
+**Limits, stated.** A unit errs at most once and one kind at a time; a rework is an unrolled detour,
+not a loop (the KNOWN LIMITS say so); the legacy spine never branches; `goods.js formAlong` resolves
+the first occurrence of an operation, so a unit queued for its re-pick is drawn in its first-pass
+form - a cosmetic limit; replication groups do not yet key on the error lever (v3.55 adds the
+levers to the grouping).
+
+**Verification.** `verify_errors.js` (33 checks), +4 Python tests (the quality view by hand with one
+reworked unit, the perfect fixture, the guarded ALTERs, the twin's error and its detection), both
+self-tests. 79 harnesses, 139 Python tests, WT-SELFTEST 187/187 + viewer 34/34. Cache wt-v133.
+The four run exports are byte-identical.
+
 ## v3.53 — The tracking database: EPCIS-shaped twins, derived not recorded, kept across runs
 
 **The module.** `tracking.js` maps every handling event of the run ledger to exactly one

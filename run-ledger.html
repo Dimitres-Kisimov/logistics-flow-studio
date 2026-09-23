@@ -32,6 +32,7 @@
 <h3>Waiting at each bench</h3><div id="rlWait"></div>
 <h3>Work in progress over the run</h3><div id="rlWip"></div>
 <h3>Workers at each bench</h3><div id="rlStaffing"></div>
+<h3>Quality by step</h3><div id="rlQuality"></div>
 <h3>Quantities at each operation</h3><div id="rlByOp"></div></section>
 <section id="secCost" aria-labelledby="hCost"><h2 id="hCost">What a handling unit costs</h2><p class="note">The spans between a unit's events, charged at the rates the run was recorded under (the planner's Analyze panel, defaults from <code>analytics.js</code>): a unit served at a station is charged that station's service time, whatever it waited; a moving unit is charged at the class of mover the floor contains. Cost per span = hours × labour rate (manned classes) + hours × capex ÷ amortisation years ÷ operating hours per year + hours × kW × energy price. Queue time costs no labour; a holding cost per unit-hour waiting is charged only if you set one in the planner's Analyze panel (default 0). Cost per order type is given per unit, per <em>received</em> each (every unit, retired or not) and per <em>delivered</em> each (partial while units are in flight).</p><div id="rlCost"></div></section>
 <section id="secDispatch" aria-labelledby="hDispatch"><h2 id="hDispatch">Dispatch manifest</h2><div id="rlDispatch"></div></section>

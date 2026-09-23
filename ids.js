@@ -66,17 +66,19 @@
     const rows = (pool || []).map((o) => [String(o.orderId), (Array.isArray(o.lines) ? o.lines : []).map((l) => [l.sku != null ? String(l.sku) : (l.skuIndex != null ? l.skuIndex : null), Math.round(Number(l.qty) || 0)])]);
     return hex8(fnv1a(JSON.stringify(rows)));
   }
-  function inputHash(layout, seed, mix, pool, policy) {
+  function inputHash(layout, seed, mix, pool, policy, errors) {
     const els = ((layout && layout.elements) || []).map((e) => [e.id, e.type, e.x, e.y, e.w, e.d, e.arc || null]);
     const m = mix == null ? null : (Array.isArray(mix) ? mix : Object.keys(mix).sort().map((k) => [k, mix[k]]));
     const parts = [(layout && layout.gridW) || 0, (layout && layout.gridH) || 0, els, seed >>> 0, m];
     if (Array.isArray(pool) && pool.length) parts.push(poolDigest(pool));
     // v3.45: the staffing what-if is a run input too (only when present)
     if (policy && policy.kind) parts.push(["policy", String(policy.kind), policy.threshold | 0, policy.maxServers | 0, policy.cooldownTicks | 0]);
+    // v3.54: the error what-if is a run input too (only when present): the kinds with their effective shares, the three levers
+    if (errors && Array.isArray(errors.kinds) && errors.kinds.length) parts.push(["errors", errors.kinds.map((k) => [k.kind, k.effective]), errors.psf ? [errors.psf.timePressure, errors.psf.signalToNoise, errors.psf.familiarity] : null]);
     return hex8(fnv1a(JSON.stringify(parts)));
   }
-  function runId(scenarioId, seed, layout, mix, pool, policy) {
-    return "RUN-" + slug(scenarioId) + "-s" + (seed >>> 0) + "-h" + inputHash(layout, seed, mix, pool, policy);
+  function runId(scenarioId, seed, layout, mix, pool, policy, errors) {
+    return "RUN-" + slug(scenarioId) + "-s" + (seed >>> 0) + "-h" + inputHash(layout, seed, mix, pool, policy, errors);
   }
   function orderId(run, n) { return "ORD-" + run + "-" + pad(n, 6); }
   function huId(order, k) { return "HU-" + order + "-" + (k == null ? 1 : k); }

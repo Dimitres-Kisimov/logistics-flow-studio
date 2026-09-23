@@ -167,6 +167,31 @@ Data-quality flags: no holding cost is set (0 per unit-hour): waiting stock cost
 | storing | 28 | 23 | 9 | 73.11 | 206 | 612 | 658 | 0.9301 |
 | unpacking | 19 | 19 | 17 | 18.0 | 18 | 0 | 306 | 0.0 |
 
+### v_quality_by_step
+
+| op | units_through | errors | reworked | scrapped_for_damage | first_pass_yield | rework_ratio | scrap_ratio |
+|---|---|---|---|---|---|---|---|
+| case-pick | 1 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| consolidate | 2 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| depalletise | 19 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| inspect | 3 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| load | 8 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| pack | 2 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| pallet-pick | 1 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| palletise | 2 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| pick | 3 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| piece-pick | 1 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| putaway | 5 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| qc-final | 1 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| qc-sample | 20 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| receive | 36 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| replen | 1 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| restock | 2 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| scrap | 1 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| stage-out | 4 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| vas | 1 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+| wrap | 3 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
+
 ## Cost detail
 
 | hours | labour_eur | equipment_eur | energy_eur | holding_eur | total_eur |

@@ -723,6 +723,7 @@ const HARNESSES = [
   { name: "Timed route playback", args: ["verify_route_playback.js"] },
   { name: "Scheduled resource playback", args: ["verify_resource_playback.js"] },
   { name: "The tracking database: one EPCIS-shaped twin per handling event, derived not recorded, dwell == spans, a store across runs, SQL == JS (verify_tracking.js)", args: ["verify_tracking.js"] },
+  { name: "Human error, honestly: declared shares per step, quota-dispatched branches, the unrolled rework, ISO 22400 quality KPIs, SQL == JS (verify_errors.js)", args: ["verify_errors.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

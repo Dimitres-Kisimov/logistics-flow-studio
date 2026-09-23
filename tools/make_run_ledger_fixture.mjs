@@ -105,6 +105,7 @@ export function reconcileRows(exp) {
       v_spans: c ? c.spans : L.spans(exp), v_span_cost: c ? c.spans : [], v_cost_by_hu: c ? c.byHu : [], v_cost_by_type: c ? c.byType : [], v_cost_by_location: c ? c.byLocation : [],
       v_dispatch_by_order: v.dispatchByOrder || [], v_staffing: v.staffing || [],
       v_bizstep_dwell: v.bizstepDwell || [], // v3.53: the tracking twins' dwell per business step
+      v_quality_by_step: v.quality || [], // v3.54: first pass yield, rework and scrap ratios per operation
     },
   };
 }

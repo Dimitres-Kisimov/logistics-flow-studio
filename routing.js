@@ -97,6 +97,11 @@
  *         order-independent LOOP it really is; the same is true of
  *         re-slotting and of the return leg inside picking. Cycles need
  *         a directed graph.
+ *       * (v3.54) A HUMAN ERROR is a declared share per step, realised as an
+ *         UNROLLED detour - the operation, its verification, the operation
+ *         once more - or a write-off. A unit that errs twice is not modelled,
+ *         a second error kind on one unit is not modelled, and the detour is
+ *         a list for the same reason the loops above are: cycles need a graph.
  *       * Not modelled at all: dangerous goods, the cold chain as a routed
  *         zone, the empties counter-flow, second-stage batch sortation and
  *         dispatch-label (SSCC) application.
@@ -324,6 +329,19 @@
       id: "scrap", label: "Scrap / write-off", stage: "shipping",
       anchor: "returns", station: null, form: "carton",
       desc: "A return that failed grading is written off at the returns bench - it never re-enters stock.",
+    },
+    // v3.54 HUMAN ERROR: the two DETECTION steps a rework passes through. No new
+    // anchors - a pick is verified at the pick face, a put-away at the storage
+    // location - and no station: the check is a scan, not a served queue.
+    "verify-pick": {
+      id: "verify-pick", label: "Pick verification (scan check at the face)", stage: "picking",
+      anchor: "pickface", station: null, form: "tote",
+      desc: "The pick is checked against the order line at the face; a mis-pick is caught here and the pick is done again once (the v3.54 error what-if).",
+    },
+    "verify-put": {
+      id: "verify-put", label: "Put-away verification (location scan)", stage: "storage",
+      anchor: "storage", station: null, form: "carton",
+      desc: "The location scan after put-away; a wrong slot is caught here and the put-away is done again once (the v3.54 error what-if).",
     },
   };
 
@@ -593,7 +611,7 @@
     }
     const outs = outcomesOf(arch);
     const outcomeId = outs ? (o.outcome && outs.some((x) => x.id === o.outcome) ? o.outcome : outs[0].id) : null;
-    const ops = opsFor(arch, outcomeId);
+    const ops = Array.isArray(o.ops) && o.ops.length ? o.ops.slice() : opsFor(arch, outcomeId); // v3.54: an error branch hands its spliced list
     const A = anchors || {};
 
     const steps = [], missing = [], shared = [];
@@ -632,13 +650,13 @@
     }
 
     const touchesStorage = steps.some((s) => s.anchor === "storage");
-    return {
+    const res = {
       ok: ok,
       id: arch.id,
-      routeId: routeIdOf(arch.id, outcomeId),
+      routeId: routeIdOf(arch.id, outcomeId) + (o.error ? ":" + o.error.kind + "@" + o.error.op : ""), // v3.54
       outcome: outcomeId,
       outcomeLabel: outcomeId && outs ? (outs.find((x) => x.id === outcomeId) || {}).label || null : null,
-      label: arch.label,
+      label: arch.label + (o.error ? " - " + errorLabel(o.error.kind) + " at " + o.error.op : ""),
       short: arch.short || arch.label,
       legacy: !!arch.legacy,
       startsInStock: !!arch.startsInStock,
@@ -653,6 +671,8 @@
       invariantOk: arch.neverStorage ? !touchesStorage : true,
       message: message,
     };
+    if (o.error) res.error = o.error; // v3.54: the declared error this branch realises (key only on an error branch)
+    return res;
   }
 
   // Every route an archetype can produce (one per outcome branch).
@@ -662,6 +682,116 @@
     const outs = outcomesOf(arch);
     if (!outs) return [resolveRoute(archetypeId, anchors, null)];
     return outs.map((oc) => resolveRoute(archetypeId, anchors, { outcome: oc.id }));
+  }
+
+
+  /* ==================================================================
+   * v3.54 HUMAN ERROR, HONESTLY - declared shares per STEP, dispatched
+   * by quota (never a random draw) and realised as BRANCHES the way the
+   * returns split is: for every base branch of an archetype and every
+   * error kind that applies to one of its operations, one extra route
+   * with the rework spliced in (an UNROLLED detour: the operation, its
+   * verification, the operation once more) or the write-off appended.
+   * An error belongs to a process step and a LATENT CONDITION (the three
+   * performance-shaping levers), never to a person: nothing here is keyed
+   * to a worker (BetrVG 87(1)6, GDPR Art. 88). The shares are TEACHING
+   * VALUES anchored on the only citable generic human-error probabilities
+   * (HEART, Williams 1986 / consolidated 2017; SPAR-H, NUREG/CR-6883) -
+   * nuclear and process-industry values, not warehouse measurements. A
+   * unit errs at most once; a second error on one unit is not modelled.
+   * ================================================================== */
+  const SAME_OP = "@same";
+  const ERROR_KINDS = [
+    { kind: "mis-pick", label: "Mis-pick (wrong item or quantity)", ops: ["pick", "case-pick", "piece-pick", "pallet-pick"], share: 0.02,
+      rework: ["verify-pick", SAME_OP], disposition: "mismatch_class",
+      source: "HEART generic task type: routine, highly practised, rapid task involving relatively low level of skill - nominal unreliability 0.02 (Williams 1986; consolidated 2017). A nuclear-industry anchor used as a TEACHING VALUE, not a warehouse measurement." },
+    { kind: "wrong-putaway", label: "Put-away into the wrong slot", ops: ["putaway"], share: 0.003,
+      rework: ["verify-put", "putaway"], disposition: "sellable_not_accessible",
+      source: "HEART generic task type: restore or shift a system to original or new state following procedures, with some checking - nominal unreliability 0.003. Teaching value." },
+    { kind: "damage", label: "Handling damage", ops: ["depalletise", "pack", "palletise"], share: 0.005,
+      tail: ["scrap"], disposition: "damaged",
+      source: "Teaching value: no generic human-error probability covers handling damage (HEART and SPAR-H give none); to be replaced by a site's own damage log." },
+  ];
+  const PSF = {
+    timePressure: { label: "Time pressure", max: 11, source: "HEART error-producing condition: a shortage of time available for error detection and correction - maximum effect x11" },
+    signalToNoise: { label: "Low signal-to-noise (label contrast, lighting, look-alike articles)", max: 10, source: "HEART error-producing condition: a low signal-to-noise ratio - maximum effect x10" },
+    familiarity: { label: "Unfamiliarity (training, a novel or infrequent task)", max: 17, source: "HEART error-producing condition: unfamiliarity with a situation which is potentially important but which only occurs infrequently or which is novel - maximum effect x17" },
+  };
+  const ERROR_CAP = 0.5;
+  const ERRORS_HONESTY =
+    "Human error is a what-if: declared shares per process step, realised as branches dispatched by quota (exact to within " +
+    "one unit, replayable) - never a random draw and never a person. The shares are teaching values anchored on generic " +
+    "human-error probabilities from the nuclear industry (HEART, SPAR-H), not warehouse measurements; the levers multiply " +
+    "them and the cap binds. A rework is one detection and one redo, a damage a write-off; a unit errs at most once. " +
+    "Errors belong to a step and a latent condition, and nothing here is keyed to a worker (BetrVG 87(1)6, GDPR Art. 88).";
+  const r6 = (v) => Math.round(v * 1e6) / 1e6;
+  function errorLabel(kind) {
+    const d = ERROR_KINDS.find((k) => k.kind === kind);
+    return d ? d.label : String(kind);
+  }
+  // normalizeErrors(spec) -> null (no what-if) or the normalised levers:
+  //   spec = true                       every kind at its default share, levers 1
+  //   spec = { "mis-pick": 0.02, damage: { share: 0.005 }, psf: { timePressure: 2 }, cap: 0.5 }
+  //   a kind that is not named, false, null or 0 is OFF; a share above 1 is clamped;
+  //   a lever below 1 is 1, above its maximum is the maximum; effective = min(cap, share x product of levers).
+  function normalizeErrors(spec) {
+    if (!spec) return null;
+    const s = spec === true ? {} : spec;
+    const psfIn = (s && s.psf) || {};
+    const psf = {}, latent = [];
+    let mult = 1;
+    for (const k of Object.keys(PSF)) {
+      const raw = Number(psfIn[k]);
+      const v = isFinite(raw) && raw > 1 ? Math.min(PSF[k].max, raw) : 1;
+      psf[k] = v;
+      mult *= v;
+      if (v > 1) latent.push(k);
+    }
+    const capRaw = Number(s.cap);
+    const cap = isFinite(capRaw) && capRaw > 0 && capRaw <= 1 ? capRaw : ERROR_CAP;
+    const kinds = [];
+    for (const def of ERROR_KINDS) {
+      const raw = spec === true ? true : s[def.kind];
+      let share = null;
+      if (raw === true) share = def.share;
+      else if (typeof raw === "number") share = raw;
+      else if (raw && typeof raw === "object" && typeof raw.share === "number") share = raw.share;
+      if (!(share > 0)) continue;
+      share = Math.min(1, share);
+      kinds.push({ kind: def.kind, label: def.label, ops: def.ops.slice(), share: r6(share), effective: r6(Math.min(cap, share * mult)),
+        disposition: def.disposition, rework: def.rework ? def.rework.slice() : null, tail: def.tail ? def.tail.slice() : null, source: def.source });
+    }
+    if (!kinds.length) return null;
+    return { kind: "human-error", kinds: kinds, psf: psf, multiplier: r6(mult), latent: latent, cap: cap, honesty: ERRORS_HONESTY };
+  }
+  // branchesFor(archetypeId, errors) -> the branch list flowsim builds routes from:
+  // without errors exactly the static outcome list; with them, per base branch, the
+  // base (its share less the error shares) followed by one branch per (kind, step)
+  // whose `ops` carry the rework spliced after the step (or the write-off appended)
+  // and whose `error` names the kind, the step, the outcome and the latent levers.
+  // The legacy spine never branches (it is the byte-identical v3.24 default).
+  function branchesFor(archetypeId, errors) {
+    const arch = ARCHETYPE_BY_ID[archetypeId];
+    const outs = arch ? outcomesOf(arch) : null;
+    const base = outs ? outs.map((o) => ({ outcome: o.id, share: o.share })) : [{ outcome: null, share: 1 }];
+    if (!arch || arch.legacy || !errors || !Array.isArray(errors.kinds) || !errors.kinds.length) return base;
+    const out = [];
+    for (const b of base) {
+      const ops = opsFor(arch, b.outcome);
+      const errs = [];
+      for (const k of errors.kinds) for (let i = 0; i < ops.length; i++) if (k.ops.indexOf(ops[i]) >= 0) errs.push({ kind: k, op: ops[i], at: i });
+      let total = 0;
+      for (const e of errs) total += e.kind.effective;
+      const scale = total > 1 ? 1 / total : 1; // the levers can push the sum past one: the base branch then gets nothing, said in the readout
+      out.push({ outcome: b.outcome, share: b.share * (1 - total * scale) });
+      for (const e of errs) {
+        const head = ops.slice(0, e.at + 1);
+        const spliced = e.kind.tail ? head.concat(e.kind.tail) : head.concat(e.kind.rework.map((r) => (r === SAME_OP ? e.op : r)), ops.slice(e.at + 1));
+        out.push({ outcome: b.outcome, share: b.share * e.kind.effective * scale, ops: spliced,
+          error: { kind: e.kind.kind, op: e.op, disposition: e.kind.disposition, rework: !e.kind.tail, latent: errors.latent.slice() } });
+      }
+    }
+    return out;
   }
 
   /* ==================================================================
@@ -721,6 +851,9 @@
   }
 
   WT.routing = {
+    // v3.54 human error, honestly
+    ERROR_KINDS: ERROR_KINDS, PSF: PSF, ERROR_CAP: ERROR_CAP, ERRORS_HONESTY: ERRORS_HONESTY, SAME_OP: SAME_OP,
+    normalizeErrors: normalizeErrors, branchesFor: branchesFor, errorLabel: errorLabel,
     LEGACY_ID: LEGACY_ID,
     ANCHORS: ANCHORS,
     OPERATIONS: OPERATIONS,

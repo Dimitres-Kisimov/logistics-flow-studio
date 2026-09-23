@@ -34,11 +34,12 @@ window.RunLedgerSQL = {
   "v_epcis_events": "SELECT t.run_id, t.id AS event_id, t.hu_id, h.archetype, h.sscc, h.order_id, t.version, t.tick, t.minute, t.event_type, t.action,\n       t.biz_step, t.disposition, t.read_point, t.read_element, t.biz_location, t.biz_transaction_type, t.biz_transaction,\n       t.epc, t.parent_id, t.epc_class, t.quantity, t.uom, t.wt_kind, t.wt_op, t.error_kind, t.error_step, t.error_latent\nFROM tracking_event t JOIN hu h ON h.id = t.hu_id;",
   "v_unit_history": "SELECT run_id, hu_id, version, tick, wt_kind AS kind, wt_op AS op, event_type, action, biz_step, disposition, read_element, quantity,\n       LEAD(tick) OVER (PARTITION BY hu_id ORDER BY version) - tick AS ticks_to_next\nFROM tracking_event;",
   "v_bizstep_dwell": "WITH t AS (\n  SELECT run_id, hu_id, biz_step, wt_kind, tick,\n         LEAD(tick) OVER (PARTITION BY hu_id ORDER BY version) - tick AS ticks_to_next\n  FROM tracking_event)\nSELECT run_id, biz_step, COUNT(*) AS events, COUNT(DISTINCT hu_id) AS units, COUNT(ticks_to_next) AS spans,\n       ROUND(AVG(ticks_to_next), 2) AS avg_ticks_to_next, MAX(ticks_to_next) AS max_ticks_to_next,\n       COALESCE(SUM(CASE WHEN wt_kind = 'queued' THEN ticks_to_next END), 0) AS waiting_ticks,\n       COALESCE(SUM(ticks_to_next), 0) AS total_ticks,\n       CASE WHEN SUM(ticks_to_next) > 0 THEN ROUND(SUM(CASE WHEN wt_kind = 'queued' THEN ticks_to_next ELSE 0 END) * 1.0 / SUM(ticks_to_next), 4) END AS waiting_share\nFROM t GROUP BY run_id, biz_step;",
-  "v_tracking_gaps": "SELECT h.run_id, e.id AS handling_event_id, 'no twin' AS gap\nFROM handling_event e JOIN hu h ON h.id = e.hu_id\nWHERE NOT EXISTS (SELECT 1 FROM tracking_event t WHERE t.handling_event_id = e.id)\nUNION ALL\nSELECT t.run_id, t.handling_event_id, 'business step ' || t.biz_step FROM tracking_event t\nWHERE t.biz_step NOT IN ('receiving','inspecting','unpacking','storing','stocking','picking','staging_outbound','repackaging','packing','loading','shipping','holding','destroying')\nUNION ALL\nSELECT t.run_id, t.handling_event_id, 'disposition ' || t.disposition FROM tracking_event t\nWHERE t.disposition NOT IN ('in_progress','returned','in_transit','sellable_accessible','sellable_not_accessible','non_sellable_other','mismatch_class','damaged');"
+  "v_tracking_gaps": "SELECT h.run_id, e.id AS handling_event_id, 'no twin' AS gap\nFROM handling_event e JOIN hu h ON h.id = e.hu_id\nWHERE NOT EXISTS (SELECT 1 FROM tracking_event t WHERE t.handling_event_id = e.id)\nUNION ALL\nSELECT t.run_id, t.handling_event_id, 'business step ' || t.biz_step FROM tracking_event t\nWHERE t.biz_step NOT IN ('receiving','inspecting','unpacking','storing','stocking','picking','staging_outbound','repackaging','packing','loading','shipping','holding','destroying')\nUNION ALL\nSELECT t.run_id, t.handling_event_id, 'disposition ' || t.disposition FROM tracking_event t\nWHERE t.disposition NOT IN ('in_progress','returned','in_transit','sellable_accessible','sellable_not_accessible','non_sellable_other','mismatch_class','damaged');",
+  "v_quality_by_step": "WITH t AS (SELECT h.run_id, e.op, e.hu_id FROM handling_event e JOIN hu h ON h.id = e.hu_id WHERE e.kind <> 'queued' GROUP BY h.run_id, e.op, e.hu_id),\n     u AS (SELECT t.run_id, t.op, t.hu_id, h.error_op, h.error_outcome FROM t JOIN hu h ON h.id = t.hu_id)\nSELECT run_id, op, COUNT(*) AS units_through,\n       SUM(CASE WHEN error_op = op THEN 1 ELSE 0 END) AS errors,\n       SUM(CASE WHEN error_op = op AND error_outcome = 'rework' THEN 1 ELSE 0 END) AS reworked,\n       SUM(CASE WHEN error_op = op AND error_outcome = 'scrap' THEN 1 ELSE 0 END) AS scrapped_for_damage,\n       ROUND((COUNT(*) - SUM(CASE WHEN error_op = op THEN 1 ELSE 0 END)) * 1.0 / COUNT(*), 4) AS first_pass_yield,\n       ROUND(SUM(CASE WHEN error_op = op AND error_outcome = 'rework' THEN 1 ELSE 0 END) * 1.0 / COUNT(*), 4) AS rework_ratio,\n       ROUND(SUM(CASE WHEN error_op = op AND error_outcome = 'scrap' THEN 1 ELSE 0 END) * 1.0 / COUNT(*), 4) AS scrap_ratio\nFROM u GROUP BY run_id, op;"
 };
 window.RunLedgerSQLMeta = {
   "generated_from": "tools/run_ledger.py",
-  "views": 33,
+  "views": 34,
   "planner": [
     "v_run_summary",
     "v_cycle_time_by_type",
@@ -50,7 +51,8 @@ window.RunLedgerSQLMeta = {
     "v_cost_by_location",
     "v_flow_links",
     "v_staffing",
-    "v_bizstep_dwell"
+    "v_bizstep_dwell",
+    "v_quality_by_step"
   ],
   "invariant": [
     "v_conservation_violations",

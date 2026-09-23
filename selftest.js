@@ -3776,6 +3776,22 @@
         return { ok:restored && rejected && preserved && cleared && $("optConstraints").value === '{incomplete', detail:"Draft roundtrip, atomic malformed-field rejection, legacy reset and incomplete-text preservation" };
       } finally { API.deserializeLayout(saved); }
     });
+    // ---- v3.54: the human-error what-if picker exists; with opts.errors the plan carries error
+    // branches (an unrolled rework, a write-off) that name their kind and step; without it no key.
+    check("human-error-what-if-picker-and-branches", function () {
+      var sel = $("flowErrorsSelect"), F = WT.flowsim, R2 = WT.routing, EX2 = WT.examples;
+      if (!sel || !F || !R2 || !EX2 || typeof R2.branchesFor !== "function") return { ok: false, detail: "missing" };
+      var b = EX2.build("ecommerce-multichannel-fc");
+      var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
+      var withE = F.spawnPlan(lay, { seed: 3, mix: lay.config.orderMix, errors: { "mis-pick": 0.02, damage: 0.005 } });
+      var without = F.spawnPlan(lay, { seed: 3, mix: lay.config.orderMix });
+      var errRoutes = withE.routes.filter(function (r) { return r.error; });
+      var ok = sel.options.length === 2 && !!withE.errors && withE.errors.kinds.length === 2 && errRoutes.length > 0 && withE.routes.length > without.routes.length && !("errors" in without) &&
+        errRoutes.every(function (r) { return r.routeId.indexOf(":" + r.error.kind + "@" + r.error.op) > 0 && r.ops.indexOf(r.error.op) >= 0; }) &&
+        errRoutes.some(function (r) { return r.error.kind === "mis-pick" && r.ops.indexOf("verify-pick") > 0; }) &&
+        Math.abs(withE.mix.reduce(function (a, m) { return a + m.share; }, 0) - 1) < 1e-9 && WT.kb && WT.kb.get("hf.error.mis-pick") === R2.ERROR_KINDS[0].share;
+      return { ok: ok, detail: withE.routes.length + " routes with errors vs " + without.routes.length + " without" };
+    });
     // ---- v3.53: the tracking database - every package is joined to its handling unit,
     // the twins map the live ledger event for event, and the store round-trips a run.
     // The backend: the memory store by default, IndexedDB when the page is opened with
