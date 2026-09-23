@@ -1,5 +1,35 @@
 # Changelog
 
+## v3.63 — The lever search runs at the plant's own rates, and a thin sample cannot win
+
+**The limit v3.62 wrote down, closed.** `tools/search_levers.mjs --profile <site-profile.json>` runs the
+whole grid at the rates a site profile fitted (v3.59, `tools/fit_rates.py`): the measured error shares
+(a kind the profile did not fit keeps its teaching default) and, when `delivery.site.n > 0`, the site's
+own lateness quantiles in ticks (= minutes, scale 1, mode `site`) instead of the SCMS Truck shape at 60
+ticks per day - the same substitution `readDeliveryLevers` makes in the app. It changes the answer: on
+the hand floor with two seeds over 400 ticks the best combination delivers 9 orders at OTIF 0.7778 at
+teaching rates and 11 at 0.9091 at the plant's own. `search.json` records a `rates` block (the site's
+name, the tool and document that fitted it, the effective shares, the lateness shape and list) and
+`search.md` names them under the title.
+
+**A thin sample cannot win.** Reading the first profiled search found a ranking weakness: a combination
+reached OTIF 1.0 over 1.5 delivered orders and outranked 0.9091 over 11. A combination whose mean
+delivered orders is below `--min-delivered` (default 5) is now marked `thin` and ranked after every
+combination that is not; `--min-delivered 0` turns the guard off. The v3.62 ranking of the teaching-rate
+search is unchanged (its thin combinations were already last).
+
+**The tower refuses a table measured under other rates.** `control.js searchRatesMatch(S, rec)`: before
+the fifth rule compares anything, the table's `rates` block is held against the run's own plan - the
+effective error shares and the dock lateness list. On a mismatch the rule stays silent and records why
+on `control.state.searchNote`; the app prints it under the loaded table (*The fifth rule is silent here:
+…*). A v3.62 table without a `rates` block matches anything; a run that declares no such block has
+nothing to contradict and the proposal carries the table's rates into the run.
+
+**Verification.** `verify_search.js` 5a-5f (+6 → 22: the profile's shares and lateness in every run of
+the grid, the recorded rates and the markdown line, the changed answer, the thin guard with
+`--min-delivered 0` as the control, the tower's silence with the note naming both sets of shares and its
+proposal when they agree, `searchRatesMatch` by hand). `docs/LEVER_SEARCH.md`. Cache `wt-v141`.
+
 ## v3.62 — Search over levers, and the control tower's fifth rule
 
 **The tool.** `tools/search_levers.mjs <scenario|hand> --seeds 1-3 --ticks 600 --out <dir>

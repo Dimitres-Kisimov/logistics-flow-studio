@@ -24,10 +24,15 @@
  *      another scenario, and without a table; a run the table did not search
  *      gets every lever including the delivery and error pickers; a decision
  *      lands in the audit and in controlRows; the rule is documented.
- *   3. SHIPPED WIRING: the app applies a combination lever (and the delivery
+ *   3. THE PLANT'S OWN RATES (v3.63): --profile runs the grid at a site
+ *      profile's fitted shares and its own lateness quantiles, the table
+ *      records them, the ranking changes (11 orders at 0.9091 against 9 at
+ *      0.7778), a thin sample cannot win, and the tower refuses a table
+ *      measured under other rates than the run's.
+ *   4. SHIPPED WIRING: the app applies a combination lever (and the delivery
  *      and error pickers) and reverts it, creates the tower with the loaded
  *      table, imports the table; the knowledge-base threshold; the self-test;
- *      run-all; sw.js at wt-v140; verify_control updated; README, CHANGELOG,
+ *      run-all; sw.js at wt-v141; verify_control updated; README, CHANGELOG,
  *      docs/LEVER_SEARCH.md.
  * Deterministic + ASCII-only. Exit code 0 = all green.
  * ===================================================================== */
@@ -159,12 +164,65 @@ const S = r1.status === 0 ? JSON.parse(fs.readFileSync(path.join(outA, "search.j
     /search: \{ minGainHalfWidths: g\("control\.search\.minGainHalfWidths", 1\) \}/.test(app) && /lever\.kind === "combo" \? lever\.levers\.map\(leverText\)\.join\("; "\)/.test(app) && /Array\.isArray\(r\.lever\.from\)/.test(app));
   check("3b. the control card: an Import lever search button with its hidden input, the loaded table's line; the handler validates wt-lever-search, keeps it on state.flow.search and re-runs the day",
     /id="controlSearchImport"/.test(html) && /id="controlSearchImportInput" type="file"/.test(html) && /id="controlSearchInfo"/.test(html) && /obj\.kind !== "wt-lever-search"/.test(app) && /state\.flow\.search = obj/.test(app) && /controlSearchImportInput/.test(app));
-  check("3c. the knowledge base's control category carries control.search.minGainHalfWidths (1); the self-test lever-search-rule-proposes-from-a-table; run-all lists verify_search.js; sw.js at wt-v140 (previously wt-v139); verify_control pins five rules and eight thresholds",
-    /id: "control\.search\.minGainHalfWidths"/.test(kb) && WT.kb.get("control.search.minGainHalfWidths") === 1 && /lever-search-rule-proposes-from-a-table/.test(st) && /verify_search\.js/.test(runall) && /CACHE_VERSION\s*=\s*"wt-v140"/.test(sw) && /Previously wt-v139/.test(sw) &&
+  check("3c. the knowledge base's control category carries control.search.minGainHalfWidths (1); the self-test lever-search-rule-proposes-from-a-table; run-all lists verify_search.js; sw.js at wt-v141 (previously wt-v140); verify_control pins five rules and eight thresholds",
+    /id: "control\.search\.minGainHalfWidths"/.test(kb) && WT.kb.get("control.search.minGainHalfWidths") === 1 && /lever-search-rule-proposes-from-a-table/.test(st) && /verify_search\.js/.test(runall) && /CACHE_VERSION\s*=\s*"wt-v141"/.test(sw) && /Previously wt-v140/.test(sw) &&
     /C\.RULES\.length === 5/.test(vc) && /"control\.search\.minGainHalfWidths"/.test(vc));
   check("3d. control.js: the rule reads the table the person loaded, never a live feed; README and CHANGELOG name v3.62; docs/LEVER_SEARCH.md states the three conditions and the honesty",
     /function ruleSearch\(/.test(ctl) && /function comboOf\(/.test(ctl) && /ctl\.search/.test(ctl) && /v3\.62/.test(readme) && /## v3\.62/.test(changelog) && fs.existsSync(path.join(__dirname, "docs", "LEVER_SEARCH.md")) &&
     /minGainHalfWidths/.test(read(path.join("docs", "LEVER_SEARCH.md"))) && /overlapping half-widths is not a ranking/.test(read(path.join("docs", "LEVER_SEARCH.md"))));
+})();
+
+/* ---- 5. the plant's own rates, the thin-sample guard and the tower's rates refusal (v3.63) ---- */
+(function () {
+  const outP = path.join(tmp, "p");
+  const rp = run(["hand", "--seeds", "1-2", "--ticks", "400", "--staffing", "declared,adaptive", "--outbound-period", "240,120", "--profile", path.join("test", "fixtures", "site-profile.json"), "--out", outP]);
+  const SP = rp.status === 0 ? JSON.parse(fs.readFileSync(path.join(outP, "search.json"), "utf8")) : null;
+  const siteLate = F.windowLateness({ min: -30, p10: -30, median: 0, p90: 45, max: 90 }, 1, 16);
+  check("5a. --profile runs the whole grid at the plant's own rates: the committed site profile's fitted shares (mis-pick 0.04, wrong put-away 0.05, damage 0.05) and its own lateness quantiles in ticks (mode site, scale 1, the first Weyl point the minimum -30, every value within [-30, 90]) reach every run's plan",
+    rp.status === 0 && !!SP && [1, 2].every((seed) => { const e = JSON.parse(fs.readFileSync(path.join(outP, "run-0-" + seed + ".json"), "utf8"));
+      return JSON.stringify(e.run.errors.kinds.map((k) => [k.kind, k.effective])) === '[["mis-pick",0.04],["wrong-putaway",0.05],["damage",0.05]]' &&
+        e.run.inbound.mode === "site" && e.run.inbound.scaleTicksPerDay === 1 && JSON.stringify(e.run.inbound.lateness) === JSON.stringify(siteLate) && siteLate[0] === -30 && siteLate.every((v) => v >= -30 && v <= 90); }),
+    (rp.stdout || rp.stderr || "").trim().split("\n").pop());
+  check("5b. the table records the rates it searched under - the site's name, the tool that fitted it and the document, the effective shares, the lateness shape - and the markdown names them; a search without a profile records the teaching values instead",
+    !!SP && SP.rates.profile === "example plant" && /tools\/fit_rates\.py site profile fitted on urn:wt:doc:fit-rates-example-1/.test(SP.rates.source) && JSON.stringify(SP.rates.errors) === '[["mis-pick",0.04],["wrong-putaway",0.05],["damage",0.05]]' &&
+    SP.rates.inbound_mode === "site" && JSON.stringify(SP.rates.inbound_lateness) === JSON.stringify(siteLate) && /^Rates: tools\/fit_rates\.py site profile fitted on .* \(example plant\); error shares mis-pick 0\.04, wrong-putaway 0\.05, damage 0\.05; lateness shape site\.$/m.test(fs.readFileSync(path.join(outP, "search.md"), "utf8")) &&
+    S.rates.profile === null && /teaching values/.test(S.rates.source) && JSON.stringify(S.rates.errors) === '[["mis-pick",0.02],["wrong-putaway",0.003],["damage",0.005]]' && S.rates.inbound_mode === "Truck");
+  check("5c. the rates change the answer: at the plant's own rates the same grid delivers 11 orders at OTIF 0.9091 where the teaching rates deliver 9 at 0.7778 - the reason the tool had to read a profile at all",
+    !!SP && SP.best === "staffing=declared|inbound=120|outbound=120|errors=declared" && SP.combos.find((c) => c.id === SP.best).otif.mean === 0.9091 && SP.combos.find((c) => c.id === SP.best).delivered_orders.mean === 11 &&
+    S.combos.find((c) => c.id === S.best).otif.mean === 0.7778 && S.combos.find((c) => c.id === S.best).delivered_orders.mean === 9);
+  const thin = SP ? SP.combos.filter((c) => c.thin) : [];
+  const outZ = path.join(tmp, "z");
+  const rz = run(["hand", "--seeds", "1-2", "--ticks", "400", "--staffing", "declared,adaptive", "--outbound-period", "240,120", "--profile", path.join("test", "fixtures", "site-profile.json"), "--min-delivered", "0", "--out", outZ]);
+  const SZ = rz.status === 0 ? JSON.parse(fs.readFileSync(path.join(outZ, "search.json"), "utf8")) : null;
+  check("5d. a thin sample cannot win: the two carrier-period-240 combinations delivered 1.5 orders on average (below the default min_delivered 5), are marked thin and ranked last although their OTIF is 1; with --min-delivered 0 nothing is thin and OTIF 1 over 1.5 orders takes the first place - the guard is what demotes it",
+    !!SP && SP.min_delivered === 5 && thin.length === 2 && thin.every((c) => c.delivered_orders.mean === 1.5 && c.otif.mean === 1 && SP.ranked.indexOf(c.id) >= 2) && SP.ranked.slice(0, 2).every((id) => !SP.combos.find((c) => c.id === id).thin) &&
+    rz.status === 0 && !!SZ && SZ.min_delivered === 0 && SZ.combos.every((c) => c.thin === false) && SZ.best === "staffing=declared|inbound=120|outbound=240|errors=declared" && SZ.combos.find((c) => c.id === SZ.best).otif.mean === 1 &&
+    / \(thin\) \| 2 \| 1 ± 0 \|/.test(fs.readFileSync(path.join(outP, "search.md"), "utf8")) && /min_delivered is marked thin/.test(SP.rule), JSON.stringify(SP ? SP.ranked : null));
+  // the tower: a table measured under other rates than the run's does not transfer
+  const mix = R.defaultMix();
+  // both runs sit at a dock period the table did not search, so the rule has a proposal to make when the rates agree
+  const teaching = { seed: 31, mix: mix, errors: true, inbound: { periodTicks: 60, openTicks: 30, lateness: [0, 53, -40, 159] }, outbound: { periodTicks: 240, promisedLeadTicks: 480, transit: [120] } };
+  const plant = { seed: 31, mix: mix, errors: { "mis-pick": 0.04, "wrong-putaway": 0.05, damage: 0.05 }, inbound: { periodTicks: 60, openTicks: 30, lateness: siteLate, mode: "site" }, outbound: { periodTicks: 240, promisedLeadTicks: 480, transit: [120] } };
+  const towerAt = (opts, table) => {
+    const plan = F.spawnPlan(FLOOR, opts), st = F.state(plan);
+    const rec = L.create(plan, { scenarioId: "hand-built", seed: opts.seed, mix: opts.mix, layout: FLOOR, profile: P.PROFILES.ecommerce, rates: A.defaultRates() });
+    const ctl = C.create({}, { search: table });
+    st.hooks = { afterTick: (s) => { L.observe(rec, s); C.observe(ctl, rec, s); } };
+    F.step(st, 20);
+    return ctl;
+  };
+  const wrongRates = towerAt(teaching, SP), rightRates = towerAt(plant, SP);
+  check("5e. the tower refuses a table measured under other rates: a run at the teaching shares with the plant's table stays silent and the note names both sets of shares; the same run at the plant's own shares and lateness proposes from the same table, and the note is cleared",
+    !!SP && wrongRates.proposals.length === 0 && /the table was searched with error shares damage=0\.05, mis-pick=0\.04, wrong-putaway=0\.05; this run uses damage=0\.005, mis-pick=0\.02, wrong-putaway=0\.003/.test(wrongRates.state.searchNote || "") &&
+    rightRates.proposals.length === 1 && rightRates.proposals[0].rule === "lever-search" && rightRates.state.searchNote === null, wrongRates.state.searchNote || "no note");
+  const noRates = JSON.parse(JSON.stringify(SP || {}));
+  delete noRates.rates;
+  const lateOnly = JSON.parse(JSON.stringify(SP || {}));
+  lateOnly.rates.errors = null;
+  check("5f. searchRatesMatch by hand: a table without a rates block matches anything (the tables of v3.62); a run without the block it names has nothing to contradict; only the lateness shape can also refuse",
+    C.searchRatesMatch({ rates: null }, { plan: { errors: { kinds: [{ kind: "mis-pick", effective: 0.9 }] } } }).ok === true && towerAt(teaching, noRates).proposals.length === 1 &&
+    C.searchRatesMatch(SP, { plan: {} }).ok === true && C.searchRatesMatch(lateOnly, { plan: { errors: { kinds: [{ kind: "mis-pick", effective: 0.02 }] } } }).ok === true &&
+    C.searchRatesMatch(SP, { plan: { inbound: { lateness: [1, 2, 3], mode: "Truck" } } }).ok === false && /the table was searched on the site lateness shape; this run uses Truck/.test(C.searchRatesMatch(SP, { plan: { inbound: { lateness: [1, 2, 3], mode: "Truck" } } }).reason));
 })();
 
 console.log("=".repeat(72));

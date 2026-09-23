@@ -25,7 +25,7 @@
  *      "retired" fallback is unreachable).
  *   4. Shipped wiring: the app passes the Analyze rates at create; the viewer
  *      page loads ledger.js and shows the cost section; RunLedger.SQL carries
- *      every view the SQLite tool defines; sw.js at wt-v140; the runner.
+ *      every view the SQLite tool defines; sw.js at wt-v141; the runner.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -229,7 +229,7 @@ console.log("=".repeat(72));
     "v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations"];
   check("4c. RunLedger.SQL carries every view the SQLite tool defines (" + want.length + ")", want.every((k) => typeof RL.SQL[k] === "string" && RL.SQL[k].length > 20) && want.every((k) => py.indexOf("CREATE VIEW IF NOT EXISTS " + k + " AS") >= 0), Object.keys(RL.SQL).length + " keys");
   check("4d. analytics.js exports TYPE_TO_CLASS and the python tool has the rate tables", !!A.TYPE_TO_CLASS && A.TYPE_TO_CLASS["carton-flow"] === "racking" && /CREATE TABLE IF NOT EXISTS rate\(/.test(py) && /CREATE TABLE IF NOT EXISTS equipment_rate\(/.test(py) && /CREATE TABLE IF NOT EXISTS location_class\(/.test(py));
-  check("4e. sw.js at wt-v140 (previously wt-v139) still precaches ledger.js and the viewer", /CACHE_VERSION\s*=\s*"wt-v140"/.test(sw) && /Previously wt-v139/.test(sw) && /"\.\/ledger\.js"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw));
+  check("4e. sw.js at wt-v141 (previously wt-v140) still precaches ledger.js and the viewer", /CACHE_VERSION\s*=\s*"wt-v141"/.test(sw) && /Previously wt-v140/.test(sw) && /"\.\/ledger\.js"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw));
   check("4f. test/run-all.mjs lists this harness", /verify_cost_ledger\.js/.test(runall));
   check("4g. no Date / Math.random CALL in ledger.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(read("ledger.js")));
 })();

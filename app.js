@@ -2642,6 +2642,12 @@
   function renderControlTower() {
     const list = $("controlList"), audit = $("controlAudit");
     if (!list || !WT.control) return;
+    // v3.63: why the fifth rule is silent, when a loaded table was searched under other rates
+    const sInfo = $("controlSearchInfo");
+    if (sInfo && state.flow.searchInfo) {
+      const note = state.flow.control && state.flow.control.state ? state.flow.control.state.searchNote : null;
+      sInfo.textContent = state.flow.searchInfo + (note ? " The fifth rule is silent here: " + note + "." : "");
+    }
     const ctl = state.flow.control, log = state.flow.controlLog || [];
     const pend = ctl ? WT.control.pending(ctl) : [];
     const key = (ctl ? ctl.evaluations : -1) + ":" + pend.map((p) => p.id).join(",") + ":" + log.length + ":" + (ctl ? ctl.proposals.length : 0);
@@ -3318,8 +3324,9 @@
           try { obj = JSON.parse(String(reader.result)); } catch (err) { toast("Not JSON: " + err.message, "err"); return; }
           if (!obj || obj.kind !== "wt-lever-search" || !Array.isArray(obj.combos) || !obj.best) { toast("Not a lever search: expected kind wt-lever-search from tools/search_levers.mjs.", "warn"); return; }
           state.flow.search = obj;
+          state.flow.searchInfo = "Lever search loaded: " + obj.scenario + ", " + obj.combos.length + " combinations x " + (obj.seeds || []).length + " seeds over " + obj.ticks + " ticks at " + ((obj.rates && obj.rates.source) || "unrecorded rates") + (obj.rates && obj.rates.profile ? " (" + obj.rates.profile + ")" : "") + "; best " + obj.best + (obj.scenario !== (state.flow.ledger ? state.flow.ledger.run.scenario : obj.scenario) ? " - searched on another scenario: the rule stays silent here" : "") + ".";
           const info = $("controlSearchInfo");
-          if (info) info.textContent = "Lever search loaded: " + obj.scenario + ", " + obj.combos.length + " combinations x " + (obj.seeds || []).length + " seeds over " + obj.ticks + " ticks; best " + obj.best + (obj.scenario !== (state.flow.ledger ? state.flow.ledger.run.scenario : obj.scenario) ? " - searched on another scenario: the rule stays silent here" : "") + ".";
+          if (info) info.textContent = state.flow.searchInfo;
           state.flow.sig = null;
           flowReset();
           status("Lever search loaded (" + obj.combos.length + " combinations); the day re-runs with the tower reading it.");

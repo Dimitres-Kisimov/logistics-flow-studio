@@ -63,7 +63,7 @@
     { id: "rework-burden", label: "Rework burden", reads: "the ledger's quality by step: reworked units over units through the error-prone steps; the levers above 1", lever: "reset the largest performance-shaping lever above 1 - the latent condition, named" },
     { id: "inbound-late", label: "Inbound late", reads: "the trailers the receiving door logged (scheduled, arrival, late ticks)", lever: "halve the inbound period: twice the scheduled trailers, each burst about half" },
     { id: "otif-below-target", label: "OTIF below target", reads: "the ledger's service: delivered orders and their on-time-in-full share", lever: "halve the carrier period: departures twice as frequent" },
-    { id: "lever-search", label: "Lever search", reads: "a lever-search table the person loaded (tools/search_levers.mjs): the ranked combinations with their OTIF and cost means and half-widths", lever: "the best-ranked combination's levers that differ from this run's, applied together as a combination lever" }, // v3.62
+    { id: "lever-search", label: "Lever search", reads: "a lever-search table the person loaded (tools/search_levers.mjs): the ranked combinations with their OTIF and cost means and half-widths, and the rates it was searched under (v3.63: a table measured under other rates is refused)", lever: "the best-ranked combination's levers that differ from this run's, applied together as a combination lever" }, // v3.62
   ];
   const r4 = (v) => Math.round(v * 10000) / 10000;
   const r6 = (v) => Math.round(v * 1e6) / 1e6;
@@ -86,7 +86,7 @@
   function create(thresholds, opts) { // v3.62: opts.search - a loaded lever-search table (tools/search_levers.mjs), or null
     const s = opts && opts.search && opts.search.kind === "wt-lever-search" && Array.isArray(opts.search.combos) ? opts.search : null;
     return { kind: "wt-control", thresholds: normalise(thresholds), proposals: [], audit: [], lastEval: -1, evaluations: 0,
-      state: { queueSince: {}, muted: {} }, search: s, honesty: HONESTY };
+      state: { queueSince: {}, muted: {}, searchNote: null }, search: s, honesty: HONESTY };
   }
   // A rule may propose when it has not fired yet, or its snooze has run out.
   const may = (ctl, rule, tick) => ctl.state.muted[rule] == null || (ctl.state.muted[rule] !== Infinity && tick >= ctl.state.muted[rule]);
@@ -170,6 +170,22 @@
     return "staffing=" + (p.policy && p.policy.kind === "queue-staffing" ? "adaptive" : "declared") + "|inbound=" + (p.inbound ? p.inbound.periodTicks : "none") +
       "|outbound=" + (p.outbound ? p.outbound.periodTicks : "none") + "|errors=" + (p.errors ? "declared" : "none");
   }
+  // v3.63: a table searched under OTHER RATES does not transfer - the ranking was measured in a different world
+  // (other error shares, another lateness shape). The run's own plan says what it runs at; when the run has no
+  // such block there is nothing to contradict and the proposal carries the table's rates into the run.
+  function searchRatesMatch(S, rec) {
+    const Rt = S.rates, p = rec.plan || {};
+    if (!Rt) return { ok: true };
+    if (p.errors && Array.isArray(Rt.errors)) {
+      const mine = (p.errors.kinds || []).map((k) => k.kind + "=" + k.effective).sort().join(", ");
+      const theirs = Rt.errors.map((e) => e[0] + "=" + e[1]).sort().join(", ");
+      if (mine !== theirs) return { ok: false, reason: "the table was searched with error shares " + (theirs || "none") + "; this run uses " + (mine || "none") };
+    }
+    if (p.inbound && Array.isArray(Rt.inbound_lateness) && JSON.stringify(p.inbound.lateness) !== JSON.stringify(Rt.inbound_lateness)) {
+      return { ok: false, reason: "the table was searched on the " + (Rt.inbound_mode || "recorded") + " lateness shape; this run uses " + (p.inbound.mode || "another") };
+    }
+    return { ok: true };
+  }
   // v3.62 lever-search: a search table the person loaded (tools/search_levers.mjs), never a live feed. At the first
   // evaluation it compares the run's own combination with the table's best and proposes the best's differing levers as
   // ONE combination lever when the table is this scenario's, the run is not at the best, and the best's OTIF gain over
@@ -180,6 +196,9 @@
     if (!S || !may(ctl, "lever-search", tick) || !rec.run || S.scenario !== rec.run.scenario || !Array.isArray(S.combos)) return;
     const best = S.combos.find((c) => c.id === S.best);
     if (!best || !best.levers || !best.otif) return;
+    const rm = searchRatesMatch(S, rec); // v3.63
+    ctl.state.searchNote = rm.ok ? null : rm.reason;
+    if (!rm.ok) return;
     const cur = comboOf(rec), curRow = S.combos.find((c) => c.id === cur);
     if (cur === S.best) return;
     const k = ctl.thresholds.search.minGainHalfWidths;
@@ -244,5 +263,5 @@
     return Object.keys(by).sort().map((k) => by[k]);
   }
 
-  WT.control = { HONESTY, DEFAULTS, RULES, normalise, create, observe, decide, pending, controlRows, comboOf }; // v3.62: comboOf
+  WT.control = { HONESTY, DEFAULTS, RULES, normalise, create, observe, decide, pending, controlRows, comboOf, searchRatesMatch }; // v3.62: comboOf; v3.63: searchRatesMatch
 })();
