@@ -6,7 +6,7 @@
 
 - **What** — draw *or* generate a whole warehouse floor (racks, docks, staging, conveyor, automation), then run the material flow and the standard WMS operation as a living, animated plant-sim.
 - **Why** — clarity over enterprise complexity: a transparent, game-like teaching twin that is standards-*informed* rather than a black-box tool.
-- **Verified at the current commit (2026-09-23)** — `node test/run-all.mjs`: **77 headless harnesses** green; `python -m pytest test`: **129 Python tests** green; `index.html?selftest=1` in headless Chromium: **WT-SELFTEST PASS 185/185** and `run-ledger.html?selftest=1`: **WT-SELFTEST PASS 31/31**; service-worker cache `wt-v130`. These checks do not establish plant safety. See [placement enforcement gaps](docs/PLACEMENT_ENFORCEMENT_AUDIT.md). The PWA caches local assets; network-disconnected behavior was not revalidated in this increment.
+- **Verified at the current commit (2026-09-23)** — `node test/run-all.mjs`: **77 headless harnesses** green; `python -m pytest test`: **129 Python tests** green; `index.html?selftest=1` in headless Chromium: **WT-SELFTEST PASS 185/185** and `run-ledger.html?selftest=1`: **WT-SELFTEST PASS 31/31**; service-worker cache `wt-v131`. These checks do not establish plant safety. See [placement enforcement gaps](docs/PLACEMENT_ENFORCEMENT_AUDIT.md). The PWA caches local assets; network-disconnected behavior was not revalidated in this increment.
 
 ### ▶ Live app — <https://dimitres-kisimov.github.io/logistics-flow-studio/>
 
@@ -139,6 +139,15 @@ Single-page, no-build, no-framework — hand-written HTML, CSS and vanilla JavaS
 The whole app is one screen: palette and generators on the left, the floor in the middle, properties and analysis on the right. The **side-panel cards are collapsible** — click a card's header (or press Enter/Space while it is focused) to fold that card away and keep long panels tidy; the collapsed state is remembered in your browser. Every card starts **expanded**, so first load looks and behaves exactly as before. A three-step onboarding card and tooltips on every palette item get a newcomer running in under a minute.
 
 ## Screenshots
+
+| | |
+|---|---|
+| [![The Class Library in Factory mode: the Machines (DIN 8580) group open in the 2.5D thumbnail style, every entry drawn as the form the floor draws with the goods it handles, its footprint, and a DIN 8580 / ISA-95 chip](docs/img/class-library.png)](docs/img/class-library.png) | [![The NIST box-assembly cell on the floor plan: source, two CNC machining centres, assembly, CMM inspection, pack and drain, conveyor-linked, with the factory panel's measured-vs-modelled cycle times](docs/img/nist-box-assembly-2d.png)](docs/img/nist-box-assembly-2d.png) |
+| The **Class Library** (v3.48–v3.51): every entry is the glyph the floor draws, here in the 2.5D style, with the goods it handles and — for the machine catalogue — its DIN 8580 main group or ISA-95 role as a chip (labels only, not a certification). | The **NIST box-assembly cell** (v3.50): a generated machining cell whose two machining cycle times are measured on a public dataset; the factory panel says which cycle times are measured and which are modelled. |
+
+[![The NIST box-assembly cell in the 2.5D view with a machining centre selected: the Inspector shows its DIN 8580 standard, the operation it carries, the measured line cycle, the provenance sentence naming the dataset, the machine and the reduction rule, and the dataset's retrieval date and commit](docs/img/nist-box-assembly-iso.png)](docs/img/nist-box-assembly-iso.png)
+
+The same cell in the **2.5D view** with the Box machining centre selected: the Inspector's *Operation*, *Line cycle*, *Provenance* and *Dataset* rows say where the 7 503 s came from (the NIST SMS Test Bed Box Assembly logs, the median run time per operation summed) and that the assembly and inspection cycles are teaching values. The three images are taken from the live app by `tools/screenshot.py` (a Playwright driver that operates the page like a person; not part of the gate).
 
 ![WarehouseTwin with the Cold-chain frozen-DC example scenario loaded — distinct 2D object glyphs across the canvas floor plan, alongside the palette, properties and analysis panels](docs/screenshots/warehousetwin-coldchain.png)
 

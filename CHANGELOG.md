@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.51 — Detail: standards chips on the group headers, the screenshots, the driver
+
+**Detail.** The *Machines (DIN 8580)* and *Production / Assembly* group headers of the Class
+Library carry a chip naming the standards the group is informed by ("informed by DIN 8580 ·
+ISA-95"; labels only, never a certification). The hover card already opens on keyboard
+focus (v3.48); the Inspector's *Provenance* and *Dataset* rows and the factory panel's
+measured / modelled chips (v3.50) are the per-operation detail.
+
+**Screenshots.** `docs/img/class-library.png` (Factory mode, the Machines group in the 2.5D
+thumbnail style, 2× DPR), `docs/img/nist-box-assembly-2d.png` and
+`docs/img/nist-box-assembly-iso.png` (the cell with the factory panel; the 2.5D view with a
+machining centre's provenance in the Inspector), all taken from the live app by
+`tools/screenshot.py` — a Playwright driver that operates the page through its own controls
+(rail drawers, mode button, library toggles, Fit), quantised to 256 colours; `--hero`
+retakes the README hero and the starter shot. Not part of the gate or CI. The deep-link
+`view` / `mode` parameters considered for reproducible screenshots were not added; the
+driver toggles the view and the mode instead.
+
+**Downstream.** Portfolio site card, the Würth case study (counts and one sentence EN / DE,
+PDF rebuilt), the agent brief and the task list carry v3.48–v3.51.
+
+**Verification.** No new harness; 77 harnesses, 129 Python tests, WT-SELFTEST 185/185 +
+viewer 31/31. Cache wt-v131.
+
 ## v3.50 — A factory from an actual dataset: the NIST box-assembly cell
 
 **The data.** `tools/nist_box_assembly.py` fetches the public NIST Smart Manufacturing
@@ -28,7 +52,7 @@ says "Cycle times: 2 measured (…), 2 modelled" and each row carries a measured
 modelled chip with the source as its title. `data/nist-box-assembly.js` loads before
 `generate.js` and is precached.
 
-**Verification.** New `verify_nist_factory.js` (23 checks: the committed file's schema,
+**Verification.** New `verify_nist_factory.js` (24 checks: the committed file's schema,
 notice, rule, ordered statistics, derived sums and JS twin; the profile, build,
 geometry, determinism, block, provenance strings, sanitize round-trip, metrics, dataset
 meta and the honest fallback; the example and its export; the ten unchanged digests;

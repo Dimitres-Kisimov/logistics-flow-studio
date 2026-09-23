@@ -4014,9 +4014,13 @@
       head.dataset.group = group.label;
       head.setAttribute("aria-expanded", String(!collapsed));
       const countLabel = (q && types.length !== allTypes.length) ? types.length + "/" + allTypes.length : String(allTypes.length);
+      // v3.51: the standards a factory group is informed by, on its header (labels only, never a certification)
+      const L = WT.library || {};
+      const groupChip = group.label === L.MACHINES ? "informed by DIN 8580 · ISA-95" : group.label === L.PRODUCTION ? "informed by ISA-95" : "";
       head.innerHTML =
         `<span class="pal-caret" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>` +
         `<span class="pal-group-label">${esc(group.label)}</span>` +
+        (groupChip ? `<span class="pal-chip pal-chip--group" title="Classification labels from public standards - informed by, not a certification">${esc(groupChip)}</span>` : "") +
         `<span class="pal-count">${esc(countLabel)}</span>`;
       head.addEventListener("click", () => { togglePalGroup(group.label); });
       g.appendChild(head);
