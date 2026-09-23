@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS run(
 -- run.policy: v3.45, the adaptive-staffing what-if as JSON (NULL when the run had none);
 -- run.errors: v3.54, the human-error what-if as JSON (NULL when the run had none);
 -- run.inbound / run.outbound: v3.55, the dock and carrier windows as JSON (NULL when the run had none).
+-- v3.56 the control tower's audit: one row per decision a person took, with the run it came from
+CREATE TABLE IF NOT EXISTS control_event(
+  run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, seq INTEGER NOT NULL, tick INTEGER NOT NULL, rule TEXT NOT NULL, proposal_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('accepted','declined','snoozed')), lever TEXT, evidence TEXT, from_run TEXT, PRIMARY KEY(run_id, seq));
 -- v3.55 the trailers the receiving door logged (one row per trailer whose window opened)
 CREATE TABLE IF NOT EXISTS inbound_event(
   run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, trailer INTEGER NOT NULL, scheduled_tick INTEGER NOT NULL,
@@ -519,6 +523,15 @@ SELECT i.run_id, i.trailer, i.scheduled_tick, i.arrival_tick, i.late_ticks,
 FROM inbound_event i;"""
 DELIVERY_VIEWS = ("v_otif", "v_inbound")
 
+# ---- v3.56 the control tower's audit, per rule ----------------------------------------------
+# One row per run and rule: the proposals a person decided, how many accepted / declined / snoozed,
+# the first tick. The same rows as control.js controlRows (reconciled). Empty when nobody decided.
+VIEWS["v_control"] = """
+CREATE VIEW IF NOT EXISTS v_control AS
+SELECT run_id, rule, COUNT(*) AS proposals, SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) AS accepted,
+       SUM(CASE WHEN status = 'declined' THEN 1 ELSE 0 END) AS declined, SUM(CASE WHEN status = 'snoozed' THEN 1 ELSE 0 END) AS snoozed, MIN(tick) AS first_tick
+FROM control_event GROUP BY run_id, rule;"""
+
 # ---- v3.54 quality by step (ISO 22400-2 names) ----------------------------------------------
 # Per operation: units through = distinct units with a non-queued handling event at the step;
 # errors = those whose declared error (hu.error_op) is this step - realised when they passed it;
@@ -546,7 +559,7 @@ T975 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8
 
 INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations", "v_tracking_gaps")
 PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
-                 "v_cost_by_type", "v_cost_by_location", "v_flow_links", "v_staffing", "v_bizstep_dwell", "v_quality_by_step", "v_otif", "v_inbound")
+                 "v_cost_by_type", "v_cost_by_location", "v_flow_links", "v_staffing", "v_bizstep_dwell", "v_quality_by_step", "v_otif", "v_inbound", "v_control")
 DETAIL_VIEWS = ("v_wip_by_tick", "v_spans", "v_span_cost", "v_cost_by_hu", "v_dispatch_by_order", "v_epcis_events", "v_unit_history")  # long or per-row views: `views --all`
 COMPARE_VIEWS = ("v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost")
 
@@ -633,6 +646,10 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
             json.dumps(run.get("outbound"), sort_keys=True) if run.get("outbound") is not None else None))
         db.executemany("INSERT INTO inbound_event(run_id, trailer, scheduled_tick, arrival_tick, late_ticks) VALUES(?,?,?,?,?)", [
             (run["id"], int(t["trailer"]), int(t["scheduled_tick"]), int(t["arrival_tick"]), int(t["late_ticks"])) for t in data.get("inbound") or []])
+        db.executemany("INSERT INTO control_event(run_id, seq, tick, rule, proposal_id, status, lever, evidence, from_run) VALUES(?,?,?,?,?,?,?,?,?)", [
+            (run["id"], int(c.get("seq", i)), int(c["tick"]), str(c["rule"]), str(c.get("proposal_id", "")), str(c["status"]),
+             json.dumps(c.get("lever"), sort_keys=True) if c.get("lever") is not None else None, json.dumps(c.get("evidence"), sort_keys=True) if c.get("evidence") is not None else None,
+             c.get("from_run")) for i, c in enumerate(data.get("control") or [], start=1)])
         db.executemany("INSERT INTO staffing_event(run_id, tick, location_id, servers) VALUES(?,?,?,?)", [
             (run["id"], int(s["tick"]), str(s["location_id"]), int(s["servers"])) for s in data.get("staffing") or []])
         prof = data.get("profile")
@@ -988,6 +1005,7 @@ RECONCILE_KEYS = {
     "v_bizstep_dwell": ("biz_step",),  # v3.53
     "v_quality_by_step": ("op",),  # v3.54
     "v_otif": (), "v_inbound": ("trailer",),  # v3.55
+    "v_control": ("rule",),  # v3.56
 }
 RAW_VIEWS = ("v_spans", "v_span_cost")
 

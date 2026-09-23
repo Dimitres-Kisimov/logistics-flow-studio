@@ -161,7 +161,7 @@
     // ring for the sparkline; `poolDemandFactor` sets the synthetic arrival
     // (order-generation) rate as a multiple of the modelled pick capacity so a
     // live backlog is visible (honest what-if, documented in the readout).
-    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15, errors: "none", delivery: "instant" },
+    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15, errors: "none", delivery: "instant", control: null, controlLog: [] },
   };
 
   // ---------------- DOM refs ----------------
@@ -2562,6 +2562,50 @@
       outbound: { periodTicks: g("delivery.outbound.periodTicks", 240), promisedLeadTicks: g("delivery.promisedLeadTicks", 480), transit: late.map((v) => Math.max(0, nominal + v)), mode: mode, scaleTicksPerDay: scale, source: source + "; nominal transit " + nominal + " ticks plus the same lateness shape" },
     };
   }
+  // v3.56: the control tower's thresholds as the knowledge base holds them (the queue threshold is the sim's
+  // congestion threshold, the OTIF target the delivery category's).
+  function readControlThresholds() {
+    const g = (id, d) => { const v = WT.kb ? WT.kb.get(id) : undefined; return typeof v === "number" && isFinite(v) ? v : d; };
+    return { evalEveryTicks: g("control.evalEveryTicks", 10), snoozeTicks: g("control.snoozeTicks", 120),
+      queue: { threshold: WT.flowsim.PARAMS.congestQueueThreshold, sustainTicks: g("control.queue.sustainTicks", 30) },
+      rework: { maxShare: g("control.rework.maxShare", 0.01), minUnits: g("control.rework.minUnits", 20) },
+      inbound: { lateTicks: g("control.inbound.lateTicks", 60) },
+      otif: { minDeliveries: g("control.otif.minDeliveries", 20), target: g("delivery.otif.target", 0.95) } };
+  }
+  // The lever a proposal names, applied exactly as the picker or the knowledge base panel would.
+  function applyLever(lever) {
+    if (!lever) return false;
+    if (lever.kind === "picker" && lever.key === "staffing") {
+      state.flow.staffing = lever.value === "adaptive" ? "adaptive" : "declared";
+      const sel = $("flowStaffingSelect");
+      if (sel) sel.value = state.flow.staffing;
+      try { localStorage.setItem("wt-flow-staffing", state.flow.staffing); } catch (_) { /* ignore */ }
+      return true;
+    }
+    if (lever.kind === "kb" && WT.kb) return WT.kb.set(lever.key, lever.value);
+    return false;
+  }
+  const leverText = (lever) => (!lever ? "-" : lever.kind === "picker" ? "Staffing -> " + lever.value : lever.key + " -> " + lever.value);
+  const ruleLabel = (id) => { const r = WT.control && WT.control.RULES.find((x) => x.id === id); return r ? r.label : id; };
+  // The tower's card: the pending proposals with their evidence, and the audit trail across runs.
+  function renderControlTower() {
+    const list = $("controlList"), audit = $("controlAudit");
+    if (!list || !WT.control) return;
+    const ctl = state.flow.control, log = state.flow.controlLog || [];
+    const pend = ctl ? WT.control.pending(ctl) : [];
+    const key = (ctl ? ctl.evaluations : -1) + ":" + pend.map((p) => p.id).join(",") + ":" + log.length + ":" + (ctl ? ctl.proposals.length : 0);
+    if (list.getAttribute("data-key") === key) return;
+    list.setAttribute("data-key", key);
+    const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    if (!ctl) list.innerHTML = '<p class="empty">Press Play - the tower reads the run as it happens.</p>';
+    else if (!pend.length) list.innerHTML = '<p class="empty">No open proposal (' + ctl.evaluations + ' evaluations, one every ' + ctl.thresholds.evalEveryTicks + ' ticks' + (ctl.proposals.length ? '; ' + ctl.proposals.length + ' decided this run' : '') + ').</p>';
+    else list.innerHTML = pend.map((p) => '<article class="control-proposal" data-id="' + esc(p.id) + '"><h4>' + esc(ruleLabel(p.rule)) + ' <span class="control-tick">tick ' + p.tick + '</span></h4>' +
+      '<p class="control-why">' + esc(p.why) + '</p><p><strong>Proposes:</strong> ' + esc(leverText(p.lever)) + '<br><strong>Expected effect:</strong> ' + esc(p.expectedEffect) + '</p>' +
+      '<p class="control-evidence">Evidence: <code>' + esc(JSON.stringify(p.evidence)) + '</code></p>' +
+      '<div class="control-actions"><button type="button" class="btn small" data-accept="' + esc(p.id) + '">Accept and re-run the day</button><button type="button" class="btn small" data-snooze="' + esc(p.id) + '">Snooze</button><button type="button" class="btn small" data-decline="' + esc(p.id) + '">Decline</button></div></article>').join("");
+    if (audit) audit.innerHTML = log.length ? '<table class="flow-ledger-table"><thead><tr><th>tick</th><th>rule</th><th>decision</th><th>lever</th><th>run it came from</th></tr></thead><tbody>' +
+      log.map((r) => '<tr><td>' + r.tick + '</td><td>' + esc(r.rule) + '</td><td>' + esc(r.status) + '</td><td>' + esc(leverText(r.lever)) + '</td><td><code>' + esc(String(r.from_run || '')) + '</code></td></tr>').join('') + '</tbody></table>' : '<p class="empty">No decision recorded yet.</p>';
+  }
   function flowBuild() {
     if (!WT.flowsim) return false;
     readConfigFromUI();
@@ -2596,6 +2640,7 @@
     // export feeds tools/run_ledger.py (SQLite) and the run-ledger viewer.
     state.flow.ledger = null;
     state.flow.track = null; // v3.53
+    state.flow.control = null; // v3.56
     if (WT.ledger && WT.ids && WT.pack) {
       const scen = currentScenarioId();
       state.flow.ledger = WT.ledger.create(state.flow.sim.plan, {
@@ -2605,11 +2650,15 @@
         // v3.44: the pool's provenance rides in run.dataset; the pool digest joins the run id
         pool: opts.pool || null,
         dataset: opts.pool && state.dataset ? { source: state.dataset.source || "imported", skus: (state.dataset.skus || []).length } : null,
+        // v3.56: the control tower's audit log rides with the run (exported only when a decision exists)
+        control: state.flow.controlLog,
       });
       // v3.53 THE TRACKING DATABASE: a second pure observer maps the events the ledger
       // just appended to their EPCIS-shaped twins; the hook multiplexes both, ledger first.
       state.flow.track = WT.tracking ? WT.tracking.create(state.flow.ledger) : null;
-      state.flow.sim.hooks = { afterTick: (st) => { WT.ledger.observe(state.flow.ledger, st); if (state.flow.track) WT.tracking.observe(state.flow.track, state.flow.ledger); } };
+      // v3.56 THE CONTROL TOWER: a third read-only observer; its proposals wait for a person (wireControl).
+      state.flow.control = WT.control ? WT.control.create(readControlThresholds()) : null;
+      state.flow.sim.hooks = { afterTick: (st) => { WT.ledger.observe(state.flow.ledger, st); if (state.flow.track) WT.tracking.observe(state.flow.track, state.flow.ledger); if (state.flow.control) WT.control.observe(state.flow.control, state.flow.ledger, st); } };
     }
     ledgerTraceCache = "";
     sceneSelection = null;
@@ -2920,6 +2969,7 @@
       "</strong> · tick " + s.tick + " · bottleneck throughput ~" + s.plan.lineThroughput.toFixed(0) + " units/hr" +
       queueTxt + (state.flow.playing ? "" : " · paused") + "</p>";
     updateLedgerReadout(); // v3.32
+    renderControlTower(); // v3.56
   }
 
   /* ------------------------------------------------------------------
@@ -3153,6 +3203,28 @@
         try { localStorage.setItem("wt-flow-delivery", state.flow.delivery); } catch (_) { /* ignore */ }
         state.flow.sig = null;
         if (state.flow.sim) flowReset();
+      });
+    })();
+    // v3.56: the control tower's decisions. Decline and snooze write the log; accept is the only path that
+    // writes elsewhere - the lever, exactly as the picker would, and the day re-runs from tick 0.
+    (function wireControl() {
+      const list = $("controlList");
+      if (!list || !WT.control) return;
+      list.addEventListener("click", (ev) => {
+        const b = ev.target && ev.target.closest ? ev.target.closest("button[data-accept],button[data-decline],button[data-snooze]") : null;
+        if (!b) return;
+        const ctl = state.flow.control, rec = state.flow.ledger;
+        if (!ctl || !rec) return;
+        const id = b.getAttribute("data-accept") || b.getAttribute("data-decline") || b.getAttribute("data-snooze");
+        const decision = b.hasAttribute("data-accept") ? "accepted" : b.hasAttribute("data-decline") ? "declined" : "snoozed";
+        const row = WT.control.decide(ctl, id, decision, state.flow.sim ? state.flow.sim.tick : 0);
+        if (!row) return;
+        state.flow.controlLog.push(Object.assign({}, row, { from_run: rec.run.id }));
+        if (decision !== "accepted") { renderControlTower(); status("Control tower: " + decision + " " + ruleLabel(row.rule) + " at tick " + row.tick + " - recorded in the audit, nothing changed."); return; }
+        applyLever(row.lever);
+        state.flow.sig = null;
+        flowReset();
+        status("Control tower: accepted " + ruleLabel(row.rule) + " - " + leverText(row.lever) + "; the day re-runs from tick 0 with the lever set (a run id is a hash of its inputs).");
       });
     })();
     on("flowPauseBtn", flowPause);
@@ -10153,6 +10225,8 @@
       loadExample: loadExample,
       // v3.53: the tracking database (the live tracker and the store)
       tracking: { store: trackingStore, current: () => state.flow.track },
+      // v3.56: the control tower (the live tower and the audit log across runs)
+      control: { current: () => state.flow.control, log: () => state.flow.controlLog, render: renderControlTower },
       runWmsOps: runWmsOps,
       // v2.6 FACTORY-B: drive the REAL Generate handler (optionally with an
       // explicit profile key) so the self-test can build a factory line.
@@ -10384,7 +10458,7 @@
     { name: "library",   title: "Class Library",       cards: ["paletteCard"] },
     { name: "generate",  title: "Generate environment",cards: ["genCard"] },
     { name: "examples",  title: "Example scenarios",   cards: ["examplesCard"] },
-    { name: "simulate",  title: "Simulate & operations", cards: ["capacityCard", "simCard", "histCard", "wmsCard", "autoCard", "storageCard", "flowCard", "procCard"] },
+    { name: "simulate",  title: "Simulate & operations", cards: ["capacityCard", "simCard", "histCard", "wmsCard", "autoCard", "storageCard", "flowCard", "controlCard", "procCard"] },
     { name: "analyze",   title: "Analyze",             cards: ["analyzeCard", "catalogCard", "advisorCard", "optCard", "abCard", "complCard"] },
     { name: "report",    title: "Report & export",     cards: ["layoutCard"] },
     { name: "saveshare", title: "Save & share",        cards: ["scenariosCard", "compareCard"] },

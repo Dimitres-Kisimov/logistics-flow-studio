@@ -241,6 +241,8 @@
     if (policy) { rec.run.policy = Object.assign({}, policy, { honesty: STAFFING_HONESTY }); rec.staffing = []; } // v3.45: the what-if and its change log, keys only with a policy
     if (errors) rec.run.errors = errorsBlock(errors); // v3.54: the error what-if, key only when it ran
     if (inbound) { rec.run.inbound = deliveryBlock(inbound); rec.inbound = []; } // v3.55: the windows and the trailer log, keys only with them
+    // v3.56: the control tower's audit log the app keeps across runs (the same array; exported only when a decision exists)
+    if (Array.isArray(m.control)) rec.control = m.control;
     if (outbound) rec.run.outbound = deliveryBlock(outbound);
     return rec;
   }
@@ -452,6 +454,7 @@
     if (rec.rates) out.rates = JSON.parse(JSON.stringify(rec.rates));
     if (rec.staffing) out.staffing = rec.staffing.slice(); // v3.45: only when a policy ran
     if (rec.inbound) out.inbound = rec.inbound.slice(); // v3.55: only with dock windows
+    if (rec.control && rec.control.length) out.control = rec.control.map((r) => JSON.parse(JSON.stringify(r))); // v3.56: only when a person decided something
     return out;
   }
 

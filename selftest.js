@@ -3808,6 +3808,30 @@
         WT.kb && WT.kb.get("delivery.inbound.periodTicks") === 120 && WT.kb.get("delivery.otif.target") === 0.95;
       return { ok: ok, detail: "lateness " + late.join(",") + "; modes " + (DS ? DS.modes.length : 0) };
     });
+    // ---- v3.56: the control tower - on the hand floor (seed 31, the default mix; here the stations serve at the
+    // floor's DECLARED capacities because wms.js is loaded, so the tick-140 fact of verify_control.js does not
+    // apply) a threshold-1 tower proposes at the first evaluation that sees a queue, naming the element; declining
+    // writes one audit row and changes nothing; the app's card exists and the live run carries a tower.
+    check("control-tower-proposes-and-decline-keeps-the-run", function () {
+      var C2 = WT.control, F = WT.flowsim, L2 = WT.ledger, R2 = WT.routing, P2 = WT.pack;
+      if (!C2 || !F || !L2 || !R2 || !$("controlCard") || !$("controlList") || !API || !API.control) return { ok: false, detail: "missing" };
+      var FLOOR = { gridW: 40, gridH: 24, cell: 1, elements: [
+        { id: "in", type: "dock-in", x: 2, y: 0, w: 2, d: 1 }, { id: "stg", type: "staging", x: 14, y: 2, w: 4, d: 2 }, { id: "qc", type: "qc-bench", x: 6, y: 2, w: 3, d: 2 },
+        { id: "dep", type: "depalletiser", x: 10, y: 2, w: 3, d: 3 }, { id: "ret", type: "returns-station", x: 30, y: 2, w: 3, d: 2 }, { id: "rack", type: "selective-racking", x: 4, y: 8, w: 20, d: 1 },
+        { id: "face", type: "carton-flow", x: 4, y: 12, w: 12, d: 1 }, { id: "belt", type: "conveyor", x: 4, y: 15, w: 14, d: 1 }, { id: "pack", type: "pack-station", x: 20, y: 18, w: 3, d: 2 },
+        { id: "wrap", type: "stretch-wrap", x: 24, y: 18, w: 2, d: 2 }, { id: "vas", type: "vas-station", x: 28, y: 18, w: 3, d: 2 }, { id: "out", type: "dock-out", x: 30, y: 23, w: 2, d: 1 }] };
+      var mix = R2.defaultMix(), plan = F.spawnPlan(FLOOR, { seed: 31, mix: mix }), st = F.state(plan);
+      var rec = L2.create(plan, { scenarioId: "hand-built", seed: 31, mix: mix, layout: FLOOR, profile: P2.PROFILES.ecommerce });
+      var ctl = C2.create({ queue: { threshold: 1, sustainTicks: 0 } }), planBefore = JSON.stringify(plan);
+      st.hooks = { afterTick: function (s) { L2.observe(rec, s); C2.observe(ctl, rec, s); } };
+      F.step(st, 300);
+      var p = ctl.proposals[0];
+      var row = p ? C2.decide(ctl, p.id, "declined", 300) : null;
+      var live = API.control.current();
+      return { ok: !!p && p.rule === "queue-congestion" && p.tick % 10 === 0 && p.tick > 0 && typeof p.evidence.stations[0].element === "string" && !!row && row.status === "declined" && ctl.audit.length === 1 &&
+        C2.pending(ctl).length === 0 && JSON.stringify(plan) === planBefore && (!live || live.kind === "wt-control") && Array.isArray(API.control.log()),
+        detail: (p ? p.rule + "@" + p.tick + " at " + p.evidence.stations[0].element : "no proposal") + ", audit " + ctl.audit.length + ", live tower " + (live ? "attached" : "none yet") };
+    });
     // ---- v3.53: the tracking database - every package is joined to its handling unit,
     // the twins map the live ledger event for event, and the store round-trips a run.
     // The backend: the memory store by default, IndexedDB when the page is opened with

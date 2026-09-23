@@ -725,6 +725,7 @@ const HARNESSES = [
   { name: "The tracking database: one EPCIS-shaped twin per handling event, derived not recorded, dwell == spans, a store across runs, SQL == JS (verify_tracking.js)", args: ["verify_tracking.js"] },
   { name: "Human error, honestly: declared shares per step, quota-dispatched branches, the unrolled rework, ISO 22400 quality KPIs, SQL == JS (verify_errors.js)", args: ["verify_errors.js"] },
   { name: "Delivery and shipping times in between: dock and carrier windows, the Weyl / quantile lateness by hand, OTIF, the SCMS dataset twin, SQL == JS (verify_delivery.js)", args: ["verify_delivery.js"] },
+  { name: "The control tower: four rules over the ledger by hand (tick 140 at stg; 0.22 -> 0.02; trailer 3 at 460; OTIF after 20), decisions and the audit, purity, SQL == JS (verify_control.js)", args: ["verify_control.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

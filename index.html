@@ -970,6 +970,13 @@
            editable cycle times on drill-in. Only meaningful for a FACTORY
            layout (a `process` block); a warehouse shows a hint. Pure metrics
            in process.js (WT.process); verify_process.js covers it headlessly. -->
+      <!-- v3.56: THE CONTROL TOWER - proposes from aggregates, a person decides; accepting re-runs the day. -->
+      <section class="card" id="controlCard" data-default-collapsed>
+        <h2 class="card-title">Control tower (a human in the loop)</h2>
+        <p class="hint">The tower proposes, a person decides; nothing acts on its own. Every proposal is explainable from aggregates per step and station (element ids, counts, ticks, shares) recorded by the run ledger - no per-person data exists to read, and none may (BetrVG 87(1)6, GDPR Art. 88). Four teaching rules with editable thresholds (knowledge base, <em>Control tower thresholds</em>): queue congestion, rework burden, inbound late, OTIF below target. <strong>Accept</strong> sets the lever exactly as the picker or the knowledge base would and re-runs the day from tick 0 (a run id is a hash of its inputs); <strong>Decline</strong> and <strong>Snooze</strong> only write the audit, which travels with the run ledger export. Not an MES, not a WMS, not a scheduler, not a certification.</p>
+        <div id="controlList" aria-live="polite"><p class="empty">Press Play - the tower reads the run as it happens.</p></div>
+        <details class="control-audit"><summary>Audit trail (every decision, with the run it came from)</summary><div id="controlAudit"><p class="empty">No decision recorded yet.</p></div></details>
+      </section>
       <section class="card" id="procCard" data-default-collapsed>
         <h2 class="card-title">Factory line efficiency</h2>
         <div class="wms-disclaimer">
@@ -1346,6 +1353,7 @@
 <script src="pack.js"></script>
 <script src="ledger.js"></script>
 <script src="tracking.js"></script>
+<script src="control.js"></script>
   <script src="knowledge.js"></script>
   <script src="library.js"></script>
   <script src="tiers.js"></script>

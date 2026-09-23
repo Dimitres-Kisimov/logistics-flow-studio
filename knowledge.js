@@ -73,6 +73,8 @@
       desc: "Per automation-system cycle-time / throughput assumptions the automation model (WT.automation) and the WMS capacity layer read (informed by VDI 4480 / VDI 2510)." },
     { key: "delivery", label: "Delivery windows (what-if)",
       desc: "Dock and carrier windows the flow's delivery what-if reads (Simulate -> Live material flow -> Delivery): the inbound period and door-open time, the shipment mode whose lateness shape (a public USAID SCMS delivery dataset, aggregates only) is scaled to plant ticks by a declared teaching parameter, the carrier period, the promised lead, the nominal transit and the OTIF target. Teaching values; the dataset's lanes are international pharmaceutical shipments, not a warehouse's dock." },
+    { key: "control", label: "Control tower thresholds",
+      desc: "The thresholds the control tower's four teaching rules read (Simulate -> Control tower): how often it evaluates, how long a queue must stay congested, the rework share and the units it needs, the trailer lateness limit, the deliveries the OTIF rule needs, the snooze. The tower proposes and a person decides; it reads aggregates per step and station, never a person." },
     { key: "human-factors", label: "Human factors (error what-if)",
       desc: "Per-step error shares and performance-shaping multipliers the flow's error what-if reads (Simulate -> Live material flow -> Human error). Errors belong to a process step and a latent condition, never to a person; nothing here is keyed to a worker (BetrVG § 87(1)6, GDPR Art. 88). Anchored on HEART / SPAR-H generic values - teaching values, not warehouse measurements." },
   ];
@@ -292,6 +294,16 @@
     source: "WarehouseTwin choice: two plant hours of nominal transit; the dataset's lateness shape (scaled) is added on top.", note: DL_NOTE, editable: true, kind: "number", min: 0, max: 1000000 });
   seed({ id: "delivery.otif.target", category: "delivery", label: "On-time-in-full target (share of delivered orders)", value: 0.95, unit: "share",
     source: "A commonly quoted OTIF target in logistics guides - not a standard, not a measurement; the control tower (v3.56) compares against it.", note: DL_NOTE, editable: true, kind: "number", min: 0, max: 1 });
+
+  /* ---- v3.56 control tower: the rules' thresholds (teaching values; control.js DEFAULTS hold the same numbers) ---- */
+  const CT_NOTE = "Teaching threshold for a control-tower rule; the tower proposes, a person decides. Edit it and the next run evaluates with it.";
+  seed({ id: "control.evalEveryTicks", category: "control", label: "Evaluate every n ticks", value: 10, unit: "ticks", source: "WarehouseTwin choice: ten ticks between evaluations.", note: CT_NOTE, editable: true, kind: "number", min: 1, max: 10000 });
+  seed({ id: "control.queue.sustainTicks", category: "control", label: "Queue congestion: ticks a queue must stay at or above the congestion threshold", value: 30, unit: "ticks", source: "WarehouseTwin choice: half an hour at 60 ticks per hour before a queue is called sustained.", note: CT_NOTE, editable: true, kind: "number", min: 0, max: 100000 });
+  seed({ id: "control.rework.maxShare", category: "control", label: "Rework burden: the reworked-or-scrapped share of units through the error-prone steps above which the tower proposes", value: 0.01, unit: "share", source: "WarehouseTwin choice: one in a hundred.", note: CT_NOTE, editable: true, kind: "number", min: 0, max: 1 });
+  seed({ id: "control.rework.minUnits", category: "control", label: "Rework burden: units through the error-prone steps before the rule may fire", value: 20, unit: "units", source: "WarehouseTwin choice: twenty units before a share is worth a proposal.", note: CT_NOTE, editable: true, kind: "number", min: 1, max: 100000 });
+  seed({ id: "control.inbound.lateTicks", category: "control", label: "Inbound late: a trailer later than this many ticks triggers the rule", value: 60, unit: "ticks", source: "WarehouseTwin choice: an hour late at 60 ticks per hour.", note: CT_NOTE, editable: true, kind: "number", min: 0, max: 100000 });
+  seed({ id: "control.otif.minDeliveries", category: "control", label: "OTIF below target: delivered orders before the rule may fire", value: 20, unit: "orders", source: "WarehouseTwin choice: twenty delivered orders before a share is worth a proposal (the target is delivery.otif.target).", note: CT_NOTE, editable: true, kind: "number", min: 1, max: 100000 });
+  seed({ id: "control.snoozeTicks", category: "control", label: "Snooze: ticks before a snoozed rule may propose again", value: 120, unit: "ticks", source: "WarehouseTwin choice: two hours at 60 ticks per hour.", note: CT_NOTE, editable: true, kind: "number", min: 1, max: 100000 });
 
   // ------------------------------------------------------------------
   // Build the store. `defaults` is a frozen id -> default-value map;

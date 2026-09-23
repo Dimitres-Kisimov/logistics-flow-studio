@@ -2422,3 +2422,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .constraint-fields input { min-width:0; width:100%; box-sizing:border-box; }
 .constraint-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
 #constraintObject { display:block; width:100%; margin:8px 0; }
+
+/* v3.56 the control tower's proposals */
+.control-proposal{border-top:2px solid currentColor;padding:6px 0 4px;margin:8px 0}
+.control-proposal h4{margin:0 0 4px;font-size:1em}
+.control-tick{font-weight:400;opacity:.7;font-size:.85em}
+.control-evidence code{word-break:break-all;font-size:.8em}
+.control-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.control-audit{margin-top:8px}

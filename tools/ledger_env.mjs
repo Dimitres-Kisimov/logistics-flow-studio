@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 
 export const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-export const MODULES_HAND = ["domain.js", "iso.js", "shapes.js", "routing.js", "ids.js", "pack.js", "flowsim.js", "goods.js", "analytics.js", "ledger.js", "tracking.js", "run-ledger-sql.js", "run-ledger.js"];
+export const MODULES_HAND = ["domain.js", "iso.js", "shapes.js", "routing.js", "ids.js", "pack.js", "flowsim.js", "goods.js", "analytics.js", "ledger.js", "tracking.js", "control.js", "run-ledger-sql.js", "run-ledger.js"];
 export const MODULES_SCENARIO = ["compliance.js", "simulation.js", "generate.js", "nlcommands.js", "examples.js", "wms.js"];
 
 export function loadWT(files) {

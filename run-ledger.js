@@ -163,6 +163,7 @@
       bizstepDwell: m.dwell || null, dispositionCounts: m.dispositions || null, // v3.53: the same rows as v_bizstep_dwell (reconciled)
       quality: m.quality || null, // v3.54: first pass yield, rework and scrap ratios per operation (reconciled)
       otif: m.service ? [m.service] : [], inbound: m.inbound || [], // v3.55: on time in full, the trailers (reconciled)
+      control: m.control || [], // v3.56: the control tower's audit per rule (reconciled)
       invariants: invariants,
       flowLinks: m.flowLinks,
       rates: exp.rates || null, spans: cost ? cost.spans : null, costByHu: cost ? cost.byHu : null,
@@ -187,6 +188,8 @@
     m.quality = Lg && typeof Lg.qualityByStep === "function" ? Lg.qualityByStep(exp) : null; // v3.54: the same rows as v_quality_by_step
     m.service = Lg && typeof Lg.serviceOf === "function" ? Lg.serviceOf(exp) : null; // v3.55: v_otif's row (null without carrier windows)
     m.inbound = Lg && typeof Lg.inboundRows === "function" ? Lg.inboundRows(exp) : []; // v3.55: v_inbound's rows
+    const Ct = window.WT && window.WT.control;
+    m.control = Ct && typeof Ct.controlRows === "function" ? Ct.controlRows(exp) : []; // v3.56: v_control's rows (empty when nobody decided)
     m.views = computeViews(exp, m);
     m.ribbon = ribbon(exp);
     m.costByHu = {};
@@ -405,6 +408,9 @@
       // v3.55: the delivery what-if, if any
       delivery: r.inbound || r.outbound ? { text: "dock and carrier windows (what-if)", sub: (r.inbound ? "trailers every " + r.inbound.periodTicks + " ticks, " + (r.inbound.mode || "-") + " lateness shape" : "") + (r.outbound ? (r.inbound ? "; " : "") + "carriers every " + r.outbound.periodTicks + ", promised in " + r.outbound.promisedLeadTicks : "") + " · teaching values on a public dataset's shape" }
         : { text: "instantaneous dock and carrier", sub: "no delivery what-if ran: every trailer on time, no promise to miss" },
+      // v3.56: the control tower's decisions, if any
+      control: exp.control && exp.control.length ? { text: exp.control.length + " decision" + (exp.control.length === 1 ? "" : "s") + " recorded", sub: (v.control || []).map((r) => r.rule + " " + r.proposals + (r.accepted ? " (" + r.accepted + " accepted)" : "")).join(" · ") + " · a person decided; nothing acted on its own" }
+        : { text: "no proposal decided", sub: "the tower proposes from aggregates; a run exports its audit only when someone decided" },
       invariantCount: Object.keys(v.invariants).length,
       // v3.44: where the order stream came from
       dataset: r.dataset ? { text: "own data: " + r.dataset.orders + " orders / " + r.dataset.lines + " lines", sub: (r.dataset.source || "pool") + (r.dataset.skus != null ? " · " + r.dataset.skus + " articles" : "") + " · one unit per order line, the line's quantity on the unit; order types from the mix" }
@@ -519,6 +525,7 @@
       { label: "Staffing", value: g.policy.text, sub: g.policy.sub },
       { label: "Human error", value: g.errors.text, sub: g.errors.sub },
       { label: "Delivery", value: g.delivery.text, sub: g.delivery.sub },
+      { label: "Control tower", value: g.control.text, sub: g.control.sub },
       { label: "Simulated", value: r.ticks + " ticks · " + g.minutes + " min", sub: r.minutes_per_tick + " min per tick" },
       { label: "Units · events", value: g.units + " · " + g.events, sub: g.retired + " retired · " + g.inFlight + " in flight" },
       { label: "Delivered", value: g.delivered + " units · " + g.delivered_eaches + " eaches", sub: g.delivered_pallets + " pallets · " + g.delivered_parcels + " parcels · " + g.trailers + " trailer" + (g.trailers === 1 ? "" : "s") },
@@ -751,6 +758,15 @@
     html += (v.inbound && v.inbound.length ? table(v.inbound, INBOUND_COLS, "Trailers at the door", { minutes: ["late_ticks"], mpt: exp.run.minutes_per_tick }) : "<p class=\"note\">No trailer was logged.</p>") + sqlBlock("v_inbound");
     return html;
   }
+  // v3.56 the control tower: the decisions a person took during the run, per rule, and the raw audit.
+  const CONTROL_COLS = ["rule", "proposals", "accepted", "declined", "snoozed", "first_tick"];
+  function controlHtml(exp) {
+    const rows = views(exp).control || [], log = exp.control || [];
+    if (!log.length) return "<p class=\"note\">No control-tower decision in this run: the tower proposes from aggregates per step and station and a person decides; nothing acts on its own. A run exports its audit only when someone accepted, declined or snoozed a proposal.</p>" + sqlBlock("v_control");
+    return "<p class=\"note\">" + log.length + " decision" + (log.length === 1 ? "" : "s") + " recorded (accepting re-runs the day from tick 0, so an accepted lever shows in the run that came after; the audit names the run each decision came from). Nothing here names a person.</p>" +
+      table(rows, CONTROL_COLS, "Control tower: decisions per rule") + table(log.map((r) => ({ seq: r.seq, tick: r.tick, rule: r.rule, decision: r.status, lever: r.lever ? (r.lever.kind === "picker" ? "staffing -> " + r.lever.value : r.lever.key + " -> " + r.lever.value) : null, from_run: r.from_run || null })),
+        ["seq", "tick", "rule", "decision", "lever", "from_run"], "The audit trail") + sqlBlock("v_control");
+  }
   function renderPlanner(exp) {
     const v = views(exp), mpt = exp.run.minutes_per_tick;
     $("rlCycle").innerHTML = table(v.cycle, ["archetype", "units", "retired", "avg_cycle_ticks", "avg_cycle_minutes", "min_cycle_ticks", "max_cycle_ticks"], "Cycle time by order type") + sqlBlock("v_cycle_time_by_type");
@@ -766,6 +782,7 @@
     $("rlStaffing").innerHTML = staffingHtml(exp); // v3.45
     $("rlQuality").innerHTML = qualityHtml(exp); // v3.54
     $("rlDelivery").innerHTML = deliveryHtml(exp); // v3.55
+    $("rlControl").innerHTML = controlHtml(exp); // v3.56
   }
 
   /* ---------------- dispatch ------------------------------------------ */

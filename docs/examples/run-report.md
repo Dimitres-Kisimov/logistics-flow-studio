@@ -200,6 +200,10 @@ Data-quality flags: no holding cost is set (0 per unit-hour): waiting stock cost
 
 (no rows)
 
+### v_control
+
+(no rows)
+
 ## Cost detail
 
 | hours | labour_eur | equipment_eur | energy_eur | holding_eur | total_eur |

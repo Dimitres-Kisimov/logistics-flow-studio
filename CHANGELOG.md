@@ -1,5 +1,56 @@
 # Changelog
 
+## v3.56 — The control tower: four rules propose, a person decides, accepting re-runs the day
+
+**The module.** `control.js` (`WT.control`): `create(thresholds)`, the read-only `observe(ctl, rec, state)`
+evaluated every `evalEveryTicks` ticks (10) on the app's after-tick hook - ledger, tracking twins, then
+the tower - and `decide(ctl, id, status, tick)`. Four rules, each at most once per run (again after a
+snooze): *queue congestion* (a station's queue at or above the sim's congestion threshold at every
+evaluation for `sustainTicks` (30) with no staffing policy active → the adaptive-staffing picker; on the
+hand floor the put-away queue reaches 6 at tick 97, dips to 5 across the tick-100 evaluation, is at or
+above 6 from 110, and the tower proposes at 140 naming element stg, expected effect quoted from verify_staffing.js: 19 → 17, no fewer completions,
+"your floor will differ"), *rework burden* (the error what-if ran with a lever above 1 and, after
+`minUnits` (20) through the error-prone steps, the reworked-or-scrapped share exceeds `maxShare` (0.01)
+→ reset the largest lever, named, with the per-kind arithmetic, e.g. mis-pick 0.22 → 0.02; silent
+without a lever to remove), *inbound late* (a logged trailer later than `lateTicks` (60) → halve the
+inbound period; the hand lateness list's trailer 3 at 159 ticks proposes at tick 460), *OTIF below
+target* (at least `minDeliveries` (20) delivered orders and OTIF below `delivery.otif.target` → halve
+the carrier period; never without carrier windows, never when every order is on time). A proposal =
+{ id, rule, tick, evidence (element ids, counts, ticks, shares), lever { kind: picker | kb, key, value },
+expectedEffect, why, status, decided_tick }. `decide` writes { seq, tick, rule, proposal_id, status,
+lever, evidence } into the tower's audit; declined never proposes again, snoozed returns after
+`snoozeTicks` (120: on the hand floor at 260, 380, 500), a second decision or an unknown id is refused.
+Purity: a run with the tower attached is byte-identical to one without; two identical runs propose the
+same at the same ticks. `controlRows(export)` is the `v_control` twin.
+
+**The app.** A *Control tower* card in the Simulate drawer (after the flow card) lists the open proposals
+with their evidence and three buttons. *Decline* and *Snooze* push the audit row (with the run it came
+from) into a log the app keeps across runs and change nothing else; *Accept* applies the lever exactly as
+the picker (staffing) or the knowledge base (a PSF lever, an inbound or outbound period) would, then
+re-runs the day from tick 0 - the run id is a hash of its inputs. The log rides with every run ledger
+(`ledger.create(..., { control })`) and is exported as `control` only when a decision exists. The
+knowledge base gains a *Control tower thresholds* category (seven seeds pinned equal to control.js
+DEFAULTS); the readout's audit table names the run each decision came from.
+
+**SQL and viewer.** `control_event(run_id, seq, tick, rule, proposal_id, status, lever, evidence,
+from_run)` and the planner view `v_control` (per rule: proposals, accepted, declined, snoozed, first
+tick; reconciled); the viewer's *Control tower* block (the per-rule table and the raw audit, a note
+when nobody decided) and a glance card.
+
+**Human, mechanically.** The evidence of every proposal is aggregates per step and station; the module
+reads no roster and no worker module and the harness proves it; HONESTY names BetrVG 87(1)6, GDPR
+Art. 88, "a person decides" and "not a certification". The deep dive's chapter 3 is rewritten as what
+exists at v3.56 and its Reproduce section lists every harness of the programme.
+
+**Limits, stated.** Four teaching rules with teaching thresholds; the expected effects are measured on
+the hand floor or arithmetic on declared values, never a prediction for another floor; the tower
+cannot undo an accepted lever (a person changes the picker back and re-runs); accepting discards the
+running day.
+
+**Verification.** `verify_control.js` (25 checks), +3 Python tests (v_control by hand on a three-row audit,
+the status CHECK, an old database gaining the table), both self-tests. 81 harnesses, 153 Python
+tests, WT-SELFTEST 189/189 + viewer 36/36. Cache wt-v135. The four run exports are byte-identical.
+
 ## v3.55 — Delivery and shipping times in between: dock and carrier windows on a public dataset's shape
 
 **The dataset.** `tools/scms_delivery.py` (fetch / reduce / --check / --offline-check, the shape of

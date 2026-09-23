@@ -34,6 +34,7 @@
 <h3>Workers at each bench</h3><div id="rlStaffing"></div>
 <h3>Quality by step</h3><div id="rlQuality"></div>
 <h3>Delivery</h3><div id="rlDelivery"></div>
+<h3>Control tower</h3><div id="rlControl"></div>
 <h3>Quantities at each operation</h3><div id="rlByOp"></div></section>
 <section id="secCost" aria-labelledby="hCost"><h2 id="hCost">What a handling unit costs</h2><p class="note">The spans between a unit's events, charged at the rates the run was recorded under (the planner's Analyze panel, defaults from <code>analytics.js</code>): a unit served at a station is charged that station's service time, whatever it waited; a moving unit is charged at the class of mover the floor contains. Cost per span = hours × labour rate (manned classes) + hours × capex ÷ amortisation years ÷ operating hours per year + hours × kW × energy price. Queue time costs no labour; a holding cost per unit-hour waiting is charged only if you set one in the planner's Analyze panel (default 0). Cost per order type is given per unit, per <em>received</em> each (every unit, retired or not) and per <em>delivered</em> each (partial while units are in flight).</p><div id="rlCost"></div></section>
 <section id="secDispatch" aria-labelledby="hDispatch"><h2 id="hDispatch">Dispatch manifest</h2><div id="rlDispatch"></div></section>
@@ -49,4 +50,4 @@
 <section id="secAppendix" aria-labelledby="hAppendix"><h2 id="hAppendix">Appendix: how to read this page</h2><div id="rlAppendix"></div></section>
 </div>
 <footer>Deterministic: the same scenario, seed and order mix reproduce this file byte for byte. The viewer computes every table in the browser once, by the definitions shown under <em>SQL</em>; <code>python tools/run_ledger.py import &lt;file&gt; --database run.sqlite</code> then <code>views</code> runs them in SQLite. Unit-load dimensions follow DIN EN 13698 and VDA 4500; the 33 / 26 pallets per 13.6 m trailer are planning figures; everything about the goods themselves is a synthetic teaching value.</footer>
-</main><script src="run-ledger-sql.js"></script><script src="ids.js"></script><script src="pack.js"></script><script src="ledger.js"></script><script src="tracking.js"></script><script src="analytics.js"></script><script src="run-ledger.js"></script><script src="run-ledger-selftest.js"></script></body></html>
+</main><script src="run-ledger-sql.js"></script><script src="ids.js"></script><script src="pack.js"></script><script src="ledger.js"></script><script src="tracking.js"></script><script src="control.js"></script><script src="analytics.js"></script><script src="run-ledger.js"></script><script src="run-ledger-selftest.js"></script></body></html>

@@ -37,11 +37,12 @@ window.RunLedgerSQL = {
   "v_tracking_gaps": "SELECT h.run_id, e.id AS handling_event_id, 'no twin' AS gap\nFROM handling_event e JOIN hu h ON h.id = e.hu_id\nWHERE NOT EXISTS (SELECT 1 FROM tracking_event t WHERE t.handling_event_id = e.id)\nUNION ALL\nSELECT t.run_id, t.handling_event_id, 'business step ' || t.biz_step FROM tracking_event t\nWHERE t.biz_step NOT IN ('receiving','inspecting','unpacking','storing','stocking','picking','staging_outbound','repackaging','packing','loading','shipping','holding','destroying')\nUNION ALL\nSELECT t.run_id, t.handling_event_id, 'disposition ' || t.disposition FROM tracking_event t\nWHERE t.disposition NOT IN ('in_progress','returned','in_transit','sellable_accessible','sellable_not_accessible','non_sellable_other','mismatch_class','damaged');",
   "v_otif": "WITH o AS (SELECT run_id, order_id, MIN(CASE WHEN final_kind = 'delivered' THEN 1 ELSE 0 END) AS delivered,\n                  MIN(CASE WHEN final_kind = 'delivered' AND on_time = 1 THEN 1 ELSE 0 END) AS on_time\n           FROM hu GROUP BY run_id, order_id),\n     u AS (SELECT run_id, COUNT(*) AS delivered_units, SUM(COALESCE(on_time_shipped, 0)) AS shipped_on_time, AVG(transit_ticks) AS avg_transit\n           FROM hu WHERE final_kind = 'delivered' GROUP BY run_id)\nSELECT r.id AS run_id, COUNT(o.order_id) AS orders, SUM(o.delivered) AS delivered_orders, SUM(o.delivered * o.on_time) AS otif_orders,\n       CASE WHEN SUM(o.delivered) > 0 THEN ROUND(SUM(o.delivered * o.on_time) * 1.0 / SUM(o.delivered), 4) END AS otif,\n       CASE WHEN u.delivered_units > 0 THEN ROUND(u.shipped_on_time * 1.0 / u.delivered_units, 4) END AS shipped_on_time_share,\n       ROUND(u.avg_transit, 2) AS avg_transit_ticks\nFROM run r JOIN o ON o.run_id = r.id LEFT JOIN u ON u.run_id = r.id\nWHERE r.outbound IS NOT NULL GROUP BY r.id;",
   "v_inbound": "SELECT i.run_id, i.trailer, i.scheduled_tick, i.arrival_tick, i.late_ticks,\n       (SELECT COUNT(*) FROM hu h WHERE h.run_id = i.run_id AND h.trailer = i.trailer) AS units\nFROM inbound_event i;",
+  "v_control": "SELECT run_id, rule, COUNT(*) AS proposals, SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) AS accepted,\n       SUM(CASE WHEN status = 'declined' THEN 1 ELSE 0 END) AS declined, SUM(CASE WHEN status = 'snoozed' THEN 1 ELSE 0 END) AS snoozed, MIN(tick) AS first_tick\nFROM control_event GROUP BY run_id, rule;",
   "v_quality_by_step": "WITH t AS (SELECT h.run_id, e.op, e.hu_id FROM handling_event e JOIN hu h ON h.id = e.hu_id WHERE e.kind <> 'queued' GROUP BY h.run_id, e.op, e.hu_id),\n     u AS (SELECT t.run_id, t.op, t.hu_id, h.error_op, h.error_outcome FROM t JOIN hu h ON h.id = t.hu_id)\nSELECT run_id, op, COUNT(*) AS units_through,\n       SUM(CASE WHEN error_op = op THEN 1 ELSE 0 END) AS errors,\n       SUM(CASE WHEN error_op = op AND error_outcome = 'rework' THEN 1 ELSE 0 END) AS reworked,\n       SUM(CASE WHEN error_op = op AND error_outcome = 'scrap' THEN 1 ELSE 0 END) AS scrapped_for_damage,\n       ROUND((COUNT(*) - SUM(CASE WHEN error_op = op THEN 1 ELSE 0 END)) * 1.0 / COUNT(*), 4) AS first_pass_yield,\n       ROUND(SUM(CASE WHEN error_op = op AND error_outcome = 'rework' THEN 1 ELSE 0 END) * 1.0 / COUNT(*), 4) AS rework_ratio,\n       ROUND(SUM(CASE WHEN error_op = op AND error_outcome = 'scrap' THEN 1 ELSE 0 END) * 1.0 / COUNT(*), 4) AS scrap_ratio\nFROM u GROUP BY run_id, op;"
 };
 window.RunLedgerSQLMeta = {
   "generated_from": "tools/run_ledger.py",
-  "views": 36,
+  "views": 37,
   "planner": [
     "v_run_summary",
     "v_cycle_time_by_type",
@@ -56,7 +57,8 @@ window.RunLedgerSQLMeta = {
     "v_bizstep_dwell",
     "v_quality_by_step",
     "v_otif",
-    "v_inbound"
+    "v_inbound",
+    "v_control"
   ],
   "invariant": [
     "v_conservation_violations",

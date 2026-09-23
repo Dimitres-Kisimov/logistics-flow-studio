@@ -870,7 +870,7 @@ class Tracking(unittest.TestCase):
         self.assertIn("v_tracking_gaps", RL.INVARIANT_VIEWS)
         self.assertTrue({"v_epcis_events", "v_unit_history"} <= set(RL.DETAIL_VIEWS))
         self.assertTrue(set(RL.TRACKING_VIEWS) <= set(RL.VIEWS))
-        self.assertEqual(len(RL.VIEWS), 36)
+        self.assertEqual(len(RL.VIEWS), 37)
         self.assertEqual(RL.RECONCILE_KEYS["v_bizstep_dwell"], ("biz_step",))
         data = json.loads((FIX / "run-ledger.json").read_text(encoding="utf-8"))
         js = json.loads((FIX / "run-ledger.tracking.views.json").read_text(encoding="utf-8"))
@@ -1065,6 +1065,52 @@ class Delivery(unittest.TestCase):
         for view in ("v_replication_cycle_by_type", "v_replication_cost_by_type", "v_replication_summary"):
             rows_ = RL.rows(db, f"SELECT DISTINCT n FROM {view} WHERE errors = '' AND inbound = '' AND outbound = ''")
             self.assertEqual([r["n"] for r in rows_], [2], view)
+
+
+class ControlTower(unittest.TestCase):
+    """v3.56 the control tower's audit: v_control by hand, idempotent import, empty without decisions, an old database gains the table."""
+
+    def audit(self):
+        return [
+            {"seq": 1, "tick": 130, "rule": "queue-congestion", "proposal_id": "P-queue-congestion-130", "status": "declined", "lever": {"kind": "picker", "key": "staffing", "value": "adaptive"}, "evidence": {"stations": [{"id": "put-0", "element": "stg", "queue": 6}]}, "from_run": "RUN-hand-s1-h00000000"},
+            {"seq": 2, "tick": 250, "rule": "queue-congestion", "proposal_id": "P-queue-congestion-250", "status": "snoozed", "lever": {"kind": "picker", "key": "staffing", "value": "adaptive"}, "evidence": {}, "from_run": "RUN-hand-s1-h00000000"},
+            {"seq": 3, "tick": 460, "rule": "inbound-late", "proposal_id": "P-inbound-late-460", "status": "accepted", "lever": {"kind": "kb", "key": "delivery.inbound.periodTicks", "value": 50}, "evidence": {"worst": {"trailer": 3, "late_ticks": 159}}, "from_run": "RUN-hand-s0-h00000009"},
+        ]
+
+    def test_control_by_hand(self):
+        data = hand_ledger()
+        data["control"] = self.audit()
+        db = fresh_with(data)
+        rows_ = RL.rows(db, "SELECT * FROM v_control WHERE run_id = ? ORDER BY rule", ("RUN-hand-s1-h00000000",))
+        self.assertEqual([(r["rule"], r["proposals"], r["accepted"], r["declined"], r["snoozed"], r["first_tick"]) for r in rows_],
+                         [("inbound-late", 1, 1, 0, 0, 460), ("queue-congestion", 2, 0, 1, 1, 130)])
+        ev = RL.rows(db, "SELECT seq, tick, status, lever, from_run FROM control_event ORDER BY seq")
+        self.assertEqual([(r["seq"], r["tick"], r["status"]) for r in ev], [(1, 130, "declined"), (2, 250, "snoozed"), (3, 460, "accepted")])
+        self.assertEqual(json.loads(ev[2]["lever"]), {"key": "delivery.inbound.periodTicks", "kind": "kb", "value": 50})
+        self.assertEqual(ev[2]["from_run"], "RUN-hand-s0-h00000009")
+        RL.import_ledger(db, data)  # idempotent
+        self.assertEqual(RL.rows(db, "SELECT COUNT(*) AS n FROM control_event")[0]["n"], 3)
+        self.assertEqual(RL.summary(db, "RUN-hand-s1-h00000000")["invariants"], {n: 0 for n in RL.INVARIANT_VIEWS})
+
+    def test_no_decisions_no_rows_and_the_groups(self):
+        db = fresh_with(hand_ledger())
+        self.assertEqual(RL.rows(db, "SELECT * FROM v_control"), [])
+        self.assertIn("v_control", RL.PLANNER_VIEWS)
+        self.assertEqual(RL.RECONCILE_KEYS["v_control"], ("rule",))
+        with self.assertRaises(sqlite3.IntegrityError):
+            db.execute("INSERT INTO control_event(run_id, seq, tick, rule, proposal_id, status) VALUES(?, 1, 1, 'x', 'p', 'maybe')", ("RUN-hand-s1-h00000000",))
+
+    def test_old_database_gains_the_control_table(self):
+        db = fresh()
+        for name in RL.VIEWS:
+            db.execute(f"DROP VIEW IF EXISTS {name}")
+        db.execute("DROP TABLE control_event")
+        RL.initialize(db)
+        RL.initialize(db)
+        data = hand_ledger()
+        data["control"] = self.audit()[:1]
+        RL.import_ledger(db, data)
+        self.assertEqual(RL.rows(db, "SELECT declined FROM v_control")[0]["declined"], 1)
 
 
 if __name__ == "__main__":
