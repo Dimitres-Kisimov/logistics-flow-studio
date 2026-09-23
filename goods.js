@@ -361,6 +361,31 @@
     if (mu.status === "queued") i = Math.max(0, i - 1); // still the incoming form
     return STAGE_FORM[STAGE_ORDER[i]] || "carton";
   }
+  /* ==================================================================
+   * v3.48 WHAT A TYPE HANDLES. The goods form a placed type carries, for the
+   * Class Library thumbnail and card ("a little representation of the items").
+   * An explicit table first, then the type's domain category / base. Pure;
+   * null when the type handles no discrete goods (a gate, a pipe, a tank).
+   * ================================================================== */
+  const TYPE_FORM = {
+    "carton-flow": "carton", "pick-to-light": "carton", "mezzanine": "carton",
+    "conveyor": "carton", "conveyor-curve": "carton", "sorter": "carton", "converter": "carton", "angular-converter": "carton",
+    "turntable": "carton", "turnplate": "carton", "flow-control": "carton", "cycle": "carton",
+    "track": "pallet-load", "two-lane-track": "pallet-load", "rgv": "pallet-load", "agv": "pallet-load", "forklift": "pallet",
+    "push-station": "tote", "pull-station": "tote", "pack-station": "parcel", "vas-station": "parcel", "returns-station": "parcel",
+    "qc-bench": "carton", "depalletiser": "pallet-load", "stretch-wrap": "wrapped-pallet",
+    "dock-in": "pallet-load", "staging": "pallet-load", "dock-out": "parcel",
+    "mfg-source": "tote", "mfg-drain": "tote", "mfg-station": "tote", "mfg-parallel-station": "tote", "mfg-assembly": "tote", "mfg-dismantle": "tote",
+    "charging-station": null, "gate": null, "pipe": null, "fluid-source": null, "fluid-drain": null, "tank": null, "mixer": null, "portioner": null, "deportioner": null,
+  };
+  function formForType(type) {
+    if (Object.prototype.hasOwnProperty.call(TYPE_FORM, type)) return TYPE_FORM[type];
+    const D = WT.domain, def = D && D.ELEMENTS && D.ELEMENTS[type];
+    if (!def) return null;
+    if (def.category === "storage") return "pallet-load";
+    const b = def.base;
+    return b === "conveyor" ? "carton" : b === "transporter" ? "pallet-load" : b === "station" ? "tote" : b === "dock" ? "pallet-load" : null;
+  }
   function sizeOf(form) {
     return NOMINAL[form] || NOMINAL.carton;
   }
@@ -980,6 +1005,7 @@
     HONESTY,
     // model (pure)
     formFor, sizeOf, supportIndex, supportAt, carrierOf,
+    TYPE_FORM, formForType, // v3.48 what a type handles
     OP_FORM, startFormOf, formAlong, // v3.30 R3
     queueTrail, sample, units,
     vehicles, sampleVehicle,

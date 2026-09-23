@@ -570,20 +570,43 @@ a.btn.app-link { color: var(--accent-ink); border-color: color-mix(in srgb, var(
 /* Cards inside a drawer body sit flush (the drawer supplies the surface). */
 .wt-drawer-body .card { box-shadow: none; }
 
-/* v3.9 icon-led Class Library item: the flat colour swatch is upgraded to a
-   mini WT.shapes glyph so the palette icon matches what lands on the floor. */
+/* v3.9 icon-led Class Library item / v3.48 the library shows what you place:
+   the swatch is the real WT.shapes glyph at 56 x 36 px (aspect-true, full glyph
+   tier) with the goods the type handles on it. No !important: the inline
+   def.color fallback must win when a glyph cannot be drawn. */
 .pal-swatch.pal-glyph {
   width: 30px;
   height: 30px;
   border-radius: 6px;
   padding: 1px;
-  background: var(--surface-2, rgba(127, 127, 127, 0.10)) !important;
+  background: var(--surface-2, rgba(127, 127, 127, 0.10));
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+  overflow: hidden;
 }
 .pal-swatch.pal-glyph canvas { width: 28px; height: 28px; display: block; }
+.pal-item .pal-swatch.pal-glyph { width: 56px; height: 36px; padding: 0; }
+.pal-item .pal-swatch.pal-glyph canvas.pal-thumb { width: 56px; height: 36px; }
+.pal-meta { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.pal-sub { font-size: 0.66rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pal-view { display: flex; gap: 4px; margin-top: 6px; }
+.pal-view .btn { flex: 1 1 0; }
+.pal-view .btn[aria-pressed="true"] { border-color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-ink); }
+.tb-add-glyph.pal-glyph { width: 18px; height: 18px; padding: 0; }
+/* v3.48 the library hover card */
+.tooltip.tooltip--card { max-width: 320px; padding: 9px 11px; }
+.tip-head { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
+.tip-thumb { display: inline-flex; flex: 0 0 auto; width: 120px; height: 80px; border-radius: 6px; overflow: hidden; background: rgba(127, 127, 127, 0.15); }
+.tip-thumb canvas { display: block; }
+.tip-title { font-weight: 700; font-size: 0.8rem; }
+.tip-sub { font-size: 0.68rem; opacity: 0.85; }
+.tip-rows { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 0.7rem; font-variant-numeric: tabular-nums; margin: 0; }
+.tip-rows dt { opacity: 0.75; }
+.tip-rows dd { margin: 0; }
+.tip-note { font-size: 0.64rem; opacity: 0.75; margin: 6px 0 0; }
+@media (prefers-reduced-motion: reduce) { .tooltip { transition: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   .wt-drawer { transition: none; }

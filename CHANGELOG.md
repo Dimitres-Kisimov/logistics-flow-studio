@@ -1,5 +1,43 @@
 # Changelog
 
+## v3.48 — The library shows what you place
+
+**The list.** The Class Library's swatches used to collapse to the 28 px LOD icon (the
+painter passed the footprint in cells where `draw2D` expects pixels, and no 28 px box
+reaches the glyph tier). Now every entry draws the same glyph the floor draws, aspect-true
+in a 56 × 36 px box at the full detail tier, with the goods the type handles on it
+(`goods.formForType`: racking → pallet load, conveyors → carton, pack bench → parcel,
+control stations and the production components → tote, stretch-wrap → wrapped pallet;
+gates, chargers and the fluids components handle no discrete goods). `draw2D` gains one
+flag, `thumbnail: true`, that skips the on-screen footprint guard; no floor caller passes
+it, so floor rendering is unchanged. A Plan | 2.5D toggle (remembered on this device) draws
+the list as the 2.5D form instead; the sub-line names the footprint and the handled goods;
+the hover (and keyboard-focus) card shows the 2.5D form, the height, and the capacity or
+cycle-time rows the Inspector shows, from one descriptor (`library.describe`), labelled
+teaching values. The toolbar flyout keeps the simplified icon on purpose (18 px).
+
+**The drop.** While a tool is armed or a library item is dragged, a placement ghost follows
+the pointer: the item's own glyph in a dashed footprint, green where the drop is legal, red
+with the reason where it is not (`ghostCandidate` = the `placeAt` clamp + the same
+`placementProblem` the click uses). The drag image is the thumbnail itself. The ghost is
+never serialised and never enters the simulation; on a touch screen, tap an item, drag a
+finger over the floor, tap to place. Honest limit: the ghost checks bounds, overlap and
+reserved zones only; aisle and dock-approach rules stay with the Compliance Check.
+
+**Inspector.** Behaviour gains *Handles* and *Cycle time* rows for flow types (the same
+descriptor). The swatch CSS loses its `!important`, so the flat-colour fallback for a custom
+type without a glyph is visible again.
+
+**Verification.** New `verify_library_preview.js` (26 checks: the flag reaches the glyph
+tier for all 54 types in both themes against an icon-tier control, the guard line exact and
+single, the aspect-true fit by hand and over the catalogue, `formForType` total with pinned
+pairs, `describe` against the domain, the ghost's overlap / clamp / reserved-zone / unknown
+cases, the wiring), app self-test +3 (every entry carries a real thumbnail canvas; the ghost
+follows a pointer move while armed and clears on leave; a library drag over the floor
+previews the drop and clears on leave). 76 harnesses, 120 Python tests, WT-SELFTEST
+183/183 + viewer 31/31. Cache wt-v128. Screenshots `docs/img/hero-plant-2d.png` and
+`docs/img/warehousetwin.png` retaken.
+
 ## v3.47 — Board grades
 
 **The table.** `pack.js` `BOARDS`: the twelve ECT box-certificate classes (23, 26, 29, 32,

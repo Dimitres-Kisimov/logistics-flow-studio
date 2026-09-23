@@ -92,6 +92,7 @@
     calibPts: [], // up to 2 clicked points (image-pixel coords)
     drag: null, // {id, offsetX, offsetY, moved}
     preview: null, // optimizer proposal: [{id,type,x,y,w,d}] shown as ghosts
+    hover: null, // v3.48 placement ghost: {type,x,y,w,d,ok,problem} while a tool is armed or dragged; never serialised
     complianceHighlight: null, // element ids highlighted from a Compliance Check finding
     showHeat: false, // pick-traffic heatmap overlay toggle
     // v1.12 realistic floor: the "Measurements" layer (edge scale ruler +
@@ -1278,6 +1279,11 @@
       }
       ctx.restore();
     }
+
+    // v3.48 THE PLACEMENT GHOST: the armed / dragged type drawn where it would
+    // land - its real glyph in a dashed footprint, green when the spot is legal,
+    // red with the reason when it is not. Never serialised, never in the sim.
+    if (state.hover && state.viewMode !== "iso") drawPlacementGhost(state.hover, cellPx);
 
     // I/O marker. When the point sits inside a dock (the usual case) the
     // diamond used to cover the dock's own IN/OUT label — hop it to the
@@ -3218,6 +3224,33 @@
     ctx.restore();
   }
 
+  function drawPlacementGhost(h, cellPx) {
+    const def = ELEMENTS[h.type];
+    if (!def) return;
+    const px = h.x * cellPx, py = h.y * cellPx, pw = h.w * cellPx, ph = h.d * cellPx;
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    roundRect(px + 2, py + 2, pw - 4, ph - 4, 6);
+    ctx.fillStyle = hexA(def.color, 0.34);
+    ctx.fill();
+    ctx.setLineDash([6, 4]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = h.ok ? COLORS.flow : COLORS.violation;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (WT.shapes && (WT.shapes.has(h.type) || def.custom)) {
+      WT.shapes.draw2D(ctx, h.type, { x: px, y: py, w: pw, d: ph, cellPx: cellPx, color: def.color, theme: thumbTheme(), lod: cellPx * view.scale, glyph: def.glyph, base: def.base, arc: def.arc });
+    }
+    ctx.globalAlpha = 1;
+    if (!h.ok && h.problem) {
+      ctx.fillStyle = COLORS.violation;
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      clipText(h.problem, px + 4, py + ph + 4, Math.max(pw, 360));
+    }
+    ctx.restore();
+  }
   function clipText(text, x, y, maxW) {
     let t = text;
     while (t.length > 1 && ctx.measureText(t).width > maxW) t = t.slice(0, -1);
@@ -3353,16 +3386,21 @@
       paletteDragType = type;
       e.dataTransfer.setData("application/x-warehousetwin-equipment", type);
       e.dataTransfer.effectAllowed = "copy";
+      // v3.48: the thumbnail itself is the drag image - the item you see is the item you drop
+      const thumb = button.querySelector("canvas.pal-thumb") || button.querySelector("canvas");
+      if (thumb && typeof e.dataTransfer.setDragImage === "function") { try { e.dataTransfer.setDragImage(thumb, Math.round(thumb.clientWidth / 2), Math.round(thumb.clientHeight / 2)); } catch (_) { /* best-effort */ } }
       if (state.viewMode === "iso") setViewMode("top");
       status("Drag " + ELEMENTS[type].label + " onto the floor. Placement uses the 2D plan.");
     });
-    button.addEventListener("dragend", () => { paletteDragType = null; canvas.classList.remove("equipment-drop-target"); });
+    button.addEventListener("dragend", () => { paletteDragType = null; canvas.classList.remove("equipment-drop-target"); setHover(null); });
   }
   canvas.addEventListener("dragover", e => {
     if (!paletteDragType) return;
     e.preventDefault(); e.dataTransfer.dropEffect = "copy"; canvas.classList.add("equipment-drop-target");
+    const p = pointerCell(e); // v3.48: the ghost under the dragged item
+    setHover(ghostCandidate(paletteDragType, Math.floor(p.cx), Math.floor(p.cy)));
   });
-  canvas.addEventListener("dragleave", () => canvas.classList.remove("equipment-drop-target"));
+  canvas.addEventListener("dragleave", () => { canvas.classList.remove("equipment-drop-target"); setHover(null); });
   canvas.addEventListener("drop", e => {
     if (!paletteDragType) return;
     e.preventDefault();
@@ -3372,6 +3410,7 @@
     if (state.flow.playing) flowPause();
     const point = pointerCell(e);
     setTool(null);
+    setHover(null);
     placeAt(type, Math.floor(point.cx), Math.floor(point.cy));
   });
 
@@ -3440,6 +3479,11 @@
       render();
       return;
     }
+    if (state.activeTool && !state.drag && state.viewMode !== "iso") { // v3.48: the ghost follows the armed tool
+      const p = pointerCell(e);
+      setHover(ghostCandidate(state.activeTool, Math.floor(p.cx), Math.floor(p.cy)));
+      return;
+    }
     if (!state.drag) return;
     const { cx, cy } = pointerCell(e);
     const el = state.elements.find((x) => x.id === state.drag.id);
@@ -3487,6 +3531,7 @@
   }
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
+  canvas.addEventListener("pointerleave", () => setHover(null)); // v3.48: the ghost leaves with the pointer
 
   // ================================================================
   // VIEW: ZOOM + PAN
@@ -3694,6 +3739,24 @@
     return area < 0 ? "" : "Reserved area " + (area+1) + " would be outside the resized floor. Edit that area first.";
   }
 
+  // v3.48 THE PLACEMENT GHOST. Where the armed / dragged type would land if
+  // dropped here (the same clamp as placeAt) and whether the spot is legal
+  // (the same placementProblem). Pure; null for an unknown type.
+  function ghostCandidate(type, cx, cy) {
+    const def = ELEMENTS[type];
+    if (!def) return null;
+    if (def.w > GRID_W || def.d > GRID_H) return { type: type, x: cx, y: cy, w: def.w, d: def.d, ok: false, problem: "This equipment is larger than the floor. Resize the floor first." };
+    const cand = { x: Math.max(0, Math.min(GRID_W - def.w, cx)), y: Math.max(0, Math.min(GRID_H - def.d, cy)), w: def.w, d: def.d };
+    const problem = placementProblem(cand, null);
+    return { type: type, x: cand.x, y: cand.y, w: cand.w, d: cand.d, ok: !problem, problem: problem || "" };
+  }
+  function setHover(next) {
+    const cur = state.hover;
+    const same = (!cur && !next) || (!!cur && !!next && cur.type === next.type && cur.x === next.x && cur.y === next.y && cur.ok === next.ok && cur.problem === next.problem);
+    if (same) return;
+    state.hover = next;
+    render();
+  }
   function placeAt(type, cx, cy) {
     const def = ELEMENTS[type];
     if (!def || def.w > GRID_W || def.d > GRID_H) { toast("This equipment is larger than the floor. Resize the floor first.", "warn"); return; }
@@ -4024,7 +4087,7 @@
         name.textContent = def.label;
         it.appendChild(sw);
         it.appendChild(name);
-        paintPaletteGlyph(sw, type, def); // the SAME glyph the palette + floor use
+        paintPaletteGlyph(sw, type, def, { mode: "icon" }); // the 18 px flyout keeps the LOD icon on purpose (v3.48)
         body.appendChild(it);
       }
       head.addEventListener("click", (e) => {
@@ -4057,6 +4120,8 @@
   // Up/Down move between headers + items, Left/Right collapse/expand a group,
   // Enter/Space pick an item (native button behaviour), Esc clears the search.
   function wirePaletteControls() {
+    document.querySelectorAll("#palViewToggle [data-view]").forEach((b) => { if (!b.dataset.wired) { b.dataset.wired = "1"; b.addEventListener("click", () => setPalView(b.dataset.view)); } });
+    syncPalViewToggle();
     const input = $("paletteSearch");
     if (input && !input.dataset.wired) {
       input.dataset.wired = "1";
@@ -4116,15 +4181,18 @@
     // built-ins still respect the tier gate.
     const locked = !isCustom && !caps.paletteAllowed(type);
     const catLabel = isCustom ? def.base : def.category;
+    // v3.48: the sub-line names the footprint and what the type handles
+    const dsc = WT.library && typeof WT.library.describe === "function" ? WT.library.describe(type) : null;
+    const sub = dsc ? dsc.footprint + (dsc.handles ? " · " + String(dsc.handles).replace(/-/g, " ") : "") : "";
     btn.innerHTML =
-      `<span class="pal-swatch pal-glyph"></span>` +
-      `<span class="pal-name">${esc(def.label)}</span>` +
+      `<span class="pal-swatch pal-glyph" aria-hidden="true"></span>` +
+      `<span class="pal-meta"><span class="pal-name">${esc(def.label)}</span>` + (sub ? `<span class="pal-sub">${esc(sub)}</span>` : "") + `</span>` +
       (locked ? WT.tiers.padlockSVG() : `<span class="pal-cat">${esc(catLabel)}</span>`);
-    // v3.9 REDESIGN-2 (icon-led library): paint the per-type WT.shapes glyph
-    // into the swatch so the palette icon MATCHES what lands on the floor (one
-    // source of truth). Falls back to the flat colour if shapes is unavailable.
+    // v3.9 REDESIGN-2 (icon-led library) / v3.48: paint the per-type WT.shapes
+    // glyph into the swatch so the palette thumbnail MATCHES what lands on the
+    // floor (one source of truth), with the goods it handles on it.
     const sw = btn.querySelector(".pal-swatch");
-    if (sw) paintPaletteGlyph(sw, type, def);
+    if (sw) paintPaletteGlyph(sw, type, def, { mode: palViewMode });
     if (locked) {
       btn.classList.add("locked");
       btn.setAttribute("aria-disabled", "true");
@@ -4134,7 +4202,7 @@
       if (state.activeTool === type) btn.classList.add("active");
       wireEquipmentDrag(btn, type);
       btn.addEventListener("click", () => setTool(state.activeTool === type ? null : type));
-      attachTooltip(btn, def.desc);
+      attachLibraryCard(btn, type); // v3.48: the hover card instead of the plain description
     }
     row.appendChild(btn);
     // Mini action: EDIT (custom) or CLONE-to-custom (built-in seed).
@@ -4156,37 +4224,164 @@
     body.appendChild(row);
   }
 
-  // v3.9 REDESIGN-2: render the per-type WT.shapes glyph into a Class Library
-  // swatch as a tiny offline canvas (currentColor/theme-aware via draw2D). One
-  // source of truth with the on-canvas glyph; degrades to a flat colour swatch.
-  function paintPaletteGlyph(host, type, def) {
+  // v3.9 REDESIGN-2 / v3.48 THE LIBRARY SHOWS WHAT YOU PLACE: render the per-type
+  // WT.shapes glyph into a Class Library swatch as an offline canvas - the SAME
+  // glyph the floor draws, at a size where it reads (56 x 36 px, aspect-true,
+  // the full glyph tier through draw2D's `thumbnail` flag) with the goods the
+  // type handles drawn on it (WT.goods.formForType). Modes: "plan" (top-down,
+  // the list), "iso" (the 2.5D form: the hover card and the 2.5D list mode),
+  // "icon" (the 28 px LOD icon the toolbar flyout keeps on purpose - an 18 px
+  // glyph is illegible). Degrades to a flat colour swatch. Cached per
+  // mode/theme/type, so a search keystroke re-appends instead of repainting.
+  const THUMB_W = 56, THUMB_H = 36, THUMB_PAD = 2;
+  const palThumbCache = new Map();
+  function thumbTheme() { return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light"; }
+  // Aspect-true fit of a w x d cell footprint into a cw x ch px box (pad px each side).
+  function thumbGeometry(w, d, cw, ch, pad) {
+    const ww = w > 0 ? w : 1, dd = d > 0 ? d : 1;
+    const cellPx = Math.max(3, Math.min((cw - 2 * pad) / ww, (ch - 2 * pad) / dd));
+    const gw = ww * cellPx, gd = dd * cellPx;
+    return { cellPx: cellPx, gw: gw, gd: gd, x: (cw - gw) / 2, y: (ch - gd) / 2 };
+  }
+  function thumbCanvas(cw, ch) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(cw * dpr);
+    cv.height = Math.round(ch * dpr);
+    cv.style.width = cw + "px";
+    cv.style.height = ch + "px";
+    cv.className = "pal-thumb";
+    cv.setAttribute("aria-hidden", "true");
+    const ctx2 = cv.getContext("2d");
+    if (ctx2) ctx2.scale(dpr, dpr);
+    return { cv: cv, ctx: ctx2 };
+  }
+  // The goods the type handles, drawn small through a caller-supplied projector.
+  function thumbUnit(ctx2, type, def, project, cellPx, theme, z) {
+    const G = WT.goods;
+    if (!G || typeof G.formForType !== "function" || typeof G.draw !== "function") return;
+    const form = G.formForType(type);
+    if (!form) return;
+    const u = { id: 1, form: form, size: G.sizeOf(form), x: def.w / 2, y: def.d / 2, z: z || 0, heading: 0, stage: "storage", status: "active", hot: false, queueIndex: 0 };
+    G.draw(ctx2, u, { project: project, cellPx: cellPx, tier: "glyph", theme: theme, stageColor: COLORS.flowStages ? COLORS.flowStages.storage : undefined });
+  }
+  function drawThumbPlan(ctx2, type, def, cw, ch, theme) {
+    const g = thumbGeometry(def.w, def.d, cw, ch, THUMB_PAD);
+    ctx2.save();
+    ctx2.beginPath();
+    ctx2.rect(g.x + 0.5, g.y + 0.5, g.gw - 1, g.gd - 1);
+    ctx2.fillStyle = hexA(def.color, 0.34);
+    ctx2.fill();
+    ctx2.strokeStyle = def.color;
+    ctx2.lineWidth = 1;
+    ctx2.stroke();
+    ctx2.restore();
+    const ok = WT.shapes.draw2D(ctx2, type, { x: g.x, y: g.y, w: g.gw, d: g.gd, cellPx: g.cellPx, color: def.color, theme: theme,
+      lod: Math.max(WT.shapes.DETAIL_GLYPH_MIN || 10, g.cellPx), thumbnail: true, seed: 0, glyph: def.glyph, base: def.base, arc: def.arc });
+    if (ok) thumbUnit(ctx2, type, def, (x, y) => ({ x: g.x + x * g.cellPx, y: g.y + y * g.cellPx }), g.cellPx, theme, 0);
+    return ok;
+  }
+  function drawThumbIso(ctx2, type, def, cw, ch, theme) {
+    const I = WT.iso;
+    if (!I || typeof I.project !== "function" || typeof WT.shapes.draw3D !== "function") return drawThumbPlan(ctx2, type, def, cw, ch, theme);
+    const w = def.w > 0 ? def.w : 1, d = def.d > 0 ? def.d : 1, h = I.elementHeight(type);
+    const K = I.ISO || { KX: 0.5, KY: 0.25, KZ: 0.28 };
+    const dw = (w + d) * K.KX, dh = (w + d) * K.KY + h * K.KZ; // the projected diamond + height, in cells
+    const cellPx = Math.max(3, Math.min((cw - 2 * THUMB_PAD) / dw, (ch - 2 * THUMB_PAD) / dh));
+    const ox = cw / 2 - ((w - d) * K.KX * cellPx) / 2;
+    const oy = (ch - dh * cellPx) / 2 + h * K.KZ * cellPx;
+    const P = (cx, cy, cz) => { const p = I.project(cx, cy, cz); return { x: ox + p.x * cellPx, y: oy + p.y * cellPx }; };
+    const c0 = P(0, 0, 0), c1 = P(w, 0, 0), c2 = P(w, d, 0), c3 = P(0, d, 0);
+    ctx2.save();
+    ctx2.beginPath();
+    ctx2.moveTo(c0.x, c0.y); ctx2.lineTo(c1.x, c1.y); ctx2.lineTo(c2.x, c2.y); ctx2.lineTo(c3.x, c3.y); ctx2.closePath();
+    ctx2.fillStyle = COLORS.concrete || "#c9c5bd";
+    ctx2.fill();
+    ctx2.restore();
+    WT.shapes.draw3D(ctx2, type, P, { cx: 0, cy: 0, w: w, d: d, heightM: h, color: def.color, theme: theme, base: def.base, glyph: def.glyph, arc: def.arc, lod: cellPx });
+    const carrier = WT.goods && typeof WT.goods.carrierOf === "function" ? WT.goods.carrierOf({ type: type }) : null;
+    thumbUnit(ctx2, type, def, P, cellPx, theme, carrier ? carrier.z : 0);
+    return true;
+  }
+  function drawThumbIcon(ctx2, type, def, theme) {
+    const size = 28, pad = 3, avail = size - pad * 2;
+    const w = def.w > 0 ? def.w : 1, d = def.d > 0 ? def.d : 1;
+    const cellPx = Math.max(4, Math.floor(avail / Math.max(w, d)));
+    const g = { x: (size - w * cellPx) / 2, y: (size - d * cellPx) / 2, w: w, d: d, cellPx: cellPx, color: def.color, theme: theme, lod: cellPx };
+    if (def.custom && def.glyph) g.glyph = def.glyph;
+    return WT.shapes.draw2D(ctx2, type, g);
+  }
+  function paintPaletteGlyph(host, type, def, opts) {
     try {
-      if (!host || !def) return;
-      if (!WT.shapes || typeof WT.shapes.draw2D !== "function") { host.style.background = def.color; return; }
-      const size = 28;
+      if (!host || !def) return null;
+      const o = opts || {};
+      const mode = o.mode === "iso" || o.mode === "icon" ? o.mode : "plan";
+      if (!WT.shapes || typeof WT.shapes.draw2D !== "function") { host.style.background = def.color; return null; }
+      const theme = o.theme === "dark" || o.theme === "light" ? o.theme : thumbTheme();
+      const cw = mode === "icon" ? 28 : (o.w > 0 ? o.w : THUMB_W), ch = mode === "icon" ? 28 : (o.h > 0 ? o.h : THUMB_H);
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const cv = document.createElement("canvas");
-      cv.width = Math.round(size * dpr);
-      cv.height = Math.round(size * dpr);
-      const ctx = cv.getContext("2d");
-      if (!ctx) { host.style.background = def.color; return; }
-      ctx.scale(dpr, dpr);
-      const theme = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
-      const w = def.w > 0 ? def.w : 1;
-      const d = def.d > 0 ? def.d : 1;
-      const pad = 3;
-      const avail = size - pad * 2;
-      const cellPx = Math.max(4, Math.floor(avail / Math.max(w, d)));
-      const gw = w * cellPx;
-      const gd = d * cellPx;
-      const g = { x: (size - gw) / 2, y: (size - gd) / 2, w: w, d: d, cellPx: cellPx, color: def.color, theme: theme, lod: cellPx };
-      if (def.custom && def.glyph) g.glyph = def.glyph;
-      const ok = WT.shapes.draw2D(ctx, type, g);
-      if (!ok) { host.style.background = def.color; return; }
+      const key = [mode, theme, dpr, type, def.color, def.w + "x" + def.d, def.glyph || "", def.base || "", def.arc || "", cw + "x" + ch].join("|");
+      let cv = o.noCache ? null : palThumbCache.get(key);
+      if (!cv) {
+        const t = thumbCanvas(cw, ch);
+        if (!t.ctx) { host.style.background = def.color; return null; }
+        const ok = mode === "icon" ? drawThumbIcon(t.ctx, type, def, theme) : mode === "iso" ? drawThumbIso(t.ctx, type, def, cw, ch, theme) : drawThumbPlan(t.ctx, type, def, cw, ch, theme);
+        if (!ok) { host.style.background = def.color; return null; }
+        cv = t.cv;
+        if (!o.noCache) palThumbCache.set(key, cv);
+      }
       host.appendChild(cv);
+      return cv;
     } catch (_) {
       try { host.style.background = def.color; } catch (__) { /* best-effort */ }
+      return null;
     }
+  }
+  // v3.48: the list's thumbnail style (plan | 2.5D), remembered on this device.
+  const PAL_VIEW_KEY = "wt.palette.view.v1";
+  let palViewMode = "plan";
+  try { palViewMode = localStorage.getItem(PAL_VIEW_KEY) === "iso" ? "iso" : "plan"; } catch (_) { /* private mode */ }
+  function syncPalViewToggle() {
+    document.querySelectorAll("#palViewToggle [data-view]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === palViewMode ? "true" : "false"));
+  }
+  function setPalView(mode) {
+    palViewMode = mode === "iso" ? "iso" : "plan";
+    try { localStorage.setItem(PAL_VIEW_KEY, palViewMode); } catch (_) { /* ignore */ }
+    syncPalViewToggle();
+    buildPalette();
+  }
+  // v3.48: the Class Library hover card - the 2.5D form with the goods it
+  // handles, footprint and height, and the rows the Inspector shows, all from
+  // WT.library.describe. The tooltip inverts the theme colours, so the mini
+  // scene is drawn in the opposite theme. Shown on hover and on keyboard focus.
+  function libraryCardHtml(type) {
+    const L = WT.library;
+    const d = L && typeof L.describe === "function" ? L.describe(type) : null;
+    if (!d) return null;
+    const rows = d.rows.map((r) => "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>").join("");
+    const sub = d.footprint + " · " + d.heightM.toFixed(1) + " m high" + (d.handles ? " · handles " + String(d.handles).replace(/-/g, " ") : "");
+    return '<div class="tip-head"><span class="tip-thumb"></span><span><span class="tip-title">' + esc(d.label) + '</span><br><span class="tip-sub">' + esc(sub) + "</span></span></div>" +
+      (rows ? '<dl class="tip-rows">' + rows + "</dl>" : "") +
+      (d.glyph2d ? '<p class="tip-note">2D: ' + esc(d.glyph2d) + " · 2.5D: " + esc(d.form3d || "") + "</p>" : "") +
+      '<p class="tip-note">' + esc(d.desc) + "</p><p class=\"tip-note\">Teaching values, not a vendor specification.</p>";
+  }
+  function attachLibraryCard(el, type) {
+    const show = (e) => {
+      const html = libraryCardHtml(type);
+      if (!html) { tip.textContent = (ELEMENTS[type] && ELEMENTS[type].desc) || ""; tip.hidden = false; moveTip(e); return; }
+      tip.innerHTML = html;
+      tip.classList.add("tooltip--card");
+      const host = tip.querySelector(".tip-thumb");
+      if (host) paintPaletteGlyph(host, type, ELEMENTS[type], { mode: "iso", w: 120, h: 80, noCache: true, theme: thumbTheme() === "dark" ? "light" : "dark" });
+      tip.hidden = false;
+      moveTip(e);
+    };
+    const hide = () => { tip.hidden = true; tip.classList.remove("tooltip--card"); };
+    el.addEventListener("pointerenter", show);
+    el.addEventListener("pointermove", moveTip);
+    el.addEventListener("pointerleave", hide);
+    el.addEventListener("focus", () => { const r = el.getBoundingClientRect(); show({ clientX: r.right, clientY: r.top }); });
+    el.addEventListener("blur", hide);
   }
 
   // Clone a built-in SEED into a new editable custom object (the built-in is
@@ -4405,6 +4600,7 @@
     // top-down view so the placement actually lands (iso is view-only).
     if (type && state.viewMode === "iso") setViewMode("top");
     state.activeTool = type;
+    if (!type) setHover(null); // v3.48
     document.querySelectorAll(".pal-item").forEach((b) => {
       b.classList.toggle("active", b.dataset.type === type);
     });
@@ -4467,6 +4663,9 @@
     if (def.io) behaviour.push(row("I/O role", def.io));
     if (def.flow) behaviour.push(row("Flow control", def.flow.toUpperCase()));
     if (def.stage) behaviour.push(row("Chain stage", def.stage));
+    // v3.48: what the type handles and its cycle - the same descriptor the Class Library card reads
+    if (WT.goods && typeof WT.goods.formForType === "function") { const hf = WT.goods.formForType(el.type); if (hf) behaviour.push(row("Handles", String(hf).replace(/-/g, " "))); }
+    if (def.category !== "storage" && def.cycleSec > 0) behaviour.push(row("Cycle time", def.cycleSec + " s × " + (def.servers > 0 ? def.servers : 1) + " server" + ((def.servers > 0 ? def.servers : 1) > 1 ? "s" : "") + " (teaching value)"));
 
     // v3.20 FLUIDS-PERSIST: editable per-element fluid rate overrides in the
     // EXISTING Behaviour group (the grouped-Inspector pattern - no new
@@ -8402,6 +8601,7 @@
   const tip = $("tooltip");
   function attachTooltip(el, text) {
     el.addEventListener("pointerenter", (e) => {
+      tip.classList.remove("tooltip--card");
       tip.textContent = text;
       tip.hidden = false;
       moveTip(e);
@@ -9956,6 +10156,12 @@
         setSearch: (query) => { paletteFilter = query || ""; const inp = $("paletteSearch"); if (inp) inp.value = paletteFilter; buildPalette(); },
         toggleGroup: (label) => togglePalGroup(label),
         collapsedState: () => Object.assign({}, palCollapsed),
+        // v3.48: the thumbnails, the hover card and the placement ghost
+        setTool: (t) => setTool(t),
+        hover: () => (state.hover ? Object.assign({}, state.hover) : null),
+        describe: (t) => (WT.library && typeof WT.library.describe === "function" ? WT.library.describe(t) : null),
+        setView: (m) => setPalView(m),
+        viewMode: () => palViewMode,
       },
       // v3.6 UI-3: the Ctrl/Cmd-K command palette. Drive open/close/run through
       // the SAME controller + dispatcher the live UI uses, and read the live

@@ -573,6 +573,40 @@
         detail: "search=" + !!input + " heads=" + heads.length + " aria=" + allHaveAria + " toggles=" + toggleOk,
       };
     });
+    // ---- v3.48: the library shows what you place - real glyph thumbnails, the placement ghost.
+    check("class-library-thumbnails-are-real-glyphs", function () {
+      var items = document.querySelectorAll("#palette .pal-item"), n = 0, bad = [];
+      for (var i = 0; i < items.length; i++) {
+        var cv = items[i].querySelector("canvas.pal-thumb");
+        if (!cv || cv.getAttribute("aria-hidden") !== "true" || cv.width < 40) bad.push(items[i].dataset.type); else n++;
+      }
+      return { ok: n >= 30 && bad.length === 0, detail: n + " thumbnails" + (bad.length ? ", bad: " + bad.slice(0, 5).join(",") : "") };
+    });
+    check("placement-ghost-follows-pointer-while-armed", function () {
+      if (!haveApi || !API.library || typeof API.library.setTool !== "function") return { ok: false, detail: "no setTool API" };
+      var floor = $("floor"), r = floor.getBoundingClientRect();
+      API.library.setTool("pack-station");
+      floor.dispatchEvent(new PointerEvent("pointermove", { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true, pointerType: "mouse" }));
+      var h = API.library.hover();
+      floor.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerType: "mouse" }));
+      var gone = API.library.hover() === null;
+      API.library.setTool(null);
+      return { ok: !!h && h.type === "pack-station" && Number.isInteger(h.x) && Number.isInteger(h.y) && typeof h.ok === "boolean" && gone, detail: h ? JSON.stringify({ x: h.x, y: h.y, ok: h.ok }) + " then cleared=" + gone : "no ghost" };
+    });
+    check("palette-drag-over-floor-previews-drop", function () {
+      if (!haveApi) return false;
+      API.library.setSearch("pack");
+      var item = document.querySelector('#palette .pal-item[data-type="pack-station"]'), floor = $("floor"), r = floor.getBoundingClientRect();
+      var data = new DataTransfer();
+      item.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: data }));
+      floor.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: data, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
+      var h = API.library.hover();
+      floor.dispatchEvent(new DragEvent("dragleave", { bubbles: true, dataTransfer: data }));
+      var gone = API.library.hover() === null;
+      item.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: data }));
+      API.library.setSearch("");
+      return { ok: !!h && h.type === "pack-station" && gone, detail: h ? "ghost at " + h.x + "," + h.y + " ok=" + h.ok + ", cleared=" + gone : "no ghost" };
+    });
     check("class-library-search-filters", function () {
       if (!haveApi || !API.library || typeof API.library.setSearch !== "function") return { ok: false, detail: "no setSearch API" };
       API.library.setSearch("conveyor");

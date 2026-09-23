@@ -295,7 +295,7 @@
 
       <section class="card" id="paletteCard">
         <h2 class="card-title">Class Library</h2>
-        <p class="hint">Drag equipment from this library onto the floor. You can also click an item, then click the floor. Drag placed equipment to move it.</p>
+        <p class="hint">Drag equipment from this library onto the floor. You can also click an item, then click the floor. Drag placed equipment to move it. While a tool is armed or dragged, a ghost on the floor shows where it would land and whether the spot is legal (on a touch screen: tap an item, then drag a finger over the floor and tap).</p>
         <div class="pal-actions">
           <button id="defineObjectBtn" class="btn wide primary" type="button" title="Define your OWN object type (like Siemens Plant Simulation UserObjects) — derived from a base MaterialFlow behaviour class, organised into the categorised tree. The built-ins are editable seeds.">＋ Define Object</button>
           <div class="btn-grid" style="margin-top:6px">
@@ -303,6 +303,11 @@
             <button id="libImportBtn" class="btn" type="button" title="Load user-defined objects from a JSON file you exported earlier">Import objects</button>
           </div>
           <input id="libImportInput" type="file" accept="application/json,.json" hidden />
+          <!-- v3.48: how the library draws each item (plan glyph or the 2.5D form); aria-pressed is set at runtime from the remembered choice -->
+          <div id="palViewToggle" class="pal-view" role="group" aria-label="Library thumbnail style">
+            <button class="btn" type="button" data-view="plan" title="Draw each item as its top-down glyph, as on the 2D floor">Plan</button>
+            <button class="btn" type="button" data-view="iso" title="Draw each item as its 2.5D form with the goods it handles">2.5D</button>
+          </div>
         </div>
         <p class="hint">A categorised, collapsible tree — built-ins under their group, your own under <strong>My Objects</strong>. Groups start collapsed (the first stays open); <strong>Search</strong> filters components across every group. <strong>✎</strong> edits a custom object, <strong>⧉</strong> clones a built-in into an editable custom.</p>
         <!-- v2.3 UI-1: live search across the whole class library. Filters

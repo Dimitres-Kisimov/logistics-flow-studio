@@ -514,6 +514,52 @@
     for (const id of customOrder.slice()) remove(id);
   }
 
+  /* ------------------------------------------------------------------
+   * v3.48 describe(type[, {w, d}]) -> one pure descriptor for a type: what
+   * the Class Library's hover card and sub-line show and what the Inspector's
+   * Behaviour rows say, from one place. No DOM, no config, no persistence;
+   * null for an unknown type. Cycle times and rates are labelled teaching
+   * values; nothing here is a vendor specification.
+   * ------------------------------------------------------------------ */
+  function describe(type, opts) {
+    const els = ELEMENTS();
+    const def = els[type];
+    if (!def) return null;
+    const o = opts || {};
+    const w = o.w > 0 ? o.w : (def.w > 0 ? def.w : 1), d = o.d > 0 ? o.d : (def.d > 0 ? def.d : 1);
+    const dom = D();
+    const S = window.WT && window.WT.shapes, G = window.WT && window.WT.goods, I = window.WT && window.WT.iso;
+    const meta = S && S.meta && S.meta[type] ? S.meta[type] : null;
+    const servers = def.servers > 0 ? def.servers : 1;
+    const rows = [];
+    if (def.category === "storage" && dom && typeof dom.elementCapacity === "function") {
+      rows.push([def.pickFace ? "Positions (pallet-eq.)" : "Pallet positions", String(dom.elementCapacity({ type: type, w: w, d: d }))]);
+    }
+    if (def.goodsToPerson) rows.push(["Pick mode", "Goods-to-person · " + def.cycleSec + " s cycle per line"]);
+    else if (def.handlingDeltaSec) rows.push(["Handling", (def.handlingDeltaSec > 0 ? "+" : "") + def.handlingDeltaSec + " s/line vs base"]);
+    if (def.category !== "storage" && def.cycleSec > 0) rows.push(["Cycle time", def.cycleSec + " s × " + servers + " server" + (servers > 1 ? "s" : "") + " (teaching value)"]);
+    if (def.emitRatePerHr > 0) rows.push(["Emits", def.emitRatePerHr + " parts/h (teaching value)"]);
+    if (def.unitsPerHr > 0 && !def.cycleSec) rows.push(["Rate", def.unitsPerHr + " units/h (teaching value)"]);
+    if (def.inputs) rows.push(["Inputs", String(def.inputs)]);
+    if (def.outputs) rows.push(["Outputs", String(def.outputs)]);
+    if (def.io) rows.push(["I/O role", String(def.io)]);
+    if (def.flow) rows.push(["Flow control", String(def.flow).toUpperCase()]);
+    if (def.stage) rows.push(["Chain stage", String(def.stage)]);
+    if (def.levels) rows.push(["Levels", String(def.levels)]);
+    if (def.selectivity != null) rows.push(["Selectivity", (def.selectivity * 100).toFixed(0) + "%"]);
+    if (def.rotation) rows.push(["Rotation", String(def.rotation)]);
+    if (def.costIndex) rows.push(["Cost index", "×" + def.costIndex]);
+    const heightM = I && typeof I.elementHeight === "function" ? I.elementHeight(type) : (def.heightM > 0 ? def.heightM : 1);
+    const group = BUILTIN_GROUP[type] || def.paletteCategory || (def.custom ? MY_OBJECTS : (def.category === "storage" ? "Storage & Racking" : "Docks & Endpoints"));
+    return {
+      type: type, label: def.label, category: def.category, group: group, base: def.base || null, custom: !!def.custom,
+      w: w, d: d, footprint: w + " × " + d + " m", heightM: heightM,
+      handles: G && typeof G.formForType === "function" ? G.formForType(type) : null,
+      glyph2d: meta ? meta.glyph2d : null, form3d: meta ? meta.form3d : null,
+      rows: rows, desc: def.desc || "",
+    };
+  }
+
   WT.library = {
     BASES: BASES,
     GLYPHS: GLYPHS,
@@ -522,6 +568,7 @@
     PRODUCTION: PRODUCTION,
     FLUIDS: FLUIDS,
     BUILTIN_BASE: BUILTIN_BASE,
+    describe: describe, // v3.48
     buildDef: buildDef,
     define: define,
     update: update,

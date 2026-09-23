@@ -2731,6 +2731,9 @@
   //   cellPx  : px per cell in the SAME units (feature density)
   //   lod     : effective ON-SCREEN px per cell (cellPx * zoom) - only
   //             used to pick the detail tier (full glyph vs LOD icon)
+  //   thumbnail: true -> skip the on-screen FOOTPRINT guard (v3.48: the Class
+  //             Library draws the full glyph into a 56 x 36 px box; nothing
+  //             on the floor passes it, so floor rendering is unchanged)
   function draw2D(ctx, type, g) {
     const r = REG[type];
     if (!g) return false;
@@ -2755,7 +2758,7 @@
     ctx.lineWidth = clampN(cell * 0.05, 1, 2.2);
     // A too-small on-screen FOOTPRINT also collapses to the icon (even if the
     // px/cell tier would allow a glyph) - the existing legibility guard.
-    const tinyFootprint = (w * scale < LOD_MIN_W || d * scale < LOD_MIN_H);
+    const tinyFootprint = g.thumbnail !== true && (w * scale < LOD_MIN_W || d * scale < LOD_MIN_H);
     if (level === "icon" || tinyFootprint) {
       // LOD path: a single tiny centred icon (the tinted footprint is
       // already drawn by the caller), so it stays cheap + legible. The
