@@ -1074,7 +1074,8 @@ class ControlTower(unittest.TestCase):
         return [
             {"seq": 1, "tick": 130, "rule": "queue-congestion", "proposal_id": "P-queue-congestion-130", "status": "declined", "lever": {"kind": "picker", "key": "staffing", "value": "adaptive"}, "evidence": {"stations": [{"id": "put-0", "element": "stg", "queue": 6}]}, "from_run": "RUN-hand-s1-h00000000"},
             {"seq": 2, "tick": 250, "rule": "queue-congestion", "proposal_id": "P-queue-congestion-250", "status": "snoozed", "lever": {"kind": "picker", "key": "staffing", "value": "adaptive"}, "evidence": {}, "from_run": "RUN-hand-s1-h00000000"},
-            {"seq": 3, "tick": 460, "rule": "inbound-late", "proposal_id": "P-inbound-late-460", "status": "accepted", "lever": {"kind": "kb", "key": "delivery.inbound.periodTicks", "value": 50}, "evidence": {"worst": {"trailer": 3, "late_ticks": 159}}, "from_run": "RUN-hand-s0-h00000009"},
+            {"seq": 3, "tick": 460, "rule": "inbound-late", "proposal_id": "P-inbound-late-460", "status": "accepted", "lever": {"kind": "kb", "key": "delivery.inbound.periodTicks", "value": 50, "from": 120}, "evidence": {"worst": {"trailer": 3, "late_ticks": 159}}, "from_run": "RUN-hand-s0-h00000009"},
+            {"seq": 4, "tick": 40, "rule": "inbound-late", "proposal_id": "P-inbound-late-460", "status": "reverted", "lever": {"kind": "kb", "key": "delivery.inbound.periodTicks", "value": 120, "from": 50}, "evidence": {"reverts": "P-inbound-late-460"}, "from_run": "RUN-hand-s1-h00000000"},
         ]
 
     def test_control_by_hand(self):
@@ -1082,14 +1083,14 @@ class ControlTower(unittest.TestCase):
         data["control"] = self.audit()
         db = fresh_with(data)
         rows_ = RL.rows(db, "SELECT * FROM v_control WHERE run_id = ? ORDER BY rule", ("RUN-hand-s1-h00000000",))
-        self.assertEqual([(r["rule"], r["proposals"], r["accepted"], r["declined"], r["snoozed"], r["first_tick"]) for r in rows_],
-                         [("inbound-late", 1, 1, 0, 0, 460), ("queue-congestion", 2, 0, 1, 1, 130)])
+        self.assertEqual([(r["rule"], r["proposals"], r["accepted"], r["declined"], r["snoozed"], r["reverted"], r["first_tick"]) for r in rows_],
+                         [("inbound-late", 2, 1, 0, 0, 1, 40), ("queue-congestion", 2, 0, 1, 1, 0, 130)])
         ev = RL.rows(db, "SELECT seq, tick, status, lever, from_run FROM control_event ORDER BY seq")
-        self.assertEqual([(r["seq"], r["tick"], r["status"]) for r in ev], [(1, 130, "declined"), (2, 250, "snoozed"), (3, 460, "accepted")])
-        self.assertEqual(json.loads(ev[2]["lever"]), {"key": "delivery.inbound.periodTicks", "kind": "kb", "value": 50})
+        self.assertEqual([(r["seq"], r["tick"], r["status"]) for r in ev], [(1, 130, "declined"), (2, 250, "snoozed"), (3, 460, "accepted"), (4, 40, "reverted")])
+        self.assertEqual(json.loads(ev[2]["lever"]), {"from": 120, "key": "delivery.inbound.periodTicks", "kind": "kb", "value": 50})
         self.assertEqual(ev[2]["from_run"], "RUN-hand-s0-h00000009")
         RL.import_ledger(db, data)  # idempotent
-        self.assertEqual(RL.rows(db, "SELECT COUNT(*) AS n FROM control_event")[0]["n"], 3)
+        self.assertEqual(RL.rows(db, "SELECT COUNT(*) AS n FROM control_event")[0]["n"], 4)
         self.assertEqual(RL.summary(db, "RUN-hand-s1-h00000000")["invariants"], {n: 0 for n in RL.INVARIANT_VIEWS})
 
     def test_no_decisions_no_rows_and_the_groups(self):
@@ -1111,6 +1112,25 @@ class ControlTower(unittest.TestCase):
         data["control"] = self.audit()[:1]
         RL.import_ledger(db, data)
         self.assertEqual(RL.rows(db, "SELECT declined FROM v_control")[0]["declined"], 1)
+
+    def test_old_database_gains_the_reverted_status(self):
+        """v3.57: a control_event table with the v3.56 CHECK is rebuilt once so a reverted row is accepted."""
+        db = fresh()
+        for name in RL.VIEWS:
+            db.execute(f"DROP VIEW IF EXISTS {name}")
+        db.execute("DROP TABLE control_event")
+        db.execute("CREATE TABLE control_event(run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, seq INTEGER NOT NULL, tick INTEGER NOT NULL, rule TEXT NOT NULL, proposal_id TEXT NOT NULL, "
+                   "status TEXT NOT NULL CHECK(status IN ('accepted','declined','snoozed')), lever TEXT, evidence TEXT, from_run TEXT, PRIMARY KEY(run_id, seq))")
+        data = hand_ledger()
+        data["control"] = self.audit()[:1]
+        RL.initialize(db)
+        RL.import_ledger(db, data)
+        RL.initialize(db)
+        RL.initialize(db)  # idempotent once rebuilt
+        data["control"] = self.audit()
+        RL.import_ledger(db, data)
+        self.assertEqual(RL.rows(db, "SELECT reverted FROM v_control WHERE rule = 'inbound-late'")[0]["reverted"], 1)
+        self.assertIn("'reverted'", RL.rows(db, "SELECT sql FROM sqlite_master WHERE name = 'control_event'")[0]["sql"])
 
 
 if __name__ == "__main__":

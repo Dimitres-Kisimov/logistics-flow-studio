@@ -33,7 +33,7 @@
  *      outbound and the readout, the knowledge base's delivery category (eight
  *      seeds), SQL columns / table / views / groups / reconcile keys, the
  *      replication views keyed on the levers, the viewer section + glance card,
- *      both self-tests, the runner, sw.js at wt-v135 precaching the dataset
+ *      both self-tests, the runner, sw.js at wt-v136 precaching the dataset
  *      twin, README / CHANGELOG / CREDITS / the schema page / docs/SCMS_DELIVERY.md.
  * ===================================================================== */
 "use strict";
@@ -224,9 +224,9 @@ const W = record({ seed: 31, mix: MIX, inbound: HAND_IN, outbound: OUT }, 600);
     /GROUP BY scenario, COALESCE\(mix, ''\), ticks, COALESCE\(policy, ''\), COALESCE\(errors, ''\), COALESCE\(inbound, ''\), COALESCE\(outbound, ''\)/.test(py) && /v_otif: v\.otif/.test(mk));
   check("7e. the viewer: the Delivery section, deliveryHtml with the no-windows note, the glance card, replication groups keyed on the levers and named in the heading",
     /id="rlDelivery"/.test(rl) && /function deliveryHtml/.test(js) && /Instantaneous dock and carrier/.test(js) && /label: "Delivery"/.test(js) && /leverKey\(r\.inbound/.test(js) && /delivery windows \(what-if\)/.test(js));
-  check("7f. both self-tests cover it; run-all lists this harness; sw.js precaches the dataset twin at wt-v135 (previously wt-v134)",
+  check("7f. both self-tests cover it; run-all lists this harness; sw.js precaches the dataset twin at wt-v136 (previously wt-v135)",
     /delivery-windows-picker-and-otif/.test(st) && /delivery-section-without-windows/.test(vst) && /"rlDelivery"/.test(vst) && /Object\.keys\(R\.SQL\)\.length === (3[6-9]|[4-9]\d)/.test(vst) && /verify_delivery\.js/.test(runall) &&
-    /"\.\/data\/scms-delivery\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v135"/.test(sw) && /Previously wt-v134/.test(sw));
+    /"\.\/data\/scms-delivery\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v136"/.test(sw) && /Previously wt-v135/.test(sw));
   check("7g. README names the what-if and the dataset's limits; CHANGELOG has v3.55; CREDITS names the USAID SCMS aggregates with the licence status; the schema page has the columns and views",
     /Delivery and shipping times in between \(v3\.55\)/.test(readme) && /shape only/.test(readme) && /## v3\.55/.test(changelog) && /USAID SCMS/.test(credits) && /unresolved/.test(credits) && /v_otif/.test(schema) && /inbound_event/.test(schema));
 })();

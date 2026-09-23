@@ -759,7 +759,7 @@
     return html;
   }
   // v3.56 the control tower: the decisions a person took during the run, per rule, and the raw audit.
-  const CONTROL_COLS = ["rule", "proposals", "accepted", "declined", "snoozed", "first_tick"];
+  const CONTROL_COLS = ["rule", "proposals", "accepted", "declined", "snoozed", "reverted", "first_tick"];
   function controlHtml(exp) {
     const rows = views(exp).control || [], log = exp.control || [];
     if (!log.length) return "<p class=\"note\">No control-tower decision in this run: the tower proposes from aggregates per step and station and a person decides; nothing acts on its own. A run exports its audit only when someone accepted, declined or snoozed a proposal.</p>" + sqlBlock("v_control");

@@ -2573,17 +2573,39 @@
       otif: { minDeliveries: g("control.otif.minDeliveries", 20), target: g("delivery.otif.target", 0.95) } };
   }
   // The lever a proposal names, applied exactly as the picker or the knowledge base panel would.
+  // Returns { ok, from } - `from` is the value the lever had, so an accepted lever can be reverted (v3.57).
   function applyLever(lever) {
-    if (!lever) return false;
+    if (!lever) return null;
     if (lever.kind === "picker" && lever.key === "staffing") {
+      const from = state.flow.staffing;
       state.flow.staffing = lever.value === "adaptive" ? "adaptive" : "declared";
       const sel = $("flowStaffingSelect");
       if (sel) sel.value = state.flow.staffing;
       try { localStorage.setItem("wt-flow-staffing", state.flow.staffing); } catch (_) { /* ignore */ }
-      return true;
+      return { ok: true, from: from };
     }
-    if (lever.kind === "kb" && WT.kb) return WT.kb.set(lever.key, lever.value);
-    return false;
+    if (lever.kind === "kb" && WT.kb) { const from = WT.kb.get(lever.key); return { ok: WT.kb.set(lever.key, lever.value), from: from }; }
+    return null;
+  }
+  // v3.57: the last accepted lever that was not reverted yet, and its undo - the value it had before, an
+  // audit row of status reverted naming the proposal, and the day re-run. The tower never writes a lever.
+  function lastRevertable() {
+    const log = state.flow.controlLog || [], reverted = {};
+    for (const r of log) if (r.status === "reverted" && r.evidence && r.evidence.reverts) reverted[r.evidence.reverts] = 1;
+    for (let i = log.length - 1; i >= 0; i--) { const r = log[i]; if (r.status === "accepted" && r.lever && r.lever.from !== undefined && r.lever.from !== null && !reverted[r.proposal_id]) return r; }
+    return null;
+  }
+  function revertLastAccepted() {
+    const r = lastRevertable(), rec = state.flow.ledger;
+    if (!r || !rec) return false;
+    const back = { kind: r.lever.kind, key: r.lever.key, value: r.lever.from };
+    const applied = applyLever(back);
+    state.flow.controlLog.push({ seq: state.flow.controlLog.length + 1, tick: state.flow.sim ? state.flow.sim.tick : 0, rule: r.rule, proposal_id: r.proposal_id, status: "reverted",
+      lever: Object.assign({}, back, { from: applied ? applied.from : r.lever.value }), evidence: { reverts: r.proposal_id }, from_run: rec.run.id });
+    state.flow.sig = null;
+    flowReset();
+    status("Control tower: reverted " + ruleLabel(r.rule) + " - " + leverText(back) + "; the day re-runs from tick 0.");
+    return true;
   }
   const leverText = (lever) => (!lever ? "-" : lever.kind === "picker" ? "Staffing -> " + lever.value : lever.key + " -> " + lever.value);
   const ruleLabel = (id) => { const r = WT.control && WT.control.RULES.find((x) => x.id === id); return r ? r.label : id; };
@@ -2603,8 +2625,10 @@
       '<p class="control-why">' + esc(p.why) + '</p><p><strong>Proposes:</strong> ' + esc(leverText(p.lever)) + '<br><strong>Expected effect:</strong> ' + esc(p.expectedEffect) + '</p>' +
       '<p class="control-evidence">Evidence: <code>' + esc(JSON.stringify(p.evidence)) + '</code></p>' +
       '<div class="control-actions"><button type="button" class="btn small" data-accept="' + esc(p.id) + '">Accept and re-run the day</button><button type="button" class="btn small" data-snooze="' + esc(p.id) + '">Snooze</button><button type="button" class="btn small" data-decline="' + esc(p.id) + '">Decline</button></div></article>').join("");
-    if (audit) audit.innerHTML = log.length ? '<table class="flow-ledger-table"><thead><tr><th>tick</th><th>rule</th><th>decision</th><th>lever</th><th>run it came from</th></tr></thead><tbody>' +
-      log.map((r) => '<tr><td>' + r.tick + '</td><td>' + esc(r.rule) + '</td><td>' + esc(r.status) + '</td><td>' + esc(leverText(r.lever)) + '</td><td><code>' + esc(String(r.from_run || '')) + '</code></td></tr>').join('') + '</tbody></table>' : '<p class="empty">No decision recorded yet.</p>';
+    const revertable = lastRevertable();
+    if (audit) audit.innerHTML = (revertable ? '<p><button type="button" class="btn small" data-revert="' + esc(revertable.proposal_id) + '">Revert the last accepted lever (' + esc(leverText({ kind: revertable.lever.kind, key: revertable.lever.key, value: revertable.lever.from })) + ') and re-run the day</button></p>' : '') +
+      (log.length ? '<table class="flow-ledger-table"><thead><tr><th>tick</th><th>rule</th><th>decision</th><th>lever</th><th>run it came from</th></tr></thead><tbody>' +
+      log.map((r) => '<tr><td>' + r.tick + '</td><td>' + esc(r.rule) + '</td><td>' + esc(r.status) + '</td><td>' + esc(leverText(r.lever)) + '</td><td><code>' + esc(String(r.from_run || '')) + '</code></td></tr>').join('') + '</tbody></table>' : '<p class="empty">No decision recorded yet.</p>');
   }
   function flowBuild() {
     if (!WT.flowsim) return false;
@@ -3219,13 +3243,15 @@
         const decision = b.hasAttribute("data-accept") ? "accepted" : b.hasAttribute("data-decline") ? "declined" : "snoozed";
         const row = WT.control.decide(ctl, id, decision, state.flow.sim ? state.flow.sim.tick : 0);
         if (!row) return;
-        state.flow.controlLog.push(Object.assign({}, row, { from_run: rec.run.id }));
-        if (decision !== "accepted") { renderControlTower(); status("Control tower: " + decision + " " + ruleLabel(row.rule) + " at tick " + row.tick + " - recorded in the audit, nothing changed."); return; }
-        applyLever(row.lever);
+        if (decision !== "accepted") { state.flow.controlLog.push(Object.assign({}, row, { from_run: rec.run.id })); renderControlTower(); status("Control tower: " + decision + " " + ruleLabel(row.rule) + " at tick " + row.tick + " - recorded in the audit, nothing changed."); return; }
+        const applied = applyLever(row.lever); // v3.57: the value it had rides in the audit, so it can be reverted
+        state.flow.controlLog.push(Object.assign({}, row, { from_run: rec.run.id, lever: Object.assign({}, row.lever, { from: applied ? applied.from : null }) }));
         state.flow.sig = null;
         flowReset();
         status("Control tower: accepted " + ruleLabel(row.rule) + " - " + leverText(row.lever) + "; the day re-runs from tick 0 with the lever set (a run id is a hash of its inputs).");
       });
+      const audit = $("controlAudit");
+      if (audit) audit.addEventListener("click", (ev) => { const b = ev.target && ev.target.closest ? ev.target.closest("button[data-revert]") : null; if (b) revertLastAccepted(); });
     })();
     on("flowPauseBtn", flowPause);
     on("flowStepBtn", flowStep);
@@ -10226,7 +10252,7 @@
       // v3.53: the tracking database (the live tracker and the store)
       tracking: { store: trackingStore, current: () => state.flow.track },
       // v3.56: the control tower (the live tower and the audit log across runs)
-      control: { current: () => state.flow.control, log: () => state.flow.controlLog, render: renderControlTower },
+      control: { current: () => state.flow.control, log: () => state.flow.controlLog, render: renderControlTower, revert: revertLastAccepted, lastRevertable: lastRevertable },
       runWmsOps: runWmsOps,
       // v2.6 FACTORY-B: drive the REAL Generate handler (optionally with an
       // explicit profile key) so the self-test can build a factory line.

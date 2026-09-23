@@ -23,7 +23,7 @@
  *      invariant restated), the glance flags exactly no-holding,in-flight,
  *      transport class amr.
  *   4. Shipped wiring: example C on the page and in ?example=, the usage
- *      string, sw.js precaching C at wt-v135, the reconcile command and
+ *      string, sw.js precaching C at wt-v136, the reconcile command and
  *      its 13 views, CI importing and reconciling C, the runner.
  * ===================================================================== */
 "use strict";
@@ -145,7 +145,7 @@ load(["compliance.js", "simulation.js", "generate.js", "nlcommands.js", "example
   check("4a. the page offers example C and ?example=a|b|c(|d) loads it", /id="rlDemoC"/.test(html) && /run-ledger-c\.json/.test(js) && /example=\(a\|b\|c\|d\)/.test(js) && /rlDemoC/.test(js));
   check("4b. the fixture script documents [a|b|c|all] and the reconcile sub-command, and builds a and b before loading wms.js",
     /\[a\|b\|c\|d\|all\]/.test(mk) && /reconcile <dir>/.test(mk) && /build a and b before c/.test(mk) && /MODULES_SCENARIO/.test(env) && /wms\.js/.test(env));
-  check("4c. sw.js precaches fixture C at wt-v135 (previously wt-v134)", /"\.\/test\/fixtures\/run-ledger-c\.json"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v135"/.test(sw) && /Previously wt-v134/.test(sw));
+  check("4c. sw.js precaches fixture C at wt-v136 (previously wt-v135)", /"\.\/test\/fixtures\/run-ledger-c\.json"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v136"/.test(sw) && /Previously wt-v135/.test(sw));
   check("4d. tools/run_ledger.py has the reconcile command over 20 views with the two tolerances (v_bizstep_dwell since v3.53, v_quality_by_step since v3.54, v_otif + v_inbound since v3.55, v_control since v3.56)", /def reconcile\(/.test(py) && /"reconcile"/.test(py) && (py.match(/"v_[a-z_]+": \(/g) || []).length === 20 && /--tolerance-raw/.test(py));
   check("4e. CI imports fixture C and reconciles every fixture", /run-ledger-c\.json/.test(ci) && /make_run_ledger_fixture\.mjs reconcile/.test(ci) && /run_ledger\.py reconcile/.test(ci));
   check("4f. ledger.js records 1 / rate and the minute unrounded and exports nsum", /= 1 \/ s\.serviceRatePerTick;/.test(lg) && /minute: state\.tick \* rec\.run\.minutes_per_tick,/.test(lg) && typeof L.nsum === "function" && !/Math\.round\(\(1 \/ s\.serviceRatePerTick\)/.test(lg));

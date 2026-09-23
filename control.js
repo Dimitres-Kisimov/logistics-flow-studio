@@ -15,7 +15,9 @@
  *     accepted, declined or snoozed in the audit; ACCEPT is the caller's only
  *     write path (the app sets the lever exactly as the picker would and re-runs
  *     the day from tick zero, because a run id is a hash of its inputs and a run
- *     that changed them half way would carry an id that lies);
+ *     that changed them half way would carry an id that lies); the caller may
+ *     later REVERT an accepted lever to the value it had, with an audit row of
+ *     status reverted (v3.57) - the tower itself never writes a lever;
  *   - deterministic: the proposals are a pure function of the run history (two
  *     identical runs propose the same at the same ticks); no Date, no
  *     Math.random.
@@ -190,9 +192,9 @@
     const rows = (exp && exp.control) || [];
     const by = {};
     for (const r of rows) {
-      const a = by[r.rule] || (by[r.rule] = { rule: r.rule, proposals: 0, accepted: 0, declined: 0, snoozed: 0, first_tick: null });
+      const a = by[r.rule] || (by[r.rule] = { rule: r.rule, proposals: 0, accepted: 0, declined: 0, snoozed: 0, reverted: 0, first_tick: null });
       a.proposals++;
-      if (r.status === "accepted") a.accepted++; else if (r.status === "declined") a.declined++; else if (r.status === "snoozed") a.snoozed++;
+      if (r.status === "accepted") a.accepted++; else if (r.status === "declined") a.declined++; else if (r.status === "snoozed") a.snoozed++; else if (r.status === "reverted") a.reverted++;
       if (a.first_tick == null || r.tick < a.first_tick) a.first_tick = r.tick;
     }
     return Object.keys(by).sort().map((k) => by[k]);

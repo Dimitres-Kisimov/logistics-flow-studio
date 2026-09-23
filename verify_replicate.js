@@ -64,6 +64,15 @@ const bundle = JSON.parse(fs.readFileSync(path.join(tmp, "a", "bundle.json"), "u
   const r2 = runReplicate(path.join(tmp, "b"));
   check("1d. a second run writes the same bytes (deterministic)", r2.status === 0 && files.every((f) => fs.readFileSync(path.join(tmp, "a", f), "utf8") === fs.readFileSync(path.join(tmp, "b", f), "utf8")));
   check("1e. an unknown target or a missing --out exits 2 with the usage", spawnSync(process.execPath, [path.join(__dirname, "tools", "replicate.mjs")], { encoding: "utf8" }).status === 2 && spawnSync(process.execPath, [path.join(__dirname, "tools", "replicate.mjs"), "hand", "--seeds", "1-2"], { encoding: "utf8" }).status === 2);
+  // v3.57: the three levers as run inputs
+  const r3 = spawnSync(process.execPath, [path.join(__dirname, "tools", "replicate.mjs"), "hand", "--seeds", "1-2", "--ticks", "200", "--errors", "declared", "--inbound", "windows", "--out", path.join(tmp, "c")], { encoding: "utf8" });
+  const expsC = [1, 2].map((s) => JSON.parse(fs.readFileSync(path.join(tmp, "c", "run-" + s + ".json"), "utf8")));
+  const bundleC = JSON.parse(fs.readFileSync(path.join(tmp, "c", "bundle.json"), "utf8"));
+  check("1f. `--errors declared --inbound windows`: both runs carry the three error kinds and dock windows on the Truck shape, the bundle records them (no outbound key), and the lever runs form their own group beside the plain ones",
+    r3.status === 0 && expsC.every((e) => e.run.errors && e.run.errors.kinds.length === 3 && e.run.inbound && e.run.inbound.kind === "dock-windows" && e.run.inbound.mode === "Truck" && e.run.inbound.lateness.length === 16 && !e.run.outbound) &&
+    bundleC.errors && bundleC.inbound && !("outbound" in bundleC) && !("errors" in bundle) && RL.replications(exps.concat(expsC)).groups.length === 2 && RL.replications(expsC).groups[0].n === 2,
+    (r3.stdout || r3.stderr || "").trim().split("\n").pop());
+  check("1g. a lever that is neither a keyword nor JSON exits 2", spawnSync(process.execPath, [path.join(__dirname, "tools", "replicate.mjs"), "hand", "--seeds", "1", "--ticks", "10", "--errors", "maybe", "--out", path.join(tmp, "d")], { encoding: "utf8" }).status === 2);
 })();
 
 /* ---- 2. the twin against independent arithmetic -------------------------- */

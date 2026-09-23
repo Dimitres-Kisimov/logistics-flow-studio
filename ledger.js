@@ -281,7 +281,7 @@
       location: locationFor(rec.plan, route, mu, op, stationEl),
       tick: state.tick, minute: state.tick * rec.run.minutes_per_tick, // v3.43: unrounded (an integer at 60 ticks per hour)
       stage: (mu && mu.stage) || (route.steps && route.steps.length ? null : null),
-      form: G && typeof G.formAlong === "function" && !route.legacy ? G.formAlong(route, op, !!before) : (q.form || null),
+      form: G && typeof G.formAlong === "function" && !route.legacy ? G.formAlong(route, op, !!before, opIndex) : (q.form || null), // v3.57: by op index
       pallets: q.pallets, cases: q.cases, eaches: q.eaches, parcels: q.parcels, retained: q.retained, scrapped: q.scrapped,
     };
     rec.events.push(ev);

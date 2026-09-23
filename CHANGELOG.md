@@ -1,5 +1,34 @@
 # Changelog
 
+## v3.57 — Housekeeping after the twin programme: the replication runner's three levers, the rework drawing by op index, an undo for an accepted lever
+
+**The replication runner.** `tools/replicate.mjs` takes the three what-ifs of v3.54 / v3.55 as run inputs:
+`--errors declared|<json>`, `--inbound windows|<json>`, `--outbound windows|<json>`. A keyword takes the
+app's defaults (the three error kinds at their teaching shares; dock and carrier windows on the SCMS Truck
+lateness shape at 60 ticks per day, loaded from `data/scms-delivery.js`), a JSON literal is handed to
+flowsim as it is, anything else exits 2. The bundle records the levers (keys only when present) and, because
+the SQL and the viewer key replication groups on them since v3.55, runs with different levers never form one
+group. `verify_replicate.js` 1f / 1g (+2 → 22 checks).
+
+**The rework drawing.** v3.54 stated a cosmetic limit: `goods.js formAlong` resolved the first occurrence of
+an operation, so a unit queued for its re-pick could be drawn in the form before its first pick. `formAlong`
+now takes the op's index and `opIndexAt(route, seg)` derives it from the unit's waypoint (the k-th run of
+waypoints carrying an op is the k-th occurrence); the ledger passes the index it already had. On every route
+without a rework the index is the first occurrence, so nothing else moves (every fixture byte-identical).
+`verify_forms.js` 8a / 8b (+2 → 27 checks): queued at the second pick draws the tote, at the first the carton.
+
+**An undo for an accepted lever.** `applyLever` returns the value the lever had; the accepted audit row
+carries it as `lever.from`; the audit table in the control-tower card offers *Revert the last accepted
+lever* when one exists, which sets the lever back, appends an audit row of status `reverted` (evidence
+`{ reverts: <proposal id> }`) and re-runs the day, the same rule as accepting. The tower itself still never
+writes a lever. `controlRows` and `v_control` gain a `reverted` column; the SQLite `CHECK` accepts the new
+status and a database created before v3.57 rebuilds its `control_event` table once at open (SQLite cannot
+alter a CHECK) - `test_run_ledger.py` (+1 → 154). `verify_control.js` 5c / 6b / 6d updated.
+
+**Counts.** 81 harnesses; 154 Python tests; WT-SELFTEST 189/189 and the viewer's 36/36; cache `wt-v136`.
+Deleted on GitHub: the three merged Codex branches. The SCMS licence stays unresolved (data.usaid.gov and
+catalog.data.gov unreachable from this machine on 2026-09-23; an open human task).
+
 ## v3.56 — The control tower: four rules propose, a person decides, accepting re-runs the day
 
 **The module.** `control.js` (`WT.control`): `create(thresholds)`, the read-only `observe(ctl, rec, state)`

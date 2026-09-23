@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS run(
 -- v3.56 the control tower's audit: one row per decision a person took, with the run it came from
 CREATE TABLE IF NOT EXISTS control_event(
   run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, seq INTEGER NOT NULL, tick INTEGER NOT NULL, rule TEXT NOT NULL, proposal_id TEXT NOT NULL,
-  status TEXT NOT NULL CHECK(status IN ('accepted','declined','snoozed')), lever TEXT, evidence TEXT, from_run TEXT, PRIMARY KEY(run_id, seq));
+  status TEXT NOT NULL CHECK(status IN ('accepted','declined','snoozed','reverted')), lever TEXT, evidence TEXT, from_run TEXT, PRIMARY KEY(run_id, seq));
 -- v3.55 the trailers the receiving door logged (one row per trailer whose window opened)
 CREATE TABLE IF NOT EXISTS inbound_event(
   run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, trailer INTEGER NOT NULL, scheduled_tick INTEGER NOT NULL,
@@ -524,12 +524,13 @@ FROM inbound_event i;"""
 DELIVERY_VIEWS = ("v_otif", "v_inbound")
 
 # ---- v3.56 the control tower's audit, per rule ----------------------------------------------
-# One row per run and rule: the proposals a person decided, how many accepted / declined / snoozed,
+# One row per run and rule: the proposals a person decided, how many accepted / declined / snoozed / reverted (v3.57),
 # the first tick. The same rows as control.js controlRows (reconciled). Empty when nobody decided.
 VIEWS["v_control"] = """
 CREATE VIEW IF NOT EXISTS v_control AS
 SELECT run_id, rule, COUNT(*) AS proposals, SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) AS accepted,
-       SUM(CASE WHEN status = 'declined' THEN 1 ELSE 0 END) AS declined, SUM(CASE WHEN status = 'snoozed' THEN 1 ELSE 0 END) AS snoozed, MIN(tick) AS first_tick
+       SUM(CASE WHEN status = 'declined' THEN 1 ELSE 0 END) AS declined, SUM(CASE WHEN status = 'snoozed' THEN 1 ELSE 0 END) AS snoozed,
+       SUM(CASE WHEN status = 'reverted' THEN 1 ELSE 0 END) AS reverted, MIN(tick) AS first_tick
 FROM control_event GROUP BY run_id, rule;"""
 
 # ---- v3.54 quality by step (ISO 22400-2 names) ----------------------------------------------
@@ -598,6 +599,15 @@ def initialize(db: sqlite3.Connection) -> None:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {typ}")
         except sqlite3.OperationalError:
             pass
+    # v3.57: a database created before v3.57 refuses the status 'reverted' (SQLite cannot alter a CHECK) - rebuild the table once
+    old = db.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'control_event'").fetchone()
+    if old and old[0] and "'reverted'" not in old[0]:
+        for name in VIEWS:
+            db.execute(f"DROP VIEW IF EXISTS {name}")
+        db.execute("ALTER TABLE control_event RENAME TO control_event_old")
+        db.executescript(DDL)
+        db.execute("INSERT INTO control_event SELECT run_id, seq, tick, rule, proposal_id, status, lever, evidence, from_run FROM control_event_old")
+        db.execute("DROP TABLE control_event_old")
     # views are dropped and recreated on every open, so a database created by an
     # older version always runs the current text (v3.39) - the text the viewer shows
     for name in VIEWS:

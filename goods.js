@@ -182,17 +182,28 @@
   // The form after walking the route's ops up to and including `op` (up to
   // but EXCLUDING it when `queued` - the station has not served the unit
   // yet). Pure; an op not on the route yields the start form.
-  function formAlong(route, op, queued) {
+  // v3.57: `opIndex` resolves a repeated operation (a rework lists an op twice); without
+  // one the first occurrence, which is the same thing on every route without a rework.
+  function formAlong(route, op, queued, opIndex) {
     const ops = (route && route.ops) || [];
     let form = startFormOf(route);
-    if (ops.indexOf(op) < 0) return form; // not on this route: no progress is known
-    for (let i = 0; i < ops.length; i++) {
-      const cur = ops[i];
-      if (cur === op && queued) break;
-      if (OP_FORM[cur]) form = OP_FORM[cur];
-      if (cur === op) break;
+    const at = opIndex != null && opIndex >= 0 && opIndex < ops.length && ops[opIndex] === op ? opIndex : ops.indexOf(op);
+    if (at < 0) return form; // not on this route: no progress is known
+    for (let i = 0; i <= at; i++) {
+      if (i === at && queued) break;
+      if (OP_FORM[ops[i]]) form = OP_FORM[ops[i]];
     }
     return form;
+  }
+  // v3.57: the op's INDEX on the route from a unit's waypoint - the k-th run of waypoints
+  // carrying an op is the k-th occurrence (every op has one step; conveyor points repeat the
+  // op they leave from) - so a unit queued for its re-pick is drawn in the form of its first pass.
+  function opIndexAt(route, seg) {
+    const wps = route && route.waypoints;
+    if (!Array.isArray(wps) || !wps.length || seg == null || seg < 0) return -1;
+    let idx = -1, prev = null;
+    for (let i = 0; i <= Math.min(seg, wps.length - 1); i++) { const o = wps[i].op || null; if (o !== prev) { idx++; prev = o; } }
+    return idx;
   }
 
   // Where each transformation HAPPENS, in the sim's own vocabulary. Used
@@ -367,7 +378,7 @@
     // v3.30 R3: on a per-order route the OPERATION decides the form. The
     // legacy spine (route 0, or no route at all) keeps the stage chain.
     if (route && !route.legacy && Array.isArray(route.ops) && route.ops.length && mu.op) {
-      return formAlong(route, mu.op, mu.status === "queued");
+      return formAlong(route, mu.op, mu.status === "queued", opIndexAt(route, mu.seg)); // v3.57: by op index
     }
     let i = STAGE_ORDER.indexOf(mu.stage);
     if (i < 0) i = 0;
@@ -1033,6 +1044,7 @@
     "and machined workpieces (a drawing constant); the same one-MU-one-unit rule holds.";
 
   WT.goods = {
+    opIndexAt: opIndexAt, // v3.57
     NOMINAL, FORMS, STAGE_FORM, STAGE_ORDER, TRANSFORMS, PALLET,
     MACHINE_STAGE_FORM, // v3.49
     NOSE_GAP, BENCH_TOP, DECK_TOP, MAX_FORM_UNITS, MAX_VEHICLES,

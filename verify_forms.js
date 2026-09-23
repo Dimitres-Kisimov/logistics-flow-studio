@@ -29,7 +29,7 @@
  *   6. DRAWING smoke: a wrapped pallet draws at every tier through a mock
  *      context with finite coordinates and no throw.
  *   7. Shipped wiring: sample() passes the route, makeRoute carries
- *      startsInStock, run-all lists this file, sw.js bumped to wt-v135.
+ *      startsInStock, run-all lists this file, sw.js bumped to wt-v136.
  *
  * Deterministic + ASCII-only. Exit code 0 = all green.
  * ===================================================================== */
@@ -210,10 +210,23 @@ console.log("=".repeat(72));
   check("7a. sample() hands the unit's own route to formFor, and makeRoute carries startsInStock",
     /formFor\(mu, route, so\)/.test(goods) /* v3.49: the opts ride along for MACHINE_STAGE_FORM */ && /startsInStock: !!res\.startsInStock/.test(flow));
   check("7b. test/run-all.mjs lists verify_forms.js", /verify_forms\.js/.test(runall));
-  check("7c. sw.js cache bumped to wt-v135 (trail preserved: previously wt-v134)",
-    /CACHE_VERSION\s*=\s*"wt-v135"/.test(sw) && /Previously wt-v134/.test(sw));
+  check("7c. sw.js cache bumped to wt-v136 (trail preserved: previously wt-v135)",
+    /CACHE_VERSION\s*=\s*"wt-v136"/.test(sw) && /Previously wt-v135/.test(sw));
   check("7d. no Date / Math.random CALL in goods.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(goods));
   check("7e. nothing above mutated the hand-built floor", JSON.stringify(FLOOR) === snapshot);
+})();
+
+/* ---- 8. the rework drawing by op index (v3.57) ---------------------- */
+(function () {
+  const plan = F.spawnPlan(FLOOR, { seed: 21, mix: ["piece-pick"], errors: { "mis-pick": 0.02 } });
+  const route = plan.routes.find((r) => r.error);
+  const picks = route.waypoints.map((w, i) => (w.op === "piece-pick" ? i : -1)).filter((i) => i >= 0);
+  const first = picks[0], second = picks[picks.length - 1];
+  check("8a. opIndexAt walks the waypoints of the rework route: the first pick is op 4, the verification op 5, the second pick op 6; out of range is -1",
+    route.ops[4] === "piece-pick" && route.ops[5] === "verify-pick" && route.ops[6] === "piece-pick" && G.opIndexAt(route, first) === 4 && G.opIndexAt(route, second - 1) === 5 && G.opIndexAt(route, second) === 6 && G.opIndexAt(route, -1) === -1 && G.opIndexAt(null, 0) === -1);
+  check("8b. a unit queued for its re-pick is drawn as the tote it already picked, one queued for its first pick as the carton it is about to pick from; formAlong without an index keeps the first occurrence",
+    G.formFor({ op: "piece-pick", status: "queued", seg: second }, route) === "tote" && G.formFor({ op: "piece-pick", status: "queued", seg: first }, route) === "carton" &&
+    G.formAlong(route, "piece-pick", true, 6) === "tote" && G.formAlong(route, "piece-pick", true) === "carton" && G.formAlong(route, "piece-pick", false, 6) === "tote" && G.formAlong(route, "piece-pick", false) === "tote");
 })();
 
 console.log("=".repeat(72));
