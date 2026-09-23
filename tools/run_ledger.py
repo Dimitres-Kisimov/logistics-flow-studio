@@ -86,6 +86,20 @@ CREATE TABLE IF NOT EXISTS t_critical(df INTEGER PRIMARY KEY NOT NULL, t975 REAL
 CREATE TABLE IF NOT EXISTS location_class(
   run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, type TEXT NOT NULL, class TEXT,
   labour INTEGER NOT NULL DEFAULT 0 CHECK(labour IN (0, 1)), PRIMARY KEY(run_id, type));
+-- v3.53 the tracking database: one EPCIS-shaped twin per handling event, DERIVED at import
+-- (track_events below is the Python twin of tracking.js; the test pins the two equal on fixture A).
+-- No wall clock: tick and minute only. Identifiers are EPC URIs on GS1's documentation prefix.
+CREATE TABLE IF NOT EXISTS tracking_event(
+  id TEXT PRIMARY KEY NOT NULL, run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE,
+  handling_event_id TEXT NOT NULL UNIQUE REFERENCES handling_event(id) ON DELETE CASCADE,
+  hu_id TEXT NOT NULL REFERENCES hu(id) ON DELETE CASCADE, version INTEGER NOT NULL, tick INTEGER NOT NULL, minute REAL NOT NULL,
+  event_type TEXT NOT NULL CHECK(event_type IN ('ObjectEvent','AggregationEvent')), action TEXT NOT NULL CHECK(action IN ('ADD','OBSERVE','DELETE')),
+  biz_step TEXT NOT NULL, disposition TEXT NOT NULL, read_point TEXT, read_element TEXT NOT NULL, biz_location TEXT,
+  biz_transaction_type TEXT NOT NULL, biz_transaction TEXT NOT NULL, epc TEXT, parent_id TEXT, epc_class TEXT NOT NULL,
+  quantity INTEGER NOT NULL, uom TEXT NOT NULL DEFAULT 'EA', wt_kind TEXT NOT NULL, wt_op TEXT NOT NULL,
+  error_kind TEXT, error_step TEXT, error_latent TEXT);
+CREATE INDEX IF NOT EXISTS ix_tracking_hu ON tracking_event(hu_id, version);
+CREATE INDEX IF NOT EXISTS ix_tracking_step ON tracking_event(run_id, biz_step);
 """
 
 VIEWS = {
@@ -425,16 +439,59 @@ SELECT m.scenario, m.mix, m.ticks, m.policy, m.k AS metric, m.n, ROUND(m.mean, 4
 FROM m JOIN s ON s.scenario = m.scenario AND s.mix = m.mix AND s.ticks = m.ticks AND s.policy = m.policy AND s.k = m.k
 LEFT JOIN t_critical t ON t.df = m.n - 1;"""
 REPLICATION_VIEWS = ("v_replication_groups", "v_replication_cycle_by_type", "v_replication_cost_by_type", "v_replication_summary")
+
+
+# ---- v3.53 the tracking database -------------------------------------------------------------
+# The twins joined to their units; one unit's steps with the ticks to its next event; per business
+# step the events, units, spans, mean and maximum ticks to the next event, the waiting ticks (queued
+# twins) and their share - the same definition as tracking.js dwellByBizStep (LEAD(tick) - tick per
+# unit in version order), reconciled between SQL and JavaScript; and the invariant: a handling event
+# without a twin, or a twin outside the CBV 2.0 vocabulary this app may emit, must not exist.
+VIEWS["v_epcis_events"] = """
+CREATE VIEW IF NOT EXISTS v_epcis_events AS
+SELECT t.run_id, t.id AS event_id, t.hu_id, h.archetype, h.sscc, h.order_id, t.version, t.tick, t.minute, t.event_type, t.action,
+       t.biz_step, t.disposition, t.read_point, t.read_element, t.biz_location, t.biz_transaction_type, t.biz_transaction,
+       t.epc, t.parent_id, t.epc_class, t.quantity, t.uom, t.wt_kind, t.wt_op, t.error_kind, t.error_step, t.error_latent
+FROM tracking_event t JOIN hu h ON h.id = t.hu_id;"""
+VIEWS["v_unit_history"] = """
+CREATE VIEW IF NOT EXISTS v_unit_history AS
+SELECT run_id, hu_id, version, tick, wt_kind AS kind, wt_op AS op, event_type, action, biz_step, disposition, read_element, quantity,
+       LEAD(tick) OVER (PARTITION BY hu_id ORDER BY version) - tick AS ticks_to_next
+FROM tracking_event;"""
+VIEWS["v_bizstep_dwell"] = """
+CREATE VIEW IF NOT EXISTS v_bizstep_dwell AS
+WITH t AS (
+  SELECT run_id, hu_id, biz_step, wt_kind, tick,
+         LEAD(tick) OVER (PARTITION BY hu_id ORDER BY version) - tick AS ticks_to_next
+  FROM tracking_event)
+SELECT run_id, biz_step, COUNT(*) AS events, COUNT(DISTINCT hu_id) AS units, COUNT(ticks_to_next) AS spans,
+       ROUND(AVG(ticks_to_next), 2) AS avg_ticks_to_next, MAX(ticks_to_next) AS max_ticks_to_next,
+       COALESCE(SUM(CASE WHEN wt_kind = 'queued' THEN ticks_to_next END), 0) AS waiting_ticks,
+       COALESCE(SUM(ticks_to_next), 0) AS total_ticks,
+       CASE WHEN SUM(ticks_to_next) > 0 THEN ROUND(SUM(CASE WHEN wt_kind = 'queued' THEN ticks_to_next ELSE 0 END) * 1.0 / SUM(ticks_to_next), 4) END AS waiting_share
+FROM t GROUP BY run_id, biz_step;"""
+VIEWS["v_tracking_gaps"] = """
+CREATE VIEW IF NOT EXISTS v_tracking_gaps AS
+SELECT h.run_id, e.id AS handling_event_id, 'no twin' AS gap
+FROM handling_event e JOIN hu h ON h.id = e.hu_id
+WHERE NOT EXISTS (SELECT 1 FROM tracking_event t WHERE t.handling_event_id = e.id)
+UNION ALL
+SELECT t.run_id, t.handling_event_id, 'business step ' || t.biz_step FROM tracking_event t
+WHERE t.biz_step NOT IN ('receiving','inspecting','unpacking','storing','stocking','picking','staging_outbound','repackaging','packing','loading','shipping','holding','destroying')
+UNION ALL
+SELECT t.run_id, t.handling_event_id, 'disposition ' || t.disposition FROM tracking_event t
+WHERE t.disposition NOT IN ('in_progress','returned','in_transit','sellable_accessible','sellable_not_accessible','non_sellable_other','mismatch_class','damaged');"""
+TRACKING_VIEWS = ("v_epcis_events", "v_unit_history", "v_bizstep_dwell", "v_tracking_gaps")
 # Student's t, two-sided 95 % (0.975 quantile) for df 1..30 - standard tables; df > 30 uses 1.960.
 T975 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
         11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086,
         21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042}
 
 
-INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations")
+INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations", "v_tracking_gaps")
 PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
-                 "v_cost_by_type", "v_cost_by_location", "v_flow_links", "v_staffing")
-DETAIL_VIEWS = ("v_wip_by_tick", "v_spans", "v_span_cost", "v_cost_by_hu", "v_dispatch_by_order")  # long or per-row views: `views --all`
+                 "v_cost_by_type", "v_cost_by_location", "v_flow_links", "v_staffing", "v_bizstep_dwell")
+DETAIL_VIEWS = ("v_wip_by_tick", "v_spans", "v_span_cost", "v_cost_by_hu", "v_dispatch_by_order", "v_epcis_events", "v_unit_history")  # long or per-row views: `views --all`
 COMPARE_VIEWS = ("v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost")
 
 
@@ -550,7 +607,161 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
             e["id"], e["hu_id"], int(e["version"]), e["kind"], e["op"], e.get("anchor"), e["location"], int(e["tick"]), float(e["minute"]),
             e.get("stage"), e.get("form"), int(e["pallets"]), int(e["cases"]), int(e["eaches"]), int(e["parcels"]), int(e["retained"]), int(e["scrapped"]))
             for e in events])
+        derive_tracking(db, run["id"], data)  # v3.53: the EPCIS-shaped twins, derived - never recorded twice
     return run["id"]
+
+
+# ---- v3.53 the tracking database: the Python twin of tracking.js ------------------------------
+# One EPCIS-shaped event per handling event, derived from the export at import. The mapping is
+# the one tracking.js documents (docs/DIGITAL_TWIN_DEEP_DIVE.md chapter 6); test_run_ledger.py
+# pins these rows equal to the committed test/fixtures/run-ledger.tracking.json event by event.
+TRACKING_SCHEMA_ID = "factory-tracking-events/v1"
+DEMO_PREFIX = "4012345"  # GS1's documentation prefix (ids.js) - nothing here is registered
+BIZ_STEPS = ("receiving", "inspecting", "unpacking", "storing", "stocking", "picking", "staging_outbound", "repackaging", "packing",
+             "loading", "shipping", "holding", "destroying")
+DISPOSITIONS = ("in_progress", "returned", "in_transit", "sellable_accessible", "sellable_not_accessible", "non_sellable_other",
+                "mismatch_class", "damaged")
+# op -> (business step, stage zone, aggregation action, parent level, child level, disposition after the arrival)
+TRACK_OPS = {
+    "receive": ("receiving", "receiving", None, None, None, None), "qc-sample": ("inspecting", "receiving", None, None, None, None),
+    "qc-final": ("inspecting", "packing", None, None, None, None), "inspect": ("inspecting", "receiving", None, None, None, None),
+    "depalletise": ("unpacking", "receiving", "DELETE", "pallet", "cases", None), "putaway": ("storing", "storage", None, None, None, None),
+    "replen": ("stocking", "storage", None, None, None, None), "restock": ("stocking", "storage", None, None, None, None),
+    "pick": ("picking", "picking", None, None, None, None), "pallet-pick": ("picking", "picking", None, None, None, None),
+    "case-pick": ("picking", "picking", None, None, None, None), "piece-pick": ("picking", "picking", None, None, None, None),
+    "consolidate": ("staging_outbound", "picking", None, None, None, None), "vas": ("repackaging", "packing", None, None, None, None),
+    "pack": ("packing", "packing", "ADD", "parcel", "eaches", None), "palletise": ("packing", "packing", "ADD", "pallet", "cases", None),
+    "wrap": ("packing", "packing", None, None, None, None), "stage-out": ("staging_outbound", "shipping", None, None, None, None),
+    "load": ("loading", "shipping", None, None, None, None), "scrap": ("holding", "shipping", None, None, None, "non_sellable_other"),
+    "verify-pick": ("inspecting", "picking", None, None, None, None), "verify-put": ("inspecting", "storage", None, None, None, None),
+}
+TRACK_TERMINAL = {"delivered": ("shipping", "in_transit", "OBSERVE"), "restocked": ("stocking", "sellable_accessible", "OBSERVE"),
+                  "scrapped": ("destroying", "non_sellable_other", "DELETE")}
+
+
+def fnv1a(text: str) -> int:
+    """FNV-1a 32-bit over the string's code units (ids.js)."""
+    h = 0x811C9DC5
+    for ch in text:
+        h ^= ord(ch)
+        h = (h * 0x01000193) & 0xFFFFFFFF
+    return h
+
+
+def gs1_check(digits: str) -> int:
+    total = 0
+    for i, ch in enumerate(digits):
+        total += int(ch) * (3 if (len(digits) - 1 - i) % 2 == 0 else 1)
+    return (10 - total % 10) % 10
+
+
+def sscc(extension: int, serial: int, prefix: str = DEMO_PREFIX) -> str:
+    width = 17 - 1 - len(prefix)
+    body = str(extension)[-1:] + prefix + f"{serial:0{width}d}"[-width:]
+    return body + str(gs1_check(body))
+
+
+def gln(location_ref: int, prefix: str = DEMO_PREFIX) -> str:
+    width = 12 - len(prefix)
+    body = prefix + f"{location_ref:0{width}d}"[-width:]
+    return body + str(gs1_check(body))
+
+
+def sscc_urn(code: str) -> str:
+    p = len(DEMO_PREFIX)
+    return f"urn:epc:id:sscc:{code[1:1 + p]}.{code[0]}{code[1 + p:17]}"
+
+
+def sgtin_pattern(gtin: str) -> str:
+    g = "0" + gtin if len(gtin) == 13 else gtin
+    p = len(DEMO_PREFIX)
+    return f"urn:epc:idpat:sgtin:{g[1:1 + p]}.{g[0]}{g[1 + p:13]}.*"
+
+
+def sgln_urn(code: str) -> str:
+    p = len(DEMO_PREFIX)
+    return f"urn:epc:id:sgln:{code[:p]}.{code[p:12]}.0"
+
+
+def gln_for(element_id: str) -> str:
+    return gln(1 + fnv1a(element_id) % 99999)
+
+
+def _track_twin(e: dict, h: dict, st: dict) -> dict:
+    op = TRACK_OPS.get(e["op"]) or (f"wt:unknown:{e['op']}", e.get("stage") or "unknown", None, None, None, None)
+    step, stage, aggregation, parent, children, arrival_disp = op
+    term = TRACK_TERMINAL.get(e["kind"])
+    event_type, action, disp, agg = "ObjectEvent", "OBSERVE", st["disposition"], False
+    if e["kind"] == "created":
+        action = "ADD"
+    elif term:
+        step, disp, action = term
+    elif e["kind"] != "queued":
+        if aggregation:
+            event_type, action, agg = "AggregationEvent", aggregation, True
+        if arrival_disp:
+            disp = arrival_disp
+    st["disposition"] = disp
+    ev: dict = {"eventID": f"urn:wt:evt:{e['id']}", "type": event_type, "action": action, "eventTime": None,
+                "wt:tick": e["tick"], "wt:minute": e["minute"], "wt:kind": e["kind"], "wt:op": e["op"], "wt:hu_id": e["hu_id"], "wt:version": e["version"]}
+    own = str(h["sscc"])
+    if agg:
+        if parent == "pallet":
+            code = own if own[0] == "3" else sscc(3, int(h["seq"]))
+        else:
+            code = own if own[0] == "0" else sscc(0, int(h["seq"]))
+        ev["parentID"] = sscc_urn(code)
+        ev["childQuantityList"] = [{"epcClass": sgtin_pattern(str(h["gtin14"] if children == "cases" else h["gtin13"])),
+                                    "quantity": e["cases"] if children == "cases" else e["eaches"], "uom": "EA"}]
+    else:
+        ev["epcList"] = [sscc_urn(own)]
+        ev["quantityList"] = [{"epcClass": sgtin_pattern(str(h["gtin13"])), "quantity": e["eaches"], "uom": "EA"}]
+    ev["bizStep"] = step
+    ev["disposition"] = disp
+    loc = str(e["location"])
+    ev["readPoint"] = {"id": None, "wt:zone": loc[5:]} if loc.startswith("zone:") else {"id": sgln_urn(gln_for(loc)), "wt:element": loc}
+    ev["bizLocation"] = None if disp == "in_transit" else {"id": f"urn:wt:zone:{stage}"}
+    ev["bizTransactionList"] = [{"type": "rma" if h["archetype"] == "returns" else "po", "bizTransaction": h["order_id"]}]
+    if h.get("order_ref") is not None:
+        ev["bizTransactionList"].append({"type": "wt:order_ref", "bizTransaction": str(h["order_ref"])})
+    ev["wt:error"] = None
+    ev["wt:delivery"] = None
+    return ev
+
+
+def track_events(data: dict) -> list[dict]:
+    """tracking.js fromLedger(export).events - one EPCIS-shaped dict per handling event, in the export's order."""
+    hus = {h["id"]: h for h in data.get("hus") or []}
+    state: dict[str, dict] = {}
+    out = []
+    for e in data.get("events") or []:
+        h = hus.get(e["hu_id"])
+        if h is None:
+            continue
+        st = state.setdefault(h["id"], {"disposition": "returned" if h["archetype"] == "returns" else "in_progress"})
+        out.append(_track_twin(e, h, st))
+    return out
+
+
+def tracking_row(run_id: str, ev: dict) -> tuple:
+    """One tracking_event row from one JSON event (the columns in table order)."""
+    agg = ev["type"] == "AggregationEvent"
+    q = ev["childQuantityList"][0] if agg else ev["quantityList"][0]
+    rp = ev["readPoint"]
+    bt = ev["bizTransactionList"][0]
+    err = ev.get("wt:error") or {}
+    return (ev["eventID"], run_id, ev["eventID"][len("urn:wt:evt:"):], ev["wt:hu_id"], int(ev["wt:version"]), int(ev["wt:tick"]), float(ev["wt:minute"]),
+            ev["type"], ev["action"], ev["bizStep"], ev["disposition"], rp.get("id"), rp.get("wt:element") or f"zone:{rp.get('wt:zone')}",
+            ev["bizLocation"]["id"] if ev.get("bizLocation") else None, bt["type"], bt["bizTransaction"],
+            None if agg else ev["epcList"][0], ev.get("parentID") if agg else None, q["epcClass"], int(q["quantity"]), q.get("uom") or "EA",
+            ev["wt:kind"], ev["wt:op"], err.get("kind"), err.get("step"), json.dumps(err.get("latent"), sort_keys=True) if err.get("latent") is not None else None)
+
+
+def derive_tracking(db: sqlite3.Connection, run_id: str, data: dict) -> int:
+    """Insert the run's tracking twins (the handling events must already be in). Returns the count."""
+    rows_ = [tracking_row(run_id, ev) for ev in track_events(data)]
+    db.executemany("INSERT INTO tracking_event VALUES(" + ",".join("?" * 26) + ")", rows_)
+    return len(rows_)
 
 
 def rows(db: sqlite3.Connection, sql: str, params=()) -> list[dict]:
@@ -690,6 +901,7 @@ RECONCILE_KEYS = {
     "v_dispatch": (), "v_flow_links": ("from_op", "to_op"), "v_spans": ("hu_id", "version"), "v_span_cost": ("hu_id", "version"),
     "v_cost_by_hu": ("hu_id",), "v_cost_by_type": ("archetype",), "v_cost_by_location": ("location",),
     "v_dispatch_by_order": ("order_id",), "v_staffing": ("location_id",),
+    "v_bizstep_dwell": ("biz_step",),  # v3.53
 }
 RAW_VIEWS = ("v_spans", "v_span_cost")
 

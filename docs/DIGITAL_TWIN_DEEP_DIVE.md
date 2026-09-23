@@ -203,6 +203,7 @@ An event is EPCIS-shaped: `what` is the unit's SSCC (or, for an aggregation, a p
 | `wrap` | ObjectEvent OBSERVE, `wt:op` | `packing` | `in_progress` | stretch-wrap |
 | `stage-out` | ObjectEvent OBSERVE | `staging_outbound` | `in_progress` | staging |
 | `load` → `delivered` (terminal) | ObjectEvent OBSERVE | `loading`, then `shipping` | `in_transit` | outbound dock |
+| `scrap` (the arrival, `passed`) | ObjectEvent OBSERVE | `holding` | `non_sellable_other` (graded out, held for write-off) | returns bench |
 | `scrap` → `scrapped` (terminal) | ObjectEvent DELETE | `destroying` | `non_sellable_other` | returns bench |
 | `verify-pick`, `verify-put` (v3.54) | ObjectEvent OBSERVE | `inspecting` | `in_progress`, `wt:error.detected` | pick face / storage |
 | an error at a step (v3.54) | as the step | as the step | mis-pick `mismatch_class`; wrong put-away `sellable_not_accessible`; damage `damaged` | as the step |

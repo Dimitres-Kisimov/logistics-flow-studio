@@ -781,5 +781,117 @@ class RecordedFixture(unittest.TestCase):
         self.assertTrue(all(len(r["sscc"]) == 18 and len(r["gtin14"]) == 14 for r in ssccs))
 
 
+class Tracking(unittest.TestCase):
+    """v3.53 the tracking database: the Python twin of tracking.js, the derived rows, the four views."""
+
+    def test_epc_uris_and_gln_by_hand(self):
+        self.assertEqual(RL.sscc_urn("340123450000000017"), "urn:epc:id:sscc:4012345.3000000001")
+        self.assertEqual(RL.sscc_urn("040123450000000031"), "urn:epc:id:sscc:4012345.0000000003")
+        self.assertEqual(RL.sgtin_pattern("4012345019179"), "urn:epc:idpat:sgtin:4012345.001917.*")
+        self.assertEqual(RL.sgtin_pattern("14012345019176"), "urn:epc:idpat:sgtin:4012345.101917.*")
+        self.assertEqual(RL.gln_for("in"), "4012345313895")  # 1 + fnv1a("in") % 99999 = 31389, mod-10 check 5 (ids.js)
+        self.assertEqual(RL.sgln_urn(RL.gln_for("in")), "urn:epc:id:sgln:4012345.31389.0")
+        self.assertEqual(RL.sscc(3, 1), "340123450000000017")
+        self.assertEqual(RL.sscc(0, 3), "040123450000000030")  # the same digits ids.js produces (the hand ledger types its own SSCCs)
+
+    def test_python_twin_equals_the_committed_javascript_fixture_event_by_event(self):
+        data = json.loads((FIX / "run-ledger.json").read_text(encoding="utf-8"))
+        fixture = json.loads((FIX / "run-ledger.tracking.json").read_text(encoding="utf-8"))
+        self.assertEqual(fixture["schema"], RL.TRACKING_SCHEMA_ID)
+        py = RL.track_events(data)
+        self.assertEqual(len(py), len(data["events"]))
+        for a, b in zip(py, fixture["events"]):
+            self.assertEqual(a, b, a["eventID"])
+        self.assertEqual(py, fixture["events"])
+        db = fresh_with(data)
+        run = data["run"]["id"]
+        sql = [tuple(r.values()) for r in RL.rows(db, "SELECT * FROM tracking_event WHERE run_id = ? ORDER BY rowid", (run,))]
+        self.assertEqual(sql, [RL.tracking_row(run, ev) for ev in fixture["events"]])
+        RL.import_ledger(db, data)  # idempotent: the twins are replaced, never duplicated
+        self.assertEqual(RL.rows(db, "SELECT COUNT(*) AS n FROM tracking_event")[0]["n"], len(fixture["events"]))
+        self.assertEqual(sorted(set(RL.BIZ_STEPS)), sorted(set(fixture["vocabulary"]["bizSteps"])))
+        self.assertEqual(sorted(set(RL.DISPOSITIONS)), sorted(set(fixture["vocabulary"]["dispositions"])))
+
+    def test_tracking_gaps_empty_on_every_fixture_and_fire_after_a_corruption(self):
+        db = fresh()
+        for name in ("run-ledger", "run-ledger-b", "run-ledger-c", "run-ledger-d"):
+            data = json.loads((FIX / f"{name}.json").read_text(encoding="utf-8"))
+            run = RL.import_ledger(db, data)
+            self.assertEqual(RL.rows(db, "SELECT COUNT(*) AS n FROM tracking_event WHERE run_id = ?", (run,))[0]["n"], len(data["events"]), name)
+            self.assertEqual(RL.rows(db, "SELECT * FROM v_tracking_gaps WHERE run_id = ?", (run,)), [], name)
+            self.assertEqual(RL.summary(db, run)["invariants"]["v_tracking_gaps"], 0, name)
+        one = RL.rows(db, "SELECT id, handling_event_id FROM tracking_event WHERE run_id = ? ORDER BY rowid LIMIT 3", (run,))
+        with db:
+            db.execute("DELETE FROM tracking_event WHERE id = ?", (one[0]["id"],))
+            db.execute("UPDATE tracking_event SET biz_step = 'waiting' WHERE id = ?", (one[1]["id"],))
+            db.execute("UPDATE tracking_event SET disposition = 'lost' WHERE id = ?", (one[2]["id"],))
+        gaps = RL.rows(db, "SELECT handling_event_id, gap FROM v_tracking_gaps WHERE run_id = ? ORDER BY gap", (run,))
+        self.assertEqual(gaps, [{"handling_event_id": one[1]["handling_event_id"], "gap": "business step waiting"},
+                                {"handling_event_id": one[2]["handling_event_id"], "gap": "disposition lost"},
+                                {"handling_event_id": one[0]["handling_event_id"], "gap": "no twin"}])
+
+    def test_bizstep_dwell_by_hand(self):
+        # A: receiving@0 > unpacking@4 > picking (queued)@8 > picking@12 > packing@20 > shipping@30;
+        # B: receiving@5 > staging_outbound@12 > shipping@20; C: receiving@10 (returned) > inspecting (queued)@14
+        db = fresh_with(hand_ledger())
+        rows_ = {r["biz_step"]: r for r in RL.rows(db, "SELECT * FROM v_bizstep_dwell WHERE run_id = ?", ("RUN-hand-s1-h00000000",))}
+        want = {
+            "receiving": (3, 3, 3, 5.0, 7, 0, 15, 0.0), "unpacking": (1, 1, 1, 4.0, 4, 0, 4, 0.0), "picking": (2, 1, 2, 6.0, 8, 4, 12, 0.3333),
+            "packing": (1, 1, 1, 10.0, 10, 0, 10, 0.0), "staging_outbound": (1, 1, 1, 8.0, 8, 0, 8, 0.0),
+            "shipping": (2, 2, 0, None, None, 0, 0, None), "inspecting": (1, 1, 0, None, None, 0, 0, None),
+        }
+        self.assertEqual(set(rows_), set(want))
+        for step, (events, units, spans, avg, mx, waiting, total, share) in want.items():
+            r = rows_[step]
+            self.assertEqual((r["events"], r["units"], r["spans"], r["avg_ticks_to_next"], r["max_ticks_to_next"], r["waiting_ticks"], r["total_ticks"], r["waiting_share"]),
+                             (events, units, spans, avg, mx, waiting, total, share), step)
+
+    def test_unit_history_ordering_ticks_to_next_and_dispositions(self):
+        db = fresh_with(hand_ledger())
+        run = "RUN-hand-s1-h00000000"
+        a = RL.rows(db, "SELECT * FROM v_unit_history WHERE run_id = ? AND hu_id = ? ORDER BY version", (run, f"HU-ORD-{run}-000001-1"))
+        self.assertEqual([r["version"] for r in a], [0, 1, 2, 3, 4, 5])
+        self.assertEqual([r["ticks_to_next"] for r in a], [4, 4, 4, 8, 10, None])
+        self.assertEqual([r["biz_step"] for r in a], ["receiving", "unpacking", "picking", "picking", "packing", "shipping"])
+        self.assertEqual([r["disposition"] for r in a], ["in_progress"] * 5 + ["in_transit"])
+        self.assertEqual([r["event_type"] for r in a], ["ObjectEvent", "AggregationEvent", "ObjectEvent", "ObjectEvent", "AggregationEvent", "ObjectEvent"])
+        self.assertEqual([r["action"] for r in a], ["ADD", "DELETE", "OBSERVE", "OBSERVE", "ADD", "OBSERVE"])
+        c = RL.rows(db, "SELECT * FROM v_unit_history WHERE run_id = ? AND hu_id = ? ORDER BY version", (run, f"HU-ORD-{run}-000003-1"))
+        self.assertEqual([(r["biz_step"], r["disposition"], r["kind"]) for r in c], [("receiving", "returned", "created"), ("inspecting", "returned", "queued")])
+        ep = RL.rows(db, "SELECT * FROM v_epcis_events WHERE run_id = ? AND hu_id = ? ORDER BY version", (run, f"HU-ORD-{run}-000001-1"))
+        self.assertEqual(ep[1]["parent_id"], "urn:epc:id:sscc:4012345.3000000001")
+        self.assertEqual((ep[1]["epc_class"], ep[1]["quantity"]), ("urn:epc:idpat:sgtin:4012345.167890.*", 48))  # GTIN-14 14012345678908: indicator 1, item reference 67890
+        self.assertEqual((ep[0]["epc"], ep[0]["quantity"], ep[0]["biz_transaction_type"], ep[0]["read_element"]), ("urn:epc:id:sscc:4012345.3000000001", 576, "po", "in"))
+        self.assertIsNone(ep[5]["biz_location"])  # in transit: no business location
+        self.assertEqual(RL.rows(db, "SELECT biz_transaction_type AS t FROM tracking_event WHERE hu_id = ?", (f"HU-ORD-{run}-000003-1",))[0]["t"], "rma")
+
+    def test_tracking_views_are_grouped_reconciled_and_the_sql_equals_javascript_on_the_fixture(self):
+        self.assertIn("v_bizstep_dwell", RL.PLANNER_VIEWS)
+        self.assertIn("v_tracking_gaps", RL.INVARIANT_VIEWS)
+        self.assertTrue({"v_epcis_events", "v_unit_history"} <= set(RL.DETAIL_VIEWS))
+        self.assertTrue(set(RL.TRACKING_VIEWS) <= set(RL.VIEWS))
+        self.assertEqual(len(RL.VIEWS), 33)
+        self.assertEqual(RL.RECONCILE_KEYS["v_bizstep_dwell"], ("biz_step",))
+        data = json.loads((FIX / "run-ledger.json").read_text(encoding="utf-8"))
+        js = json.loads((FIX / "run-ledger.tracking.views.json").read_text(encoding="utf-8"))
+        db = fresh_with(data)
+        run = data["run"]["id"]
+        sql = {r["biz_step"]: r for r in RL.rows(db, "SELECT * FROM v_bizstep_dwell WHERE run_id = ?", (run,))}
+        self.assertEqual(set(sql), {r["biz_step"] for r in js["bizstepDwell"]})
+        for want in js["bizstepDwell"]:
+            got = sql[want["biz_step"]]
+            for key in ("events", "units", "spans", "max_ticks_to_next", "waiting_ticks", "total_ticks"):
+                self.assertEqual(got[key], want[key], f"{want['biz_step']} {key}")
+            for key in ("avg_ticks_to_next", "waiting_share"):
+                if want[key] is None:
+                    self.assertIsNone(got[key], f"{want['biz_step']} {key}")
+                else:
+                    self.assertAlmostEqual(got[key], want[key], delta=TOL, msg=f"{want['biz_step']} {key}")
+        disp = RL.rows(db, "SELECT biz_step, disposition, COUNT(*) AS events, COUNT(DISTINCT hu_id) AS units FROM tracking_event WHERE run_id = ? GROUP BY 1, 2 ORDER BY 1, 2", (run,))
+        self.assertEqual(disp, js["dispositionCounts"])
+        ok, table = RL.reconcile(db, run, {"run": run, "views": {"v_bizstep_dwell": js["bizstepDwell"]}})
+        self.assertTrue(ok, [r for r in table if not r["ok"]])
+
+
 if __name__ == "__main__":
     unittest.main()

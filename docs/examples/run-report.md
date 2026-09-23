@@ -149,6 +149,24 @@ Data-quality flags: no holding cost is set (0 per unit-hour): waiting stock cost
 
 (no rows)
 
+### v_bizstep_dwell
+
+| biz_step | events | units | spans | avg_ticks_to_next | max_ticks_to_next | waiting_ticks | total_ticks | waiting_share |
+|---|---|---|---|---|---|---|---|---|
+| destroying | 1 | 1 | 0 | — | — | 0 | 0 | — |
+| holding | 1 | 1 | 1 | 8.0 | 8 | 0 | 8 | 0.0 |
+| inspecting | 24 | 24 | 22 | 21.09 | 60 | 0 | 464 | 0.0 |
+| loading | 8 | 8 | 8 | 8.0 | 8 | 0 | 64 | 0.0 |
+| packing | 9 | 5 | 9 | 12.67 | 26 | 5 | 114 | 0.0439 |
+| picking | 9 | 6 | 8 | 22.13 | 52 | 3 | 177 | 0.0169 |
+| receiving | 36 | 36 | 34 | 21.12 | 72 | 0 | 718 | 0.0 |
+| repackaging | 1 | 1 | 1 | 20.0 | 20 | 0 | 20 | 0.0 |
+| shipping | 8 | 8 | 0 | — | — | 0 | 0 | — |
+| staging_outbound | 6 | 6 | 5 | 57.0 | 65 | 0 | 285 | 0.0 |
+| stocking | 7 | 4 | 4 | 22.25 | 50 | 50 | 89 | 0.5618 |
+| storing | 28 | 23 | 9 | 73.11 | 206 | 612 | 658 | 0.9301 |
+| unpacking | 19 | 19 | 17 | 18.0 | 18 | 0 | 306 | 0.0 |
+
 ## Cost detail
 
 | hours | labour_eur | equipment_eur | energy_eur | holding_eur | total_eur |
@@ -165,6 +183,7 @@ Rates: labour 35.0 per hour · energy 0.3 per kWh · 4000.0 operating hours per 
 | v_cross_dock_violations | 0 |
 | v_version_gaps | 0 |
 | v_terminal_violations | 0 |
+| v_tracking_gaps | 0 |
 
 Invariant violations: 0
 

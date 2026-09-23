@@ -759,7 +759,7 @@
   WT.sceneTracking = {
     select(id) { sceneSelection = id || null; render(); },
     snapshot() {
-      const sim = state.flow.sim;
+      const sim = state.flow.sim, rec = state.flow.ledger;
       const units = sim && WT.goods ? WT.goods.units(sim, goodsSupport(), goodsUnitOpts()) : [];
       const t = workerAnimT(), busy = workerBusyFn();
       const store = WT.shift && t != null ? _shiftStore : null;
@@ -775,9 +775,13 @@
       });
       return { tick: sim ? sim.tick : 0, playing: state.flow.playing, view: state.viewMode,
         packagesVisible: state.flow.on, completed: sim ? sim.completed : 0,
-        selected: sceneSelection, packages: units.map(p => ({ id: "package:" + p.id,
-          x: p.x, y: p.y, z: p.z, heading: p.heading, status: p.status, task: p.stage,
-          basis: "Synthetic model; coordinates match displayed queue offsets" })), workers: people };
+        selected: sceneSelection, packages: units.map(p => {
+          // v3.53: every package is joined to its handling unit in the run ledger (never to a worker)
+          const last = rec && rec.last ? rec.last[p.id] : null, hu = last && rec.hus[last.hu] ? rec.hus[last.hu] : null;
+          return { id: "package:" + p.id,
+            x: p.x, y: p.y, z: p.z, heading: p.heading, status: p.status, task: p.stage,
+            hu: last ? last.hu : null, sscc: hu ? hu.sscc : null, order_id: hu ? hu.order_id : null, order_ref: hu && hu.order_ref != null ? hu.order_ref : null,
+            basis: "Synthetic model; coordinates match displayed queue offsets" }; }), workers: people };
     }
   };
   function drawWorkers() {
@@ -2447,6 +2451,13 @@
     return (state.flow && state.flow.scenarioId) || "custom";
   }
   let ledgerTraceCache = "";
+  // v3.53: the tracking store, opened once on first use (IndexedDB over http; a memory
+  // store where none is available - the promise-shaped API is the same).
+  let trackingStorePromise = null, trackingInfo = null;
+  function trackingStore() {
+    if (!trackingStorePromise) trackingStorePromise = WT.tracking.openStore({ name: "wt-tracking-v1", maxRuns: 20 }).then((store) => store.size().then((size) => { trackingInfo = size; return store; }));
+    return trackingStorePromise;
+  }
   let ledgerCostCache = { key: null, total: null }; // v3.40: the run's cost so far, recomputed only when the recording grew
   function ledgerStatsHtml(rec) {
     const s = WT.ledger.stats(rec);
@@ -2475,6 +2486,16 @@
     const rec = state.flow.ledger;
     if (!out || !rec || !WT.ledger) return;
     out.innerHTML = ledgerStatsHtml(rec);
+    const ts = $("flowTrackingStats"); // v3.53: the twins derived so far, and what the store keeps
+    if (ts && state.flow.track) {
+      const n = state.flow.track.events.length;
+      const tkey = n + ":" + (trackingInfo ? trackingInfo.runs + "/" + trackingInfo.events + "/" + trackingInfo.backend : "-");
+      if (ts.getAttribute("data-key") !== tkey) {
+        ts.setAttribute("data-key", tkey);
+        ts.innerHTML = '<p class="flow-pool-stats">Tracking: <strong>' + n + "</strong> EPCIS-shaped events derived from the ledger (GS1 CBV 2.0 steps and dispositions as vocabulary; no wall clock; never keyed to a person)" +
+          (trackingInfo ? " · store (" + trackingInfo.backend + "): " + trackingInfo.runs + " runs / " + trackingInfo.events + " events kept in this browser" : "") + "</p>";
+      }
+    }
     if (!sel || !trace) return;
     // the unit picker lists the most recent 60 units; keep the user's choice
     const chosen = sel.value;
@@ -2531,6 +2552,7 @@
     // Every unit gets its identities (ids.js) and quantities (pack.js); the
     // export feeds tools/run_ledger.py (SQLite) and the run-ledger viewer.
     state.flow.ledger = null;
+    state.flow.track = null; // v3.53
     if (WT.ledger && WT.ids && WT.pack) {
       const scen = currentScenarioId();
       state.flow.ledger = WT.ledger.create(state.flow.sim.plan, {
@@ -2541,7 +2563,10 @@
         pool: opts.pool || null,
         dataset: opts.pool && state.dataset ? { source: state.dataset.source || "imported", skus: (state.dataset.skus || []).length } : null,
       });
-      state.flow.sim.hooks = { afterTick: (st) => WT.ledger.observe(state.flow.ledger, st) };
+      // v3.53 THE TRACKING DATABASE: a second pure observer maps the events the ledger
+      // just appended to their EPCIS-shaped twins; the hook multiplexes both, ledger first.
+      state.flow.track = WT.tracking ? WT.tracking.create(state.flow.ledger) : null;
+      state.flow.sim.hooks = { afterTick: (st) => { WT.ledger.observe(state.flow.ledger, st); if (state.flow.track) WT.tracking.observe(state.flow.track, state.flow.ledger); } };
     }
     ledgerTraceCache = "";
     sceneSelection = null;
@@ -3002,6 +3027,24 @@
         return;
       }
       window.open("run-ledger.html", "_blank", "noopener");
+    });
+    // v3.53: the tracking store (IndexedDB, the last 20 runs) and the tracking export.
+    on("flowTrackingSave", () => {
+      const track = state.flow.track;
+      if (!track || !WT.tracking || !track.events.length) { toast("Press Play first - the tracking events are derived from the run as it happens.", "warn"); return; }
+      const doc = WT.tracking.exportJson(track);
+      trackingStore().then((store) => store.putRun(doc).then((r) => store.size().then((size) => {
+        trackingInfo = size;
+        updateLedgerReadout();
+        status("Tracking store (" + size.backend + "): saved " + doc.run.id + " with " + r.events + " events; " + size.runs + " runs / " + size.events + " events kept" + (r.evicted.length ? "; evicted " + r.evicted.join(", ") : "") + ".");
+      }))).catch((e) => toast("The tracking store refused the run: " + (e && e.message ? e.message : e), "warn"));
+    });
+    on("flowTrackingExport", () => {
+      const track = state.flow.track;
+      if (!track || !WT.tracking || !track.events.length) { toast("Press Play first - the tracking events are derived from the run as it happens.", "warn"); return; }
+      const doc = WT.tracking.exportJson(track);
+      downloadFile("tracking-events-" + doc.run.id + ".json", JSON.stringify(doc, null, 1), "application/json");
+      status("Tracking events exported: " + doc.events.length + " EPCIS-shaped events (factory-tracking-events/v1).");
     });
     const unitSel = $("flowLedgerUnit");
     if (unitSel) unitSel.addEventListener("change", () => { ledgerTraceCache = ""; updateLedgerReadout(); });
@@ -10034,6 +10077,8 @@
       currentLayout: currentLayout,
       // the real UI handlers
       loadExample: loadExample,
+      // v3.53: the tracking database (the live tracker and the store)
+      tracking: { store: trackingStore, current: () => state.flow.track },
       runWmsOps: runWmsOps,
       // v2.6 FACTORY-B: drive the REAL Generate handler (optionally with an
       // explicit profile key) so the self-test can build a factory line.

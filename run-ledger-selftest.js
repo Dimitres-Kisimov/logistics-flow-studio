@@ -40,7 +40,7 @@
   }
   function clickAndWait(id, side) { var p = nextLoaded(side); $(id).click(); return p; }
   function wait(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
-  var SECTIONS = ["rlGlance", "rlRibbon", "rlFlow", "rlCycle", "rlTouches", "rlWait", "rlWip", "rlStaffing", "rlByOp", "rlCost", "rlDispatch", "rlPack", "rlOptimise", "rlYourCase", "rlTrace", "rlReplications", "rlInvariants", "rlAppendix"];
+  var SECTIONS = ["rlGlance", "rlRibbon", "rlFlow", "rlCycle", "rlTouches", "rlWait", "rlWip", "rlStaffing", "rlByOp", "rlCost", "rlDispatch", "rlPack", "rlOptimise", "rlYourCase", "rlTrace", "rlTracking", "rlReplications", "rlInvariants", "rlAppendix"];
   var BAD_TEXT = /\[FAIL\]|Could not|is not loaded|not a factory-run-ledger|\bNaN\b|\bundefined\b/;
 
   function runSuite() {
@@ -48,7 +48,7 @@
     check("errors-boundary-installed", function () { return Array.isArray(window.__WT_ERRORS__); });
     check("no-errors-during-boot", function () { var e = window.__WT_ERRORS__ || []; return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" }; });
     check("model-and-generated-sql-present", function () {
-      return { ok: !!R && typeof R.views === "function" && typeof R.model === "function" && typeof R.csv === "function" && typeof R.glance === "function" && R.SQL === window.RunLedgerSQL && Object.keys(R.SQL).length === 29,
+      return { ok: !!R && typeof R.views === "function" && typeof R.model === "function" && typeof R.csv === "function" && typeof R.glance === "function" && R.SQL === window.RunLedgerSQL && Object.keys(R.SQL).length === 33,
         detail: R ? Object.keys(R.SQL).length + " SQL texts" : "no RunLedger" };
     });
     check("nav-anchors-resolve", function () {
@@ -89,6 +89,21 @@
       check("print-and-csv-buttons", function () { var n = $("rlView").querySelectorAll("button.csv").length; return { ok: !!$("rlPrint") && n >= 10 && typeof window.print === "function", detail: n + " CSV buttons" }; });
       check("views-and-model-memoised", function () { return R.views(exp) === R.views(exp) && R.model(exp) === R.model(exp) && R.model(exp).views === R.views(exp); });
       check("derived-minutes-columns", function () { var n = $("rlWait").querySelectorAll("th.derived").length; return { ok: n === 2, detail: n + " derived columns in the wait table" }; });
+      // v3.53: the tracking section (dwell per business step), the twins beside the trace, the invariant and the export shape
+      check("tracking-section-bizstep-dwell-and-unit-history", function () {
+        var T = window.WT && window.WT.tracking, v = R.views(exp), sec = $("rlTracking");
+        if (!T) return { ok: false, detail: "no WT.tracking" };
+        var doc = T.fromLedger(exp), hu = exp.hus[0].id, hist = T.historyOf(doc.events, hu), own = exp.events.filter(function (e) { return e.hu_id === hu; }).length;
+        var rows = v.bizstepDwell || [], picking = rows.filter(function (r) { return r.biz_step === "picking"; })[0];
+        return { ok: !!sec && sec.querySelectorAll("table").length === 2 && !!sec.querySelector('details.sql[data-view="v_bizstep_dwell"]') && !!sec.querySelector('details.sql[data-view="v_epcis_events"]') &&
+          rows.length >= 10 && !!picking && picking.spans > 0 && hist.length === own && own > 0 && $("rlTrace").textContent.indexOf("biz_step") >= 0 && !!$("rlTrace").querySelector('details.sql[data-view="v_unit_history"]') && !BAD_TEXT.test(sec.textContent),
+          detail: rows.length + " steps, unit history " + hist.length + "/" + own };
+      });
+      check("tracking-invariant-and-export-shape", function () {
+        var T = window.WT.tracking, v = R.views(exp), doc = T.fromLedger(exp);
+        return { ok: v.invariants.v_tracking_gaps === 0 && doc.schema === "factory-tracking-events/v1" && doc.events.length === exp.events.length && doc.events.every(function (e) { return e.eventTime === null; }) &&
+          !!$("rlInvariants").querySelector('details.sql[data-view="v_tracking_gaps"]') && $("rlInvariants").textContent.indexOf("v_tracking_gaps") >= 0, detail: doc.events.length + " twins, gaps " + v.invariants.v_tracking_gaps };
+      });
       var out = $("rlYourCaseOut"), before = out.innerHTML, inp = $("rlYourCase").querySelector('[data-yc="l"]');
       inp.value = String(Number(inp.value) + 100);
       inp.dispatchEvent(new Event("input", { bubbles: true }));
@@ -107,11 +122,11 @@
       });
     }).then(function (d) {
       check("compare-renders-after-b", function () { var n = $("rlCompare").querySelectorAll("table").length; return { ok: !!window.RunLedger.currentB() && window.RunLedger.currentB().run.id === d.run && n === 6, detail: d.run + " · " + n + " tables" }; });
-      check("all-29-sql-blocks-after-compare", function () {
+      check("all-33-sql-blocks-after-compare", function () {
         var seen = {}, els = $("rlView").querySelectorAll("details.sql[data-view]");
         for (var i = 0; i < els.length; i++) seen[els[i].getAttribute("data-view")] = 1;
         var miss = Object.keys(window.RunLedgerSQL).filter(function (k) { return !seen[k]; });
-        return { ok: miss.length === 0, detail: miss.length ? "missing " + miss.join(",") : "29/29" };
+        return { ok: miss.length === 0, detail: miss.length ? "missing " + miss.join(",") : "33/33" };
       });
       check("no-errors-after-b", function () { var e = window.__WT_ERRORS__ || []; return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" }; });
       return clickAndWait("rlDemoC", "a");

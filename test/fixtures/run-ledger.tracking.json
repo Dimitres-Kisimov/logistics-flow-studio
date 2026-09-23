@@ -1,0 +1,6110 @@
+{
+ "schema": "factory-tracking-events/v1",
+ "honesty": "EPCIS-SHAPED, not EPCIS-conformant: synthetic events derived from a synthetic teaching simulation's run ledger - not telemetry, not a WMS. There is no wall clock (eventTime is null; the tick and minute ride in wt: fields); the EPC identifiers are built on GS1's documentation prefix and identify nothing real; the business steps and dispositions are GS1 CBV 2.0 identifiers used as a vocabulary. Every event is keyed to a handling unit, an element and a business step - never to a person: nothing here reads the illustrative worker roster, and nothing may (BetrVG § 87(1)6, GDPR Art. 88).",
+ "notes": {
+  "queued": "a unit waiting at a station; CBV has no business step for waiting, so the op's step is kept and wt:kind says queued",
+  "inspecting": "pass-through: the simulation grades nothing at a QC bench or a returns bench (v3.53); an error what-if (v3.54) records its detection here",
+  "repackaging": "the value-add bench (kitting, labelling) as repackaging - a stated choice; kitting could also be read as assembling",
+  "holding": "a return graded out at the returns bench, held for write-off; the write-off itself is the destroying event",
+  "aggregation": "depalletise breaks the inbound pallet into cases (DELETE); pack and palletise build a parcel or a dispatch pallet (ADD); the child quantities are the ledger's own conserved quantities"
+ },
+ "vocabulary": {
+  "source": "GS1 EPCIS 2.0 and Core Business Vocabulary (CBV) 2.0, ratified June 2022 - identifiers used as vocabulary, no conformance claimed",
+  "bizSteps": [
+   "receiving",
+   "inspecting",
+   "unpacking",
+   "storing",
+   "stocking",
+   "picking",
+   "staging_outbound",
+   "repackaging",
+   "packing",
+   "loading",
+   "shipping",
+   "holding",
+   "destroying"
+  ],
+  "dispositions": [
+   "in_progress",
+   "returned",
+   "in_transit",
+   "sellable_accessible",
+   "sellable_not_accessible",
+   "non_sellable_other",
+   "mismatch_class",
+   "damaged"
+  ]
+ },
+ "run": {
+  "id": "RUN-hand-built-s31-hc28a7688",
+  "scenario": "hand-built",
+  "seed": 31,
+  "hash": "c28a7688",
+  "ticks": 300,
+  "minutes_per_tick": 1
+ },
+ "events": [
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 9,
+   "wt:minute": 9,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 17,
+   "wt:minute": 17,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000002"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.045503.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 24,
+   "wt:minute": 24,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000003"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.019556.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000003"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 30,
+   "wt:minute": 30,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000002"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.045503.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 31,
+   "wt:minute": 31,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000001",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.101917.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000004-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 31,
+   "wt:minute": 31,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000004-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000004"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.073388.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000004"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 37,
+   "wt:minute": 37,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000003"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.019556.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000003"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000005-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 38,
+   "wt:minute": 38,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000005-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000005"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.040695.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000005"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-2",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 40,
+   "wt:minute": 40,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 2,
+   "parentID": "urn:epc:id:sscc:4012345.3000000002",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.145503.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000004-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 44,
+   "wt:minute": 44,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000004-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000004"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.073388.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000004"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000006-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 46,
+   "wt:minute": 46,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000006-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000006"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.049332.*",
+     "quantity": 8,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "returned",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000006"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 49,
+   "wt:minute": 49,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 50,
+   "wt:minute": 50,
+   "wt:kind": "served",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-4",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 50,
+   "wt:minute": 50,
+   "wt:kind": "queued",
+   "wt:op": "replen",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 4,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "stocking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000007-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 53,
+   "wt:minute": 53,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000007-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000007"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.091512.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000007"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 58,
+   "wt:minute": 58,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000002"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.045503.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 59,
+   "wt:minute": 59,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000003"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.019556.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000003"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000005-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 60,
+   "wt:minute": 60,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000005-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000005",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.140695.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000005"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000008-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 62,
+   "wt:minute": 62,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000008-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000008"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.035119.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000008"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000004-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 65,
+   "wt:minute": 65,
+   "wt:kind": "passed",
+   "wt:op": "stage-out",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000004-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000004"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.073388.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "staging_outbound",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000004"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000007-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 66,
+   "wt:minute": 66,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000007-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000007"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.091512.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000007"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000009-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 70,
+   "wt:minute": 70,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000009-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000009"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.012652.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000009"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000008-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 75,
+   "wt:minute": 75,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000008-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000008"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.035119.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000008"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000007-1-2",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 76,
+   "wt:minute": 76,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000007-1",
+   "wt:version": 2,
+   "parentID": "urn:epc:id:sscc:4012345.3000000007",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.191512.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000007"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 77,
+   "wt:minute": 77,
+   "wt:kind": "created",
+   "wt:op": "pick",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000010"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.081815.*",
+     "quantity": 9,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "picking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.58631.0",
+    "wt:element": "face"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000010"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000005-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 78,
+   "wt:minute": 78,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000005-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000005"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.040695.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000005"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000011-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 84,
+   "wt:minute": 84,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000011-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000011"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.050458.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000011"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000012-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 91,
+   "wt:minute": 91,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000012-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000012"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.007469.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000012"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000009-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 92,
+   "wt:minute": 92,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000009-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000009",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.112652.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000009"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000007-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 94,
+   "wt:minute": 94,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000007-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000007"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.091512.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000007"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000008-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 97,
+   "wt:minute": 97,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000008-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000008"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.035119.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000008"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000011-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 97,
+   "wt:minute": 97,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000011-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000011"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.050458.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000011"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000013-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 99,
+   "wt:minute": 99,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000013-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000013"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.040759.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000013"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-5",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 100,
+   "wt:minute": 100,
+   "wt:kind": "served",
+   "wt:op": "replen",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 5,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "stocking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000014-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 106,
+   "wt:minute": 106,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000014-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000014"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.064615.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000014"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000011-1-2",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 107,
+   "wt:minute": 107,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000011-1",
+   "wt:version": 2,
+   "parentID": "urn:epc:id:sscc:4012345.3000000011",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.150458.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000011"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000009-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 110,
+   "wt:minute": 110,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000009-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000009"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.012652.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000009"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000013-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 112,
+   "wt:minute": 112,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000013-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000013"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.040759.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000013"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000012-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 113,
+   "wt:minute": 113,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000012-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000012",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.107469.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000012"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000015-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 113,
+   "wt:minute": 113,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000015-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000015"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.011592.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000015"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000006-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 118,
+   "wt:minute": 118,
+   "wt:kind": "passed",
+   "wt:op": "inspect",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000006-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000006"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.049332.*",
+     "quantity": 8,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "returned",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31906.0",
+    "wt:element": "ret"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000006"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000014-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 119,
+   "wt:minute": 119,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000014-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000014"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.064615.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000014"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000016-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 121,
+   "wt:minute": 121,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000016-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000016"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.013201.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000016"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-6",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 123,
+   "wt:minute": 123,
+   "wt:kind": "queued",
+   "wt:op": "piece-pick",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 6,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "picking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.58631.0",
+    "wt:element": "face"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-7",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 124,
+   "wt:minute": 124,
+   "wt:kind": "served",
+   "wt:op": "piece-pick",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 7,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 4,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "picking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.58631.0",
+    "wt:element": "face"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000011-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 125,
+   "wt:minute": 125,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000011-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000011"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.050458.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000011"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 129,
+   "wt:minute": 129,
+   "wt:kind": "passed",
+   "wt:op": "vas",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000010"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.081815.*",
+     "quantity": 9,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "repackaging",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.40931.0",
+    "wt:element": "vas"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000010"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 129,
+   "wt:minute": 129,
+   "wt:kind": "created",
+   "wt:op": "pick",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000017"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.046491.*",
+     "quantity": 84,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "picking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.58631.0",
+    "wt:element": "face"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000017"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000004-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 130,
+   "wt:minute": 130,
+   "wt:kind": "passed",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000004-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000004"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.073388.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "loading",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000004"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000012-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 131,
+   "wt:minute": 131,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000012-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000012"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.007469.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000012"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000013-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 133,
+   "wt:minute": 133,
+   "wt:kind": "passed",
+   "wt:op": "stage-out",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000013-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000013"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.040759.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "staging_outbound",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000013"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000016-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 134,
+   "wt:minute": 134,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000016-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000016"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.013201.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000016"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000015-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 135,
+   "wt:minute": 135,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000015-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000015",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.111592.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000015"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000018-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 137,
+   "wt:minute": 137,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000018-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000018"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.036572.*",
+     "quantity": 5,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "returned",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000018"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000004-1-4",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 138,
+   "wt:minute": 138,
+   "wt:kind": "delivered",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000004-1",
+   "wt:version": 4,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000004"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.073388.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "shipping",
+   "disposition": "in_transit",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": null,
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000004"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000014-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 141,
+   "wt:minute": 141,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000014-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000014"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.064615.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000014"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000016-1-2",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 144,
+   "wt:minute": 144,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000016-1",
+   "wt:version": 2,
+   "parentID": "urn:epc:id:sscc:4012345.3000000016",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.113201.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000016"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000019-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 144,
+   "wt:minute": 144,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000019-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000019"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.007078.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000019"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 149,
+   "wt:minute": 149,
+   "wt:kind": "queued",
+   "wt:op": "pack",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000010"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.081815.*",
+     "quantity": 9,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "packing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.16377.0",
+    "wt:element": "pack"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000010"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-4",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 150,
+   "wt:minute": 150,
+   "wt:kind": "served",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 4,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000002"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.045503.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1-3",
+   "type": "AggregationEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 150,
+   "wt:minute": 150,
+   "wt:kind": "served",
+   "wt:op": "pack",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1",
+   "wt:version": 3,
+   "parentID": "urn:epc:id:sscc:4012345.0000000010",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.081815.*",
+     "quantity": 9,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "packing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.16377.0",
+    "wt:element": "pack"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000010"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000020-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 151,
+   "wt:minute": 151,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000020-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000020"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.084694.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000020"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-8",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 152,
+   "wt:minute": 152,
+   "wt:kind": "passed",
+   "wt:op": "consolidate",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 8,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 4,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "staging_outbound",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000015-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 153,
+   "wt:minute": 153,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000015-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000015"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.011592.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000015"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 154,
+   "wt:minute": 154,
+   "wt:kind": "passed",
+   "wt:op": "qc-final",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000017"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.046491.*",
+     "quantity": 84,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000017"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000021-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 159,
+   "wt:minute": 159,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000021-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000021"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.026875.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000021"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000016-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 162,
+   "wt:minute": 162,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000016-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000016"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.013201.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000016"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000020-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 164,
+   "wt:minute": 164,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000020-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000020"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.084694.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000020"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000019-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 166,
+   "wt:minute": 166,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000019-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000019",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.107078.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000019"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000022-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 166,
+   "wt:minute": 166,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000022-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000022"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.008751.*",
+     "quantity": 9,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "returned",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000022"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000006-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 172,
+   "wt:minute": 172,
+   "wt:kind": "passed",
+   "wt:op": "restock",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000006-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000006"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.049332.*",
+     "quantity": 0,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "stocking",
+   "disposition": "returned",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.38094.0",
+    "wt:element": "rack"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000006"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000021-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 172,
+   "wt:minute": 172,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000021-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000021"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.026875.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000021"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-5",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 173,
+   "wt:minute": 173,
+   "wt:kind": "queued",
+   "wt:op": "case-pick",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 5,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000002"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.045503.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "picking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.58631.0",
+    "wt:element": "face"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-6",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 174,
+   "wt:minute": 174,
+   "wt:kind": "served",
+   "wt:op": "case-pick",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 6,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000002"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.045503.*",
+     "quantity": 60,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "picking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.58631.0",
+    "wt:element": "face"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000023-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 174,
+   "wt:minute": 174,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000023-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000023"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.064617.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000023"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1-4",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 176,
+   "wt:minute": 176,
+   "wt:kind": "passed",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1",
+   "wt:version": 4,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000010"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.081815.*",
+     "quantity": 9,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "loading",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000010"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000006-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 180,
+   "wt:minute": 180,
+   "wt:kind": "restocked",
+   "wt:op": "restock",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000006-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000006"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.049332.*",
+     "quantity": 0,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "stocking",
+   "disposition": "sellable_accessible",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.38094.0",
+    "wt:element": "rack"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000006"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000021-1-2",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 182,
+   "wt:minute": 182,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000021-1",
+   "wt:version": 2,
+   "parentID": "urn:epc:id:sscc:4012345.3000000021",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.126875.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000021"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000024-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 182,
+   "wt:minute": 182,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000024-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000024"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.022964.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000024"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000019-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 184,
+   "wt:minute": 184,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000019-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000019"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.007078.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000019"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1-5",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 184,
+   "wt:minute": 184,
+   "wt:kind": "delivered",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000010-1",
+   "wt:version": 5,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000010"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.081815.*",
+     "quantity": 9,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "shipping",
+   "disposition": "in_transit",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": null,
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000010"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000020-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 186,
+   "wt:minute": 186,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000020-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000020"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.084694.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000020"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000025-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 190,
+   "wt:minute": 190,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000025-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000025"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.054918.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000025"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-9",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 195,
+   "wt:minute": 195,
+   "wt:kind": "queued",
+   "wt:op": "pack",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 9,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 4,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "packing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.16377.0",
+    "wt:element": "pack"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000024-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 195,
+   "wt:minute": 195,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000024-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000024"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.022964.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000024"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000023-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 196,
+   "wt:minute": 196,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000023-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000023",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.164617.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000023"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000026-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 197,
+   "wt:minute": 197,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000026-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000026"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.003019.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000026"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000013-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 198,
+   "wt:minute": 198,
+   "wt:kind": "passed",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000013-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000013"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.040759.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "loading",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000013"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-10",
+   "type": "AggregationEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 199,
+   "wt:minute": 199,
+   "wt:kind": "served",
+   "wt:op": "pack",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 10,
+   "parentID": "urn:epc:id:sscc:4012345.0000000001",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 4,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "packing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.16377.0",
+    "wt:element": "pack"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 200,
+   "wt:minute": 200,
+   "wt:kind": "served",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000003"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.019556.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000003"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000021-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 200,
+   "wt:minute": 200,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000021-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000021"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.026875.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000021"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-7",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 202,
+   "wt:minute": 202,
+   "wt:kind": "passed",
+   "wt:op": "consolidate",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 7,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000002"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.045503.*",
+     "quantity": 60,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "staging_outbound",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000025-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 203,
+   "wt:minute": 203,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000025-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000025"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.054918.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000025"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000027-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 204,
+   "wt:minute": 204,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000027-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000027"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.069131.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000027"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000013-1-4",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 206,
+   "wt:minute": 206,
+   "wt:kind": "delivered",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000013-1",
+   "wt:version": 4,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000013"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.040759.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "shipping",
+   "disposition": "in_transit",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": null,
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000013"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000018-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 209,
+   "wt:minute": 209,
+   "wt:kind": "passed",
+   "wt:op": "inspect",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000018-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000018"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.036572.*",
+     "quantity": 5,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "returned",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31906.0",
+    "wt:element": "ret"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000018"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000018-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 209,
+   "wt:minute": 209,
+   "wt:kind": "passed",
+   "wt:op": "scrap",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000018-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000018"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.036572.*",
+     "quantity": 0,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "holding",
+   "disposition": "non_sellable_other",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31906.0",
+    "wt:element": "ret"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000018"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000028-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 212,
+   "wt:minute": 212,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000028-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000028"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.095429.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000028"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1-2",
+   "type": "AggregationEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 214,
+   "wt:minute": 214,
+   "wt:kind": "passed",
+   "wt:op": "palletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1",
+   "wt:version": 2,
+   "parentID": "urn:epc:id:sscc:4012345.3000000017",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.146491.*",
+     "quantity": 7,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "packing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.42897.0",
+    "wt:element": "wrap"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000017"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 214,
+   "wt:minute": 214,
+   "wt:kind": "passed",
+   "wt:op": "wrap",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000017"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.046491.*",
+     "quantity": 84,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "packing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.42897.0",
+    "wt:element": "wrap"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000017"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000023-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 214,
+   "wt:minute": 214,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000023-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000023"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.064617.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000023"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000024-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 216,
+   "wt:minute": 216,
+   "wt:kind": "passed",
+   "wt:op": "stage-out",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000024-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000024"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.022964.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "staging_outbound",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000024"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000027-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 217,
+   "wt:minute": 217,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000027-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000027"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.069131.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000027"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000018-1-3",
+   "type": "ObjectEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 217,
+   "wt:minute": 217,
+   "wt:kind": "scrapped",
+   "wt:op": "scrap",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000018-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000018"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.036572.*",
+     "quantity": 0,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "destroying",
+   "disposition": "non_sellable_other",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31906.0",
+    "wt:element": "ret"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000018"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000026-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 219,
+   "wt:minute": 219,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000026-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000026",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.103019.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000026"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000029-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 219,
+   "wt:minute": 219,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000029-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000029"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.037013.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000029"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1-4",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 223,
+   "wt:minute": 223,
+   "wt:kind": "queued",
+   "wt:op": "pallet-pick",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1",
+   "wt:version": 4,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000003"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.019556.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "picking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.58631.0",
+    "wt:element": "face"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000003"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1-5",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 224,
+   "wt:minute": 224,
+   "wt:kind": "served",
+   "wt:op": "pallet-pick",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1",
+   "wt:version": 5,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000003"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.019556.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "picking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.58631.0",
+    "wt:element": "face"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000003"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-11",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 225,
+   "wt:minute": 225,
+   "wt:kind": "passed",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 11,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 4,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "loading",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000025-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 225,
+   "wt:minute": 225,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000025-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000025"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.054918.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000025"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000030-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 226,
+   "wt:minute": 226,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000030-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000030"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.052969.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000030"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000027-1-2",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 227,
+   "wt:minute": 227,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000027-1",
+   "wt:version": 2,
+   "parentID": "urn:epc:id:sscc:4012345.3000000027",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.169131.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000027"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000029-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 232,
+   "wt:minute": 232,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000029-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000029"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.037013.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000029"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1-4",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 233,
+   "wt:minute": 233,
+   "wt:kind": "passed",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1",
+   "wt:version": 4,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000017"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.046491.*",
+     "quantity": 84,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "loading",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000017"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000031-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 233,
+   "wt:minute": 233,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000031-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000031"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.074839.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000031"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1-12",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 233,
+   "wt:minute": 233,
+   "wt:kind": "delivered",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000001-1",
+   "wt:version": 12,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000001"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.001917.*",
+     "quantity": 4,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "shipping",
+   "disposition": "in_transit",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": null,
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000001"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000028-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 234,
+   "wt:minute": 234,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000028-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000028",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.195429.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000028"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000026-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 237,
+   "wt:minute": 237,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000026-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000026"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.003019.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000026"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000022-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 238,
+   "wt:minute": 238,
+   "wt:kind": "passed",
+   "wt:op": "inspect",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000022-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000022"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.008751.*",
+     "quantity": 9,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "returned",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31906.0",
+    "wt:element": "ret"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000022"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000030-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 239,
+   "wt:minute": 239,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000030-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000030"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.052969.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000030"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000032-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 241,
+   "wt:minute": 241,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000032-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000032"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.003787.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000032"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1-5",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 241,
+   "wt:minute": 241,
+   "wt:kind": "delivered",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000017-1",
+   "wt:version": 5,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000017"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.046491.*",
+     "quantity": 84,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "shipping",
+   "disposition": "in_transit",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": null,
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000017"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000027-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 245,
+   "wt:minute": 245,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000027-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000027"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.069131.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000027"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000031-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 246,
+   "wt:minute": 246,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000031-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000031"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.074839.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000031"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-8",
+   "type": "AggregationEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 249,
+   "wt:minute": 249,
+   "wt:kind": "passed",
+   "wt:op": "palletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 8,
+   "parentID": "urn:epc:id:sscc:4012345.3000000002",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.145503.*",
+     "quantity": 5,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "packing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.42897.0",
+    "wt:element": "wrap"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-9",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 249,
+   "wt:minute": 249,
+   "wt:kind": "passed",
+   "wt:op": "wrap",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 9,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000002"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.045503.*",
+     "quantity": 60,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "packing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.42897.0",
+    "wt:element": "wrap"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000030-1-2",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 249,
+   "wt:minute": 249,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000030-1",
+   "wt:version": 2,
+   "parentID": "urn:epc:id:sscc:4012345.3000000030",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.152969.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000030"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000033-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 249,
+   "wt:minute": 249,
+   "wt:kind": "created",
+   "wt:op": "pick",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000033-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000033"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.095978.*",
+     "quantity": 9,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "picking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.58631.0",
+    "wt:element": "face"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:picking"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000033"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000005-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 250,
+   "wt:minute": 250,
+   "wt:kind": "served",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000005-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000005"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.040695.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000005"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000005-1-4",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 250,
+   "wt:minute": 250,
+   "wt:kind": "queued",
+   "wt:op": "replen",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000005-1",
+   "wt:version": 4,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000005"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.040695.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "stocking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000005"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000028-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 252,
+   "wt:minute": 252,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000028-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000028"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.095429.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000028"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000029-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 253,
+   "wt:minute": 253,
+   "wt:kind": "passed",
+   "wt:op": "stage-out",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000029-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000029"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.037013.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "staging_outbound",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000029"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000034-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 256,
+   "wt:minute": 256,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000034-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000034"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.014103.*",
+     "quantity": 11,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "returned",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000034"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000032-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 263,
+   "wt:minute": 263,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000032-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000032",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.103787.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000032"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000035-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 264,
+   "wt:minute": 264,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000035-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000035"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.047393.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000035"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1-6",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 265,
+   "wt:minute": 265,
+   "wt:kind": "passed",
+   "wt:op": "wrap",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1",
+   "wt:version": 6,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000003"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.019556.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "packing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.42897.0",
+    "wt:element": "wrap"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:packing"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000003"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000030-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 267,
+   "wt:minute": 267,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000030-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000030"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.052969.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000030"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-10",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 268,
+   "wt:minute": 268,
+   "wt:kind": "passed",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 10,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000002"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.045503.*",
+     "quantity": 60,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "loading",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000031-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 268,
+   "wt:minute": 268,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000031-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000031"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.074839.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000031"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000036-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 271,
+   "wt:minute": 271,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000036-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000036"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.099272.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000036"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1-11",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 276,
+   "wt:minute": 276,
+   "wt:kind": "delivered",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000002-1",
+   "wt:version": 11,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000002"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.045503.*",
+     "quantity": 60,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "shipping",
+   "disposition": "in_transit",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": null,
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000002"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000035-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 277,
+   "wt:minute": 277,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000035-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000035"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.047393.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000035"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000037-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 279,
+   "wt:minute": 279,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000037-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000037"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.057092.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000037"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000024-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 281,
+   "wt:minute": 281,
+   "wt:kind": "passed",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000024-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000024"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.022964.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "loading",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000024"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000032-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 281,
+   "wt:minute": 281,
+   "wt:kind": "queued",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000032-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000032"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.003787.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000032"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1-7",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 284,
+   "wt:minute": 284,
+   "wt:kind": "passed",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1",
+   "wt:version": 7,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000003"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.019556.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "loading",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:shipping"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000003"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000038-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 286,
+   "wt:minute": 286,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000038-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000038"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.031391.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000038"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000035-1-2",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 287,
+   "wt:minute": 287,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000035-1",
+   "wt:version": 2,
+   "parentID": "urn:epc:id:sscc:4012345.3000000035",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.147393.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000035"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000024-1-4",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 289,
+   "wt:minute": 289,
+   "wt:kind": "delivered",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000024-1",
+   "wt:version": 4,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000024"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.022964.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "shipping",
+   "disposition": "in_transit",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": null,
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000024"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000022-1-2",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 292,
+   "wt:minute": 292,
+   "wt:kind": "passed",
+   "wt:op": "restock",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000022-1",
+   "wt:version": 2,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000022"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.008751.*",
+     "quantity": 0,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "stocking",
+   "disposition": "returned",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.38094.0",
+    "wt:element": "rack"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000022"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000037-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 292,
+   "wt:minute": 292,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000037-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000037"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.057092.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000037"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1-8",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 292,
+   "wt:minute": 292,
+   "wt:kind": "delivered",
+   "wt:op": "load",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000003-1",
+   "wt:version": 8,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000003"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.019556.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "shipping",
+   "disposition": "in_transit",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.50498.0",
+    "wt:element": "out"
+   },
+   "bizLocation": null,
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000003"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000036-1-1",
+   "type": "AggregationEvent",
+   "action": "DELETE",
+   "eventTime": null,
+   "wt:tick": 293,
+   "wt:minute": 293,
+   "wt:kind": "passed",
+   "wt:op": "depalletise",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000036-1",
+   "wt:version": 1,
+   "parentID": "urn:epc:id:sscc:4012345.3000000036",
+   "childQuantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.199272.*",
+     "quantity": 48,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "unpacking",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.98777.0",
+    "wt:element": "dep"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000036"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000039-1-0",
+   "type": "ObjectEvent",
+   "action": "ADD",
+   "eventTime": null,
+   "wt:tick": 294,
+   "wt:minute": 294,
+   "wt:kind": "created",
+   "wt:op": "receive",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000039-1",
+   "wt:version": 0,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000039"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.064681.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "receiving",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.31389.0",
+    "wt:element": "in"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000039"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000038-1-1",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 299,
+   "wt:minute": 299,
+   "wt:kind": "passed",
+   "wt:op": "qc-sample",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000038-1",
+   "wt:version": 1,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000038"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.031391.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "inspecting",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.11735.0",
+    "wt:element": "qc"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:receiving"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000038"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000007-1-4",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 300,
+   "wt:minute": 300,
+   "wt:kind": "served",
+   "wt:op": "putaway",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000007-1",
+   "wt:version": 4,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.3000000007"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.091512.*",
+     "quantity": 576,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "storing",
+   "disposition": "in_progress",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.25696.0",
+    "wt:element": "stg"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "po",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000007"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  },
+  {
+   "eventID": "urn:wt:evt:EVT-HU-ORD-RUN-hand-built-s31-hc28a7688-000022-1-3",
+   "type": "ObjectEvent",
+   "action": "OBSERVE",
+   "eventTime": null,
+   "wt:tick": 300,
+   "wt:minute": 300,
+   "wt:kind": "restocked",
+   "wt:op": "restock",
+   "wt:hu_id": "HU-ORD-RUN-hand-built-s31-hc28a7688-000022-1",
+   "wt:version": 3,
+   "epcList": [
+    "urn:epc:id:sscc:4012345.0000000022"
+   ],
+   "quantityList": [
+    {
+     "epcClass": "urn:epc:idpat:sgtin:4012345.008751.*",
+     "quantity": 0,
+     "uom": "EA"
+    }
+   ],
+   "bizStep": "stocking",
+   "disposition": "sellable_accessible",
+   "readPoint": {
+    "id": "urn:epc:id:sgln:4012345.38094.0",
+    "wt:element": "rack"
+   },
+   "bizLocation": {
+    "id": "urn:wt:zone:storage"
+   },
+   "bizTransactionList": [
+    {
+     "type": "rma",
+     "bizTransaction": "ORD-RUN-hand-built-s31-hc28a7688-000022"
+    }
+   ],
+   "wt:error": null,
+   "wt:delivery": null
+  }
+ ]
+}

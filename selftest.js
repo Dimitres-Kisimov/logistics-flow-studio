@@ -3776,6 +3776,39 @@
         return { ok:restored && rejected && preserved && cleared && $("optConstraints").value === '{incomplete', detail:"Draft roundtrip, atomic malformed-field rejection, legacy reset and incomplete-text preservation" };
       } finally { API.deserializeLayout(saved); }
     });
+    // ---- v3.53: the tracking database - every package is joined to its handling unit,
+    // the twins map the live ledger event for event, and the store round-trips a run.
+    // The backend: the memory store by default, IndexedDB when the page is opened with
+    // &idb=1 - which tools/selftest_realtime.py does in real-time headless Chrome. The
+    // gate's --virtual-time-budget driver cannot: under it Chromium leaves IndexedDB
+    // requests incomplete (an open and a write went through, a read never returned -
+    // found while shipping v3.53), so a suite that touched it would never report.
+    // The detail names the backend served. Async check.
+    var trackOk = false, trackDetail = "";
+    try {
+      if (haveApi && WT.tracking && API.tracking) {
+        API.flowReset();
+        for (var ti = 0; ti < 6; ti++) API.flowStep();
+        API.flowPause();
+        var track = API.tracking.current(), rec = API.state.flow.ledger;
+        var doc = WT.tracking.exportJson(track);
+        var snap = WT.sceneTracking.snapshot();
+        var joined = snap.packages.length > 0 && snap.packages.every(function (p) { return typeof p.hu === "string" && p.hu.indexOf("HU-") === 0 && !!rec.hus[p.hu] && p.sscc === rec.hus[p.hu].sscc; });
+        var wantIdb = /[?&]idb=1(?:&|$)/.test(window.location.search);
+        var store = await WT.tracking.openStore({ name: "wt-tracking-selftest", maxRuns: 2, openTimeoutMs: 5000, backend: wantIdb ? undefined : "memory" });
+        var put = await store.putRun(doc);
+        var hist = await store.history(doc.events[0]["wt:hu_id"]);
+        var runs = await store.runs();
+        await store.deleteRun(doc.run.id);
+        var after = await store.runs();
+        await store.close();
+        if (wantIdb) await WT.tracking.deleteStore("wt-tracking-selftest");
+        trackOk = doc.events.length === rec.events.length && doc.events.length > 0 && joined && store.backend === (wantIdb ? "indexeddb" : "memory") && put.events === doc.events.length &&
+          hist.length === 1 && hist[0].events.length > 0 && runs.length === 1 && after.length === 0 && WT.tracking.gaps(WT.ledger.exportJson(rec), doc) === 0;
+        trackDetail = doc.events.length + " twins, " + snap.packages.length + " packages joined=" + joined + ", store " + store.backend + (store.reason ? " (" + store.reason + ")" : "") + ", runs " + runs.length + " -> " + after.length;
+      } else trackDetail = "no test API / tracking";
+    } catch (e) { trackDetail = "threw: " + (e && e.message ? e.message : String(e)); }
+    check("tracking-maps-ledger-and-persists-across-runs", function () { return { ok: trackOk, detail: trackDetail }; });
     check("no-errors-after-drive", function () {
       var e = window.__WT_ERRORS__ || [];
       return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" };

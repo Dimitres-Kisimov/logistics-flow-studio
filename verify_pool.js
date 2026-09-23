@@ -184,7 +184,7 @@ load(["compliance.js", "simulation.js", "generate.js", "nlcommands.js", "example
   check("6a. the page offers example D and the handler fetches it", /id="rlDemoD"/.test(html) && /run-ledger-d\.json/.test(js) && /d: "rlDemoD"/.test(js));
   check("6b. the fixture script documents [a|b|c|d|all] and feeds the CSVs through the importer", /\[a\|b\|c\|d\|all\]/.test(mk) && /importOrdersCsv/.test(mk) && /docs\/examples/.test(mk) && /wmsdata\.js/.test(mk));
   check("6c. tools/run_ledger.py has v_dispatch_by_order in DETAIL_VIEWS and the reconcile keys, the dataset and line columns with guarded ALTERs and named inserts",
-    /CREATE VIEW IF NOT EXISTS v_dispatch_by_order AS/.test(py) && /"v_dispatch_by_order": \("order_id",\)/.test(py) && /DETAIL_VIEWS = \([^)]*"v_dispatch_by_order"\)/.test(py) &&
+    /CREATE VIEW IF NOT EXISTS v_dispatch_by_order AS/.test(py) && /"v_dispatch_by_order": \("order_id",\)/.test(py) && /DETAIL_VIEWS = \([^)]*"v_dispatch_by_order"/.test(py) &&
     /ALTER TABLE \{table\} ADD COLUMN \{column\} \{typ\}/.test(py) && /INSERT INTO hu\(id, run_id/.test(py) && /INSERT INTO run\(id, scenario/.test(py) && typeof RL.SQL.v_dispatch_by_order === "string");
   check("6d. CI imports D, reconciles it and checks the sample data", /run-ledger-d\.json/.test(ci) && /run-ledger run-ledger-b run-ledger-c run-ledger-d/.test(ci) && /make_sample_data\.py --check/.test(ci));
   check("6e. the app hands the loaded pool to the flow and the ledger", /opts\.pool = /.test(app) && /function activeOrderPool\(/.test(app) && /pool: opts\.pool \|\| null/.test(app));

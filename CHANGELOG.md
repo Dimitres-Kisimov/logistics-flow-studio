@@ -1,5 +1,63 @@
 # Changelog
 
+## v3.53 — The tracking database: EPCIS-shaped twins, derived not recorded, kept across runs
+
+**The module.** `tracking.js` maps every handling event of the run ledger to exactly one
+EPCIS-shaped event: GS1 EPCIS 2.0 event types (ObjectEvent, AggregationEvent) and actions,
+CBV 2.0 business steps and dispositions used as vocabulary - no conformance is claimed, because a
+simulation has no wall clock (`eventTime` is null; the tick and minute ride in `wt:` fields) and
+the EPC URIs are built on GS1's documentation prefix. The mapping is the one the deep dive's
+chapter 6 specified: `created` is an ADD at receiving (or picking for a unit that starts in
+stock), a return enters `returned` with an `rma` transaction, `queued` keeps the op's step with
+`wt:kind: queued`, depalletise is an AggregationEvent DELETE (unpacking: the pallet SSCC over its
+cases as GTIN-14), pack and palletise are AggregationEvent ADDs (the parcel or pallet SSCC over
+eaches as GTIN-13 or cases as GTIN-14), `load` is loading then shipping / in_transit, `restock` is
+stocking / sellable_accessible, `scrap` is holding then destroying / non_sellable_other as a
+DELETE. The twins are **derived, not recorded**: `fromLedger(export)` and the incremental
+`observe(track, rec)` produce the same document event for event, and neither touches the ledger
+or the simulation (a run with the tracker attached is byte-identical to one without). Three
+questions over the events: `historyOf` (where was unit X), `dwellByBizStep` (per step: events,
+units, spans, mean and maximum ticks to the unit's next event, waiting separated - equal to the
+ledger's own spans) and `dispositionCounts`.
+
+**The store.** `openStore({ name, maxRuns })` keeps runs across sessions in IndexedDB (over http)
+with the same promise-shaped API served by an in-memory store where none is available (Node,
+file://, a private window): put / get / delete a run, history by handling unit and by order
+reference across runs, eviction of the oldest run beyond the cap, export and an import that
+refuses an unknown business step. A stored-sequence counter replaces a clock. History is keyed by
+the handling-unit id or the order reference, not by the SSCC, which recurs per run.
+
+**SQL and viewer.** `tools/run_ledger.py` derives `tracking_event` at import with a Python twin
+of the mapping (the test pins it equal to the committed `test/fixtures/run-ledger.tracking.json`
+event by event) and four views: `v_epcis_events`, `v_unit_history`, `v_bizstep_dwell` (a planner
+view, reconciled against the JavaScript rows) and the invariant `v_tracking_gaps` (a handling
+event without a twin, or a twin outside the vocabulary - zero rows on every fixture, one row per
+deliberate corruption in the tests). The run-ledger viewer gains a *Tracking* section (dwell per
+business step, dispositions by step, the gap count), the twins beside a unit's trace, and the
+fifth invariant. The committed example report gained the new planner view.
+
+**The app.** The after-tick hook multiplexes the ledger observer and the tracker; *Save to
+tracking store* and *Export tracking events (JSON)* sit beside the run-ledger buttons; the scene
+inspector joins every package to its handling unit, SSCC and order (the assistant no longer says
+the identities are not connected).
+
+**Human, mechanically.** Every event is keyed to a handling unit, an element and a business step,
+never to a person; the harness proves `tracking.js` references no worker roster and no clock, and
+its HONESTY names BetrVG § 87(1)6 and GDPR Art. 88.
+
+**Verification.** `verify_tracking.js` (43 checks: the mapping, the vocabulary against the deep dive, the
+EPC URIs by hand, GLNs one-to-one with the elements, dwell == spans, the store, purity, export ==
+observer, wiring); seven Python tests (the twin equal to the fixture, gaps on every fixture and after
+a corruption, dwell and history by hand, SQL == JavaScript on the fixture); the app self-test round-trips a
+run through the store - on the memory backend under the gate, and on IndexedDB when the page is opened
+with `&idb=1`, which `python tools/selftest_realtime.py` does in real-time headless Chrome (run by
+hand: PASS 186/186, "store indexeddb"). The gate's `--virtual-time-budget` driver cannot reach
+IndexedDB: under it Chromium leaves requests incomplete (an open and a write went through, a read
+never returned) - a limit found while shipping this release and stated here rather than hidden; the
+store's open also times out into the memory fallback with the reason, so no caller can stall on it.
+The viewer self-test drives the section. 78 harnesses,
+135 Python tests, WT-SELFTEST 186/186 + viewer 33/33. Cache wt-v132. The four run exports are byte-identical.
+
 ## v3.52 — The deep dive: what a factory digital twin is still missing
 
 **The document.** `docs/DIGITAL_TWIN_DEEP_DIVE.md` (about 11 700 words, twelve chapters):

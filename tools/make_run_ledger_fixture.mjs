@@ -17,6 +17,9 @@
  *      reads the COMMITTED exports and writes <dir>/<base>.reconcile.json - the JavaScript rows
  *      of every planner, detail and cost view - for `python tools/run_ledger.py reconcile`, which
  *      measures how far SQLite's rows are from these (nothing is committed; CI generates them).
+ * Variant a also writes <base>.tracking.json - the EPCIS-shaped twins of its events (tracking.js,
+ * v3.53) - and <base>.tracking.views.json, the dwell-per-business-step and disposition rows the
+ * Python test equates with the SQL views derived at import.
  * Each variant also writes <base>.stats.json (WT.ledger.stats) and <base>.views.json (the
  * JavaScript cost tables and flow links the Python test equates with the SQL views).
  * a and b are built BEFORE wms.js is loaded: flowsim.throughputOf picks WT.wms up whenever it is
@@ -29,7 +32,7 @@ import { FLOOR, MIX_B, MODULES_HAND, MODULES_SCENARIO, loadWT, root, scenarioLay
 
 export { FLOOR, MIX_B };
 loadWT(MODULES_HAND);
-const { routing: R, flowsim: F, ledger: L, pack: P, analytics: A } = globalThis.WT;
+const { routing: R, flowsim: F, ledger: L, pack: P, analytics: A, tracking: T } = globalThis.WT;
 
 const VARIANTS = {
   a: { base: "run-ledger", mix: R.defaultMix(), seed: 31, ticks: 300, note: "the full default mix" },
@@ -80,6 +83,11 @@ function build(v) {
   fs.writeFileSync(path.join(OUT, v.base + ".json"), JSON.stringify(exp, null, 1) + "\n");
   fs.writeFileSync(path.join(OUT, v.base + ".stats.json"), JSON.stringify(L.stats(rec), null, 1) + "\n");
   fs.writeFileSync(path.join(OUT, v.base + ".views.json"), JSON.stringify({ costByType: cost.byType, costByLocation: cost.byLocation, costTotal: cost.total, flowLinks: L.flowLinks(exp) }, null, 1) + "\n");
+  if (v.base === "run-ledger") { // v3.53: the tracking twins of fixture A, derived from the export it just wrote
+    const doc = T.fromLedger(exp);
+    fs.writeFileSync(path.join(OUT, v.base + ".tracking.json"), JSON.stringify(doc, null, 1) + "\n");
+    fs.writeFileSync(path.join(OUT, v.base + ".tracking.views.json"), JSON.stringify({ bizstepDwell: T.dwellByBizStep(doc.events), dispositionCounts: T.dispositionCounts(doc.events) }, null, 1) + "\n");
+  }
   const stations = exp.locations.filter((l) => l.service_ticks != null);
   console.log(v.base + ":", rec.order.length, "units,", rec.events.length, "events, run", rec.run.id, "(" + v.note + ") - cost", cost.total.total_eur, "EUR, transport", exp.rates.transport.class + ", stations", stations.length, "at", stations.map((l) => +l.service_ticks.toFixed(4)).join("/"), "ticks per unit");
 }
@@ -96,6 +104,7 @@ export function reconcileRows(exp) {
       v_wip_by_tick: v.wip, v_quantities_by_op: v.byOp, v_dispatch: v.dispatch ? [v.dispatch] : [], v_flow_links: v.flowLinks || [],
       v_spans: c ? c.spans : L.spans(exp), v_span_cost: c ? c.spans : [], v_cost_by_hu: c ? c.byHu : [], v_cost_by_type: c ? c.byType : [], v_cost_by_location: c ? c.byLocation : [],
       v_dispatch_by_order: v.dispatchByOrder || [], v_staffing: v.staffing || [],
+      v_bizstep_dwell: v.bizstepDwell || [], // v3.53: the tracking twins' dwell per business step
     },
   };
 }

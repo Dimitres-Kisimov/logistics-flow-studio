@@ -164,7 +164,7 @@ const pol = run({ seed: 31, mix: MIX, policy: { kind: "queue-staffing" } }, 300,
   check("5b. app.js remembers the choice, hands opts.policy to the flow, nulls the signature on change and shows workers in the readout",
     /wt-flow-staffing/.test(app) && /opts\.policy = \{ kind: "queue-staffing" \}/.test(app) && /function wireStaffing/.test(app) && /workers <strong>/.test(app));
   check("5c. tools/run_ledger.py has staffing_event, v_staffing in PLANNER_VIEWS, run.policy with a guarded ALTER, the reconcile key",
-    /CREATE TABLE IF NOT EXISTS staffing_event/.test(py) && /CREATE VIEW IF NOT EXISTS v_staffing AS/.test(py) && /PLANNER_VIEWS = \([^)]*"v_staffing"\)/.test(py) && /\("run", "policy", "TEXT"\)/.test(py) && /"v_staffing": \("location_id",\)/.test(py) && typeof RL.SQL.v_staffing === "string");
+    /CREATE TABLE IF NOT EXISTS staffing_event/.test(py) && /CREATE VIEW IF NOT EXISTS v_staffing AS/.test(py) && /PLANNER_VIEWS = \([^)]*"v_staffing"/.test(py) && /\("run", "policy", "TEXT"\)/.test(py) && /"v_staffing": \("location_id",\)/.test(py) && typeof RL.SQL.v_staffing === "string");
   check("5d. the viewer has the section, the step chart, the glance card and the compare note", /id="rlStaffing"/.test(rl) && /function staffingHtml/.test(js) && /class="staff-line"/.test(js) && /label: "Staffing"/.test(js) && /adaptive staffing \(what-if\)/.test(js));
   check("5e. both self-tests cover it and the fixture script reconciles v_staffing", /staffing-what-if-picker-and-policy/.test(st) && /staffing-section-without-policy/.test(vst) && /"rlStaffing"/.test(vst) && /v_staffing: v\.staffing/.test(mk));
   check("5f. test/run-all.mjs lists this harness", /verify_staffing\.js/.test(runall));

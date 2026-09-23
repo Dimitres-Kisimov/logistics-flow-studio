@@ -183,7 +183,7 @@ const thumbGeometry = helperCtx.thumbGeometry;
   check("6c. the swatch CSS has no !important and the 56 x 36 thumbnail rule; the card and the view toggle are styled", block.indexOf("!important") < 0 && /\.pal-item \.pal-swatch\.pal-glyph \{ width: 56px; height: 36px/.test(css) && /\.tooltip\.tooltip--card/.test(css) && /\.pal-view/.test(css) && /\.tip-rows/.test(css));
   check("6d. the page has the view toggle and the hint names the ghost and the touch path", /id="palViewToggle"/.test(html) && /data-view="plan"/.test(html) && /data-view="iso"/.test(html) && /a ghost on the floor/.test(html) && /touch screen/.test(html));
   check("6e. the self-test carries the three new checks", /class-library-thumbnails-are-real-glyphs/.test(st) && /placement-ghost-follows-pointer-while-armed/.test(st) && /palette-drag-over-floor-previews-drop/.test(st));
-  check("6f. sw.js at wt-v131 (previously wt-v130); the runner lists this harness", /CACHE_VERSION\s*=\s*"wt-v131"/.test(sw) && /Previously wt-v130/.test(sw) && /verify_library_preview\.js/.test(runall));
+  check("6f. sw.js at wt-v132 (previously wt-v131); the runner lists this harness", /CACHE_VERSION\s*=\s*"wt-v132"/.test(sw) && /Previously wt-v131/.test(sw) && /verify_library_preview\.js/.test(runall));
   check("6g. library.js and goods.js export describe / formForType and reference no URL", typeof L.describe === "function" && typeof G.formForType === "function" && !/https?:\/\//.test(read("library.js")) && !/https?:\/\//.test(read("goods.js")));
 })();
 

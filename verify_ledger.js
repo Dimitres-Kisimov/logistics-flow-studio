@@ -25,7 +25,7 @@
  *   7. Simulated time: minute = tick x 60 / ticks-per-hour.
  *   8. Shipped wiring: the after-tick hook, station elementId and anchor ids
  *      in flowsim.js; the app creating the ledger and its export button; the
- *      flow card block; sw.js precaching ledger.js at wt-v131.
+ *      flow card block; sw.js precaching ledger.js at wt-v132.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -190,9 +190,9 @@ const huIds = Object.keys(rec.hus);
   check("8a. flowsim.js runs after-tick hooks, stamps elementId on stations and ids on anchors",
     /state\.hooks\.afterTick\(state\)/.test(flow) && /elementId: e && e\.id/.test(flow) && /ids: idsOf\(els, pred\)/.test(flow));
   check("8b. app.js creates the ledger on every run and wires the export button",
-    /WT\.ledger\.create\(/.test(app) && /flowLedgerExport/.test(app) && /afterTick: \(st\) => WT\.ledger\.observe/.test(app));
+    /WT\.ledger\.create\(/.test(app) && /flowLedgerExport/.test(app) && /afterTick: \(st\) => \{ WT\.ledger\.observe/.test(app)); // v3.53: the hook multiplexes the tracker after the ledger
   check("8c. index.html ships the run-ledger block and loads ledger.js", /id="flowLedger"/.test(html) && /<script src="ledger\.js"><\/script>/.test(html));
-  check("8d. sw.js precaches ledger.js at wt-v131 (trail preserved: previously wt-v130)", /"\.\/ledger\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v131"/.test(sw) && /Previously wt-v130/.test(sw));
+  check("8d. sw.js precaches ledger.js at wt-v132 (trail preserved: previously wt-v131)", /"\.\/ledger\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v132"/.test(sw) && /Previously wt-v131/.test(sw));
   check("8e. test/run-all.mjs lists verify_ledger.js", /verify_ledger\.js/.test(runall));
   check("8f. honesty label: synthetic, not telemetry, not a WMS", /not telemetry/.test(L.HONESTY) && /not a WMS/.test(L.HONESTY) && /SYNTHETIC|synthetic/.test(L.HONESTY));
   check("8g. no Date / Math.random CALL in ledger.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(read("ledger.js")));

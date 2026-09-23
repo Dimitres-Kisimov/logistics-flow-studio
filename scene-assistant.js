@@ -6,7 +6,7 @@
     const q = question.toLowerCase();
     if (/safety|safe|regulat|placement|danger|put/.test(q)) return "Placement proposals still need reviewed geometry, access envelopes, exits and applicable rules. The current layout checks are screening heuristics. I cannot approve a safe layout or invent regulatory clearances. Open Analyze for the existing findings.";
     if (/worker|people|person/.test(q)) return `${snap.workers.length} illustrative workers are represented. Select one below to inspect the same pose used by both views. Their movement is a drawing model, not tracked staff, a work schedule or a headcount recommendation.`;
-    if (/package|parcel|track|order|pick/.test(q)) return `${snap.packages.length} packages are currently in the simulation, with ${snap.completed} completions at tick ${snap.tick}. Select an ID to see its stage, position and heading. These IDs last for this run; SQL order identities are not connected yet.${snap.packagesVisible ? "" : " Package drawing is hidden: use Play or Step to show it."}`;
+    if (/package|parcel|track|order|pick/.test(q)) return `${snap.packages.length} packages are currently in the simulation, with ${snap.completed} completions at tick ${snap.tick}. Select an ID to see its stage, position and heading, and the handling unit it is in the run ledger (HU id, SSCC, order); the tracking store keeps a unit's EPCIS-shaped history across runs once you save the run - keyed to the unit, never to a person.${snap.packagesVisible ? "" : " Package drawing is hidden: use Play or Step to show it."}`;
     if (/speed|time|timer/.test(q)) return "In Simulate → Live material flow, choose 1×–100× and a duration in minutes, hours or days. 1× uses real elapsed time, but movement still updates in one-minute model buckets. Step advances up to eight minutes. Changing the duration resets the run.";
     if (/3d|2d|view/.test(q)) return "Use the 2.5D view button (P) to switch views. The selected entity uses the same world coordinates in both projections. Heights, worker poses and package dimensions remain illustrative; this is not surveyed BIM geometry.";
     return "I can explain packages, workers, timing, 2D/3D views and placement limitations using the current model. I am an offline rule-based guide; no language model is connected. Try ‘Track packages’ or ‘Explain workers’.";
@@ -44,8 +44,9 @@
     const chosen = all.find(p => p.id === picker.value);
     if (chosen) {
       const degrees = ((chosen.heading * 180 / Math.PI) % 360 + 360) % 360;
-      details.textContent = `${chosen.task} / ${chosen.status}. X ${chosen.x.toFixed(2)} m · Y ${chosen.y.toFixed(2)} m · heading ${degrees.toFixed(0)}°. ${chosen.basis}.`;
-    } else details.textContent = "Select an entity to mark it in 2D and 3D. Package IDs may leave the active list when completed; no persistent history is stored here.";
+      details.textContent = `${chosen.task} / ${chosen.status}. X ${chosen.x.toFixed(2)} m · Y ${chosen.y.toFixed(2)} m · heading ${degrees.toFixed(0)}°. ${chosen.basis}.` +
+        (chosen.hu ? ` Handling unit ${chosen.hu} · SSCC ${chosen.sscc} · order ${chosen.order_ref || chosen.order_id} (run ledger, v3.53; its tracking twins carry the EPCIS-shaped history).` : "");
+    } else details.textContent = "Select an entity to mark it in 2D and 3D. Package IDs leave the active list when completed; the run ledger and the tracking store keep the handling unit's history.";
   }
   toggle.addEventListener("click", () => {
     panel.hidden = !panel.hidden; toggle.setAttribute("aria-expanded", String(!panel.hidden)); refresh();

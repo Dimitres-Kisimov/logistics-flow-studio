@@ -722,6 +722,7 @@ const HARNESSES = [
   { name: "Replications over seeds: the runner, the viewer twin against independent arithmetic, the t table, honest wiring (verify_replicate.js)", args: ["verify_replicate.js"] },
   { name: "Timed route playback", args: ["verify_route_playback.js"] },
   { name: "Scheduled resource playback", args: ["verify_resource_playback.js"] },
+  { name: "The tracking database: one EPCIS-shaped twin per handling event, derived not recorded, dwell == spans, a store across runs, SQL == JS (verify_tracking.js)", args: ["verify_tracking.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

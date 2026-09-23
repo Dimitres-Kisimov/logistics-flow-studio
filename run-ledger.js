@@ -157,8 +157,11 @@
     // the SQL views (WT.ledger); computed once per export by model(), null without
     // rates or without ledger.js
     const cost = m.costs;
+    const invariants = { v_conservation_violations: conservation, v_cross_dock_violations: crossDock, v_version_gaps: versionGaps, v_terminal_violations: terminals };
+    if (m.tracking) invariants.v_tracking_gaps = m.trackGaps; // v3.53: a handling event without a twin, or a twin outside the vocabulary
     return { summary, cycle, touches, wait, wip, byOp, dispatch, dispatchByOrder, staffing,
-      invariants: { v_conservation_violations: conservation, v_cross_dock_violations: crossDock, v_version_gaps: versionGaps, v_terminal_violations: terminals },
+      bizstepDwell: m.dwell || null, dispositionCounts: m.dispositions || null, // v3.53: the same rows as v_bizstep_dwell (reconciled)
+      invariants: invariants,
       flowLinks: m.flowLinks,
       rates: exp.rates || null, spans: cost ? cost.spans : null, costByHu: cost ? cost.byHu : null,
       costByType: cost ? cost.byType : null, costByLocation: cost ? cost.byLocation : null, costTotal: cost ? cost.total : null };
@@ -173,6 +176,12 @@
     m = { exp: exp, sankeys: {} };
     m.costs = Lg && typeof Lg.costs === "function" ? Lg.costs(exp) : null;
     m.flowLinks = Lg && typeof Lg.flowLinks === "function" ? Lg.flowLinks(exp) : null;
+    // v3.53 the tracking twins, derived once per export (tracking.js); null on a page without tracking.js
+    const T = window.WT && window.WT.tracking;
+    m.tracking = T && typeof T.fromLedger === "function" ? T.fromLedger(exp) : null;
+    m.dwell = m.tracking ? T.dwellByBizStep(m.tracking.events) : null;
+    m.dispositions = m.tracking ? T.dispositionCounts(m.tracking.events) : null;
+    m.trackGaps = m.tracking ? T.gaps(exp, m.tracking) : null;
     m.views = computeViews(exp, m);
     m.ribbon = ribbon(exp);
     m.costByHu = {};
@@ -795,7 +804,7 @@
     const bad = Object.keys(inv).filter((k) => inv[k] > 0);
     $("rlInvariants").innerHTML = cards(Object.keys(inv).map((k) => ({ label: k, value: inv[k] + (inv[k] ? " violations" : " · holds"), cls: inv[k] ? "bad" : "good" }))) +
       (bad.length ? '<p class="note">This file breaks an invariant - it is not a faithful recording.</p>' : "<p class=\"note\">Every invariant holds on this file: eaches are conserved at every event, no cross-dock unit touched storage, versions are consecutive, terminals are well-formed.</p>") +
-      sqlBlock("v_conservation_violations") + sqlBlock("v_cross_dock_violations") + sqlBlock("v_version_gaps") + sqlBlock("v_terminal_violations");
+      sqlBlock("v_conservation_violations") + sqlBlock("v_cross_dock_violations") + sqlBlock("v_version_gaps") + sqlBlock("v_terminal_violations") + (inv.v_tracking_gaps != null ? sqlBlock("v_tracking_gaps") : "");
   }
 
   /* ---------------- compare two runs ---------------------------------- */
@@ -882,26 +891,56 @@
         { label: "Received", value: h.received_eaches + " eaches · " + h.cases_per_pallet + " cases × " + h.eaches_per_case + " on " + h.pallet },
       ];
       if (cost) items.push({ label: "Cost so far", value: money(cost.total_eur), sub: cost.charged_ticks + " charged ticks (" + (cost.hours == null ? "—" : cost.hours.toFixed(2)) + " h): labour " + money(cost.labour_eur) + " · equipment " + money(cost.equipment_eur) + " · energy " + money(cost.energy_eur) + (cost.holding_eur ? " · holding " + money(cost.holding_eur) : "") });
+      // v3.53: the unit's tracking twins (business step, disposition after) beside its events
+      const tw = model(exp).tracking, twinByV = {};
+      if (tw) for (const ev of tw.events) if (ev["wt:hu_id"] === h.id) twinByV[ev["wt:version"]] = ev;
+      const cols = ["version", "tick", "minute", "kind", "op", "location", "form", "pallets", "cases", "eaches", "parcels", "retained", "scrapped"].concat(tw ? ["biz_step", "disposition"] : []);
+      const rows = tw ? t.events.map((e) => Object.assign({}, e, { biz_step: twinByV[e.version] ? twinByV[e.version].bizStep : null, disposition: twinByV[e.version] ? twinByV[e.version].disposition : null })) : t.events;
       $("rlTrace").innerHTML = cards(items) + g +
-        table(t.events, ["version", "tick", "minute", "kind", "op", "location", "form", "pallets", "cases", "eaches", "parcels", "retained", "scrapped"], "Recorded events") + sqlBlock("v_cost_by_hu");
+        table(rows, cols, "Recorded events" + (tw ? " with their tracking twins" : "")) + sqlBlock("v_cost_by_hu") + (tw ? sqlBlock("v_unit_history") : "");
     };
     sel.onchange = draw;
     draw();
+  }
+
+  /* ---------------- tracking (v3.53) ---------------------------------- */
+  // The run in the EPCIS vocabulary: dwell per business step (the same rows as
+  // v_bizstep_dwell), dispositions by step, the gap count. Derived by tracking.js
+  // from the loaded export; nothing is recorded twice.
+  function renderTracking(exp) {
+    const m = model(exp), out = $("rlTracking");
+    if (!out) return;
+    if (!m.tracking) { out.innerHTML = "<p class=\"note\">tracking.js is not loaded on this page, so the tracking twins cannot be derived.</p>"; return; }
+    const doc = m.tracking;
+    const steps = {}, disps = {};
+    let agg = 0;
+    for (const ev of doc.events) { steps[ev.bizStep] = 1; disps[ev.disposition] = 1; if (ev.type === "AggregationEvent") agg++; }
+    out.innerHTML = cards([
+      { label: "Tracking events", value: String(doc.events.length), sub: "one twin per handling event · " + agg + " aggregation events (depalletise, pack, palletise)" },
+      { label: "Business steps used", value: String(Object.keys(steps).length), sub: "of the " + doc.vocabulary.bizSteps.length + " CBV 2.0 steps this app may emit" },
+      { label: "Dispositions used", value: String(Object.keys(disps).length), sub: "of " + doc.vocabulary.dispositions.length + "; in_progress until a terminal step, returned for a return" },
+      { label: "v_tracking_gaps", value: m.trackGaps + (m.trackGaps ? " gaps" : " · holds"), cls: m.trackGaps ? "bad" : "good", sub: "handling events without a twin, twins outside the vocabulary" },
+    ]) +
+      "<h3>Dwell per business step</h3>" + table(m.dwell, ["biz_step", "events", "units", "spans", "avg_ticks_to_next", "max_ticks_to_next", "waiting_ticks", "total_ticks", "waiting_share"],
+        "Dwell per business step: ticks from an event to the unit's next event; waiting = queued twins", { minutes: ["avg_ticks_to_next", "max_ticks_to_next"], mpt: exp.run.minutes_per_tick }) + sqlBlock("v_bizstep_dwell") +
+      "<h3>Dispositions by step</h3>" + table(m.dispositions, ["biz_step", "disposition", "events", "units"], "Dispositions by business step") + sqlBlock("v_epcis_events") +
+      '<p class="note">' + esc(doc.honesty) + "</p>";
   }
 
   /* ---------------- appendix ------------------------------------------ */
   function renderAppendix(exp) {
     const id = exp.run.id, b = EXP_B ? EXP_B.run.id : "<RUN-B>";
     const guide = [
-      ["The run at a glance", "identity, totals, cost and the four invariants, with the data-quality flags a reader must know first (no rates; stations at the floor rate; units still in flight)", "v_run_summary · verify_run_ledger_view.js"],
+      ["The run at a glance", "identity, totals, cost and the five invariants, with the data-quality flags a reader must know first (no rates; stations at the floor rate; units still in flight)", "v_run_summary · verify_run_ledger_view.js"],
       ["Start to finish", "the ribbon per order type (units and eaches at every operation) and the flow as recorded, a layered Sankey where every interior operation conserves over the retired units", "v_flow_links · verify_ledger_flow.js"],
       ["What the planner asks", "cycle time, touches, waiting at each bench, work in progress, quantities at each operation", "v_cycle_time_by_type … v_quantities_by_op · verify_run_ledger_view.js"],
       ["What a handling unit costs", "every span between a unit's events charged at the recorded rates; queue time costs nothing", "v_spans · v_span_cost · v_cost_by_type · v_cost_by_location · verify_cost_ledger.js"],
       ["Dispatch manifest", "delivered units, pallets, parcels and trailers, slot by slot", "v_dispatch"],
       ["Packaging", "the hierarchy and the drawn pallet pattern, the ranked alternatives with the what-if on this run's volumes, the stack-strength verdict, and a case of your own", "pack.js · verify_pack.js · verify_stacking.js"],
-      ["Trace one unit", "one handling unit's events with its timeline and cost", "v_cost_by_hu"],
+      ["Trace one unit", "one handling unit's events with its timeline and cost, and its tracking twins (business step, disposition)", "v_cost_by_hu · v_unit_history"],
+      ["Tracking", "the run in the EPCIS vocabulary: dwell per business step with the waiting separated, dispositions by step, the gap count - derived from this file, never recorded twice", "v_bizstep_dwell · v_epcis_events · v_tracking_gaps · verify_tracking.js"],
       ["Compare two runs", "every table paired key by key against a second run, deltas B − A", "v_compare_* · verify_run_compare.js"],
-      ["The invariants", "the four views that must return zero rows; a deliberate corruption in the tests makes each fire", "v_conservation_violations … v_terminal_violations · test_run_ledger.py"],
+      ["The invariants", "the five views that must return zero rows; a deliberate corruption in the tests makes each fire", "v_conservation_violations … v_terminal_violations · test_run_ledger.py"],
     ];
     const cmds = [
       "python tools/run_ledger.py import <this file> --database run.sqlite",
@@ -909,7 +948,7 @@
       "python tools/run_ledger.py summary --database run.sqlite --run " + id + " --out summary.json",
       "python tools/run_ledger.py compare --database run.sqlite --runs " + id + " " + b,
       "python tools/export_viewer_sql.py --check          # the SQL on this page is the SQL in the tool",
-      "node verify_run_ledger_view.js && node verify_cost_ledger.js && node verify_ledger_flow.js && node verify_run_compare.js && node verify_stacking.js",
+      "node verify_run_ledger_view.js && node verify_cost_ledger.js && node verify_ledger_flow.js && node verify_run_compare.js && node verify_stacking.js && node verify_tracking.js",
       "python -m unittest discover -s test -p 'test_run_ledger.py'",
     ];
     $("rlAppendix").innerHTML = '<div class="table-wrap"><table><caption>How to read this page</caption><thead><tr><th scope="col">section</th><th scope="col">what it shows</th><th scope="col">proved by</th></tr></thead><tbody>' +
@@ -960,7 +999,7 @@
     $("rlStatus").textContent = "Loaded " + exp.hus.length + " units and " + exp.events.length + " events from " + exp.run.id + ".";
     $("rlView").hidden = false;
     renderGlance(exp); renderRibbon(exp); renderFlow(exp); renderPlanner(exp); renderCost(exp); renderDispatch(exp);
-    renderPackaging(exp); renderOptimise(exp); renderYourCase(exp); renderTrace(exp); renderCompare(); renderReplications(); renderInvariants(exp); renderAppendix(exp);
+    renderPackaging(exp); renderOptimise(exp); renderYourCase(exp); renderTrace(exp); renderTracking(exp); renderCompare(); renderReplications(); renderInvariants(exp); renderAppendix(exp);
     $("rlNav").hidden = false;
     setCurrentNav("secGlance");
     try { $("rlGlance").focus({ preventScroll: true }); } catch (_) { /* older focus() */ }

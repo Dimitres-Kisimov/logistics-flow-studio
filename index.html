@@ -929,12 +929,13 @@
         </div>
         <!-- v3.32: THE RUN LEDGER - every unit's identity, operations and quantities, recorded live. -->
         <div class="flow-ledger" id="flowLedger" aria-label="Run ledger">
-          <div class="flow-pool-head"><span class="flow-pool-title">Run ledger</span><button id="flowLedgerExport" class="btn small" type="button">Export run ledger (JSON)</button><button id="flowLedgerOpen" class="btn small" type="button" title="Opens run-ledger.html with this run: the packaging hierarchy, the start-to-finish ribbon per order type, cycle times, waits, WIP, quantities per operation, the dispatch manifest and a unit trace">Open in the run-ledger viewer</button></div>
+          <div class="flow-pool-head"><span class="flow-pool-title">Run ledger</span><button id="flowLedgerExport" class="btn small" type="button">Export run ledger (JSON)</button><button id="flowLedgerOpen" class="btn small" type="button" title="Opens run-ledger.html with this run: the packaging hierarchy, the start-to-finish ribbon per order type, cycle times, waits, WIP, quantities per operation, the dispatch manifest and a unit trace">Open in the run-ledger viewer</button><button id="flowTrackingSave" class="btn small" type="button" title="Keeps this run's EPCIS-shaped tracking events in this browser (IndexedDB, the last 20 runs), so a handling unit's history can be read across runs">Save to tracking store</button><button id="flowTrackingExport" class="btn small" type="button" title="Downloads the run's tracking events (factory-tracking-events/v1): one EPCIS-shaped twin per handling event, GS1 CBV 2.0 steps and dispositions as vocabulary, no wall clock">Export tracking events (JSON)</button></div>
           <div id="flowLedgerStats"><p class="empty">Press Play to start recording: one record per handling unit, one event per operation, with SSCC / GTIN identities and pallet / case / each quantities.</p></div>
+          <div id="flowTrackingStats" aria-live="off"></div>
           <label for="flowLedgerUnit">Trace a unit</label>
           <select id="flowLedgerUnit" aria-label="Handling unit to trace"></select>
           <div id="flowLedgerTrace" class="flow-ledger-trace" aria-live="off"></div>
-          <p class="flow-pool-cap"><strong>SYNTHETIC ledger</strong> — recorded from the teaching simulation, not telemetry and not a WMS. Quantities are the synthetic order-line quantities of the scenario's packaging profile; GS1 numbers use GS1's documentation prefix. The same file feeds <code>tools/run_ledger.py</code> (SQLite views) and the run-ledger viewer.</p>
+          <p class="flow-pool-cap"><strong>SYNTHETIC ledger</strong> — recorded from the teaching simulation, not telemetry and not a WMS. Quantities are the synthetic order-line quantities of the scenario's packaging profile; GS1 numbers use GS1's documentation prefix. The same file feeds <code>tools/run_ledger.py</code> (SQLite views) and the run-ledger viewer. Its <strong>tracking twins</strong> (v3.53) are derived from the same events in the GS1 EPCIS 2.0 / CBV 2.0 vocabulary — EPCIS-shaped, not conformant (no wall clock) — and keyed to a handling unit, an element and a business step, never to a person; <em>Save to tracking store</em> keeps the last 20 runs in this browser.</p>
         </div>
         <!-- P3.1: Live KPI dashboard — a compact "plant-sim cockpit" strip
              (kpicharts.js) that updates in real time from the SAME rAF loop
@@ -1328,6 +1329,7 @@
 <script src="ids.js"></script>
 <script src="pack.js"></script>
 <script src="ledger.js"></script>
+<script src="tracking.js"></script>
   <script src="knowledge.js"></script>
   <script src="library.js"></script>
   <script src="tiers.js"></script>

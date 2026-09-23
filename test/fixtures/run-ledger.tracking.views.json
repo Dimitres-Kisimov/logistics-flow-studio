@@ -1,0 +1,251 @@
+{
+ "bizstepDwell": [
+  {
+   "biz_step": "destroying",
+   "events": 1,
+   "units": 1,
+   "spans": 0,
+   "avg_ticks_to_next": null,
+   "max_ticks_to_next": null,
+   "waiting_ticks": 0,
+   "total_ticks": 0,
+   "waiting_share": null
+  },
+  {
+   "biz_step": "holding",
+   "events": 1,
+   "units": 1,
+   "spans": 1,
+   "avg_ticks_to_next": 8,
+   "max_ticks_to_next": 8,
+   "waiting_ticks": 0,
+   "total_ticks": 8,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "inspecting",
+   "events": 24,
+   "units": 24,
+   "spans": 22,
+   "avg_ticks_to_next": 21.09,
+   "max_ticks_to_next": 60,
+   "waiting_ticks": 0,
+   "total_ticks": 464,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "loading",
+   "events": 8,
+   "units": 8,
+   "spans": 8,
+   "avg_ticks_to_next": 8,
+   "max_ticks_to_next": 8,
+   "waiting_ticks": 0,
+   "total_ticks": 64,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "packing",
+   "events": 9,
+   "units": 5,
+   "spans": 9,
+   "avg_ticks_to_next": 12.67,
+   "max_ticks_to_next": 26,
+   "waiting_ticks": 5,
+   "total_ticks": 114,
+   "waiting_share": 0.0439
+  },
+  {
+   "biz_step": "picking",
+   "events": 9,
+   "units": 6,
+   "spans": 8,
+   "avg_ticks_to_next": 22.13,
+   "max_ticks_to_next": 52,
+   "waiting_ticks": 3,
+   "total_ticks": 177,
+   "waiting_share": 0.0169
+  },
+  {
+   "biz_step": "receiving",
+   "events": 36,
+   "units": 36,
+   "spans": 34,
+   "avg_ticks_to_next": 21.12,
+   "max_ticks_to_next": 72,
+   "waiting_ticks": 0,
+   "total_ticks": 718,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "repackaging",
+   "events": 1,
+   "units": 1,
+   "spans": 1,
+   "avg_ticks_to_next": 20,
+   "max_ticks_to_next": 20,
+   "waiting_ticks": 0,
+   "total_ticks": 20,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "shipping",
+   "events": 8,
+   "units": 8,
+   "spans": 0,
+   "avg_ticks_to_next": null,
+   "max_ticks_to_next": null,
+   "waiting_ticks": 0,
+   "total_ticks": 0,
+   "waiting_share": null
+  },
+  {
+   "biz_step": "staging_outbound",
+   "events": 6,
+   "units": 6,
+   "spans": 5,
+   "avg_ticks_to_next": 57,
+   "max_ticks_to_next": 65,
+   "waiting_ticks": 0,
+   "total_ticks": 285,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "stocking",
+   "events": 7,
+   "units": 4,
+   "spans": 4,
+   "avg_ticks_to_next": 22.25,
+   "max_ticks_to_next": 50,
+   "waiting_ticks": 50,
+   "total_ticks": 89,
+   "waiting_share": 0.5618
+  },
+  {
+   "biz_step": "storing",
+   "events": 28,
+   "units": 23,
+   "spans": 9,
+   "avg_ticks_to_next": 73.11,
+   "max_ticks_to_next": 206,
+   "waiting_ticks": 612,
+   "total_ticks": 658,
+   "waiting_share": 0.9301
+  },
+  {
+   "biz_step": "unpacking",
+   "events": 19,
+   "units": 19,
+   "spans": 17,
+   "avg_ticks_to_next": 18,
+   "max_ticks_to_next": 18,
+   "waiting_ticks": 0,
+   "total_ticks": 306,
+   "waiting_share": 0
+  }
+ ],
+ "dispositionCounts": [
+  {
+   "biz_step": "destroying",
+   "disposition": "non_sellable_other",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "holding",
+   "disposition": "non_sellable_other",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "inspecting",
+   "disposition": "in_progress",
+   "events": 21,
+   "units": 21
+  },
+  {
+   "biz_step": "inspecting",
+   "disposition": "returned",
+   "events": 3,
+   "units": 3
+  },
+  {
+   "biz_step": "loading",
+   "disposition": "in_progress",
+   "events": 8,
+   "units": 8
+  },
+  {
+   "biz_step": "packing",
+   "disposition": "in_progress",
+   "events": 9,
+   "units": 5
+  },
+  {
+   "biz_step": "picking",
+   "disposition": "in_progress",
+   "events": 9,
+   "units": 6
+  },
+  {
+   "biz_step": "receiving",
+   "disposition": "in_progress",
+   "events": 32,
+   "units": 32
+  },
+  {
+   "biz_step": "receiving",
+   "disposition": "returned",
+   "events": 4,
+   "units": 4
+  },
+  {
+   "biz_step": "repackaging",
+   "disposition": "in_progress",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "shipping",
+   "disposition": "in_transit",
+   "events": 8,
+   "units": 8
+  },
+  {
+   "biz_step": "staging_outbound",
+   "disposition": "in_progress",
+   "events": 6,
+   "units": 6
+  },
+  {
+   "biz_step": "stocking",
+   "disposition": "in_progress",
+   "events": 3,
+   "units": 2
+  },
+  {
+   "biz_step": "stocking",
+   "disposition": "returned",
+   "events": 2,
+   "units": 2
+  },
+  {
+   "biz_step": "stocking",
+   "disposition": "sellable_accessible",
+   "events": 2,
+   "units": 2
+  },
+  {
+   "biz_step": "storing",
+   "disposition": "in_progress",
+   "events": 28,
+   "units": 23
+  },
+  {
+   "biz_step": "unpacking",
+   "disposition": "in_progress",
+   "events": 19,
+   "units": 19
+  }
+ ]
+}
