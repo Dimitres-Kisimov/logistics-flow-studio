@@ -3852,6 +3852,32 @@
         /v_run_summary/.test(outText) && /handling units/.test(outText) && $("flowAskChips").querySelectorAll("button[data-ask]").length === 11;
       return { ok: okA, detail: "wait -> " + (a1.numbers ? a1.numbers.location + "/" + a1.numbers.op : "no wait yet") + "; units " + (s.read[0].rows[0] ? s.read[0].rows[0].units : "-") + "; unknown unanswered " + u.unanswered };
     });
+    // ---- v3.62 the tower's fifth rule on a hand lever-search table: a run at no searched combination (no windows, no
+    // errors, no policy) gets the best's levers as one combination lever at the first evaluation; declining keeps the run.
+    check("lever-search-rule-proposes-from-a-table", function () {
+      var C3 = WT.control, F3 = WT.flowsim, L3 = WT.ledger, R3 = WT.routing, P3 = WT.pack;
+      if (!C3 || !F3 || !L3 || !R3 || !$("controlSearchImport") || !$("controlSearchImportInput") || !$("controlSearchInfo")) return { ok: false, detail: "missing" };
+      var FLOOR3 = { gridW: 40, gridH: 24, cell: 1, elements: [
+        { id: "in", type: "dock-in", x: 2, y: 0, w: 2, d: 1 }, { id: "stg", type: "staging", x: 14, y: 2, w: 4, d: 2 }, { id: "qc", type: "qc-bench", x: 6, y: 2, w: 3, d: 2 },
+        { id: "dep", type: "depalletiser", x: 10, y: 2, w: 3, d: 3 }, { id: "ret", type: "returns-station", x: 30, y: 2, w: 3, d: 2 }, { id: "rack", type: "selective-racking", x: 4, y: 8, w: 20, d: 1 },
+        { id: "face", type: "carton-flow", x: 4, y: 12, w: 12, d: 1 }, { id: "belt", type: "conveyor", x: 4, y: 15, w: 14, d: 1 }, { id: "pack", type: "pack-station", x: 20, y: 18, w: 3, d: 2 },
+        { id: "wrap", type: "stretch-wrap", x: 24, y: 18, w: 2, d: 2 }, { id: "vas", type: "vas-station", x: 28, y: 18, w: 3, d: 2 }, { id: "out", type: "dock-out", x: 30, y: 23, w: 2, d: 1 }] };
+      var mk = function (st, ip, op, mean, half, cost) { return { id: "staffing=" + st + "|inbound=" + ip + "|outbound=" + op + "|errors=declared", levers: { staffing: st, inbound_period: ip, outbound_period: op, errors: "declared" },
+        kb: [{ kind: "picker", key: "staffing", value: st }, { kind: "kb", key: "delivery.inbound.periodTicks", value: ip }, { kind: "kb", key: "delivery.outbound.periodTicks", value: op }], n: 5,
+        otif: { n: 5, mean: mean, stdev: 0.05, ci95_half: half }, cost_eur: { n: 5, mean: cost, stdev: 3, ci95_half: 3.7 }, delivered_orders: { n: 5, mean: 20, stdev: 0, ci95_half: 0 } }; };
+      var A3 = mk("adaptive", 120, 120, 0.9, 0.05, 600), B3 = mk("declared", 120, 240, 0.6, 0.1, 520);
+      var table = { kind: "wt-lever-search", scenario: "hand-built", ticks: 600, seeds: [1, 2, 3, 4, 5], combos: [A3, B3], ranked: [A3.id, B3.id], best: A3.id };
+      var mix = R3.defaultMix(), plan = F3.spawnPlan(FLOOR3, { seed: 31, mix: mix }), st = F3.state(plan), planBefore = JSON.stringify(plan);
+      var rec = L3.create(plan, { scenarioId: "hand-built", seed: 31, mix: mix, layout: FLOOR3, profile: P3.PROFILES.ecommerce });
+      var ctl = C3.create({}, { search: table });
+      st.hooks = { afterTick: function (s) { L3.observe(rec, s); C3.observe(ctl, rec, s); } };
+      F3.step(st, 30);
+      var p = ctl.proposals.filter(function (x) { return x.rule === "lever-search"; })[0];
+      var row = p ? C3.decide(ctl, p.id, "declined", 30) : null;
+      var ok = !!p && p.tick === 10 && p.lever.kind === "combo" && p.lever.levers.length === 5 && p.lever.levers[0].key === "staffing" && p.lever.levers[1].key === "delivery" && p.lever.levers[4].key === "errors" && p.evidence.current_searched === false &&
+        p.evidence.table.length === 2 && !!row && row.status === "declined" && JSON.stringify(plan) === planBefore && C3.RULES.length === 5 && WT.kb && WT.kb.get("control.search.minGainHalfWidths") === 1 && ctl.search === table;
+      return { ok: ok, detail: p ? p.rule + "@" + p.tick + " with " + p.lever.levers.length + " levers" : "no proposal" };
+    });
     // ---- v3.56: the control tower - on the hand floor (seed 31, the default mix; here the stations serve at the
     // floor's DECLARED capacities because wms.js is loaded, so the tick-140 fact of verify_control.js does not
     // apply) a threshold-1 tower proposes at the first evaluation that sees a queue, naming the element; declining

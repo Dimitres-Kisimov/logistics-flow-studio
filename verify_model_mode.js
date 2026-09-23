@@ -71,8 +71,8 @@ const py = (args) => spawnSync(PY, [path.join(__dirname, "tools", "ask_model.py"
 /* ---- 3. the app unchanged with the mode off ---------------------------------- */
 (function () {
   const html = read("index.html"), app = read("app.js"), ask = read("ask.js"), sw = read("sw.js"), guardSrc = read(path.join("tools", "offline-guard.mjs"));
-  check("3a. the page is still offline: connect-src 'self' in the CSP, no fetch to a host in app.js or ask.js, the offline guard still forbids external fetches, the cache pin did not move (nothing shipped changed: wt-v139)",
-    /connect-src 'self'/.test(html) && !/fetch\(\s*["'`]https?:\/\//.test(app) && !/fetch\(|XMLHttpRequest|WebSocket/.test(ask) && /fetch to external host/.test(guardSrc) && /CACHE_VERSION\s*=\s*"wt-v139"/.test(sw));
+  check("3a. the page is still offline: connect-src 'self' in the CSP, no fetch to a host in app.js or ask.js, the offline guard still forbids external fetches, the service worker still pins a wt-vNNN cache (v3.61 itself shipped no app file)",
+    /connect-src 'self'/.test(html) && !/fetch\(\s*["'`]https?:\/\//.test(app) && !/fetch\(|XMLHttpRequest|WebSocket/.test(ask) && /fetch to external host/.test(guardSrc) && /CACHE_VERSION\s*=\s*"wt-v\d+"/.test(sw));
   const w = ASK.answer("which step waits longest", { exp: expA, kb: KB }), c = ASK.answer("what does the run cost", { exp: expA, kb: KB });
   check("3b. the deterministic answers are the v3.60 ones with the mode off (stg / putaway 122.4 over 23; 349.74 EUR)", w.numbers.location === "stg" && w.numbers.avg_wait_ticks === 122.4 && w.numbers.waits === 23 && /The run cost 349\.74 EUR/.test(c.text));
 })();

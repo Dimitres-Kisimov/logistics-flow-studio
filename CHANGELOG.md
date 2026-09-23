@@ -1,5 +1,41 @@
 # Changelog
 
+## v3.62 — Search over levers, and the control tower's fifth rule
+
+**The tool.** `tools/search_levers.mjs <scenario|hand> --seeds 1-3 --ticks 600 --out <dir>
+[--staffing declared,adaptive] [--inbound-period 120,60] [--outbound-period 240,120] [--errors declared|none]`:
+the cartesian product of the lever values, every combination once per seed with the delivery what-if on
+exactly as the app's pickers and knowledge base would set it (door open 30 ticks, the SCMS Truck lateness
+shape at 60 ticks per day, transit 120 + the shape, promised lead 480); per combination OTIF (v_otif's
+share; a seed without a delivered order is missing), the cost at the default rates (v_cost_by_type's
+total) and the delivered orders as mean, sample standard deviation and the Student-t 95 % half-width
+(run-ledger.js T975 - the viewer's own replication arithmetic, pinned equal); ranked by OTIF mean
+descending, then cost mean ascending, then id. `search.json` (the combinations with their levers in the
+tower's format, the ranking, the best), `search.md`, every export. Deterministic.
+
+**The fifth rule.** `control.js` `lever-search`: `create(thresholds, { search: table })` keeps a
+loaded table (kind `wt-lever-search`); at the first evaluation the rule derives the run's own
+combination (`comboOf`: staffing policy, dock period, carrier period, errors) and proposes the best's
+differing levers as ONE combination lever (`{ kind: "combo", levers: [...] }`, the delivery and error
+pickers included when the run had no windows or no errors) when the table is this scenario's, the run
+is not at the best, and the best's OTIF gain over the run's combination exceeds
+`control.search.minGainHalfWidths` (knowledge base, default 1) × the wider half-width; a combination the
+table did not search is compared to nothing and the evidence says so. The evidence carries the ranked
+table, the current id, the gain and the rule. The app applies a combination lever as one (every lever
+applied, the froms kept; the revert puts every lever back), the delivery and error pickers are levers
+now, and the control card imports a table (*Import lever search*), which re-runs the day so the tower
+reads it from tick 0. The four v3.56 rules are unchanged.
+
+**Verification.** `verify_search.js` (the search on the hand floor for two levers and two seeds by
+hand - every statistic recomputed from the eight exports, the ranking, the literal best (declared
+staffing, carrier period 120: OTIF 0.7778 ± 0, 9 delivered orders; carrier 240 leaves 0.25 ± 3.1765 -
+no ranking inside it), the viewer's replication rows equal, byte-identical, the usage; the rule on a hand
+table: the proposal with the differing levers and the gain 0.3, silent at the best, inside the
+half-widths, on another scenario, without a table, a foreign document; every lever for an unsearched
+run; a decision in the audit and in controlRows; read-only), `verify_control.js` (five rules, eight
+thresholds), the in-app self-test `lever-search-rule-proposes-from-a-table` (193/193).
+`docs/LEVER_SEARCH.md`. Cache `wt-v140`.
+
 ## v3.61 — The optional model mode: a language model beside the app, off by default
 
 **The runtime decision.** The page is offline by contract (`connect-src 'self'`, the offline guard, the

@@ -43,7 +43,7 @@
  *   8. SHIPPED WIRING: the picker and its hint, app.js opts.errors and the
  *      readout, SQL columns / view / planner group / reconcile key, the Python
  *      twin's error logic, the viewer section + glance card, both self-tests,
- *      the runner, sw.js at wt-v139, README / CHANGELOG / CREDITS.
+ *      the runner, sw.js at wt-v140, README / CHANGELOG / CREDITS.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -310,7 +310,7 @@ const Q = record({ seed: 31, mix: ["piece-pick"], errors: { "mis-pick": 0.02 }, 
     /id="rlQuality"/.test(rl) && /function qualityHtml/.test(js) && /Every step was perfect/.test(js) && /label: "Human error"/.test(js) && !/all four hold/.test(js) && /v_quality_by_step: v\.quality/.test(mk));
   check("8e. both self-tests cover it; run-all lists this harness; the knowledge base has the category",
     /human-error-what-if-picker-and-branches/.test(st) && /quality-section-without-errors/.test(vst) && /"rlQuality"/.test(vst) && /Object\.keys\(R\.SQL\)\.length === (3[4-9]|[4-9]\d)/.test(vst) && /verify_errors\.js/.test(runall) && /key: "human-factors"/.test(kb));
-  check("8f. sw.js at wt-v139 (previously wt-v138)", /CACHE_VERSION\s*=\s*"wt-v139"/.test(sw) && /Previously wt-v138/.test(sw));
+  check("8f. sw.js at wt-v140 (previously wt-v139)", /CACHE_VERSION\s*=\s*"wt-v140"/.test(sw) && /Previously wt-v139/.test(sw));
   check("8g. README names the what-if and step-not-person; CHANGELOG has v3.54 and the cosmetic formAlong limit; CREDITS names HEART / SPAR-H as anchors; the schema page has the error columns and the view",
     /Human error, honestly \(v3\.54\)/.test(readme) && /never to a person/.test(readme) && /## v3\.54/.test(changelog) && /formAlong/.test(changelog) && /HEART/.test(credits) && /SPAR-H/.test(credits) &&
     /v_quality_by_step/.test(schema) && /error_outcome/.test(schema));

@@ -355,6 +355,9 @@ node verify_delivery.js          # v3.55 delivery and shipping times in between
 node verify_control.js           # v3.56 the control tower
 node verify_epcis_import.js      # v3.58 the return path: a recorded EPCIS 2.0 document
 node verify_fit_rates.js         # v3.59 the plant's own rates: a site profile from recorded events
+node verify_ask.js               # v3.60 ask the ledger: the deterministic question box
+node verify_model_mode.js        # v3.61 the optional model mode beside the app (off by default)
+node verify_search.js            # v3.62 search over levers and the tower's fifth rule
 node test/run-all.mjs            # every harness (ALL n HARNESSES PASSED)
 python -m unittest discover -s test -p 'test_*.py' -v
 python tools/scms_delivery.py --offline-check     # v3.55 the delivery aggregates agree with their twins

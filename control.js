@@ -46,7 +46,7 @@
   const HONESTY =
     "The control tower proposes, a person decides; nothing acts on its own. Every proposal is explainable from " +
     "aggregates per step and station (element ids, counts, ticks, shares) recorded by the run ledger; no per-person " +
-    "data exists to read, and none may (BetrVG 87(1)6, GDPR Art. 88). The four rules are teaching rules with editable " +
+    "data exists to read, and none may (BetrVG 87(1)6, GDPR Art. 88). The five rules are teaching rules with editable " +
     "thresholds; an expected effect is either measured on the hand floor and says so, or arithmetic on declared values " +
     "and says so. Accepting a proposal re-runs the day from tick zero. Not a manufacturing execution system, not a " +
     "warehouse management system, not a scheduler, not a certification.";
@@ -56,12 +56,14 @@
     rework: { maxShare: 0.01, minUnits: 20 },
     inbound: { lateTicks: 60 },
     otif: { minDeliveries: 20, target: 0.95 },
+    search: { minGainHalfWidths: 1 }, // v3.62: the best's OTIF gain must clear this many half-widths
   };
   const RULES = [
     { id: "queue-congestion", label: "Queue congestion", reads: "the stations' queues (element id, length) at every evaluation", lever: "the adaptive-staffing what-if (a second worker joins at the threshold, leaves after the cool-down)" },
     { id: "rework-burden", label: "Rework burden", reads: "the ledger's quality by step: reworked units over units through the error-prone steps; the levers above 1", lever: "reset the largest performance-shaping lever above 1 - the latent condition, named" },
     { id: "inbound-late", label: "Inbound late", reads: "the trailers the receiving door logged (scheduled, arrival, late ticks)", lever: "halve the inbound period: twice the scheduled trailers, each burst about half" },
     { id: "otif-below-target", label: "OTIF below target", reads: "the ledger's service: delivered orders and their on-time-in-full share", lever: "halve the carrier period: departures twice as frequent" },
+    { id: "lever-search", label: "Lever search", reads: "a lever-search table the person loaded (tools/search_levers.mjs): the ranked combinations with their OTIF and cost means and half-widths", lever: "the best-ranked combination's levers that differ from this run's, applied together as a combination lever" }, // v3.62
   ];
   const r4 = (v) => Math.round(v * 10000) / 10000;
   const r6 = (v) => Math.round(v * 1e6) / 1e6;
@@ -70,7 +72,7 @@
 
   function normalise(t) {
     const s = t || {};
-    const q = s.queue || {}, rw = s.rework || {}, ib = s.inbound || {}, ot = s.otif || {};
+    const q = s.queue || {}, rw = s.rework || {}, ib = s.inbound || {}, ot = s.otif || {}, se = s.search || {};
     return {
       evalEveryTicks: Math.max(1, Math.round(pos(s.evalEveryTicks, DEFAULTS.evalEveryTicks))),
       snoozeTicks: Math.max(1, Math.round(pos(s.snoozeTicks, DEFAULTS.snoozeTicks))),
@@ -78,11 +80,13 @@
       rework: { maxShare: nonneg(rw.maxShare, DEFAULTS.rework.maxShare), minUnits: Math.max(1, Math.round(pos(rw.minUnits, DEFAULTS.rework.minUnits))) },
       inbound: { lateTicks: Math.max(0, Math.round(nonneg(ib.lateTicks, DEFAULTS.inbound.lateTicks))) },
       otif: { minDeliveries: Math.max(1, Math.round(pos(ot.minDeliveries, DEFAULTS.otif.minDeliveries))), target: Math.min(1, nonneg(ot.target, DEFAULTS.otif.target)) },
+      search: { minGainHalfWidths: nonneg(se.minGainHalfWidths, DEFAULTS.search.minGainHalfWidths) },
     };
   }
-  function create(thresholds) {
+  function create(thresholds, opts) { // v3.62: opts.search - a loaded lever-search table (tools/search_levers.mjs), or null
+    const s = opts && opts.search && opts.search.kind === "wt-lever-search" && Array.isArray(opts.search.combos) ? opts.search : null;
     return { kind: "wt-control", thresholds: normalise(thresholds), proposals: [], audit: [], lastEval: -1, evaluations: 0,
-      state: { queueSince: {}, muted: {} }, honesty: HONESTY };
+      state: { queueSince: {}, muted: {} }, search: s, honesty: HONESTY };
   }
   // A rule may propose when it has not fired yet, or its snooze has run out.
   const may = (ctl, rule, tick) => ctl.state.muted[rule] == null || (ctl.state.muted[rule] !== Infinity && tick >= ctl.state.muted[rule]);
@@ -160,6 +164,45 @@
       "the dock dwell before a departure falls by at most " + Math.round(ob.periodTicks / 2) + " ticks per unit; the transit is unchanged",
       "on time in full " + s.otif + " over " + s.delivered_orders + " delivered orders is below the target " + T.target);
   }
+  // v3.62 the run's own lever combination in the search table's id form
+  function comboOf(rec) {
+    const p = (rec && rec.plan) || {};
+    return "staffing=" + (p.policy && p.policy.kind === "queue-staffing" ? "adaptive" : "declared") + "|inbound=" + (p.inbound ? p.inbound.periodTicks : "none") +
+      "|outbound=" + (p.outbound ? p.outbound.periodTicks : "none") + "|errors=" + (p.errors ? "declared" : "none");
+  }
+  // v3.62 lever-search: a search table the person loaded (tools/search_levers.mjs), never a live feed. At the first
+  // evaluation it compares the run's own combination with the table's best and proposes the best's differing levers as
+  // ONE combination lever when the table is this scenario's, the run is not at the best, and the best's OTIF gain over
+  // the run's combination clears minGainHalfWidths x the wider half-width (a combination the table did not search is
+  // compared to nothing: the rule proposes the best and says so).
+  function ruleSearch(ctl, rec, state, tick) {
+    const S = ctl.search;
+    if (!S || !may(ctl, "lever-search", tick) || !rec.run || S.scenario !== rec.run.scenario || !Array.isArray(S.combos)) return;
+    const best = S.combos.find((c) => c.id === S.best);
+    if (!best || !best.levers || !best.otif) return;
+    const cur = comboOf(rec), curRow = S.combos.find((c) => c.id === cur);
+    if (cur === S.best) return;
+    const k = ctl.thresholds.search.minGainHalfWidths;
+    let gain = null;
+    if (curRow && curRow.otif && curRow.otif.mean != null && best.otif.mean != null) {
+      gain = r4(best.otif.mean - curRow.otif.mean);
+      const half = Math.max(best.otif.ci95_half || 0, curRow.otif.ci95_half || 0);
+      if (!(gain > k * half)) return;
+    }
+    const p = rec.plan || {}, Lv = best.levers, levers = [];
+    if ((Lv.staffing === "adaptive") !== !!(p.policy && p.policy.kind === "queue-staffing")) levers.push({ kind: "picker", key: "staffing", value: Lv.staffing === "adaptive" ? "adaptive" : "declared" });
+    if (!p.inbound || !p.outbound) levers.push({ kind: "picker", key: "delivery", value: "windows" });
+    if (!p.inbound || p.inbound.periodTicks !== Lv.inbound_period) levers.push({ kind: "kb", key: "delivery.inbound.periodTicks", value: Lv.inbound_period });
+    if (!p.outbound || p.outbound.periodTicks !== Lv.outbound_period) levers.push({ kind: "kb", key: "delivery.outbound.periodTicks", value: Lv.outbound_period });
+    if ((Lv.errors === "declared") !== !!p.errors) levers.push({ kind: "picker", key: "errors", value: Lv.errors === "declared" ? "declared" : "none" });
+    if (!levers.length) return;
+    const pm = (s) => (s && s.mean != null ? s.mean + (s.ci95_half != null ? " ± " + s.ci95_half : "") : "-");
+    const table = (S.ranked || S.combos.map((c) => c.id)).map((id) => { const c = S.combos.find((x) => x.id === id) || {}; return { id: id, n: c.n, otif_mean: c.otif ? c.otif.mean : null, otif_half: c.otif ? c.otif.ci95_half : null, cost_mean: c.cost_eur ? c.cost_eur.mean : null, cost_half: c.cost_eur ? c.cost_eur.ci95_half : null }; });
+    propose(ctl, "lever-search", tick, { table: table, current: cur, current_searched: !!curRow, best: S.best, gain: gain, min_gain_half_widths: k, searched_ticks: S.ticks, seeds: S.seeds },
+      { kind: "combo", levers: levers },
+      "OTIF " + pm(best.otif) + " over " + best.n + " seeds in the search" + (curRow ? " against " + pm(curRow.otif) + " for this run's combination" : " (this run's combination was not searched)") + "; the day re-runs with the levers set",
+      "the loaded lever search ranks " + S.best + " first" + (curRow ? " and its gain clears the half-widths" : ""));
+  }
   // Read-only. Evaluates at every multiple of evalEveryTicks on the simulation's clock (the
   // hook runs after the tick advanced, so the first evaluation is at tick evalEveryTicks).
   function observe(ctl, rec, state) {
@@ -172,6 +215,7 @@
     ruleRework(ctl, rec, state, tick);
     ruleInbound(ctl, rec, state, tick);
     ruleOtif(ctl, rec, state, tick);
+    ruleSearch(ctl, rec, state, tick); // v3.62
     return ctl;
   }
   // A person's decision: accepted | declined | snoozed. Returns the audit row (or null).
@@ -200,5 +244,5 @@
     return Object.keys(by).sort().map((k) => by[k]);
   }
 
-  WT.control = { HONESTY, DEFAULTS, RULES, normalise, create, observe, decide, pending, controlRows };
+  WT.control = { HONESTY, DEFAULTS, RULES, normalise, create, observe, decide, pending, controlRows, comboOf }; // v3.62: comboOf
 })();

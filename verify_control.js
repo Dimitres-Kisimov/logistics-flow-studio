@@ -35,7 +35,7 @@
  *      multiplexer (ledger, tracker, then the tower), accept = set the lever
  *      + re-run, the knowledge base's control category, SQL table / view /
  *      group / reconcile key, the viewer block + glance card, both self-tests,
- *      the runner, sw.js at wt-v139, README / CHANGELOG / the deep dive's
+ *      the runner, sw.js at wt-v140, README / CHANGELOG / the deep dive's
  *      chapter 3 rewritten for v3.56.
  * ===================================================================== */
 "use strict";
@@ -172,8 +172,8 @@ function record(opts, ticks, tower, thresholds, controlLog) {
   const flat = JSON.stringify(b.ctl.proposals.map((p) => p.evidence));
   check("4a. the evidence of every proposal is element ids, counts, ticks and shares - no key or value names a worker or a roster; the module reads no worker module and no clock",
     !/worker|roster|person/i.test(flat) && !/WT\.workers|\broster\b|workerRoster|new Date\(|Date\.now\(|Math\.random\(/.test(src) && /BetrVG/.test(C.HONESTY) && /GDPR/.test(C.HONESTY) && /a person decides/.test(C.HONESTY) && /not a certification/.test(C.HONESTY));
-  check("4b. the four rules are documented with what they read and what they propose; the honesty says measured-or-arithmetic and re-run from tick zero",
-    C.RULES.length === 4 && C.RULES.map((r) => r.id).join(",") === "queue-congestion,rework-burden,inbound-late,otif-below-target" && C.RULES.every((r) => r.reads && r.lever) && /re-runs the day from tick zero/.test(C.HONESTY) && /measured on the hand floor/.test(C.HONESTY));
+  check("4b. the five rules (four of v3.56, lever-search of v3.62) are documented with what they read and what they propose; the honesty says measured-or-arithmetic and re-run from tick zero",
+    C.RULES.length === 5 && C.RULES.map((r) => r.id).join(",") === "queue-congestion,rework-burden,inbound-late,otif-below-target,lever-search" && C.RULES.every((r) => r.reads && r.lever) && /re-runs the day from tick zero/.test(C.HONESTY) && /measured on the hand floor/.test(C.HONESTY));
 })();
 
 /* ---- 5. the ledger and the SQL twin ------------------------------------------------ */
@@ -202,17 +202,17 @@ function record(opts, ticks, tower, thresholds, controlLog) {
     /"flowCard", "controlCard"/.test(app) && /<script src="control\.js"><\/script>/.test(html) && /<script src="control\.js"><\/script>/.test(rl));
   check("6b. app.js: the after-tick multiplexer observes the ledger, then the tracker, then the tower; accept sets the lever as the picker would and re-runs the day; decline and snooze only write the log; the thresholds come from the knowledge base",
     /afterTick: \(st\) => \{ WT\.ledger\.observe\(state\.flow\.ledger, st\); if \(state\.flow\.track\) WT\.tracking\.observe\(state\.flow\.track, state\.flow\.ledger\); if \(state\.flow\.control\) WT\.control\.observe\(state\.flow\.control, state\.flow\.ledger, st\); \}/.test(app) &&
-    /WT\.control\.create\(readControlThresholds\(\)\)/.test(app) && /function applyLever\(/.test(app) && /state\.flow\.controlLog\.push\(/.test(app) && /function renderControlTower\(/.test(app) && /control\.queue\.sustainTicks/.test(app) && /control: state\.flow\.controlLog/.test(app) &&
+    /WT\.control\.create\(readControlThresholds\(\), \{ search: state\.flow\.search \}\)/.test(app) && /function applyLever\(/.test(app) && /state\.flow\.controlLog\.push\(/.test(app) && /function renderControlTower\(/.test(app) && /control\.queue\.sustainTicks/.test(app) && /control: state\.flow\.controlLog/.test(app) &&
     /function revertLastAccepted\(/.test(app) && /data-revert/.test(app) && /status: "reverted"/.test(app)); // v3.57: the undo
-  check("6c. the knowledge base's control category with seven thresholds; ledger.create keeps the log as rec.control and exports it only when a decision exists",
-    /key: "control"/.test(kb) && ["control.evalEveryTicks", "control.queue.sustainTicks", "control.rework.maxShare", "control.rework.minUnits", "control.inbound.lateTicks", "control.otif.minDeliveries", "control.snoozeTicks"].every((id) => typeof KB.get(id) === "number") &&
+  check("6c. the knowledge base's control category with eight thresholds (the lever-search gain of v3.62 included); ledger.create keeps the log as rec.control and exports it only when a decision exists",
+    /key: "control"/.test(kb) && ["control.evalEveryTicks", "control.queue.sustainTicks", "control.rework.maxShare", "control.rework.minUnits", "control.inbound.lateTicks", "control.otif.minDeliveries", "control.snoozeTicks", "control.search.minGainHalfWidths"].every((id) => typeof KB.get(id) === "number") &&
     KB.get("control.evalEveryTicks") === 10 && KB.get("control.queue.sustainTicks") === 30 && KB.get("control.rework.maxShare") === 0.01 && /rec\.control/.test(ledger) && /if \(rec\.control && rec\.control\.length\) out\.control/.test(ledger));
   check("6d. tools/run_ledger.py: control_event, v_control in PLANNER_VIEWS with the reconcile key on rule; the fixture script reconciles it; ledger_env loads control.js",
     /CREATE TABLE IF NOT EXISTS control_event\(/.test(py) && /CREATE VIEW IF NOT EXISTS v_control AS/.test(py) && /PLANNER_VIEWS = \([^)]*"v_control"/.test(py) && /"v_control": \("rule",\)/.test(py) && /v_control: v\.control/.test(mk) && /"control\.js"/.test(env) &&
     /'accepted','declined','snoozed','reverted'/.test(py) && /AS reverted/.test(py)); // v3.57
-  check("6e. the viewer: the Control tower block with its note, the glance card; both self-tests; run-all; sw.js precaches control.js at wt-v139 (previously wt-v138)",
+  check("6e. the viewer: the Control tower block with its note, the glance card; both self-tests; run-all; sw.js precaches control.js at wt-v140 (previously wt-v139)",
     /id="rlControl"/.test(rl) && /function controlHtml/.test(js) && /label: "Control tower"/.test(js) && /control-tower-proposes-and-decline-keeps-the-run/.test(st) && /control-section-without-decisions/.test(vst) && /"rlControl"/.test(vst) &&
-    /Object\.keys\(R\.SQL\)\.length === 37/.test(vst) && /verify_control\.js/.test(runall) && /"\.\/control\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v139"/.test(sw) && /Previously wt-v138/.test(sw));
+    /Object\.keys\(R\.SQL\)\.length === 37/.test(vst) && /verify_control\.js/.test(runall) && /"\.\/control\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v140"/.test(sw) && /Previously wt-v139/.test(sw));
   check("6f. README names the tower (proposes, a person decides, re-run the day); CHANGELOG has v3.56; the deep dive's chapter 3 is rewritten as what exists at v3.56 and its Reproduce lists this harness",
     /The control tower \(v3\.56\)/.test(readme) && /[Aa] person decides/.test(readme) && /## v3\.56/.test(changelog) && /state at v3\.56/.test(dd) && /node verify_control\.js/.test(dd));
 })();

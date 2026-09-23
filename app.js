@@ -161,7 +161,7 @@
     // ring for the sparkline; `poolDemandFactor` sets the synthetic arrival
     // (order-generation) rate as a multiple of the modelled pick capacity so a
     // live backlog is visible (honest what-if, documented in the readout).
-    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15, errors: "none", delivery: "instant", control: null, controlLog: [] },
+    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15, errors: "none", delivery: "instant", control: null, controlLog: [], search: null /* v3.62: the loaded lever-search table */ },
   };
 
   // ---------------- DOM refs ----------------
@@ -2575,7 +2575,8 @@
       queue: { threshold: WT.flowsim.PARAMS.congestQueueThreshold, sustainTicks: g("control.queue.sustainTicks", 30) },
       rework: { maxShare: g("control.rework.maxShare", 0.01), minUnits: g("control.rework.minUnits", 20) },
       inbound: { lateTicks: g("control.inbound.lateTicks", 60) },
-      otif: { minDeliveries: g("control.otif.minDeliveries", 20), target: g("delivery.otif.target", 0.95) } };
+      otif: { minDeliveries: g("control.otif.minDeliveries", 20), target: g("delivery.otif.target", 0.95) },
+      search: { minGainHalfWidths: g("control.search.minGainHalfWidths", 1) } }; // v3.62
   }
   // The lever a proposal names, applied exactly as the picker or the knowledge base panel would.
   // Returns { ok, from } - `from` is the value the lever had, so an accepted lever can be reverted (v3.57).
@@ -2589,7 +2590,28 @@
       try { localStorage.setItem("wt-flow-staffing", state.flow.staffing); } catch (_) { /* ignore */ }
       return { ok: true, from: from };
     }
+    if (lever.kind === "picker" && lever.key === "delivery") { // v3.62: the delivery what-if picker as a lever
+      const from = state.flow.delivery;
+      state.flow.delivery = lever.value === "windows" ? "windows" : "instant";
+      const sel = $("flowDeliverySelect");
+      if (sel) sel.value = state.flow.delivery;
+      try { localStorage.setItem("wt-flow-delivery", state.flow.delivery); } catch (_) { /* ignore */ }
+      return { ok: true, from: from };
+    }
+    if (lever.kind === "picker" && lever.key === "errors") { // v3.62: the error what-if picker as a lever
+      const from = state.flow.errors;
+      state.flow.errors = lever.value === "declared" ? "declared" : "none";
+      const sel = $("flowErrorsSelect");
+      if (sel) sel.value = state.flow.errors;
+      try { localStorage.setItem("wt-flow-errors", state.flow.errors); } catch (_) { /* ignore */ }
+      return { ok: true, from: from };
+    }
     if (lever.kind === "kb" && WT.kb) { const from = WT.kb.get(lever.key); return { ok: WT.kb.set(lever.key, lever.value), from: from }; }
+    if (lever.kind === "combo" && Array.isArray(lever.levers)) { // v3.62: a combination lever - every lever applied, the froms kept for the revert
+      const froms = []; let ok = true;
+      for (const l of lever.levers) { const r = applyLever(l); froms.push(r ? r.from : null); if (!r || !r.ok) ok = false; }
+      return { ok: ok, from: froms };
+    }
     return null;
   }
   // v3.57: the last accepted lever that was not reverted yet, and its undo - the value it had before, an
@@ -2600,10 +2622,12 @@
     for (let i = log.length - 1; i >= 0; i--) { const r = log[i]; if (r.status === "accepted" && r.lever && r.lever.from !== undefined && r.lever.from !== null && !reverted[r.proposal_id]) return r; }
     return null;
   }
+  // v3.62: the lever that puts an accepted one back - a combination reverts as one (every lever to its own from)
+  const revertLeverOf = (r) => (r.lever.kind === "combo" && Array.isArray(r.lever.from) && Array.isArray(r.lever.levers) ? { kind: "combo", levers: r.lever.levers.map((l, i) => ({ kind: l.kind, key: l.key, value: r.lever.from[i] })) } : { kind: r.lever.kind, key: r.lever.key, value: r.lever.from });
   function revertLastAccepted() {
     const r = lastRevertable(), rec = state.flow.ledger;
     if (!r || !rec) return false;
-    const back = { kind: r.lever.kind, key: r.lever.key, value: r.lever.from };
+    const back = revertLeverOf(r);
     const applied = applyLever(back);
     state.flow.controlLog.push({ seq: state.flow.controlLog.length + 1, tick: state.flow.sim ? state.flow.sim.tick : 0, rule: r.rule, proposal_id: r.proposal_id, status: "reverted",
       lever: Object.assign({}, back, { from: applied ? applied.from : r.lever.value }), evidence: { reverts: r.proposal_id }, from_run: rec.run.id });
@@ -2612,7 +2636,7 @@
     status("Control tower: reverted " + ruleLabel(r.rule) + " - " + leverText(back) + "; the day re-runs from tick 0.");
     return true;
   }
-  const leverText = (lever) => (!lever ? "-" : lever.kind === "picker" ? "Staffing -> " + lever.value : lever.key + " -> " + lever.value);
+  const leverText = (lever) => (!lever ? "-" : lever.kind === "combo" ? lever.levers.map(leverText).join("; ") : lever.kind === "picker" ? (lever.key === "staffing" ? "Staffing -> " : lever.key === "delivery" ? "Delivery -> " : lever.key === "errors" ? "Errors -> " : lever.key + " -> ") + lever.value : lever.key + " -> " + lever.value);
   const ruleLabel = (id) => { const r = WT.control && WT.control.RULES.find((x) => x.id === id); return r ? r.label : id; };
   // The tower's card: the pending proposals with their evidence, and the audit trail across runs.
   function renderControlTower() {
@@ -2631,7 +2655,7 @@
       '<p class="control-evidence">Evidence: <code>' + esc(JSON.stringify(p.evidence)) + '</code></p>' +
       '<div class="control-actions"><button type="button" class="btn small" data-accept="' + esc(p.id) + '">Accept and re-run the day</button><button type="button" class="btn small" data-snooze="' + esc(p.id) + '">Snooze</button><button type="button" class="btn small" data-decline="' + esc(p.id) + '">Decline</button></div></article>').join("");
     const revertable = lastRevertable();
-    if (audit) audit.innerHTML = (revertable ? '<p><button type="button" class="btn small" data-revert="' + esc(revertable.proposal_id) + '">Revert the last accepted lever (' + esc(leverText({ kind: revertable.lever.kind, key: revertable.lever.key, value: revertable.lever.from })) + ') and re-run the day</button></p>' : '') +
+    if (audit) audit.innerHTML = (revertable ? '<p><button type="button" class="btn small" data-revert="' + esc(revertable.proposal_id) + '">Revert the last accepted lever (' + esc(leverText(revertLeverOf(revertable))) + ') and re-run the day</button></p>' : '') +
       (log.length ? '<table class="flow-ledger-table"><thead><tr><th>tick</th><th>rule</th><th>decision</th><th>lever</th><th>run it came from</th></tr></thead><tbody>' +
       log.map((r) => '<tr><td>' + r.tick + '</td><td>' + esc(r.rule) + '</td><td>' + esc(r.status) + '</td><td>' + esc(leverText(r.lever)) + '</td><td><code>' + esc(String(r.from_run || '')) + '</code></td></tr>').join('') + '</tbody></table>' : '<p class="empty">No decision recorded yet.</p>');
   }
@@ -2686,7 +2710,7 @@
       // just appended to their EPCIS-shaped twins; the hook multiplexes both, ledger first.
       state.flow.track = WT.tracking ? WT.tracking.create(state.flow.ledger) : null;
       // v3.56 THE CONTROL TOWER: a third read-only observer; its proposals wait for a person (wireControl).
-      state.flow.control = WT.control ? WT.control.create(readControlThresholds()) : null;
+      state.flow.control = WT.control ? WT.control.create(readControlThresholds(), { search: state.flow.search }) : null; // v3.62: with the loaded lever-search table, if any
       state.flow.sim.hooks = { afterTick: (st) => { WT.ledger.observe(state.flow.ledger, st); if (state.flow.track) WT.tracking.observe(state.flow.track, state.flow.ledger); if (state.flow.control) WT.control.observe(state.flow.control, state.flow.ledger, st); } };
     }
     ledgerTraceCache = "";
@@ -3281,6 +3305,28 @@
     (function wireControl() {
       const list = $("controlList");
       if (!list || !WT.control) return;
+      // v3.62: a lever-search table (tools/search_levers.mjs) for the fifth rule; loading it re-runs the day so the tower reads it from tick 0
+      on("controlSearchImport", () => { const inp = $("controlSearchImportInput"); if (inp) inp.click(); });
+      const searchInput = $("controlSearchImportInput");
+      if (searchInput) searchInput.addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = "";
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          let obj = null;
+          try { obj = JSON.parse(String(reader.result)); } catch (err) { toast("Not JSON: " + err.message, "err"); return; }
+          if (!obj || obj.kind !== "wt-lever-search" || !Array.isArray(obj.combos) || !obj.best) { toast("Not a lever search: expected kind wt-lever-search from tools/search_levers.mjs.", "warn"); return; }
+          state.flow.search = obj;
+          const info = $("controlSearchInfo");
+          if (info) info.textContent = "Lever search loaded: " + obj.scenario + ", " + obj.combos.length + " combinations x " + (obj.seeds || []).length + " seeds over " + obj.ticks + " ticks; best " + obj.best + (obj.scenario !== (state.flow.ledger ? state.flow.ledger.run.scenario : obj.scenario) ? " - searched on another scenario: the rule stays silent here" : "") + ".";
+          state.flow.sig = null;
+          flowReset();
+          status("Lever search loaded (" + obj.combos.length + " combinations); the day re-runs with the tower reading it.");
+        };
+        reader.onerror = () => toast("Could not read the file.", "err");
+        reader.readAsText(file);
+      });
       list.addEventListener("click", (ev) => {
         const b = ev.target && ev.target.closest ? ev.target.closest("button[data-accept],button[data-decline],button[data-snooze]") : null;
         if (!b) return;
@@ -8499,6 +8545,9 @@
   function loadExample(id) {
     let b;
     try { b = EX.build(id); } catch (err) { toast("Could not build example: " + err.message, "err"); return; }
+    // v3.62: the library id rides on the build so the run ledger labels the run with it (scenarioId), not "custom" -
+    // a lever-search table searched on this scenario (tools/search_levers.mjs) then matches the run.
+    if (b && (!b.meta || b.meta.exampleId !== id)) b.meta = Object.assign({}, b.meta || {}, { exampleId: id });
     applyGeneratedLayout(b, "example");
     const ex = EX.library.find((e) => e.id === id);
     status("Loaded example: " + (ex ? ex.name : id) + ". Realistic-but-illustrative SYNTHETIC scenario — checked against ASR/DIN guidance, not certified. Run the sim or export the data.");

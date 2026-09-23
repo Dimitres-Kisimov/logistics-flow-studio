@@ -730,6 +730,7 @@ const HARNESSES = [
   { name: "The plant's own rates: tools/fit_rates.py on a hand-designed record (0.04 / 0.05 / 0.05; nearest-rank -30 / 0 / 45 / 90), refusals, the knowledge base's measured labels and the site quantiles in the delivery what-if (verify_fit_rates.js)", args: ["verify_fit_rates.js"] },
   { name: "Ask the ledger: a fixed catalogue answered from the views and the knowledge base by hand on fixture A (stg / putaway 122.4; 29.17 EUR per mis-pick redo), a windowed run with OTIF and a decision, twins, purity, wiring (verify_ask.js)", args: ["verify_ask.js"] },
   { name: "The optional model mode: tools/ask_cli.mjs equals WT.ask, the dry run calls nothing, the number guard refuses an invented number, the page stays offline, the rules are written down (verify_model_mode.js)", args: ["verify_model_mode.js"] },
+  { name: "Search over levers: tools/search_levers.mjs on the hand floor by hand for two levers and two seeds (OTIF, cost, t-half-widths, the ranking), the tower's fifth rule on a hand table, the combination lever (verify_search.js)", args: ["verify_search.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 
