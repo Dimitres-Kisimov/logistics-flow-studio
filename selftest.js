@@ -3865,6 +3865,35 @@
       } else trackDetail = "no test API / tracking";
     } catch (e) { trackDetail = "threw: " + (e && e.message ? e.message : String(e)); }
     check("tracking-maps-ledger-and-persists-across-runs", function () { return { ok: trackOk, detail: trackDetail }; });
+    // ---- v3.58 the return path: a small recorded EPCIS 2.0 document (three events of one pallet) through the
+    // shipped import path (store.importJson -> WT.tracking.fromEpcis) on the memory backend; history by the
+    // document's own identifier, dwell in minutes by hand (receiving 30, storing 60), a CBV step this app
+    // (the URN form here; the web-URI form is exercised in verify_epcis_import.js - selftest.js names no host)
+    // does not map refused by name; the button and the file input exist. Async check.
+    var epcisOk = false, epcisDetail = "";
+    try {
+      if (WT.tracking && typeof WT.tracking.fromEpcis === "function" && $("flowTrackingImport") && $("flowTrackingImportInput")) {
+        var EPC = "urn:epc:id:sscc:4012345.3000000009";
+        var mk = function (t, step, disp) { return { type: "ObjectEvent", action: "OBSERVE", eventTime: t, eventTimeZoneOffset: "+02:00", epcList: [EPC], bizStep: step, disposition: disp, readPoint: { id: "urn:epc:id:sgln:4012345.31389.0" } }; };
+        var epcisDoc = { type: "EPCISDocument", schemaVersion: "2.0", creationDate: "2026-09-21T12:00:00+02:00", epcisBody: { eventList: [
+          mk("2026-09-21T08:30:00+02:00", "urn:epcglobal:cbv:bizstep:storing", "sellable_accessible"), mk("2026-09-21T08:00:00+02:00", "receiving", "in_progress"), mk("2026-09-21T09:30:00+02:00", "urn:epcglobal:cbv:bizstep:shipping", "in_transit")] } };
+        var estore = await WT.tracking.openStore({ name: "wt-epcis-selftest", maxRuns: 2, backend: "memory" });
+        var eres = await estore.importJson(epcisDoc);
+        var ehist = await estore.history(EPC);
+        var edoc = await estore.getRun(eres.imported.run_id);
+        var edw = WT.tracking.dwellByBizStep(edoc.events);
+        var erow = function (s) { return edw.filter(function (r) { return r.biz_step === s; })[0]; };
+        var refusedMsg = "";
+        try { await estore.importJson({ type: "EPCISDocument", epcisBody: { eventList: [mk("2026-09-21T08:00:00+02:00", "commissioning", "in_progress")] } }); } catch (e) { refusedMsg = e.message; }
+        await estore.close();
+        epcisOk = eres.runs === 1 && eres.events === 3 && eres.imported.document_events === 3 && ehist.length === 1 && ehist[0].events.length === 3 &&
+          ehist[0].events.map(function (x) { return x.bizStep; }).join(">") === "receiving>storing>shipping" && ehist[0].events.map(function (x) { return x["wt:tick"]; }).join(",") === "0,30,90" &&
+          erow("receiving").avg_ticks_to_next === 30 && erow("storing").avg_ticks_to_next === 60 && erow("shipping").spans === 0 && edoc.run.scenario === "epcis-import" && edoc.run.minutes_per_tick === 1 &&
+          edoc.events.every(function (x) { return x["wt:source"] === "imported" && x["wt:kind"] === "recorded"; }) && /event 1: business step "commissioning" is CBV 2\.0 but not one this app maps/.test(refusedMsg);
+        epcisDetail = eres.events + " recorded events, history " + (ehist.length ? ehist[0].events.length : 0) + ", ticks " + (ehist.length ? ehist[0].events.map(function (x) { return x["wt:tick"]; }).join(",") : "-") + ", refusal " + (refusedMsg ? "named" : "missing");
+      } else epcisDetail = "no fromEpcis / import button";
+    } catch (e) { epcisDetail = "threw: " + (e && e.message ? e.message : String(e)); }
+    check("epcis-import-return-path", function () { return { ok: epcisOk, detail: epcisDetail }; });
     check("no-errors-after-drive", function () {
       var e = window.__WT_ERRORS__ || [];
       return { ok: e.length === 0, detail: e.length ? e.map(function (x) { return x.message; }).join(" | ") : "clean" };

@@ -21,7 +21,7 @@
  *      is exactly the pairing of views(A) and views(B); every archetype of
  *      either run appears once.
  *   3. Shipped wiring: the viewer's second input and demo-B button, the
- *      section, sw.js precaching run-ledger-b.json at wt-v136, the SQL views
+ *      section, sw.js precaching run-ledger-b.json at wt-v137, the SQL views
  *      and the `compare` command in tools/run_ledger.py, the runner.
  * ===================================================================== */
 "use strict";
@@ -188,7 +188,7 @@ console.log("=".repeat(72));
 (function () {
   const html = read("run-ledger.html"), js = read("run-ledger.js"), sw = read("sw.js"), runall = read("test/run-all.mjs"), py = read("tools/run_ledger.py"), mk = read("tools/make_run_ledger_fixture.mjs");
   check("3a. the viewer has the second input, the demo-B button and the section", /id="rlFileB"/.test(html) && /id="rlDemoB"/.test(html) && /id="rlCompare"/.test(html) && /run-ledger-b\.json/.test(js));
-  check("3b. sw.js precaches fixture B at wt-v136 (previously wt-v135)", /"\.\/test\/fixtures\/run-ledger-b\.json"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v136"/.test(sw) && /Previously wt-v135/.test(sw));
+  check("3b. sw.js precaches fixture B at wt-v137 (previously wt-v136)", /"\.\/test\/fixtures\/run-ledger-b\.json"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v137"/.test(sw) && /Previously wt-v136/.test(sw));
   const views = ["v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost"];
   check("3c. the six compare views exist in SQL and in RunLedger.SQL; the tool has a `compare` command", views.every((v) => py.indexOf("CREATE VIEW IF NOT EXISTS " + v + " AS") >= 0 && typeof RL.SQL[v] === "string") && /def compare\(/.test(py) && /"compare"/.test(py) && /--runs/.test(py));
   check("3d. the fixture script builds the variants and documents them", /run-ledger-b/.test(mk) && /MIX_B/.test(mk) && /\[a\|b\|c\|d\|all\]/.test(mk));

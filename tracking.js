@@ -61,7 +61,8 @@
  * virtual-time budget never completes an IndexedDB request; the store names the
  * backend it serves and the reason): putRun,
  * runs, getRun, deleteRun, history(huId), byOrderRef(ref), exportJson,
- * importJson, size, close. History across runs is keyed by the handling-unit
+ * importJson (v3.58: also an EPCIS 2.0 capture document, mapped by fromEpcis -
+ * the return path), size, close. History across runs is keyed by the handling-unit
  * id (which embeds the run id) or by the order reference - not by the SSCC,
  * which recurs from run to run because it is serialised from the unit's
  * sequence number.
@@ -343,6 +344,171 @@
     return { ok: errors.length === 0, errors: errors };
   }
 
+
+  /* ---------------- v3.58 the return path: a recorded EPCIS 2.0 document ------ */
+  // An EPCIS 2.0 capture document (JSON / JSON-LD: { type: "EPCISDocument", schemaVersion: "2.0",
+  // epcisBody: { eventList: [...] } }) from a WMS or a scanner system, mapped onto the shape the
+  // twins use, so recorded events can be asked the same three questions and kept in the same
+  // store. Strict on purpose: only ObjectEvent and AggregationEvent; only the business steps and
+  // dispositions this app knows (the refusal names the identifier and says whether it is CBV 2.0
+  // at all); every event with a zoned time and an object. The three CBV forms are read - the
+  // bare 2.0 identifier, the 1.x URN (urn:epcglobal:cbv:bizstep:x) and the web URI
+  // (https://ref.gs1.org/cbv/BizStep-x). An ObjectEvent naming several objects becomes one
+  // mapped event per object (eventID suffixed #2, #3, ...) so that a unit's history is
+  // complete; the summary reports both counts. wt:tick counts whole minutes from the document's
+  // earliest event (the wall clock stays in eventTime, which the derived twins never carry).
+  // No Date: ISO 8601 is parsed by hand (days from civil, the zone offset applied). The Python
+  // twin is tools/epcis_import.py; verify_epcis_import.js pins the two equal on the fixture.
+  const EPCIS_TYPES = ["EPCISDocument"];
+  // The CBV 2.0 vocabularies as the ratified JSON-LD context enumerates them
+  // (ref.gs1.org/standards/epcis/epcis-context.jsonld, read 2026-09-23): 41 business steps,
+  // 33 dispositions, 13 business transaction types. Used to tell "CBV, but not mapped here"
+  // from "not CBV at all" in a refusal.
+  const CBV_BIZ_STEPS = ["accepting", "arriving", "assembling", "collecting", "commissioning", "consigning", "creating_class_instance", "cycle_counting", "decommissioning", "departing", "destroying", "disassembling", "dispensing", "encoding", "entering_exiting", "holding", "inspecting", "installing", "killing", "loading", "other", "packing", "picking", "receiving", "removing", "repackaging", "repairing", "replacing", "reserving", "retail_selling", "sampling", "sensor_reporting", "shipping", "staging_outbound", "stock_taking", "stocking", "storing", "transporting", "unloading", "unpacking", "void_shipping"];
+  const CBV_DISPOSITIONS = ["active", "available", "completeness_inferred", "completeness_verified", "conformant", "container_closed", "container_open", "damaged", "destroyed", "dispensed", "disposed", "encoded", "expired", "in_progress", "in_transit", "inactive", "mismatch_class", "mismatch_instance", "mismatch_quantity", "needs_replacement", "no_pedigree_match", "non_conformant", "non_sellable_other", "partially_dispensed", "recalled", "reserved", "retail_sold", "returned", "sellable_accessible", "sellable_not_accessible", "stolen", "unavailable", "unknown"];
+  const CBV_BTT = ["bol", "cert", "desadv", "inv", "pedigree", "po", "poc", "prodorder", "recadv", "rma", "testprd", "testres", "upevt"];
+  const IMPORT_SOURCE = "imported";
+  const IMPORT_HONESTY =
+    "Recorded events imported from an EPCIS 2.0 document - the physical-to-digital direction, by hand (a file), so a " +
+    "shadow only in the manual sense of Kritzinger's ladder: nothing is streamed, nothing is sent back, the app reads " +
+    "the events, aggregates them per business step and never acts on them. The identifiers, times and places are the " +
+    "document's own (nothing here says they are registered or true); wt:tick counts whole minutes from the document's " +
+    "earliest event and the wall clock stays in eventTime. An event names an object, a place and a step - never a " +
+    "person (BetrVG 87(1)6, GDPR Art. 88).";
+  const CBV_URN = { bizStep: "urn:epcglobal:cbv:bizstep:", disposition: "urn:epcglobal:cbv:disp:", btt: "urn:epcglobal:cbv:btt:" };
+  const CBV_WEB = { bizStep: "https://ref.gs1.org/cbv/BizStep-", disposition: "https://ref.gs1.org/cbv/Disp-", btt: "https://ref.gs1.org/cbv/BTT-" };
+  const CBV_LIST = { bizStep: CBV_BIZ_STEPS, disposition: CBV_DISPOSITIONS, btt: CBV_BTT };
+  // The event fields the mapping reads; every other event-level field is counted as ignored.
+  const EPCIS_FIELDS = ["eventID", "type", "@type", "isA", "action", "eventTime", "eventTimeZoneOffset", "bizStep", "disposition", "epcList", "quantityList", "parentID", "childEPCs", "childQuantityList", "readPoint", "bizLocation", "bizTransactionList"];
+  // A CBV identifier in any of its three forms -> { id, form: bare | urn | web | other, cbv } (null when absent).
+  function cbvId(value, kind) {
+    if (typeof value !== "string" || !value) return null;
+    let id = value, form = "bare";
+    if (value.indexOf(CBV_URN[kind]) === 0) { id = value.slice(CBV_URN[kind].length); form = "urn"; }
+    else if (value.indexOf(CBV_WEB[kind]) === 0) { id = value.slice(CBV_WEB[kind].length); form = "web"; }
+    else if (!/^[a-z][a-z0-9_]*$/.test(value)) return { id: value, form: "other", cbv: false };
+    return { id: id, form: form, cbv: CBV_LIST[kind].indexOf(id) >= 0 };
+  }
+  // Days since 1970-01-01 of a proleptic Gregorian date (Howard Hinnant's days_from_civil).
+  function daysFromCivil(y, m, d) {
+    y -= m <= 2 ? 1 : 0;
+    const era = Math.floor(y / 400), yoe = y - era * 400;
+    const doy = Math.floor((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1;
+    const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+    return era * 146097 + doe - 719468;
+  }
+  // An ISO 8601 date-time with a zone (Z or +-hh:mm) -> milliseconds since the epoch; null when it is not one.
+  // Fractions beyond the millisecond are dropped (not rounded), so JavaScript and Python agree.
+  function parseIsoMs(s) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/.exec(String(s == null ? "" : s));
+    if (!m) return null;
+    const mo = +m[2], d = +m[3], hh = +m[4], mi = +m[5], ss = +m[6];
+    if (mo < 1 || mo > 12 || d < 1 || d > 31 || hh > 23 || mi > 59 || ss > 60) return null;
+    const frac = m[7] ? +((m[7] + "00").slice(0, 3)) : 0;
+    let ms = (daysFromCivil(+m[1], mo, d) * 86400 + hh * 3600 + mi * 60 + ss) * 1000 + frac;
+    if (m[8] !== "Z") { const sign = m[8].charAt(0) === "-" ? -1 : 1; ms -= sign * ((+m[8].slice(1, 3)) * 3600 + (+m[8].slice(4, 6)) * 60) * 1000; }
+    return ms;
+  }
+  // FNV-1a 32-bit over the string's code units (the same as ids.js / tools/run_ledger.py).
+  function fnv1a32(text) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h >>> 0;
+  }
+  // The objects an event names: the parent of an aggregation; the EPCs of an object event, or its
+  // first class when it is class-level only.
+  function unitKeys(ev, type) {
+    if (type === "AggregationEvent") return typeof ev.parentID === "string" && ev.parentID ? [ev.parentID] : [];
+    const epcs = Array.isArray(ev.epcList) ? ev.epcList.filter((x) => typeof x === "string" && x) : [];
+    if (epcs.length) return epcs;
+    const q = Array.isArray(ev.quantityList) ? ev.quantityList.filter((x) => x && typeof x.epcClass === "string" && x.epcClass) : [];
+    return q.length ? [q[0].epcClass] : [];
+  }
+  const quantitiesOf = (list) => (Array.isArray(list) ? list : []).filter((x) => x && typeof x.epcClass === "string" && typeof x.quantity === "number")
+    .map((x) => ({ epcClass: x.epcClass, quantity: x.quantity, uom: typeof x.uom === "string" && x.uom ? x.uom : "EA" }));
+  // The document -> { ok, errors, doc (factory-tracking-events/v1), summary }. Pure and deterministic.
+  function fromEpcis(input) {
+    const errors = [];
+    const err = (m) => { if (errors.length < 8) errors.push(m); };
+    const fail = () => ({ ok: false, errors: errors.slice(), doc: null, summary: null });
+    if (!input || typeof input !== "object" || Array.isArray(input)) { err("not an object"); return fail(); }
+    const dtype = input.type || input["@type"] || input.isA;
+    if (EPCIS_TYPES.indexOf(dtype) < 0) { err("not an EPCIS 2.0 capture document (type " + JSON.stringify(dtype == null ? null : dtype) + ", expected EPCISDocument)"); return fail(); }
+    if (input.schemaVersion != null && !/^2(\.\d+)*$/.test(String(input.schemaVersion))) { err("schemaVersion " + JSON.stringify(String(input.schemaVersion)) + ": only EPCIS 2.0 JSON is read"); return fail(); }
+    const list = input.epcisBody && Array.isArray(input.epcisBody.eventList) ? input.epcisBody.eventList : null;
+    if (!list) { err("epcisBody.eventList missing"); return fail(); }
+    if (!list.length) { err("epcisBody.eventList is empty"); return fail(); }
+    const ignored = {}, ids = {}, mapped = [];
+    list.forEach((ev, i) => {
+      const where = "event " + (i + 1);
+      if (!ev || typeof ev !== "object" || Array.isArray(ev)) { err(where + ": not an object"); return; }
+      const type = ev.type || ev["@type"] || ev.isA;
+      if (EVENT_TYPES.indexOf(type) < 0) { err(where + ": " + (type == null ? "no event type" : String(type) + " is not mapped") + " (only ObjectEvent and AggregationEvent are)"); return; }
+      if (ACTIONS.indexOf(ev.action) < 0) { err(where + ": action " + JSON.stringify(ev.action == null ? null : ev.action) + " (ADD, OBSERVE or DELETE)"); return; }
+      const ms = parseIsoMs(ev.eventTime);
+      if (ms == null) { err(where + ": eventTime " + JSON.stringify(ev.eventTime == null ? null : ev.eventTime) + " is not an ISO 8601 date-time with a zone"); return; }
+      const step = cbvId(ev.bizStep, "bizStep"), disp = cbvId(ev.disposition, "disposition");
+      if (!step) { err(where + ": no bizStep (known: " + BIZ_STEPS.join(", ") + ")"); return; }
+      if (BIZ_STEPS.indexOf(step.id) < 0) { err(where + ": business step " + JSON.stringify(step.id) + (step.cbv ? " is CBV 2.0 but not one this app maps" : " is not a CBV 2.0 business step") + " (known: " + BIZ_STEPS.join(", ") + ")"); return; }
+      if (!disp) { err(where + ": no disposition (known: " + DISPOSITIONS.join(", ") + ")"); return; }
+      if (DISPOSITIONS.indexOf(disp.id) < 0) { err(where + ": disposition " + JSON.stringify(disp.id) + (disp.cbv ? " is CBV 2.0 but not one this app maps" : " is not a CBV 2.0 disposition") + " (known: " + DISPOSITIONS.join(", ") + ")"); return; }
+      const keys = unitKeys(ev, type);
+      if (!keys.length) { err(where + ": names no object (no " + (type === "AggregationEvent" ? "parentID" : "epcList or quantityList") + ")"); return; }
+      for (const k of Object.keys(ev)) if (EPCIS_FIELDS.indexOf(k) < 0) ignored[k] = (ignored[k] || 0) + 1;
+      const baseId = typeof ev.eventID === "string" && ev.eventID ? ev.eventID : "urn:wt:evt:import-" + (i + 1);
+      const epcs = Array.isArray(ev.epcList) ? ev.epcList.filter((x) => typeof x === "string" && x) : [];
+      keys.forEach((key, n) => {
+        const id = n === 0 ? baseId : baseId + "#" + (n + 1);
+        if (ids[id]) { err(where + ": duplicate eventID " + id); return; }
+        ids[id] = 1;
+        const out = { eventID: id, type: type, action: ev.action, eventTime: String(ev.eventTime), eventTimeZoneOffset: typeof ev.eventTimeZoneOffset === "string" ? ev.eventTimeZoneOffset : null,
+          "wt:tick": 0, "wt:minute": 0, "wt:kind": "recorded", "wt:op": null, "wt:hu_id": key, "wt:version": 0, "wt:source": IMPORT_SOURCE, "wt:document_event": i + 1 };
+        if (type === "AggregationEvent") {
+          out.parentID = key;
+          out.childEPCs = Array.isArray(ev.childEPCs) ? ev.childEPCs.filter((x) => typeof x === "string" && x) : [];
+          out.childQuantityList = quantitiesOf(ev.childQuantityList);
+        } else {
+          out.epcList = epcs.length ? [key] : [];
+          out.quantityList = quantitiesOf(ev.quantityList);
+        }
+        out.bizStep = step.id;
+        out.disposition = disp.id;
+        out["wt:vocabulary"] = { bizStep: step.form, disposition: disp.form };
+        out.readPoint = { id: ev.readPoint && typeof ev.readPoint.id === "string" ? ev.readPoint.id : null };
+        out.bizLocation = ev.bizLocation && typeof ev.bizLocation.id === "string" ? { id: ev.bizLocation.id } : null;
+        out.bizTransactionList = (Array.isArray(ev.bizTransactionList) ? ev.bizTransactionList : []).filter((b) => b && typeof b.bizTransaction === "string")
+          .map((b) => { const t = cbvId(b.type, "btt"); return { type: t ? t.id : null, bizTransaction: b.bizTransaction }; });
+        out["wt:error"] = null;
+        out["wt:delivery"] = null;
+        mapped.push({ ms: ms, i: i, n: n, ev: out });
+      });
+    });
+    if (errors.length) return fail();
+    mapped.sort((a, b) => a.ms - b.ms || a.i - b.i || a.n - b.n);
+    const t0 = mapped[0].ms, versions = {};
+    let maxTick = 0;
+    for (const m of mapped) {
+      const minutes = (m.ms - t0) / 60000, key = m.ev["wt:hu_id"];
+      m.ev["wt:minute"] = minutes;
+      m.ev["wt:tick"] = Math.floor(minutes + 0.5);
+      m.ev["wt:version"] = versions[key] || 0;
+      versions[key] = m.ev["wt:version"] + 1;
+      if (m.ev["wt:tick"] > maxTick) maxTick = m.ev["wt:tick"];
+    }
+    const events = mapped.map((m) => m.ev);
+    const sig = events.map((e) => [e.eventID, e["wt:hu_id"], e["wt:tick"], e.bizStep, e.disposition, e.type, e.action].join("|")).join("\n");
+    const hash = ("00000000" + fnv1a32(sig).toString(16)).slice(-8);
+    const source = { kind: "epcis-2.0-document", document_id: typeof input.id === "string" ? input.id : null, schemaVersion: input.schemaVersion == null ? null : String(input.schemaVersion),
+      creationDate: typeof input.creationDate === "string" ? input.creationDate : null, document_events: list.length, mapped_events: events.length,
+      units: Object.keys(versions).length, earliest: events[0].eventTime, latest: events[events.length - 1].eventTime, ignored_fields: Object.keys(ignored).sort() };
+    const run = { id: "EPCIS-" + hash, scenario: "epcis-import", seed: 0, hash: hash, ticks: maxTick, minutes_per_tick: 1 };
+    const doc = makeDocument(run, events);
+    doc.honesty = IMPORT_HONESTY;
+    doc.run.source = source;
+    return { ok: true, errors: [], doc: doc, summary: Object.assign({ run_id: run.id, ticks: maxTick }, source) };
+  }
+  const isEpcis = (obj) => !!obj && typeof obj === "object" && EPCIS_TYPES.indexOf(obj.type || obj["@type"] || obj.isA) >= 0;
+
   /* ---------------- the store ----------------------------------------------- */
   // Two engines behind one API. An engine is a handful of promise-returning
   // primitives; the store logic (validation, replacement, eviction, ordering,
@@ -452,12 +618,17 @@
     store.byOrderRef = (ref) => engine.eventsByOrderRef(String(ref)).then(grouped);
     store.exportJson = () => store.runs().then((runs) => Promise.all(runs.map((r) => store.getRun(r.id)))).then((docs) => ({ schema: STORE_SCHEMA, runs: docs }));
     store.importJson = (obj) => {
-      const docs = obj && obj.schema === STORE_SCHEMA && Array.isArray(obj.runs) ? obj.runs : obj && obj.schema === SCHEMA ? [obj] : null;
-      if (!docs) return Promise.reject(new Error("refused: not a " + SCHEMA + " or " + STORE_SCHEMA + " document"));
+      let imported = null;
+      if (isEpcis(obj)) { // v3.58 the return path: a recorded document lands beside the derived runs
+        imported = fromEpcis(obj);
+        if (!imported.ok) return Promise.reject(new Error("refused: " + imported.errors.join("; ")));
+      }
+      const docs = imported ? [imported.doc] : obj && obj.schema === STORE_SCHEMA && Array.isArray(obj.runs) ? obj.runs : obj && obj.schema === SCHEMA ? [obj] : null;
+      if (!docs) return Promise.reject(new Error("refused: not a " + SCHEMA + ", " + STORE_SCHEMA + " or EPCIS 2.0 (EPCISDocument) document"));
       for (const d of docs) { const v = validate(d); if (!v.ok) return Promise.reject(new Error("refused: " + v.errors.join("; "))); }
       let p = Promise.resolve(), events = 0;
       for (const d of docs) p = p.then(() => store.putRun(d)).then((r) => { events += r.events; });
-      return p.then(() => ({ runs: docs.length, events: events }));
+      return p.then(() => (imported ? { runs: docs.length, events: events, imported: imported.summary } : { runs: docs.length, events: events }));
     };
     store.size = () => engine.count().then((c) => ({ runs: c.runs, events: c.events, backend: engine.backend }));
     store.close = () => engine.close();
@@ -516,5 +687,6 @@
   WT.tracking = { SCHEMA, STORE_SCHEMA, HONESTY, NOTES, VOCAB_SOURCE, BIZ_STEPS, DISPOSITIONS, BIZ_TRANSACTION_TYPES, EVENT_TYPES, ACTIONS, OPS, TERMINAL,
     ERROR_DISPOSITION, VERIFY_OPS, // v3.54
     ssccUrn, sgtinPattern, sglnUrn, glnFor, twin, fromLedger, create, observe, exportJson,
-    historyOf, dwellByBizStep, dispositionCounts, gaps, validate, openStore, deleteStore };
+    historyOf, dwellByBizStep, dispositionCounts, gaps, validate, openStore, deleteStore,
+    EPCIS_TYPES, CBV_BIZ_STEPS, CBV_DISPOSITIONS, CBV_BTT, IMPORT_HONESTY, IMPORT_SOURCE, cbvId, daysFromCivil, parseIsoMs, fnv1a32, fromEpcis, isEpcis }; // v3.58 the return path
 })();

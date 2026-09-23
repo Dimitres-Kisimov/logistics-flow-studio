@@ -1,0 +1,176 @@
+{
+ "bizstepDwell": [
+  {
+   "biz_step": "destroying",
+   "events": 1,
+   "units": 1,
+   "spans": 0,
+   "avg_ticks_to_next": null,
+   "max_ticks_to_next": null,
+   "waiting_ticks": 0,
+   "total_ticks": 0,
+   "waiting_share": null
+  },
+  {
+   "biz_step": "inspecting",
+   "events": 1,
+   "units": 1,
+   "spans": 1,
+   "avg_ticks_to_next": 9,
+   "max_ticks_to_next": 9,
+   "waiting_ticks": 0,
+   "total_ticks": 9,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "loading",
+   "events": 1,
+   "units": 1,
+   "spans": 1,
+   "avg_ticks_to_next": 40,
+   "max_ticks_to_next": 40,
+   "waiting_ticks": 0,
+   "total_ticks": 40,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "packing",
+   "events": 1,
+   "units": 1,
+   "spans": 1,
+   "avg_ticks_to_next": 20,
+   "max_ticks_to_next": 20,
+   "waiting_ticks": 0,
+   "total_ticks": 20,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "picking",
+   "events": 1,
+   "units": 1,
+   "spans": 0,
+   "avg_ticks_to_next": null,
+   "max_ticks_to_next": null,
+   "waiting_ticks": 0,
+   "total_ticks": 0,
+   "waiting_share": null
+  },
+  {
+   "biz_step": "receiving",
+   "events": 1,
+   "units": 1,
+   "spans": 1,
+   "avg_ticks_to_next": 12,
+   "max_ticks_to_next": 12,
+   "waiting_ticks": 0,
+   "total_ticks": 12,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "shipping",
+   "events": 1,
+   "units": 1,
+   "spans": 0,
+   "avg_ticks_to_next": null,
+   "max_ticks_to_next": null,
+   "waiting_ticks": 0,
+   "total_ticks": 0,
+   "waiting_share": null
+  },
+  {
+   "biz_step": "staging_outbound",
+   "events": 1,
+   "units": 1,
+   "spans": 1,
+   "avg_ticks_to_next": 15,
+   "max_ticks_to_next": 15,
+   "waiting_ticks": 0,
+   "total_ticks": 15,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "storing",
+   "events": 2,
+   "units": 2,
+   "spans": 2,
+   "avg_ticks_to_next": 25.5,
+   "max_ticks_to_next": 50,
+   "waiting_ticks": 0,
+   "total_ticks": 51,
+   "waiting_share": 0
+  },
+  {
+   "biz_step": "unpacking",
+   "events": 1,
+   "units": 1,
+   "spans": 0,
+   "avg_ticks_to_next": null,
+   "max_ticks_to_next": null,
+   "waiting_ticks": 0,
+   "total_ticks": 0,
+   "waiting_share": null
+  }
+ ],
+ "dispositionCounts": [
+  {
+   "biz_step": "destroying",
+   "disposition": "non_sellable_other",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "inspecting",
+   "disposition": "damaged",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "loading",
+   "disposition": "in_progress",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "packing",
+   "disposition": "in_progress",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "picking",
+   "disposition": "in_progress",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "receiving",
+   "disposition": "in_progress",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "shipping",
+   "disposition": "in_transit",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "staging_outbound",
+   "disposition": "in_progress",
+   "events": 1,
+   "units": 1
+  },
+  {
+   "biz_step": "storing",
+   "disposition": "sellable_accessible",
+   "events": 2,
+   "units": 2
+  },
+  {
+   "biz_step": "unpacking",
+   "disposition": "in_progress",
+   "events": 1,
+   "units": 1
+  }
+ ]
+}

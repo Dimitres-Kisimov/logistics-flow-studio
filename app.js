@@ -3163,6 +3163,31 @@
       downloadFile("tracking-events-" + doc.run.id + ".json", JSON.stringify(doc, null, 1), "application/json");
       status("Tracking events exported: " + doc.events.length + " EPCIS-shaped events (factory-tracking-events/v1).");
     });
+    // v3.58 the return path: an EPCIS 2.0 capture document (a WMS or scanner export) into the tracking store,
+    // mapped by WT.tracking.fromEpcis through store.importJson; the refusal names the event and the reason.
+    on("flowTrackingImport", () => { const inp = $("flowTrackingImportInput"); if (inp) inp.click(); });
+    const epcisInput = $("flowTrackingImportInput");
+    if (epcisInput) epcisInput.addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file || !WT.tracking) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        let obj = null;
+        try { obj = JSON.parse(String(reader.result)); } catch (err) { toast("Not JSON: " + err.message, "err"); return; }
+        trackingStore().then((store) => store.importJson(obj).then((r) => store.size().then((size) => {
+          trackingInfo = size;
+          updateLedgerReadout();
+          const s = r.imported || {};
+          status("Tracking store (" + size.backend + "): imported " + r.events + " recorded events from " + file.name + " as " + (s.run_id || "?") + " (" + s.document_events + " document events, " +
+            s.units + " objects, " + s.ticks + " minutes from the earliest event" + (s.ignored_fields && s.ignored_fields.length ? "; ignored fields: " + s.ignored_fields.join(", ") : "") + "); " +
+            size.runs + " runs / " + size.events + " events kept in this browser. Nothing is sent anywhere.");
+          toast("Imported " + r.events + " recorded EPCIS 2.0 events into the tracking store (" + (s.run_id || "?") + ").");
+        }))).catch((err) => toast("The tracking store refused the document: " + (err && err.message ? err.message : err), "warn"));
+      };
+      reader.onerror = () => toast("Could not read the file.", "err");
+      reader.readAsText(file);
+    });
     const unitSel = $("flowLedgerUnit");
     if (unitSel) unitSel.addEventListener("change", () => { ledgerTraceCache = ""; updateLedgerReadout(); });
     // v3.29 R4: the order-mix picker. Remembered on this device; a change

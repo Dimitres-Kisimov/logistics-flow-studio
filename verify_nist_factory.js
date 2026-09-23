@@ -169,7 +169,7 @@ const GEN = G.generateFactoryLayout(KEY, { seed: 2017 });
     /nist-cell-example-loads-with-measured-cycles/.test(st) && /verify_nist_factory\.js/.test(runall) && fs.existsSync(path.join(__dirname, "test", "test_nist_box_assembly.py")));
   check("5d. CREDITS keeps the NIST notice and the no-logo rule; README has the dataset section; DOMAIN_NOTES section 11; the generated Markdown carries the derived sums",
     /use of the NIST logo is not allowed/.test(credits) && /## A factory from an actual dataset/.test(readme) && /## 11\. /.test(notes) && md.indexOf("`hurco02_box_sum_of_medians_s`: **" + DATA.derived.hurco02_box_sum_of_medians_s + " s**") >= 0);
-  check("5e. sw.js at wt-v136 (previously wt-v135)", /CACHE_VERSION\s*=\s*"wt-v136"/.test(sw) && /Previously wt-v135/.test(sw));
+  check("5e. sw.js at wt-v137 (previously wt-v136)", /CACHE_VERSION\s*=\s*"wt-v137"/.test(sw) && /Previously wt-v136/.test(sw));
 })();
 
 console.log("");

@@ -1,0 +1,138 @@
+{
+  "@context": ["https://ref.gs1.org/standards/epcis/2.0.0/epcis-context.jsonld", {"example": "https://example.com/epcis/"}],
+  "id": "urn:wt:doc:epcis-example-1",
+  "type": "EPCISDocument",
+  "schemaVersion": "2.0",
+  "creationDate": "2026-09-21T12:00:00+02:00",
+  "wt:note": "SYNTHETIC. A small EPCIS 2.0 capture document written for this repository's tests (v3.58, the return path): one inbound pallet on GS1's documentation prefix 4012345 that is unpacked into cases, one case picked, packed under a parcel and shipped, one case found damaged and written off. Shaped after GS1's published example documents (ref.gs1.org/docs/epcis/examples; github.com/gs1/EPCIS, folder JSON), none of which is copied; the identifiers identify nothing real. The events are deliberately not in time order and use the three CBV identifier forms, one event has no eventID, one carries fields the importer ignores.",
+  "epcisBody": {
+    "eventList": [
+      {
+        "type": "ObjectEvent",
+        "action": "OBSERVE",
+        "eventTime": "2026-09-21T06:00:00Z",
+        "eventTimeZoneOffset": "+02:00",
+        "epcList": ["urn:epc:id:sscc:4012345.3000000001"],
+        "bizStep": "receiving",
+        "disposition": "in_progress",
+        "readPoint": {"id": "urn:epc:id:sgln:4012345.31389.0"},
+        "bizLocation": {"id": "urn:epc:id:sgln:4012345.00001.0"},
+        "bizTransactionList": [{"type": "po", "bizTransaction": "urn:epcglobal:cbv:bt:4012345000009:PO-1001"}]
+      },
+      {
+        "eventID": "urn:uuid:8e1a0f2c-4b8d-4c22-9a3f-000000000002",
+        "type": "AggregationEvent",
+        "action": "DELETE",
+        "eventTime": "2026-09-21T08:12:00.000+02:00",
+        "eventTimeZoneOffset": "+02:00",
+        "parentID": "urn:epc:id:sscc:4012345.3000000001",
+        "childEPCs": ["urn:epc:id:sgtin:4012345.001917.1001", "urn:epc:id:sgtin:4012345.001917.1002"],
+        "childQuantityList": [{"epcClass": "urn:epc:idpat:sgtin:4012345.001917.*", "quantity": 46, "uom": "EA"}],
+        "bizStep": "unpacking",
+        "disposition": "in_progress",
+        "readPoint": {"id": "urn:epc:id:sgln:4012345.31389.0"},
+        "bizLocation": {"id": "urn:epc:id:sgln:4012345.00001.0"}
+      },
+      {
+        "eventID": "urn:uuid:8e1a0f2c-4b8d-4c22-9a3f-000000000003",
+        "type": "ObjectEvent",
+        "action": "OBSERVE",
+        "eventTime": "2026-09-21T08:40:00+02:00",
+        "eventTimeZoneOffset": "+02:00",
+        "epcList": ["urn:epc:id:sgtin:4012345.001917.1001", "urn:epc:id:sgtin:4012345.001917.1002"],
+        "bizStep": "urn:epcglobal:cbv:bizstep:storing",
+        "disposition": "urn:epcglobal:cbv:disp:sellable_accessible",
+        "readPoint": {"id": "urn:epc:id:sgln:4012345.00002.0"},
+        "bizLocation": {"id": "urn:epc:id:sgln:4012345.00001.0"}
+      },
+      {
+        "eventID": "urn:uuid:8e1a0f2c-4b8d-4c22-9a3f-000000000004",
+        "type": "ObjectEvent",
+        "action": "OBSERVE",
+        "eventTime": "2026-09-21T09:30:00+02:00",
+        "eventTimeZoneOffset": "+02:00",
+        "epcList": ["urn:epc:id:sgtin:4012345.001917.1001"],
+        "bizStep": "https://ref.gs1.org/cbv/BizStep-picking",
+        "disposition": "https://ref.gs1.org/cbv/Disp-in_progress",
+        "readPoint": {"id": "urn:epc:id:sgln:4012345.00002.0"},
+        "bizLocation": {"id": "urn:epc:id:sgln:4012345.00001.0"}
+      },
+      {
+        "eventID": "urn:uuid:8e1a0f2c-4b8d-4c22-9a3f-000000000005",
+        "type": "AggregationEvent",
+        "action": "ADD",
+        "eventTime": "2026-09-21T09:45:00+02:00",
+        "eventTimeZoneOffset": "+02:00",
+        "parentID": "urn:epc:id:sscc:4012345.0000000003",
+        "childEPCs": ["urn:epc:id:sgtin:4012345.001917.1001"],
+        "childQuantityList": [{"epcClass": "urn:epc:idpat:sgtin:4012345.001917.*", "quantity": 12, "uom": "EA"}],
+        "bizStep": "packing",
+        "disposition": "in_progress",
+        "readPoint": {"id": "urn:epc:id:sgln:4012345.00003.0"},
+        "bizLocation": {"id": "urn:epc:id:sgln:4012345.00001.0"},
+        "bizTransactionList": [{"type": "urn:epcglobal:cbv:btt:po", "bizTransaction": "urn:epcglobal:cbv:bt:4012345000009:PO-1001"}]
+      },
+      {
+        "eventID": "urn:uuid:8e1a0f2c-4b8d-4c22-9a3f-000000000006",
+        "type": "ObjectEvent",
+        "action": "OBSERVE",
+        "eventTime": "2026-09-21T10:05:00+02:00",
+        "eventTimeZoneOffset": "+02:00",
+        "epcList": ["urn:epc:id:sscc:4012345.0000000003"],
+        "bizStep": "staging_outbound",
+        "disposition": "in_progress",
+        "readPoint": {"id": "urn:epc:id:sgln:4012345.00004.0"},
+        "bizLocation": {"id": "urn:epc:id:sgln:4012345.00001.0"}
+      },
+      {
+        "eventID": "urn:uuid:8e1a0f2c-4b8d-4c22-9a3f-000000000007",
+        "type": "ObjectEvent",
+        "action": "OBSERVE",
+        "eventTime": "2026-09-21T11:00:00+02:00",
+        "eventTimeZoneOffset": "+02:00",
+        "epcList": ["urn:epc:id:sscc:4012345.0000000003"],
+        "bizStep": "shipping",
+        "disposition": "in_transit",
+        "readPoint": {"id": "urn:epc:id:sgln:4012345.00004.0"},
+        "sourceList": [{"type": "owning_party", "source": "urn:epc:id:pgln:4012345.00001"}],
+        "destinationList": [{"type": "owning_party", "destination": "urn:epc:id:pgln:4012345.00009"}]
+      },
+      {
+        "eventID": "urn:uuid:8e1a0f2c-4b8d-4c22-9a3f-000000000008",
+        "type": "ObjectEvent",
+        "action": "OBSERVE",
+        "eventTime": "2026-09-21T10:20:00+02:00",
+        "eventTimeZoneOffset": "+02:00",
+        "epcList": ["urn:epc:id:sscc:4012345.0000000003"],
+        "bizStep": "loading",
+        "disposition": "in_progress",
+        "readPoint": {"id": "urn:epc:id:sgln:4012345.00004.0"},
+        "bizLocation": {"id": "urn:epc:id:sgln:4012345.00001.0"}
+      },
+      {
+        "eventID": "urn:uuid:8e1a0f2c-4b8d-4c22-9a3f-000000000009",
+        "type": "ObjectEvent",
+        "action": "OBSERVE",
+        "eventTime": "2026-09-21T08:41:20.500+02:00",
+        "eventTimeZoneOffset": "+02:00",
+        "epcList": ["urn:epc:id:sgtin:4012345.001917.1002"],
+        "bizStep": "inspecting",
+        "disposition": "damaged",
+        "readPoint": {"id": "urn:epc:id:sgln:4012345.00002.0"},
+        "bizLocation": {"id": "urn:epc:id:sgln:4012345.00001.0"}
+      },
+      {
+        "eventID": "urn:uuid:8e1a0f2c-4b8d-4c22-9a3f-000000000010",
+        "type": "ObjectEvent",
+        "action": "DELETE",
+        "eventTime": "2026-09-21T08:50:00+02:00",
+        "eventTimeZoneOffset": "+02:00",
+        "epcList": ["urn:epc:id:sgtin:4012345.001917.1002"],
+        "bizStep": "destroying",
+        "disposition": "non_sellable_other",
+        "readPoint": {"id": "urn:epc:id:sgln:4012345.00002.0"},
+        "example:myField": "a vendor extension the importer ignores and counts"
+      }
+    ]
+  }
+}

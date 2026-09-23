@@ -103,13 +103,17 @@ CREATE TABLE IF NOT EXISTS location_class(
 -- No wall clock: tick and minute only. Identifiers are EPC URIs on GS1's documentation prefix.
 CREATE TABLE IF NOT EXISTS tracking_event(
   id TEXT PRIMARY KEY NOT NULL, run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE,
-  handling_event_id TEXT NOT NULL UNIQUE REFERENCES handling_event(id) ON DELETE CASCADE,
-  hu_id TEXT NOT NULL REFERENCES hu(id) ON DELETE CASCADE, version INTEGER NOT NULL, tick INTEGER NOT NULL, minute REAL NOT NULL,
+  handling_event_id TEXT UNIQUE REFERENCES handling_event(id) ON DELETE CASCADE,  -- NULL for a recorded event (v3.58)
+  hu_id TEXT NOT NULL, version INTEGER NOT NULL, tick INTEGER NOT NULL, minute REAL NOT NULL,
   event_type TEXT NOT NULL CHECK(event_type IN ('ObjectEvent','AggregationEvent')), action TEXT NOT NULL CHECK(action IN ('ADD','OBSERVE','DELETE')),
-  biz_step TEXT NOT NULL, disposition TEXT NOT NULL, read_point TEXT, read_element TEXT NOT NULL, biz_location TEXT,
-  biz_transaction_type TEXT NOT NULL, biz_transaction TEXT NOT NULL, epc TEXT, parent_id TEXT, epc_class TEXT NOT NULL,
-  quantity INTEGER NOT NULL, uom TEXT NOT NULL DEFAULT 'EA', wt_kind TEXT NOT NULL, wt_op TEXT NOT NULL,
-  error_kind TEXT, error_step TEXT, error_latent TEXT, error_detected INTEGER);
+  biz_step TEXT NOT NULL, disposition TEXT NOT NULL, read_point TEXT, read_element TEXT, biz_location TEXT,
+  biz_transaction_type TEXT, biz_transaction TEXT, epc TEXT, parent_id TEXT, epc_class TEXT,
+  quantity INTEGER, uom TEXT NOT NULL DEFAULT 'EA', wt_kind TEXT NOT NULL, wt_op TEXT,
+  error_kind TEXT, error_step TEXT, error_latent TEXT, error_detected INTEGER,
+  source TEXT NOT NULL DEFAULT 'derived' CHECK(source IN ('derived','imported')));
+-- tracking_event.source: v3.58 the return path - 'derived' for a twin of a handling event (hu_id is a
+-- ledger unit, handling_event_id its event), 'imported' for a recorded event from an EPCIS 2.0 document
+-- (tools/epcis_import.py: hu_id is the document's own object identifier, handling_event_id NULL, wt_op NULL).
 CREATE INDEX IF NOT EXISTS ix_tracking_hu ON tracking_event(hu_id, version);
 CREATE INDEX IF NOT EXISTS ix_tracking_step ON tracking_event(run_id, biz_step);
 """
@@ -460,12 +464,14 @@ REPLICATION_VIEWS = ("v_replication_groups", "v_replication_cycle_by_type", "v_r
 # twins) and their share - the same definition as tracking.js dwellByBizStep (LEAD(tick) - tick per
 # unit in version order), reconciled between SQL and JavaScript; and the invariant: a handling event
 # without a twin, or a twin outside the CBV 2.0 vocabulary this app may emit, must not exist.
+# v3.58: a recorded event (tools/epcis_import.py) sits in the same table with source 'imported' and no
+# ledger unit, so v_epcis_events joins hu on the left and carries the source column.
 VIEWS["v_epcis_events"] = """
 CREATE VIEW IF NOT EXISTS v_epcis_events AS
 SELECT t.run_id, t.id AS event_id, t.hu_id, h.archetype, h.sscc, h.order_id, t.version, t.tick, t.minute, t.event_type, t.action,
        t.biz_step, t.disposition, t.read_point, t.read_element, t.biz_location, t.biz_transaction_type, t.biz_transaction,
-       t.epc, t.parent_id, t.epc_class, t.quantity, t.uom, t.wt_kind, t.wt_op, t.error_kind, t.error_step, t.error_latent
-FROM tracking_event t JOIN hu h ON h.id = t.hu_id;"""
+       t.epc, t.parent_id, t.epc_class, t.quantity, t.uom, t.wt_kind, t.wt_op, t.error_kind, t.error_step, t.error_latent, t.source
+FROM tracking_event t LEFT JOIN hu h ON h.id = t.hu_id;"""
 VIEWS["v_unit_history"] = """
 CREATE VIEW IF NOT EXISTS v_unit_history AS
 SELECT run_id, hu_id, version, tick, wt_kind AS kind, wt_op AS op, event_type, action, biz_step, disposition, read_element, quantity,
@@ -599,6 +605,21 @@ def initialize(db: sqlite3.Connection) -> None:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {typ}")
         except sqlite3.OperationalError:
             pass
+    # v3.58: a database created before v3.58 has no tracking_event.source and ties every twin to a ledger unit; rebuild the
+    # table once so recorded events can land beside the twins (SQLite cannot drop a constraint)
+    old = db.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tracking_event'").fetchone()
+    if old and old[0] and "source" not in old[0]:
+        for name in VIEWS:
+            db.execute(f"DROP VIEW IF EXISTS {name}")
+        db.execute("DROP INDEX IF EXISTS ix_tracking_hu")
+        db.execute("DROP INDEX IF EXISTS ix_tracking_step")
+        db.execute("ALTER TABLE tracking_event RENAME TO tracking_event_old")
+        db.executescript(DDL)
+        cols = ("id, run_id, handling_event_id, hu_id, version, tick, minute, event_type, action, biz_step, disposition, read_point, read_element, "
+                "biz_location, biz_transaction_type, biz_transaction, epc, parent_id, epc_class, quantity, uom, wt_kind, wt_op, error_kind, error_step, "
+                "error_latent, error_detected")
+        db.execute(f"INSERT INTO tracking_event({cols}, source) SELECT {cols}, 'derived' FROM tracking_event_old")
+        db.execute("DROP TABLE tracking_event_old")
     # v3.57: a database created before v3.57 refuses the status 'reverted' (SQLite cannot alter a CHECK) - rebuild the table once
     old = db.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'control_event'").fetchone()
     if old and old[0] and "'reverted'" not in old[0]:
@@ -865,13 +886,21 @@ def tracking_row(run_id: str, ev: dict) -> tuple:
             ev["bizLocation"]["id"] if ev.get("bizLocation") else None, bt["type"], bt["bizTransaction"],
             None if agg else ev["epcList"][0], ev.get("parentID") if agg else None, q["epcClass"], int(q["quantity"]), q.get("uom") or "EA",
             ev["wt:kind"], ev["wt:op"], err.get("kind"), err.get("step"), json.dumps(err.get("latent"), sort_keys=True) if err.get("latent") is not None else None,
-            (1 if err.get("detected") else 0) if err else None)
+            (1 if err.get("detected") else 0) if err else None, "derived")  # v3.58: source
+
+
+# The tracking_event columns in the order tracking_row / epcis_import.imported_row produce them (named on insert, so a
+# database whose columns were added in another order - an ALTER after v3.58 - still takes them).
+TRACKING_COLS = ("id", "run_id", "handling_event_id", "hu_id", "version", "tick", "minute", "event_type", "action", "biz_step", "disposition",
+                 "read_point", "read_element", "biz_location", "biz_transaction_type", "biz_transaction", "epc", "parent_id", "epc_class", "quantity", "uom",
+                 "wt_kind", "wt_op", "error_kind", "error_step", "error_latent", "error_detected", "source")
+TRACKING_INSERT = "INSERT INTO tracking_event(" + ", ".join(TRACKING_COLS) + ") VALUES(" + ",".join("?" * len(TRACKING_COLS)) + ")"
 
 
 def derive_tracking(db: sqlite3.Connection, run_id: str, data: dict) -> int:
     """Insert the run's tracking twins (the handling events must already be in). Returns the count."""
     rows_ = [tracking_row(run_id, ev) for ev in track_events(data)]
-    db.executemany("INSERT INTO tracking_event VALUES(" + ",".join("?" * 27) + ")", rows_)
+    db.executemany(TRACKING_INSERT, rows_)
     return len(rows_)
 
 

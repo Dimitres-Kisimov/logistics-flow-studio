@@ -1,5 +1,51 @@
 # Changelog
 
+## v3.58 — The return path: a recorded EPCIS 2.0 document into the tracking database
+
+**The mapping.** `tracking.js fromEpcis(document)` reads an EPCIS 2.0 capture document (JSON / JSON-LD,
+`type: "EPCISDocument"`, `epcisBody.eventList`) onto the shape the derived twins use
+(`factory-tracking-events/v1`): ObjectEvent and AggregationEvent only; only the 13 business steps and
+8 dispositions this app knows, in the three CBV forms (bare, `urn:epcglobal:cbv:bizstep:x`,
+`https://ref.gs1.org/cbv/BizStep-x`), the form remembered in `wt:vocabulary`; a refusal names the
+event and the identifier and says whether it is CBV 2.0 at all (the 41 / 33 / 13 identifiers of the
+ratified JSON-LD context, read 2026-09-23). Every event needs a zoned ISO 8601 `eventTime` and an object;
+an ObjectEvent naming several EPCs becomes one mapped event per EPC (`eventID#2`, `#3`, ...) so a unit's
+history has no holes; events are ordered by time with document order as the tie-break; `wt:tick` is
+whole minutes from the earliest event (floor(x + 0.5)), `wt:minute` exact, `eventTime` kept; `wt:kind`
+recorded, `wt:source` imported, `wt:op` null. ISO 8601 is parsed by hand (Hinnant's days-from-civil,
+the offset applied) - still no `Date` in the module. The run is `EPCIS-<fnv1a>` with scenario
+`epcis-import`, `minutes_per_tick 1` and a `run.source` block (document id, counts, earliest / latest,
+ignored fields). `store.importJson` accepts the document beside the two shapes it took; the imported run
+round-trips through the store's export.
+
+**The SQL side.** `tools/epcis_import.py check | twin | import | dwell`: the Python twin of the mapping
+(pinned equal to the committed JavaScript twin event by event), one `run` row and one `tracking_event`
+row per mapped event with the new `source` column set to `imported`. `tracking_event` is rebuilt once
+in an older database: `source` (derived | imported, CHECKed), `handling_event_id` nullable, no foreign
+key from `hu_id` to a ledger unit, the ledger-only columns nullable; `v_epcis_events` joins `hu` on the
+left and carries `source`. `v_bizstep_dwell`, `v_unit_history` and the `v_tracking_gaps` invariant work
+unchanged over both sources (the gaps stay 0 with a derived and an imported run in one database).
+
+**The app.** *Simulate → Run ledger → Import EPCIS 2.0 document* (a file input; nothing is sent
+anywhere): the status line reports the run, the counts, the minutes and the ignored fields; a refusal is
+shown with its reason.
+
+**The fixture.** `test/fixtures/epcis-document.json` is **synthetic**, this repository's own (one pallet
+unpacked into cases, one case picked, packed and shipped, one found damaged and written off; ten events
+out of time order in the three CBV forms, one without an `eventID`, one with ignored fields, mapping to
+eleven). GS1's published examples were read for the shape and none is copied: the gs1/EPCIS repository's
+LICENSE is the GS1 IP-policy disclaimer, not a copying licence (CREDITS). `tools/make_epcis_fixture.mjs`
+regenerates the committed twin. `docs/EPCIS_IMPORT.md` states the rule and what the import is not: a
+file is the physical-to-digital direction by hand - a *manual* shadow on Kritzinger's ladder (the deep
+dive's chapter 2 and roadmap say so).
+
+**Verification.** `verify_epcis_import.js` (25 checks: the mapping by hand - ticks 0,12,40,40,41,50,90,
+105,125,140,180, versions, ids, forms, parents and children; ISO 8601 by hand against the epoch, a leap
+day and the GS1 example time; dwell per step in minutes by hand; nine refusals that say which; the store;
+determinism and the fresh fixtures; nothing imported, nothing changed - fixture A's twins byte-identical;
+the Python twin's three CBV lists equal; the wiring), `test/test_epcis_import.py` (+8 → 162), the in-app
+self-test `epcis-import-return-path` (190/190). Cache `wt-v137`.
+
 ## v3.57 — Housekeeping after the twin programme: the replication runner's three levers, the rework drawing by op index, an undo for an accepted lever
 
 **The replication runner.** `tools/replicate.mjs` takes the three what-ifs of v3.54 / v3.55 as run inputs:

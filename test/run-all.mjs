@@ -726,6 +726,7 @@ const HARNESSES = [
   { name: "Human error, honestly: declared shares per step, quota-dispatched branches, the unrolled rework, ISO 22400 quality KPIs, SQL == JS (verify_errors.js)", args: ["verify_errors.js"] },
   { name: "Delivery and shipping times in between: dock and carrier windows, the Weyl / quantile lateness by hand, OTIF, the SCMS dataset twin, SQL == JS (verify_delivery.js)", args: ["verify_delivery.js"] },
   { name: "The control tower: four rules over the ledger by hand (tick 140 at stg; 0.22 -> 0.02; trailer 3 at 460; OTIF after 20), decisions and the audit, purity, SQL == JS (verify_control.js)", args: ["verify_control.js"] },
+  { name: "The return path: a recorded EPCIS 2.0 document onto the twins' shape by hand (10 -> 11 events, ticks in minutes, the three CBV forms), refusals that say which, the store, Python twin lists equal (verify_epcis_import.js)", args: ["verify_epcis_import.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 
