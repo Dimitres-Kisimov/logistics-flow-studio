@@ -144,7 +144,7 @@ def _etype(o: dict):
     return o.get("type") or o.get("@type") or o.get("isA")
 
 
-def from_epcis(doc) -> tuple:
+def from_epcis(doc, budget_minutes=None) -> tuple:
     """(mapped document, errors, summary): the document on the twins' shape, or the reasons it was refused."""
     errors: list[str] = []
 
@@ -266,24 +266,143 @@ def from_epcis(doc) -> tuple:
               "creationDate": doc["creationDate"] if isinstance(doc.get("creationDate"), str) else None,
               "document_events": len(lst), "mapped_events": len(events), "units": len(versions),
               "earliest": events[0]["eventTime"], "latest": events[-1]["eventTime"], "ignored_fields": sorted(ignored)}
-    run = {"id": f"EPCIS-{digest}", "scenario": "epcis-import", "seed": 0, "hash": digest, "ticks": max_tick, "minutes_per_tick": 1, "source": source}
+    run = {"id": f"EPCIS-{digest}", "scenario": "epcis-import", "seed": 0, "hash": digest, "ticks": max_tick, "minutes_per_tick": 1, "source": source,
+           "sync": sync_contract(budget_minutes, "manual file import (an EPCIS 2.0 capture document)")}  # v3.64
     out_doc = {"schema": RL.TRACKING_SCHEMA_ID, "honesty": IMPORT_HONESTY,
                "vocabulary": {"bizSteps": list(BIZ_STEPS), "dispositions": list(DISPOSITIONS)}, "run": run, "events": events}
     summary = {"run_id": run["id"], "ticks": max_tick, **source}
     return out_doc, errors, summary
 
 
-def import_document(db: sqlite3.Connection, doc, source_name: str | None = None) -> str:
+# ---- v3.64 the synchronisation contract (ISO 23247-1; the deep dive's gap 9) ------------------
+# The twin of tracking.js syncContract / freshness. ISO 23247-1 defines a digital twin as a
+# representation WITH SYNCHRONISATION between the element and the representation; until a record
+# could be imported there was nothing to be stale against. An imported record carries the contract -
+# direction, mode, staleness budget, who wins on conflict - and freshness() measures it against an
+# instant the caller names (no clock of its own, so the answer is reproducible).
+SYNC_DEFAULTS = {"budget_minutes": 1440, "direction": "physical-to-digital", "mode": "manual file import",
+                 "conflict": "the record wins; this app never writes to the plant", "refreshed_by": "a person importing a document"}
+SYNC_HONESTY = (
+    "A synchronisation contract in the sense of ISO 23247-1, DECLARED - not negotiated with any plant and not a "
+    "conformance claim: the data flows one way, a person carries it (a file, not a stream), the record may be as old "
+    "as the budget says before it is called stale, and on a conflict the record wins because this app never writes to "
+    "a plant. A stale record is not an error: it is the app saying it does not know what has happened since. The "
+    "budget is a declared teaching default until a plant sets its own."
+)
+
+
+def sync_contract(budget_minutes=None, mode: str | None = None, refreshed_by: str | None = None) -> dict:
+    b = None
+    try:
+        b = float(budget_minutes) if budget_minutes is not None else None
+    except (TypeError, ValueError):
+        b = None
+    return {"kind": "wt-sync-contract/v1", "direction": SYNC_DEFAULTS["direction"],
+            "mode": str(mode) if mode else SYNC_DEFAULTS["mode"],
+            "budget_minutes": int(b + 0.5) if b is not None and b > 0 else SYNC_DEFAULTS["budget_minutes"],
+            "conflict": SYNC_DEFAULTS["conflict"],
+            "refreshed_by": str(refreshed_by) if refreshed_by else SYNC_DEFAULTS["refreshed_by"],
+            "honesty": SYNC_HONESTY}
+
+
+def _r2(v: float):
+    """Math.round(v * 100) / 100 - the JavaScript rule (half up, towards +inf), so both sides agree."""
+    import math
+    return _num(math.floor(v * 100 + 0.5) / 100)
+
+
+def _as_ms(v):
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return v
+    return parse_iso_ms(v) if isinstance(v, str) else None
+
+
+def freshness(doc: dict, as_of=None, budget_minutes=None) -> dict:
+    """The twin of tracking.js freshness(): how fresh a record is against its contract, as of an instant."""
+    events = (doc or {}).get("events") or []
+    contract = ((doc or {}).get("run") or {}).get("sync")
+    budget = None
+    try:
+        budget = int(float(budget_minutes) + 0.5) if budget_minutes is not None and float(budget_minutes) > 0 else None
+    except (TypeError, ValueError):
+        budget = None
+    if budget is None:
+        budget = contract["budget_minutes"] if contract and contract.get("budget_minutes", 0) > 0 else SYNC_DEFAULTS["budget_minutes"]
+    stamped = []
+    for e in events:
+        ms = parse_iso_ms(e.get("eventTime")) if isinstance(e.get("eventTime"), str) else None
+        if ms is not None:
+            stamped.append((ms, e["eventTime"], e.get("bizStep")))
+    out = {"recorded": bool(stamped), "events": len(events), "recorded_events": len(stamped), "contract": contract,
+           "budget_minutes": budget, "newest": None, "oldest": None, "span_minutes": None, "as_of": None,
+           "age_minutes": None, "stale": None, "per_step": []}
+    if not stamped:
+        out["reason"] = "no event carries a wall clock: a derived twin of a simulation has nothing to be stale against"
+        return out
+    lo, hi = min(stamped, key=lambda s: s[0]), max(stamped, key=lambda s: s[0])
+    by_step: dict = {}
+    for ms, at, step in stamped:
+        b = by_step.setdefault(step, {"events": 0, "ms": ms, "at": at})
+        b["events"] += 1
+        if ms > b["ms"]:
+            b["ms"], b["at"] = ms, at
+    out["newest"], out["oldest"], out["span_minutes"] = hi[1], lo[1], _r2((hi[0] - lo[0]) / 60000)
+    now_ms = _as_ms(as_of)
+    if now_ms is not None:
+        out["as_of"] = as_of if isinstance(as_of, str) else now_ms
+        out["age_minutes"] = _r2((now_ms - hi[0]) / 60000)
+        out["stale"] = out["age_minutes"] > budget
+    for k in sorted(by_step):
+        b = by_step[k]
+        age = None if now_ms is None else _r2((now_ms - b["ms"]) / 60000)
+        out["per_step"].append({"biz_step": k, "events": b["events"], "newest": b["at"], "age_minutes": age,
+                                "stale": None if age is None else age > budget})
+    return out
+
+
+def measure(stored: dict, as_of=None, budget_minutes=None) -> dict:
+    """Re-measure a stored freshness block (the run row's `sync`) against another instant - the record's own
+    times are in it, so no document is needed."""
+    out = dict(stored)
+    if budget_minutes is not None and float(budget_minutes) > 0:
+        out["budget_minutes"] = int(float(budget_minutes) + 0.5)
+    now_ms = _as_ms(as_of if as_of else out.get("newest"))
+    newest_ms = _as_ms(out.get("newest"))
+    if now_ms is None or newest_ms is None:
+        return out
+    out["as_of"] = as_of if isinstance(as_of, str) else out.get("newest")
+    out["age_minutes"] = _r2((now_ms - newest_ms) / 60000)
+    out["stale"] = out["age_minutes"] > out["budget_minutes"]
+    out["per_step"] = [dict(s, age_minutes=_r2((now_ms - _as_ms(s["newest"])) / 60000),
+                            stale=_r2((now_ms - _as_ms(s["newest"])) / 60000) > out["budget_minutes"]) for s in out.get("per_step") or []]
+    return out
+
+
+def render_freshness(f: dict) -> str:
+    """The freshness of a record as a short report (the same numbers the app shows)."""
+    if not f.get("recorded"):
+        return "not a recorded document: " + str(f.get("reason", "no wall clock"))
+    head = (f"records {f['recorded_events']} events from {f['oldest']} to {f['newest']} ({f['span_minutes']} minutes)\n"
+            f"as of {f['as_of']}: {f['age_minutes']} minutes old, budget {f['budget_minutes']} -> "
+            + ("STALE: the record does not say what has happened since" if f.get("stale") else "fresh"))
+    rows = [{"biz_step": s["biz_step"], "events": s["events"], "newest": s["newest"], "age_minutes": s["age_minutes"], "stale": s["stale"]} for s in f.get("per_step") or []]
+    contract = f.get("contract") or {}
+    tail = ("contract: " + str(contract.get("direction")) + ", " + str(contract.get("mode")) + "; on a conflict " + str(contract.get("conflict"))) if contract else "no contract recorded"
+    return head + "\n" + RL.render(rows) + "\n" + tail
+
+
+def import_document(db: sqlite3.Connection, doc, source_name: str | None = None, budget_minutes=None) -> str:
     """One run row (scenario epcis-import) and one tracking_event row per mapped event, source 'imported'. Re-import replaces."""
-    mapped, errors, _summary = from_epcis(doc)
+    mapped, errors, _summary = from_epcis(doc, budget_minutes)
     if mapped is None:
         raise ValueError("refused: " + "; ".join(errors))
     run = mapped["run"]
     with db:
         db.execute("DELETE FROM run WHERE id = ?", (run["id"],))
-        db.execute("INSERT INTO run(id, scenario, seed, hash, mix, profile, ticks_per_hour, minutes_per_tick, ticks, honesty, dataset_source) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        db.execute("INSERT INTO run(id, scenario, seed, hash, mix, profile, ticks_per_hour, minutes_per_tick, ticks, honesty, dataset_source, sync) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                    (run["id"], run["scenario"], 0, run["hash"], None, None, 60, 1.0, int(run["ticks"]), IMPORT_HONESTY,
-                    "EPCIS 2.0 document" + (f" {source_name}" if source_name else "") + (f" ({run['source']['document_id']})" if run["source"]["document_id"] else "")))
+                    "EPCIS 2.0 document" + (f" {source_name}" if source_name else "") + (f" ({run['source']['document_id']})" if run["source"]["document_id"] else ""),
+                    json.dumps(freshness(mapped), sort_keys=True)))  # v3.64: the contract and the record's own span, so a later question can measure the age
         db.executemany(RL.TRACKING_INSERT, [imported_row(run["id"], ev) for ev in mapped["events"]])
     return run["id"]
 
@@ -313,22 +432,28 @@ def dwell(db: sqlite3.Connection, run_id: str | None = None) -> list[dict]:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=("check", "twin", "import", "dwell"))
+    ap.add_argument("command", choices=("check", "twin", "import", "dwell", "sync"))
     ap.add_argument("arg", nargs="?", help="the EPCIS 2.0 document (check, twin, import)")
     ap.add_argument("--database", help="the SQLite file (import, dwell)")
     ap.add_argument("--out", help="twin: write the mapped document here (default: stdout)")
-    ap.add_argument("--run", help="dwell: the run id (default: the last imported document)")
+    ap.add_argument("--run", help="dwell / sync: the run id (default: the last imported document)")
+    ap.add_argument("--as-of", dest="as_of", help="sync: the instant to measure the age from (ISO 8601 with a zone; default: the record's own newest event, so the age is 0)")
+    ap.add_argument("--budget-minutes", dest="budget_minutes", type=float, help="import / sync: how old the record may be before it is called stale (default 1440)")
     a = ap.parse_args(argv)
-    if a.command in ("check", "twin", "import"):
+    if a.command in ("check", "twin", "import") or (a.command == "sync" and a.arg):
         if not a.arg:
             ap.error(f"{a.command} needs the document path")
         doc = json.loads(Path(a.arg).read_text(encoding="utf-8"))
-        mapped, errors, summary = from_epcis(doc)
+        mapped, errors, summary = from_epcis(doc, a.budget_minutes)
         if mapped is None:
             print("refused: " + "; ".join(errors))
             return 1
         if a.command == "check":
             print(json.dumps(summary, indent=1))
+            return 0
+        if a.command == "sync":
+            f = freshness(mapped, a.as_of or mapped["run"]["source"]["latest"], a.budget_minutes)
+            print(render_freshness(f))
             return 0
         if a.command == "twin":
             text = json.dumps(mapped, indent=1, ensure_ascii=False) + "\n"
@@ -341,8 +466,17 @@ def main(argv=None) -> int:
         ap.error("--database is required")
     db = RL.connect(a.database)
     RL.initialize(db)
+    if a.command == "sync":
+        row = RL.rows(db, "SELECT id, sync FROM run WHERE id = ?", (a.run,)) if a.run else RL.rows(db, "SELECT id, sync FROM run WHERE scenario = 'epcis-import' ORDER BY rowid DESC LIMIT 1")
+        if not row or not row[0]["sync"]:
+            print("no imported record in the database" + (f" for {a.run}" if a.run else "") + " (import a document first)")
+            return 1
+        stored = json.loads(row[0]["sync"])
+        print(f"{row[0]['id']}:")
+        print(render_freshness(measure(stored, a.as_of, a.budget_minutes)))
+        return 0
     if a.command == "import":
-        rid = import_document(db, doc, Path(a.arg).name)
+        rid = import_document(db, doc, Path(a.arg).name, a.budget_minutes)
         n = RL.rows(db, "SELECT COUNT(*) AS n FROM tracking_event WHERE run_id = ?", (rid,))[0]["n"]
         print(f"imported {rid}: {n} recorded events (source imported) from {Path(a.arg).name}")
         return 0

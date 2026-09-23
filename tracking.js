@@ -62,7 +62,9 @@
  * backend it serves and the reason): putRun,
  * runs, getRun, deleteRun, history(huId), byOrderRef(ref), exportJson,
  * importJson (v3.58: also an EPCIS 2.0 capture document, mapped by fromEpcis -
- * the return path), size, close. History across runs is keyed by the handling-unit
+ * the return path; v3.64: an imported document carries the synchronisation
+ * contract of ISO 23247-1 and freshness() measures it), size, close. History
+ * across runs is keyed by the handling-unit
  * id (which embeds the run id) or by the order reference - not by the SSCC,
  * which recurs from run to run because it is serialised from the unit's
  * sequence number.
@@ -427,7 +429,7 @@
   const quantitiesOf = (list) => (Array.isArray(list) ? list : []).filter((x) => x && typeof x.epcClass === "string" && typeof x.quantity === "number")
     .map((x) => ({ epcClass: x.epcClass, quantity: x.quantity, uom: typeof x.uom === "string" && x.uom ? x.uom : "EA" }));
   // The document -> { ok, errors, doc (factory-tracking-events/v1), summary }. Pure and deterministic.
-  function fromEpcis(input) {
+  function fromEpcis(input, opts) {
     const errors = [];
     const err = (m) => { if (errors.length < 8) errors.push(m); };
     const fail = () => ({ ok: false, errors: errors.slice(), doc: null, summary: null });
@@ -505,9 +507,77 @@
     const doc = makeDocument(run, events);
     doc.honesty = IMPORT_HONESTY;
     doc.run.source = source;
+    doc.run.sync = syncContract({ mode: "manual file import (an EPCIS 2.0 capture document)", budgetMinutes: opts && opts.budgetMinutes }); // v3.64
     return { ok: true, errors: [], doc: doc, summary: Object.assign({ run_id: run.id, ticks: maxTick }, source) };
   }
   const isEpcis = (obj) => !!obj && typeof obj === "object" && EPCIS_TYPES.indexOf(obj.type || obj["@type"] || obj.isA) >= 0;
+
+  /* ---------------- v3.64 the synchronisation contract (ISO 23247-1; the deep dive's gap 9) ---- */
+  // ISO 23247-1 defines a digital twin as a representation WITH SYNCHRONISATION between the observable
+  // element and the representation. Until v3.58 there was nothing to be stale against - a simulation is
+  // never late for itself - so the app had no contract to state. An imported record has one, and it is
+  // the four things the standard and the deep dive name: in which DIRECTION data flows, HOW it is
+  // refreshed, HOW STALE it may be before the record says so, and WHICH SIDE WINS on a conflict.
+  // freshness() measures a document against that contract. Pure: the caller passes the instant to
+  // measure from (the app passes the browser's clock, a harness a fixed instant), so this module still
+  // has no Date of its own.
+  const SYNC_DEFAULTS = { budgetMinutes: 1440, direction: "physical-to-digital", mode: "manual file import",
+    conflict: "the record wins; this app never writes to the plant", refreshedBy: "a person importing a document" };
+  const SYNC_HONESTY =
+    "A synchronisation contract in the sense of ISO 23247-1, DECLARED - not negotiated with any plant and not a " +
+    "conformance claim: the data flows one way, a person carries it (a file, not a stream), the record may be as old " +
+    "as the budget says before it is called stale, and on a conflict the record wins because this app never writes to " +
+    "a plant. A stale record is not an error: it is the app saying it does not know what has happened since. The " +
+    "budget is a declared teaching default until a plant sets its own.";
+  function syncContract(opts) {
+    const o = opts || {};
+    const b = Number(o.budgetMinutes);
+    return { kind: "wt-sync-contract/v1", direction: SYNC_DEFAULTS.direction,
+      mode: o.mode ? String(o.mode) : SYNC_DEFAULTS.mode,
+      budget_minutes: isFinite(b) && b > 0 ? Math.round(b) : SYNC_DEFAULTS.budgetMinutes,
+      conflict: SYNC_DEFAULTS.conflict,
+      refreshed_by: o.refreshedBy ? String(o.refreshedBy) : SYNC_DEFAULTS.refreshedBy,
+      honesty: SYNC_HONESTY };
+  }
+  const asMs = (v) => (typeof v === "number" && isFinite(v) ? v : typeof v === "string" ? parseIsoMs(v) : null);
+  // How fresh is a record against its contract, as of an instant the caller names?
+  //   { recorded, events, recorded_events, contract, budget_minutes, newest, oldest, span_minutes,
+  //     as_of, age_minutes, stale, per_step: [{ biz_step, events, newest, age_minutes, stale }] }
+  // A derived twin carries no wall clock at all: `recorded` is false and the reason says so. Without an
+  // `asOf` the ages are null - the record's own span is still reported.
+  function freshness(doc, opts) {
+    const o = opts || {};
+    const events = (doc && doc.events) || [];
+    const contract = (doc && doc.run && doc.run.sync) || null;
+    const budget = o.budgetMinutes != null && Number(o.budgetMinutes) > 0 ? Math.round(Number(o.budgetMinutes))
+      : contract && contract.budget_minutes > 0 ? contract.budget_minutes : SYNC_DEFAULTS.budgetMinutes;
+    const stamped = [];
+    for (const e of events) { const ms = typeof e.eventTime === "string" ? parseIsoMs(e.eventTime) : null; if (ms != null) stamped.push({ ms: ms, at: e.eventTime, step: e.bizStep }); }
+    const out = { recorded: stamped.length > 0, events: events.length, recorded_events: stamped.length, contract: contract,
+      budget_minutes: budget, newest: null, oldest: null, span_minutes: null, as_of: null, age_minutes: null, stale: null, per_step: [] };
+    if (!out.recorded) { out.reason = "no event carries a wall clock: a derived twin of a simulation has nothing to be stale against"; return out; }
+    let lo = stamped[0], hi = stamped[0];
+    const byStep = {};
+    for (const s of stamped) {
+      if (s.ms < lo.ms) lo = s;
+      if (s.ms > hi.ms) hi = s;
+      const b = byStep[s.step] || (byStep[s.step] = { events: 0, ms: s.ms, at: s.at });
+      b.events++;
+      if (s.ms > b.ms) { b.ms = s.ms; b.at = s.at; }
+    }
+    out.newest = hi.at; out.oldest = lo.at; out.span_minutes = r2((hi.ms - lo.ms) / 60000);
+    const nowMs = asMs(o.asOf);
+    if (nowMs != null) {
+      out.as_of = typeof o.asOf === "string" ? o.asOf : nowMs;
+      out.age_minutes = r2((nowMs - hi.ms) / 60000);
+      out.stale = out.age_minutes > budget;
+    }
+    out.per_step = Object.keys(byStep).sort().map((k) => {
+      const b = byStep[k], age = nowMs == null ? null : r2((nowMs - b.ms) / 60000);
+      return { biz_step: k, events: b.events, newest: b.at, age_minutes: age, stale: age == null ? null : age > budget };
+    });
+    return out;
+  }
 
   /* ---------------- the store ----------------------------------------------- */
   // Two engines behind one API. An engine is a handful of promise-returning
@@ -688,5 +758,6 @@
     ERROR_DISPOSITION, VERIFY_OPS, // v3.54
     ssccUrn, sgtinPattern, sglnUrn, glnFor, twin, fromLedger, create, observe, exportJson,
     historyOf, dwellByBizStep, dispositionCounts, gaps, validate, openStore, deleteStore,
-    EPCIS_TYPES, CBV_BIZ_STEPS, CBV_DISPOSITIONS, CBV_BTT, IMPORT_HONESTY, IMPORT_SOURCE, cbvId, daysFromCivil, parseIsoMs, fnv1a32, fromEpcis, isEpcis }; // v3.58 the return path
+    EPCIS_TYPES, CBV_BIZ_STEPS, CBV_DISPOSITIONS, CBV_BTT, IMPORT_HONESTY, IMPORT_SOURCE, cbvId, daysFromCivil, parseIsoMs, fnv1a32, fromEpcis, isEpcis, // v3.58 the return path
+    SYNC_DEFAULTS, SYNC_HONESTY, syncContract, freshness }; // v3.64 the synchronisation contract
 })();

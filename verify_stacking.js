@@ -32,7 +32,7 @@
  *      strength verdict present, a custom pallet joins the ranking, bad
  *      inputs return an error.
  *   8. Shipped wiring: the viewer section, the profile board in the export,
- *      sw.js at wt-v141, the runner; no Date / Math.random in pack.js.
+ *      sw.js at wt-v142, the runner; no Date / Math.random in pack.js.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -178,7 +178,7 @@ console.log("=".repeat(72));
   check("8a. the viewer has the 'Your case' section and the strength verdict; the packaging section passes the board", /id="rlYourCase"/.test(html) && /function renderYourCase/.test(js) && /function strengthText/.test(js) && /P\.tiHi\(pallet, box, prof\.max_stack_mm, prof\.case_kg, board\)/.test(js));
   check("8b. the export's profile block carries the board", /board: rec\.profile\.board \|\| null/.test(ledger));
   check("8c. every profile declares a board (values or an honest 'not evaluated' note); the honesty text names McKee and the synthetic values", Object.keys(P.PROFILES).every((id) => P.PROFILES[id].board && (P.PROFILES[id].board.ectKNm > 0 || (P.PROFILES[id].board.evaluated === false && P.PROFILES[id].board.note))) && /McKee/.test(P.HONESTY) && /SYNTHETIC/.test(P.HONESTY) && /not a certification/.test(P.HONESTY));
-  check("8d. sw.js at wt-v141 (previously wt-v140)", /CACHE_VERSION\s*=\s*"wt-v141"/.test(sw) && /Previously wt-v140/.test(sw));
+  check("8d. sw.js at wt-v142 (previously wt-v141)", /CACHE_VERSION\s*=\s*"wt-v142"/.test(sw) && /Previously wt-v141/.test(sw));
   check("8e. test/run-all.mjs lists this harness", /verify_stacking\.js/.test(runall));
   check("8f. no Date / Math.random CALL in pack.js; Steudel and McKee cited in the source", !/new Date\(|Date\.now\(|Math\.random\(/.test(pack) && /Steudel \(1979\)/.test(pack) && /McKee, Gander & Wachuta, 1963/.test(pack));
 })();

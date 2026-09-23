@@ -3198,6 +3198,11 @@
       downloadFile("tracking-events-" + doc.run.id + ".json", JSON.stringify(doc, null, 1), "application/json");
       status("Tracking events exported: " + doc.events.length + " EPCIS-shaped events (factory-tracking-events/v1).");
     });
+    // v3.64: minutes as a person reads them (the synchronisation contract's budget and the record's age)
+    const ageText = (min) => { if (min == null) return "-"; const m = Math.abs(min), s = min < 0 ? "-" : "";
+      if (m < 90) return s + Math.round(m) + " min";
+      if (m < 1440) return s + Math.round(m / 6) / 10 + " h";
+      return s + Math.round(m / 144) / 10 + " d"; };
     // v3.58 the return path: an EPCIS 2.0 capture document (a WMS or scanner export) into the tracking store,
     // mapped by WT.tracking.fromEpcis through store.importJson; the refusal names the event and the reason.
     on("flowTrackingImport", () => { const inp = $("flowTrackingImportInput"); if (inp) inp.click(); });
@@ -3214,9 +3219,17 @@
           trackingInfo = size;
           updateLedgerReadout();
           const s = r.imported || {};
+          // v3.64 the synchronisation contract: how old the record is, measured now against its budget
+          let fresh = "";
+          try {
+            const mapped = WT.tracking.fromEpcis(obj);
+            const f = mapped.ok ? WT.tracking.freshness(mapped.doc, { asOf: Date.now() }) : null;
+            if (f && f.recorded) fresh = " Newest event " + f.newest + ", " + ageText(f.age_minutes) + " old as of now against a budget of " + ageText(f.budget_minutes) + ": " +
+              (f.stale ? "STALE - the record does not say what has happened since." : "fresh.") + " The data flows one way (a file a person carried); this app never writes to a plant.";
+          } catch (_) { /* the freshness is a readout, never a reason to fail an import */ }
           status("Tracking store (" + size.backend + "): imported " + r.events + " recorded events from " + file.name + " as " + (s.run_id || "?") + " (" + s.document_events + " document events, " +
             s.units + " objects, " + s.ticks + " minutes from the earliest event" + (s.ignored_fields && s.ignored_fields.length ? "; ignored fields: " + s.ignored_fields.join(", ") : "") + "); " +
-            size.runs + " runs / " + size.events + " events kept in this browser. Nothing is sent anywhere.");
+            size.runs + " runs / " + size.events + " events kept in this browser. Nothing is sent anywhere." + fresh);
           toast("Imported " + r.events + " recorded EPCIS 2.0 events into the tracking store (" + (s.run_id || "?") + ").");
         }))).catch((err) => toast("The tracking store refused the document: " + (err && err.message ? err.message : err), "warn"));
       };

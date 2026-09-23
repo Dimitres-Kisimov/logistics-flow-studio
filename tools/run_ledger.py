@@ -37,11 +37,13 @@ CREATE TABLE IF NOT EXISTS run(
   id TEXT PRIMARY KEY NOT NULL, scenario TEXT NOT NULL, seed INTEGER NOT NULL, hash TEXT, mix TEXT,
   profile TEXT, ticks_per_hour INTEGER NOT NULL, minutes_per_tick REAL NOT NULL, ticks INTEGER NOT NULL, honesty TEXT,
   dataset_source TEXT, dataset_orders INTEGER, dataset_lines INTEGER, dataset_skus INTEGER,
-  policy TEXT, errors TEXT, inbound TEXT, outbound TEXT);
+  policy TEXT, errors TEXT, inbound TEXT, outbound TEXT, sync TEXT);
 -- run.dataset_*: v3.44, the order pool's provenance (NULL for a synthetic stream);
 -- run.policy: v3.45, the adaptive-staffing what-if as JSON (NULL when the run had none);
 -- run.errors: v3.54, the human-error what-if as JSON (NULL when the run had none);
--- run.inbound / run.outbound: v3.55, the dock and carrier windows as JSON (NULL when the run had none).
+-- run.inbound / run.outbound: v3.55, the dock and carrier windows as JSON (NULL when the run had none);
+-- run.sync: v3.64, the synchronisation contract and the record's own span for an IMPORTED record
+--           (tools/epcis_import.py; NULL for a simulated run, which has nothing to be stale against).
 -- v3.56 the control tower's audit: one row per decision a person took, with the run it came from
 CREATE TABLE IF NOT EXISTS control_event(
   run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, seq INTEGER NOT NULL, tick INTEGER NOT NULL, rule TEXT NOT NULL, proposal_id TEXT NOT NULL,
@@ -600,6 +602,7 @@ def initialize(db: sqlite3.Connection) -> None:
         ("tracking_event", "error_detected", "INTEGER"),  # v3.54
         ("run", "inbound", "TEXT"), ("run", "outbound", "TEXT"), ("hu", "due_tick", "INTEGER"), ("hu", "trailer", "INTEGER"), ("hu", "transit_ticks", "INTEGER"),
         ("hu", "customer_tick", "INTEGER"), ("hu", "on_time_shipped", "INTEGER"), ("hu", "on_time", "INTEGER"),  # v3.55
+        ("run", "sync", "TEXT"),  # v3.64
     ):
         try:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {typ}")

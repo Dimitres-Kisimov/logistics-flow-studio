@@ -3956,11 +3956,21 @@
         var refusedMsg = "";
         try { await estore.importJson({ type: "EPCISDocument", epcisBody: { eventList: [mk("2026-09-21T08:00:00+02:00", "commissioning", "in_progress")] } }); } catch (e) { refusedMsg = e.message; }
         await estore.close();
-        epcisOk = eres.runs === 1 && eres.events === 3 && eres.imported.document_events === 3 && ehist.length === 1 && ehist[0].events.length === 3 &&
+        // v3.64 the synchronisation contract: the three events are 08:00, 08:30 and 09:30 (+02:00), so as of 10:00 the
+        // record is 30 minutes old against the default budget of a day - fresh; receiving is 120 minutes old, and a
+        // derived twin has no wall clock to be stale against at all.
+        var efr = WT.tracking.freshness(edoc, { asOf: "2026-09-21T10:00:00+02:00" });
+        var eStep = function (s) { return efr.per_step.filter(function (x) { return x.biz_step === s; })[0]; };
+        var eDerived = WT.tracking.freshness(WT.tracking.exportJson(track), { asOf: "2026-09-21T10:00:00+02:00" });
+        var syncOk = edoc.run.sync.kind === "wt-sync-contract/v1" && edoc.run.sync.direction === "physical-to-digital" && edoc.run.sync.budget_minutes === 1440 &&
+          /never writes to the plant/.test(edoc.run.sync.conflict) && efr.recorded === true && efr.newest === "2026-09-21T09:30:00+02:00" && efr.oldest === "2026-09-21T08:00:00+02:00" &&
+          efr.span_minutes === 90 && efr.age_minutes === 30 && efr.stale === false && eStep("receiving").age_minutes === 120 && eStep("shipping").age_minutes === 30 &&
+          WT.tracking.freshness(edoc, { asOf: "2026-09-23T10:00:00+02:00" }).stale === true && eDerived.recorded === false && eDerived.stale === null && /nothing to be stale against/.test(eDerived.reason);
+        epcisOk = syncOk && eres.runs === 1 && eres.events === 3 && eres.imported.document_events === 3 && ehist.length === 1 && ehist[0].events.length === 3 &&
           ehist[0].events.map(function (x) { return x.bizStep; }).join(">") === "receiving>storing>shipping" && ehist[0].events.map(function (x) { return x["wt:tick"]; }).join(",") === "0,30,90" &&
           erow("receiving").avg_ticks_to_next === 30 && erow("storing").avg_ticks_to_next === 60 && erow("shipping").spans === 0 && edoc.run.scenario === "epcis-import" && edoc.run.minutes_per_tick === 1 &&
           edoc.events.every(function (x) { return x["wt:source"] === "imported" && x["wt:kind"] === "recorded"; }) && /event 1: business step "commissioning" is CBV 2\.0 but not one this app maps/.test(refusedMsg);
-        epcisDetail = eres.events + " recorded events, history " + (ehist.length ? ehist[0].events.length : 0) + ", ticks " + (ehist.length ? ehist[0].events.map(function (x) { return x["wt:tick"]; }).join(",") : "-") + ", refusal " + (refusedMsg ? "named" : "missing");
+        epcisDetail = eres.events + " recorded events, history " + (ehist.length ? ehist[0].events.length : 0) + ", ticks " + (ehist.length ? ehist[0].events.map(function (x) { return x["wt:tick"]; }).join(",") : "-") + ", refusal " + (refusedMsg ? "named" : "missing") + ", age " + efr.age_minutes + " min (stale " + efr.stale + ")";
       } else epcisDetail = "no fromEpcis / import button";
     } catch (e) { epcisDetail = "threw: " + (e && e.message ? e.message : String(e)); }
     check("epcis-import-return-path", function () { return { ok: epcisOk, detail: epcisDetail }; });

@@ -1,5 +1,35 @@
 # Changelog
 
+## v3.64 — The synchronisation contract: how stale an imported record may be (ISO 23247, gap 9)
+
+**The contract.** `tracking.js syncContract(opts)` and the Python twin in `tools/epcis_import.py`: every
+mapped EPCIS document carries `run.sync` = `{ kind: "wt-sync-contract/v1", direction:
+"physical-to-digital", mode: "manual file import (an EPCIS 2.0 capture document)", budget_minutes (1440
+by default, `--budget-minutes` at import), conflict: "the record wins; this app never writes to the
+plant", refreshed_by, honesty }`. The honesty says it is DECLARED, not negotiated with any plant, and
+that a stale record is not an error but the app saying it does not know what has happened since.
+
+**The measurement.** `freshness(doc, { asOf, budgetMinutes })` (and `freshness(doc, as_of, budget)` in
+Python, agreeing to the second decimal - the JavaScript rounding rule on both sides): the newest and
+oldest event, the span in minutes, the age as of an instant THE CALLER NAMES (the module keeps no clock,
+so the answer is reproducible; the app passes the browser's), whether it exceeds the budget, and the
+same per business step. A derived twin answers `recorded: false` with the reason - a simulation has
+nothing to be stale against. Hand values on the fixture: 11 events over 180 minutes; as of
+2026-09-21T12:00+02:00 60 minutes old and fresh (receiving 240, storing 200, picking 150, shipping 60,
+inspecting 198.66); four days later 5820 minutes and stale; with a 10000-minute budget fresh again.
+
+**Where it shows.** The app's import status line ("Newest event …, 3 h old as of now against a budget of
+1 d: fresh. The data flows one way …"). `python tools/epcis_import.py sync <document> [--as-of …]` and
+`sync --database <db> [--run …]`, which re-measures the block stored on the imported run row (the new
+`run.sync` column; a guarded ALTER adds it to an older database, and a simulated run keeps NULL).
+
+**Verification.** `verify_epcis_import.js` 9a-9f (+6 → 31), `test/test_epcis_import.py` (+4 → 181: the
+contract equal on both sides, freshness by hand, the stored block re-measured, the `sync` command for a
+document, a database and an empty one), the in-app self-test `epcis-import-return-path` extended with
+the contract and the 30-minute hand value (193/193). `docs/EPCIS_IMPORT.md` gains the section; the deep
+dive's gap 9 row and roadmap item 2 say what shipped and what is still missing - a contract needs a
+counterpart that promises to refresh, and a file a person carries promises nothing. Cache `wt-v142`.
+
 ## v3.63 — The lever search runs at the plant's own rates, and a thin sample cannot win
 
 **The limit v3.62 wrote down, closed.** `tools/search_levers.mjs --profile <site-profile.json>` runs the

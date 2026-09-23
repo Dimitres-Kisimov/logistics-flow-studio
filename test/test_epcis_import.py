@@ -228,5 +228,87 @@ class Database(unittest.TestCase):
             self.assertIn("25.5", r.stdout)
 
 
+class Synchronisation(unittest.TestCase):
+    """v3.64 the synchronisation contract (ISO 23247-1): the contract on every imported record, the freshness
+    measured against it by hand, the stored block re-measured, and the sync command."""
+
+    def test_contract_on_every_imported_document(self):
+        c = TWIN["run"]["sync"]
+        self.assertEqual(c["kind"], "wt-sync-contract/v1")
+        self.assertEqual(c["direction"], "physical-to-digital")
+        self.assertEqual(c["budget_minutes"], 1440)
+        self.assertIn("never writes to the plant", c["conflict"])
+        self.assertIn("a person importing a document", c["refreshed_by"])
+        self.assertEqual(c["honesty"], EI.SYNC_HONESTY)
+        self.assertIn("ISO 23247-1, DECLARED", EI.SYNC_HONESTY)
+        py, _errors, _summary = EI.from_epcis(DOC)
+        self.assertEqual(py["run"]["sync"], c)  # the Python twin writes the same block as the committed JavaScript one
+        self.assertEqual(EI.from_epcis(DOC, 120)[0]["run"]["sync"]["budget_minutes"], 120)
+        self.assertEqual(EI.sync_contract(-5)["budget_minutes"], 1440)
+        self.assertEqual(EI.sync_contract()["mode"], "manual file import")
+
+    def test_freshness_by_hand(self):
+        py, _e, _s = EI.from_epcis(DOC)
+        f = EI.freshness(py, "2026-09-21T12:00:00+02:00")
+        self.assertTrue(f["recorded"])
+        self.assertEqual((f["recorded_events"], f["newest"], f["oldest"], f["span_minutes"]), (11, "2026-09-21T11:00:00+02:00", "2026-09-21T06:00:00Z", 180))
+        self.assertEqual((f["age_minutes"], f["stale"], f["budget_minutes"]), (60, False, 1440))
+        by = {s["biz_step"]: s for s in f["per_step"]}
+        self.assertEqual((by["receiving"]["age_minutes"], by["storing"]["age_minutes"], by["picking"]["age_minutes"], by["shipping"]["age_minutes"]), (240, 200, 150, 60))
+        self.assertEqual(by["inspecting"]["age_minutes"], 198.66)  # the fractional second, rounded the JavaScript way
+        self.assertEqual(by["storing"]["events"], 2)
+        late = EI.freshness(py, "2026-09-25T12:00:00+02:00")
+        self.assertEqual((late["age_minutes"], late["stale"]), (5820, True))
+        self.assertFalse(EI.freshness(py, "2026-09-25T12:00:00+02:00", 10000)["stale"])
+        self.assertEqual(EI.freshness(py, "2026-09-21T10:00:00+02:00")["age_minutes"], -60)
+        none = EI.freshness(py)
+        self.assertEqual((none["as_of"], none["age_minutes"], none["stale"], none["span_minutes"]), (None, None, None, 180))
+        derived = {"run": {}, "events": [{"eventTime": None, "bizStep": "picking"}]}
+        d = EI.freshness(derived, "2026-09-25T12:00:00+02:00")
+        self.assertEqual((d["recorded"], d["stale"], d["age_minutes"]), (False, None, None))
+        self.assertIn("nothing to be stale against", d["reason"])
+
+    def test_the_run_row_keeps_the_block_and_measure_re_reads_it(self):
+        db = fresh()
+        rid = EI.import_document(db, DOC, "epcis-document.json", 120)
+        row = RL.rows(db, "SELECT sync FROM run WHERE id = ?", (rid,))[0]
+        stored = json.loads(row["sync"])
+        self.assertEqual(stored["contract"]["budget_minutes"], 120)
+        self.assertEqual((stored["newest"], stored["span_minutes"], stored["age_minutes"]), ("2026-09-21T11:00:00+02:00", 180, None))
+        m = EI.measure(stored, "2026-09-21T14:00:00+02:00")
+        self.assertEqual((m["age_minutes"], m["stale"], m["budget_minutes"]), (180, True, 120))
+        by = {s["biz_step"]: s for s in m["per_step"]}
+        self.assertEqual((by["shipping"]["age_minutes"], by["shipping"]["stale"]), (180, True))
+        self.assertFalse(EI.measure(stored, "2026-09-21T14:00:00+02:00", 1440)["stale"])
+        self.assertEqual(EI.measure(stored)["age_minutes"], 0)  # as of its own newest event
+        # a simulated run has nothing to be stale against: no block at all
+        RL.import_ledger(db, json.loads((FIX / "run-ledger.json").read_text(encoding="utf-8")))
+        self.assertIsNone(RL.rows(db, "SELECT sync FROM run WHERE scenario != 'epcis-import'")[0]["sync"])
+
+    def test_sync_command(self):
+        tool = ROOT / "tools" / "epcis_import.py"
+        r = subprocess.run([sys.executable, str(tool), "sync", str(FIX / "epcis-document.json"), "--as-of", "2026-09-21T12:00:00+02:00"], capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("records 11 events from 2026-09-21T06:00:00Z to 2026-09-21T11:00:00+02:00 (180 minutes)", r.stdout)
+        self.assertIn("60 minutes old, budget 1440 -> fresh", r.stdout)
+        self.assertIn("physical-to-digital", r.stdout)
+        r = subprocess.run([sys.executable, str(tool), "sync", str(FIX / "epcis-document.json"), "--as-of", "2026-09-25T12:00:00+02:00"], capture_output=True, text=True, encoding="utf-8")
+        self.assertIn("STALE: the record does not say what has happened since", r.stdout)
+        with tempfile.TemporaryDirectory() as tmp:
+            dbf = Path(tmp) / "run.sqlite"
+            subprocess.run([sys.executable, str(tool), "import", str(FIX / "epcis-document.json"), "--database", str(dbf), "--budget-minutes", "120"], capture_output=True, text=True, encoding="utf-8", check=True)
+            r = subprocess.run([sys.executable, str(tool), "sync", "--database", str(dbf), "--as-of", "2026-09-21T14:00:00+02:00"], capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("EPCIS-8fd695d0:", r.stdout)
+            self.assertIn("180 minutes old, budget 120 -> STALE", r.stdout)
+            empty = Path(tmp) / "empty.sqlite"
+            db2 = RL.connect(str(empty))
+            RL.initialize(db2)
+            db2.close()
+            r = subprocess.run([sys.executable, str(tool), "sync", "--database", str(empty)], capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("no imported record in the database", r.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

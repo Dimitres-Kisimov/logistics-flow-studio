@@ -30,6 +30,11 @@
  *      three CBV lists (41 / 33 / 13) equal in tracking.js and the tool.
  *   8. SHIPPED WIRING: the import button and file input, the app handler,
  *      the self-test, run-all, the docs.
+ *   9. THE SYNCHRONISATION CONTRACT (v3.64, ISO 23247-1): every imported
+ *      document carries the contract (direction, mode, staleness budget,
+ *      who wins), freshness() measures the record against it by hand, a
+ *      derived twin has no clock to be stale against, and the Python twin
+ *      and the app say the same.
  * Deterministic + ASCII-only. Exit code 0 = all green.
  * ===================================================================== */
 "use strict";
@@ -181,9 +186,9 @@ async function storeChecks() {
     !/new Date\(|Date\.now\(|Math\.random\(/.test(src) && !/\bworker\b|\broster\b|WT\.workers/i.test(code.replace(/worker roster/g, "")) &&
     /never a person \(BetrVG 87\(1\)6, GDPR Art\. 88\)/.test(T.IMPORT_HONESTY) && /nothing is sent back/.test(T.IMPORT_HONESTY) && /shadow only in the manual sense/.test(T.IMPORT_HONESTY) && /never acts on them/.test(T.IMPORT_HONESTY));
   const listOf = (name) => { const m = new RegExp(name + ' = \\(([\\s\\S]*?)\\)\\n').exec(py); return m ? m[1].match(/"[a-z_]+"/g).map((s) => s.slice(1, -1)) : []; };
-  check("7b. tools/epcis_import.py is the twin: the same 41 / 33 / 13 CBV lists, the same honesty sentence, source 'imported', the same tick rule (floor(x + 0.5)), a check / twin / import / dwell CLI",
+  check("7b. tools/epcis_import.py is the twin: the same 41 / 33 / 13 CBV lists, the same honesty sentence, source 'imported', the same tick rule (floor(x + 0.5)), a check / twin / import / dwell / sync CLI",
     JSON.stringify(listOf("CBV_BIZ_STEPS")) === JSON.stringify(T.CBV_BIZ_STEPS) && JSON.stringify(listOf("CBV_DISPOSITIONS")) === JSON.stringify(T.CBV_DISPOSITIONS) && JSON.stringify(listOf("CBV_BTT")) === JSON.stringify(T.CBV_BTT) &&
-    /nothing is streamed, nothing is sent back/.test(py) && /IMPORT_SOURCE = "imported"/.test(py) && /\(minutes \+ 0\.5\) \/\/ 1/.test(py) && /choices=\("check", "twin", "import", "dwell"\)/.test(py) && /def from_epcis\(/.test(py) && /def import_document\(/.test(py));
+    /nothing is streamed, nothing is sent back/.test(py) && /IMPORT_SOURCE = "imported"/.test(py) && /\(minutes \+ 0\.5\) \/\/ 1/.test(py) && /choices=\("check", "twin", "import", "dwell", "sync"\)/.test(py) && /def from_epcis\(/.test(py) && /def import_document\(/.test(py));
   check("7c. tools/run_ledger.py: tracking_event carries source (derived | imported), no longer ties hu_id to a ledger unit, rebuilds an older table once, derived rows say 'derived', v_epcis_events joins hu on the left with the source column",
     /source TEXT NOT NULL DEFAULT 'derived' CHECK\(source IN \('derived','imported'\)\)/.test(rl) && /handling_event_id TEXT UNIQUE REFERENCES handling_event\(id\)/.test(rl) && /hu_id TEXT NOT NULL, version INTEGER NOT NULL/.test(rl) &&
     /"source" not in old\[0\]/.test(rl) && /ALTER TABLE tracking_event RENAME TO tracking_event_old/.test(rl) && /"derived"\)  # v3\.58: source/.test(rl) && /t\.error_latent, t\.source\nFROM tracking_event t LEFT JOIN hu h ON h\.id = t\.hu_id;/.test(rl));
@@ -199,6 +204,41 @@ async function storeChecks() {
     /epcis-import-return-path/.test(st) && /verify_epcis_import\.js/.test(runall) && /"\.\/tracking\.js"/.test(sw) && fs.existsSync(path.join(__dirname, "tools", "make_epcis_fixture.mjs")) && fs.existsSync(path.join(__dirname, "docs", "EPCIS_IMPORT.md")));
   check("8c. docs: README names the return path (v3.58); CHANGELOG has v3.58; CREDITS says GS1's examples were read and none copied and the fixture is synthetic; the deep dive calls it a manual shadow; the schema page names the source column",
     /v3\.58/.test(readme) && /EPCIS 2\.0 import|return path/i.test(readme) && /## v3\.58/.test(changelog) && /none is copied/.test(credits) && /synthetic/.test(credits) && /v3\.58/.test(dd) && /manual/.test(dd) && /source = imported|source TEXT|'imported'/.test(schema) && /epcis_import\.py/.test(schema));
+})();
+
+/* ---- 9. the synchronisation contract (v3.64, ISO 23247-1; the deep dive's gap 9) ---- */
+(function () {
+  const c = doc.run.sync, custom = T.fromEpcis(INPUT, { budgetMinutes: 120 });
+  check("9a. every imported document carries the contract the standard asks for: the direction (physical to digital), the mode (a file a person carried), the staleness budget (a day by default, the caller's otherwise) and which side wins on a conflict; the honesty says declared, not negotiated, and that a stale record is not an error",
+    !!c && c.kind === "wt-sync-contract/v1" && c.direction === "physical-to-digital" && /manual file import \(an EPCIS 2\.0 capture document\)/.test(c.mode) && c.budget_minutes === 1440 &&
+    /the record wins; this app never writes to the plant/.test(c.conflict) && /a person importing a document/.test(c.refreshed_by) && c.honesty === T.SYNC_HONESTY &&
+    /ISO 23247-1, DECLARED/.test(T.SYNC_HONESTY) && /A stale record is not an error/.test(T.SYNC_HONESTY) && custom.doc.run.sync.budget_minutes === 120 && T.SYNC_DEFAULTS.budgetMinutes === 1440 &&
+    T.syncContract({ budgetMinutes: -5 }).budget_minutes === 1440 && T.syncContract({}).mode === "manual file import");
+  const f = T.freshness(doc, { asOf: "2026-09-21T12:00:00+02:00" });
+  const step = (s) => f.per_step.find((x) => x.biz_step === s);
+  check("9b. freshness by hand on the fixture: 11 recorded events from 06:00Z to 11:00+02:00 - a span of 180 minutes; as of 12:00+02:00 the record is 60 minutes old against a budget of 1440, so fresh; per step receiving 240 minutes, storing 200, picking 150, shipping 60, and the fractional inspecting event 198.66",
+    f.recorded === true && f.recorded_events === 11 && f.events === 11 && f.newest === "2026-09-21T11:00:00+02:00" && f.oldest === "2026-09-21T06:00:00Z" && f.span_minutes === 180 &&
+    f.as_of === "2026-09-21T12:00:00+02:00" && f.age_minutes === 60 && f.stale === false && f.budget_minutes === 1440 && f.per_step.length === 10 &&
+    step("receiving").age_minutes === 240 && step("storing").age_minutes === 200 && step("storing").events === 2 && step("picking").age_minutes === 150 && step("shipping").age_minutes === 60 && step("inspecting").age_minutes === 198.66 &&
+    f.per_step.every((s) => s.stale === false), JSON.stringify({ age: f.age_minutes, span: f.span_minutes }));
+  const late = T.freshness(doc, { asOf: "2026-09-25T12:00:00+02:00" }), wide = T.freshness(doc, { asOf: "2026-09-25T12:00:00+02:00", budgetMinutes: 10000 });
+  const early = T.freshness(doc, { asOf: "2026-09-21T10:00:00+02:00" });
+  check("9c. the budget decides: four days later the same record is 5820 minutes old and STALE against the default; with a budget of 10000 minutes it is fresh again; an instant before the newest event gives a negative age and is never stale; the per-step flags follow the same budget",
+    late.age_minutes === 5820 && late.stale === true && late.per_step.every((s) => s.stale === true) && wide.age_minutes === 5820 && wide.stale === false && wide.budget_minutes === 10000 &&
+    early.age_minutes === -60 && early.stale === false && T.freshness(doc, { asOf: 1758452400000 }).as_of === 1758452400000);
+  const derived = T.fromLedger(JSON.parse(read(path.join(FIX, "run-ledger.json"))));
+  const df = T.freshness(derived, { asOf: "2026-09-25T12:00:00+02:00" }), noAs = T.freshness(doc, {});
+  check("9d. a derived twin has no wall clock to be stale against and says so (157 events, none recorded, stale null); without an instant to measure from the ages are null but the record's own span is still reported; a derived document carries no contract",
+    df.recorded === false && df.events === 157 && df.recorded_events === 0 && df.stale === null && df.age_minutes === null && /nothing to be stale against/.test(df.reason) && !derived.run.sync &&
+    noAs.as_of === null && noAs.age_minutes === null && noAs.stale === null && noAs.span_minutes === 180 && noAs.per_step.every((s) => s.age_minutes === null && s.stale === null));
+  const py = read(path.join("tools", "epcis_import.py")), rl = read(path.join("tools", "run_ledger.py")), app = read("app.js"), st = read("selftest.js");
+  check("9e. the Python twin carries the same contract and measures the same way: the 1440-minute default, sync_contract / freshness / measure / render_freshness, the JavaScript rounding rule so both agree to the second decimal, a sync command; the run row keeps the block (run.sync, with a guarded ALTER for an older database)",
+    /SYNC_DEFAULTS = \{"budget_minutes": 1440/.test(py) && /def sync_contract\(/.test(py) && /def freshness\(/.test(py) && /def measure\(/.test(py) && /def render_freshness\(/.test(py) &&
+    /math\.floor\(v \* 100 \+ 0\.5\) \/ 100/.test(py) && /choices=\("check", "twin", "import", "dwell", "sync"\)/.test(py) && /never writes to the plant/.test(py) &&
+    /run\.sync: v3\.64/.test(rl) && /\("run", "sync", "TEXT"\)/.test(rl) && /sync TEXT\);/.test(rl));
+  check("9f. the app reports the freshness of an imported record against its contract (the browser's clock, the module's own having none) and the self-test pins it; the readout says the data flows one way",
+    /WT\.tracking\.freshness\(mapped\.doc, \{ asOf: Date\.now\(\) \}\)/.test(app) && /const ageText = /.test(app) && /old as of now against a budget of/.test(app) && /never writes to a plant/.test(app) &&
+    /WT\.tracking\.freshness\(edoc, \{ asOf: "2026-09-21T10:00:00\+02:00" \}\)/.test(st) && /efr\.age_minutes === 30/.test(st));
 })();
 
 storeChecks().then(() => {

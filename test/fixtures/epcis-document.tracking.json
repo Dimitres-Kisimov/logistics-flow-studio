@@ -58,6 +58,15 @@
     "example:myField",
     "sourceList"
    ]
+  },
+  "sync": {
+   "kind": "wt-sync-contract/v1",
+   "direction": "physical-to-digital",
+   "mode": "manual file import (an EPCIS 2.0 capture document)",
+   "budget_minutes": 1440,
+   "conflict": "the record wins; this app never writes to the plant",
+   "refreshed_by": "a person importing a document",
+   "honesty": "A synchronisation contract in the sense of ISO 23247-1, DECLARED - not negotiated with any plant and not a conformance claim: the data flows one way, a person carries it (a file, not a stream), the record may be as old as the budget says before it is called stale, and on a conflict the record wins because this app never writes to a plant. A stale record is not an error: it is the app saying it does not know what has happened since. The budget is a declared teaching default until a plant sets its own."
   }
  },
  "events": [
