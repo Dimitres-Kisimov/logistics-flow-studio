@@ -143,6 +143,12 @@
    * line with each system's `levels` - NOT vendor specs, NOT measured;
    * the export marks them as assumptions in the WT_ElementType pset.
    * ------------------------------------------------------------------ */
+  // v3.49 STANDARD TYPES: the one source string and the descriptor shape the
+  // machine catalogue carries (see the MACHINES block below).
+  const STANDARD_SOURCE = "DIN 8580:2022-12 (public classification of manufacturing processes, main groups 1-6); IEC 62264-1 / ISA-95 equipment hierarchy (role labels only)";
+  function std(group, name) {
+    return { din8580: group ? { group: group, name: name } : null, isa95: "work-cell", note: "informed by, not a certification", source: STANDARD_SOURCE };
+  }
   const ELEMENTS = {
     "selective-racking": {
       id: "selective-racking", label: "Selective racking", category: "storage",
@@ -449,6 +455,75 @@
       // outputs: how many parts one input splits into.
       cycleSec: 40, servers: 1, outputs: 2,
       desc: "Dismantle STATION: SPLITS one part into SEVERAL (outputs = 2 here). Represented STRUCTURALLY now (a station carrying an outputs count); the deep split flow logic is DEFERRED to the line-simulation build. Maps onto the station-server path. 0 storage positions. Illustrative synthetic model, NOT a vendor spec.",
+    },
+
+    // ==================================================================
+    // MACHINES (v3.49 STANDARD TYPES). A typed machine catalogue whose
+    // classes are named by PUBLIC standards: the DIN 8580 main group of the
+    // manufacturing process (1 Urformen, 2 Umformen, 3 Trennen, 4 Fuegen,
+    // 5 Beschichten, 6 Stoffeigenschaft aendern) and the ISA-95 / IEC 62264-1
+    // equipment-hierarchy ROLE the element plays (a work cell inside a
+    // production line). Classification labels only - informed by the
+    // standards, NOT a certification and NOT an ISA-95 information model.
+    // Every cycle time is a labelled TEACHING value (editable in the Factory
+    // panel), never a vendor specification. All nine are single-server flow
+    // stations (base "station"), so the process model, the line sim, the
+    // workforce pose and the costing treat them exactly as the existing
+    // "Station (process)": they cost as the Workstation teaching kind.
+    // ==================================================================
+    "cnc-mill": {
+      id: "cnc-mill", label: "CNC machining centre (3-axis)", category: "flow",
+      base: "station", w: 3, d: 3, color: "#3f5f7a", resizable: false, heightM: 2.6,
+      cycleSec: 300, servers: 1, standard: std(3, "Trennen (cutting)"),
+      desc: "Three-axis vertical machining centre: a CNC milling machine that cuts a workpiece held on a travelling table under a spindle inside a guarded enclosure. DIN 8580 main group 3, Trennen (cutting with a geometrically defined edge). One server; the cycle time is a labelled teaching value, editable in the Factory panel.",
+    },
+    "cnc-mill-5axis": {
+      id: "cnc-mill-5axis", label: "CNC machining centre (5-axis)", category: "flow",
+      base: "station", w: 4, d: 3, color: "#35526b", resizable: false, heightM: 2.8,
+      cycleSec: 420, servers: 1, standard: std(3, "Trennen (cutting)"),
+      desc: "Five-axis machining centre: the table adds two rotary axes (a trunnion), so complex parts are finished in one set-up. DIN 8580 main group 3, Trennen. One server; teaching cycle time.",
+    },
+    "cnc-lathe": {
+      id: "cnc-lathe", label: "CNC turning centre (lathe)", category: "flow",
+      base: "station", w: 4, d: 2, color: "#4b6a5a", resizable: false, heightM: 2.0,
+      cycleSec: 180, servers: 1, standard: std(3, "Trennen (cutting)"),
+      desc: "CNC lathe: the workpiece rotates in a chuck while a turret tool cuts it, behind a sliding chip guard. DIN 8580 main group 3, Trennen. One server; teaching cycle time.",
+    },
+    "press-brake": {
+      id: "press-brake", label: "Press brake (sheet-metal bending)", category: "flow",
+      base: "station", w: 4, d: 2, color: "#5a5f66", resizable: false, heightM: 2.8,
+      cycleSec: 45, servers: 1, standard: std(2, "Umformen (forming)"),
+      desc: "Hydraulic press brake: a ram presses sheet metal into a V die between two C-frames. DIN 8580 main group 2, Umformen (forming). One server; teaching cycle time.",
+    },
+    "moulding-cell": {
+      id: "moulding-cell", label: "Injection-moulding cell", category: "flow",
+      base: "station", w: 5, d: 2, color: "#7a6a3a", resizable: false, heightM: 2.2,
+      cycleSec: 35, servers: 1, standard: std(1, "Urformen (primary shaping)"),
+      desc: "Injection-moulding machine: a clamp unit closes the mould on tie bars while the injection unit fills it from a hopper. DIN 8580 main group 1, Urformen (primary shaping). One server; teaching cycle time.",
+    },
+    "welding-cell": {
+      id: "welding-cell", label: "Welding cell (robot)", category: "flow",
+      base: "station", w: 3, d: 3, color: "#7d3f2d", resizable: false, heightM: 2.4,
+      cycleSec: 120, servers: 1, standard: std(4, "Fügen (joining)"),
+      desc: "Robotic welding cell: a two-link arm welds parts on a fixture table inside a fenced cell. DIN 8580 main group 4, Fügen (joining). One server; teaching cycle time.",
+    },
+    "coating-booth": {
+      id: "coating-booth", label: "Coating booth (paint / powder)", category: "flow",
+      base: "station", w: 4, d: 3, color: "#3d7a6e", resizable: false, heightM: 3.0,
+      cycleSec: 240, servers: 1, standard: std(5, "Beschichten (coating)"),
+      desc: "Spray / powder-coating booth: parts pass through a ventilated chamber past a spray gun. DIN 8580 main group 5, Beschichten (coating). One server; teaching cycle time.",
+    },
+    "heat-treatment": {
+      id: "heat-treatment", label: "Heat-treatment furnace", category: "flow",
+      base: "station", w: 3, d: 3, color: "#6e5a47", resizable: false, heightM: 2.6,
+      cycleSec: 900, servers: 1, standard: std(6, "Stoffeigenschaft ändern (changing material properties)"),
+      desc: "Heat-treatment furnace: a batch chamber with heating elements and a front door. DIN 8580 main group 6, Stoffeigenschaft ändern (changing material properties). One server; teaching cycle time.",
+    },
+    "cmm-inspection": {
+      id: "cmm-inspection", label: "CMM inspection station", category: "flow",
+      base: "station", w: 3, d: 2, color: "#5e7f9a", resizable: false, heightM: 2.4,
+      cycleSec: 600, servers: 1, standard: std(null, null),
+      desc: "Coordinate-measuring machine: a bridge with a touch probe travels over a granite table to measure the part. No DIN 8580 group - inspection is a quality operation, not a manufacturing process (said so). One server; teaching cycle time.",
     },
 
     // ==================================================================
@@ -1091,6 +1166,10 @@
       // v2.5 FACTORY-A: Production / Assembly manufacturing components.
       "mfg-source", "mfg-drain", "mfg-station", "mfg-parallel-station",
       "mfg-assembly", "mfg-dismantle",
+      // v3.49 STANDARD TYPES: the machine catalogue (Machines (DIN 8580) group).
+      // Additive; a warehouse-only layout never uses them.
+      "cnc-mill", "cnc-mill-5axis", "cnc-lathe", "press-brake", "moulding-cell",
+      "welding-cell", "coating-booth", "heat-treatment", "cmm-inspection",
       // v3.4 FACTORY-A2: flow-geometry components (Conveying & Sortation +
       // Transport). Additive; a warehouse-only layout never uses them.
       "converter", "angular-converter", "turntable", "turnplate",

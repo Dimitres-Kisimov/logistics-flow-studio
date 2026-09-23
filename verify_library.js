@@ -397,6 +397,22 @@ check("FLUIDS: cloning a fluid built-in SEED keeps its base (tank -> storage, pi
   (() => { const ct = L.clone("tank", "My tank"); const cp = L.clone("pipe", "My pipe"); return ct && ct.custom === true && ct.base === "storage" && cp && cp.base === "conveyor" && D.ELEMENTS["tank"] && !D.ELEMENTS["tank"].custom; })());
 
 /* ---------------------------------------------------------------------
+ * v3.49 STANDARD TYPES: the machine catalogue group.
+ * ------------------------------------------------------------------- */
+(() => {
+  const MACH = ["cnc-mill", "cnc-mill-5axis", "cnc-lathe", "press-brake", "moulding-cell", "welding-cell", "coating-booth", "heat-treatment", "cmm-inspection"];
+  const fac = groupOf(facTree, L.MACHINES), wh = groupOf(whTree, L.MACHINES), def = groupOf(defTree, L.MACHINES);
+  check("v3.49: the Machines (DIN 8580) group carries exactly the nine machine ids in Factory + default mode and is hidden in Warehouse mode",
+    L.MACHINES === "Machines (DIN 8580)" && !!fac && fac.types.join(",") === MACH.join(",") && !!def && wh === null,
+    fac ? fac.types.join(",") : "no group");
+  check("v3.49: describe() carries the standard descriptor, its sentence and its chip; the sentence says informed by, not a certification",
+    MACH.every((t) => { const r = L.describe(t); return r && r.standard && r.standard.isa95 === "work-cell" && r.chip.length > 0 && r.rows.some((x) => x[0] === "Standard" && /informed by, not a certification/.test(x[1])); }) &&
+    L.standardChip(D.ELEMENTS["cnc-mill"].standard) === "DIN 8580 · 3" && L.standardChip(D.ELEMENTS["cmm-inspection"].standard) === "ISA-95 work cell" && L.standardText(null) === "" && L.describe("conveyor").standard === null);
+  check("v3.49: cloning a machine seeds the station base and leaves the built-in intact",
+    (() => { const c = L.clone("cnc-lathe", "My lathe"); return c && c.custom === true && c.base === "station" && !D.ELEMENTS["cnc-lathe"].custom; })());
+})();
+
+/* ---------------------------------------------------------------------
  * Summary.
  * ------------------------------------------------------------------- */
 console.log("");

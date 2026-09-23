@@ -2651,6 +2651,305 @@
    * THE REGISTRY. Exactly the domain.ELEMENTS types (no orphans). Each
    * entry has a 2D glyph (d2), a 3D form (d3) and an LOD icon (icon).
    * ================================================================== */
+
+  /* ==================================================================
+   * v3.49 STANDARD TYPES: the typed machine catalogue. One silhouette + one
+   * characteristic feature each, in the floor's industrial materials
+   * (safety-orange guard bands, galvanised steel), no brand. The 2D glyph
+   * and the 2.5D form describe the same machine; `anim` moves the working
+   * part (spindle, ram, platen, arm, bridge) and is ignored when absent.
+   * ================================================================== */
+  function machineHousing(ctx, x, y, w, d, m) {
+    ctx.strokeRect(x + m, y + m, w - 2 * m, d - 2 * m);
+    return { x: x + m, y: y + m, w: w - 2 * m, d: d - 2 * m };
+  }
+  function guardBand2D(ctx, theme, x, y, w, h) {
+    const f = ctx.fillStyle;
+    ctx.fillStyle = mat("guard", theme);
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = f;
+  }
+  function phaseOf(anim) { return (typeof anim === "number" && isFinite(anim)) ? ((anim % 1) + 1) % 1 : null; }
+  function bounce(anim, dflt) { const p = phaseOf(anim); return p == null ? dflt : 1 - Math.abs(2 * p - 1); }
+
+  function d2CncMill(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.12, 2, 6);
+    const b = machineHousing(ctx, x, y, w, d, m);
+    const gb = clampN(cell * 0.18, 2, 5);
+    guardBand2D(ctx, theme, b.x, b.y + b.d - gb, b.w, gb);                      // the front guard band
+    const tx = b.x + b.w * 0.2, ty = b.y + b.d * 0.3, tw = b.w * 0.6, th = b.d * 0.42;
+    ctx.strokeRect(tx, ty, tw, th);                                               // the table
+    seg(ctx, b.x, b.y + b.d * 0.22, b.x + b.w, b.y + b.d * 0.22);                 // the X-axis guide rail
+    const cx = tx + tw / 2, cy = ty + th / 2, r = clampN(Math.min(tw, th) * 0.28, 3, 12);
+    ring(ctx, cx, cy, r);                                                         // the spindle nose
+    const p = phaseOf(anim), a = p == null ? 0 : p * TAU;
+    seg(ctx, cx + Math.cos(a) * r, cy + Math.sin(a) * r, cx - Math.cos(a) * r, cy - Math.sin(a) * r); // the cutter (rotates)
+    arr(ctx, b.x, b.y + b.d * 0.5, b.x + b.w * 0.16, b.y + b.d * 0.5, clampN(cell * 0.22, 3, 6));    // in
+    arr(ctx, b.x + b.w * 0.84, b.y + b.d * 0.5, b.x + b.w, b.y + b.d * 0.5, clampN(cell * 0.22, 3, 6)); // out
+    return { b: b, cx: cx, cy: cy, tw: tw, th: th };
+  }
+  function d2CncMill5axis(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    const g = d2CncMill(ctx, x, y, w, d, cell, gc, color, theme, anim);
+    ring(ctx, g.cx, g.cy, Math.min(g.tw, g.th) * 0.5);                            // the trunnion (rotary table)
+    ctx.beginPath();
+    ctx.arc(g.cx, g.cy, Math.min(g.tw, g.th) * 0.62, Math.PI * 1.15, Math.PI * 1.85); // the tilt arc
+    ctx.stroke();
+  }
+  function d2CncLathe(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.12, 2, 6);
+    const b = machineHousing(ctx, x, y, w, d, m);
+    const gb = clampN(cell * 0.18, 2, 5);
+    guardBand2D(ctx, theme, b.x, b.y + b.d - gb, b.w, gb);
+    const cy = b.y + b.d * 0.45;
+    seg(ctx, b.x + b.w * 0.08, cy + b.d * 0.22, b.x + b.w * 0.92, cy + b.d * 0.22); // the bed way
+    const hx = b.x + b.w * 0.08, hw = b.w * 0.22;
+    ctx.strokeRect(hx, b.y + b.d * 0.16, hw, b.d * 0.58);                         // the headstock
+    const r = clampN(b.d * 0.16, 3, 10);
+    ring(ctx, hx + hw, cy, r);                                                    // the chuck
+    const p = phaseOf(anim), a = p == null ? 0 : p * TAU;
+    seg(ctx, hx + hw + Math.cos(a) * r, cy + Math.sin(a) * r, hx + hw - Math.cos(a) * r, cy - Math.sin(a) * r); // the jaws (rotate)
+    const lw = ctx.lineWidth;
+    ctx.lineWidth = lw * 2.2;
+    seg(ctx, hx + hw + r, cy, b.x + b.w * 0.72, cy);                              // the workpiece bar
+    ctx.lineWidth = lw;
+    ctx.strokeRect(b.x + b.w * 0.74, cy - b.d * 0.12, b.w * 0.16, b.d * 0.24);    // the tailstock
+    seg(ctx, b.x + b.w * 0.5, cy - b.d * 0.3, b.x + b.w * 0.5, cy - r * 0.6);     // the turret tool
+  }
+  function d2PressBrake(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.12, 2, 6);
+    const b = machineHousing(ctx, x, y, w, d, m);
+    const fw = b.w * 0.12;
+    ctx.strokeRect(b.x, b.y, fw, b.d);                                            // the left C-frame
+    ctx.strokeRect(b.x + b.w - fw, b.y, fw, b.d);                                 // the right C-frame
+    const drop = bounce(anim, 0) * b.d * 0.12;
+    const beamY = b.y + b.d * 0.3 + drop, bh = clampN(b.d * 0.12, 2, 8);
+    const f = ctx.fillStyle;
+    ctx.fillStyle = mat("beam", theme);
+    ctx.fillRect(b.x + fw, beamY, b.w - 2 * fw, bh);                              // the ram (moves)
+    ctx.fillStyle = f;
+    const vy = b.y + b.d * 0.62, vx = b.x + b.w / 2, vw = b.w * 0.1, vh = b.d * 0.14;
+    seg(ctx, vx - vw, vy, vx, vy + vh);
+    seg(ctx, vx, vy + vh, vx + vw, vy);                                           // the V die
+    seg(ctx, b.x + fw, vy, b.x + b.w - fw, vy);                                   // the bed
+    seg(ctx, vx - vw * 2.4, beamY + bh + 1, vx + vw * 2.4, beamY + bh + 1);       // the sheet under the ram
+    const gb = clampN(cell * 0.16, 2, 4);
+    guardBand2D(ctx, theme, b.x + fw, b.y + b.d - gb, b.w - 2 * fw, gb);
+  }
+  function d2MouldingCell(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.12, 2, 6);
+    const b = machineHousing(ctx, x, y, w, d, m);
+    const cy = b.y + b.d / 2;
+    seg(ctx, b.x + b.w * 0.05, b.y + b.d * 0.28, b.x + b.w * 0.5, b.y + b.d * 0.28); // the tie bars
+    seg(ctx, b.x + b.w * 0.05, b.y + b.d * 0.72, b.x + b.w * 0.5, b.y + b.d * 0.72);
+    const open = bounce(anim, 1) * 0.3, pw = clampN(b.w * 0.05, 2, 6);
+    ctx.strokeRect(b.x + b.w * 0.08, b.y + b.d * 0.2, pw, b.d * 0.6);             // the fixed platen
+    ctx.strokeRect(b.x + b.w * (0.42 - open * 0.5), b.y + b.d * 0.2, pw, b.d * 0.6); // the moving platen
+    ctx.beginPath();                                                              // the injection barrel tapering to the nozzle
+    ctx.moveTo(b.x + b.w * 0.5, cy - b.d * 0.08);
+    ctx.lineTo(b.x + b.w * 0.95, cy - b.d * 0.2);
+    ctx.lineTo(b.x + b.w * 0.95, cy + b.d * 0.2);
+    ctx.lineTo(b.x + b.w * 0.5, cy + b.d * 0.08);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.strokeRect(b.x + b.w * 0.7, b.y + b.d * 0.06, b.w * 0.12, b.d * 0.16);    // the hopper
+    const gb = clampN(cell * 0.16, 2, 4);
+    guardBand2D(ctx, theme, b.x, b.y + b.d - gb, b.w * 0.5, gb);
+  }
+  function d2WeldingCell(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.1, 2, 6);
+    ctx.setLineDash([clampN(cell * 0.3, 3, 8), clampN(cell * 0.2, 2, 5)]);
+    ctx.strokeRect(x + m, y + m, w - 2 * m, d - 2 * m);                          // the safety fence
+    ctx.setLineDash([]);
+    const b = { x: x + m, y: y + m, w: w - 2 * m, d: d - 2 * m };
+    ctx.strokeRect(b.x + b.w * 0.5, b.y + b.d * 0.3, b.w * 0.38, b.d * 0.4);      // the fixture table
+    const bx = b.x + b.w * 0.24, by = b.y + b.d * 0.7;
+    disc(ctx, bx, by, clampN(cell * 0.2, 2.5, 7));                                // the robot base
+    const p = phaseOf(anim), sw = p == null ? 0 : Math.sin(p * TAU) * 0.08;
+    const ex = b.x + b.w * (0.36 + sw), ey = b.y + b.d * 0.42, tx = b.x + b.w * (0.56 + sw), ty = b.y + b.d * 0.5;
+    const lw = ctx.lineWidth;
+    ctx.lineWidth = lw * 1.8;
+    seg(ctx, bx, by, ex, ey);
+    seg(ctx, ex, ey, tx, ty);                                                     // the arm (two links)
+    ctx.lineWidth = lw;
+    if (p != null && p > 0.5) { const f = ctx.fillStyle; ctx.fillStyle = mat("guard", theme); disc(ctx, tx, ty, clampN(cell * 0.14, 2, 5)); ctx.fillStyle = f; } // the arc
+    guardBand2D(ctx, theme, b.x, b.y, b.w * 0.18, clampN(cell * 0.14, 2, 4));    // the light-curtain marker
+  }
+  function d2CoatingBooth(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.12, 2, 6);
+    const b = machineHousing(ctx, x, y, w, d, m);
+    ctx.strokeRect(b.x + b.w * 0.16, b.y + b.d * 0.14, b.w * 0.68, b.d * 0.62);   // the spray chamber
+    for (let i = 0; i < 4; i++) { const lx = b.x + b.w * (0.24 + i * 0.16); seg(ctx, lx, b.y + b.d * 0.14, lx, b.y + b.d * 0.24); } // the exhaust louvres
+    const cy = b.y + b.d * 0.5;
+    arr(ctx, b.x, cy, b.x + b.w * 0.16, cy, clampN(cell * 0.22, 3, 6));           // parts in
+    arr(ctx, b.x + b.w * 0.84, cy, b.x + b.w, cy, clampN(cell * 0.22, 3, 6));     // parts out
+    const gx = b.x + b.w * 0.5, gy = b.y + b.d * 0.66, p = phaseOf(anim), sw = p == null ? 0 : Math.sin(p * TAU) * b.w * 0.06;
+    seg(ctx, gx, gy + b.d * 0.06, gx, gy);                                        // the gun
+    for (let k = -1; k <= 1; k++) seg(ctx, gx, gy, gx + k * b.w * 0.08 + sw, gy - b.d * 0.2); // the spray fan
+    const gb = clampN(cell * 0.16, 2, 4);
+    guardBand2D(ctx, theme, b.x, b.y + b.d - gb, b.w, gb);
+  }
+  function d2HeatTreatment(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.12, 2, 6);
+    const b = machineHousing(ctx, x, y, w, d, m);
+    const ix = b.x + b.w * 0.18, iy = b.y + b.d * 0.18, iw = b.w * 0.64, ih = b.d * 0.5;
+    ctx.strokeRect(ix, iy, iw, ih);                                               // the chamber
+    for (let i = 0; i < 3; i++) {                                                 // the heating elements (zigzags)
+      const ey = iy + ih * (0.25 + i * 0.25), sx = ix + iw * 0.1, n = 6, st = iw * 0.8 / n;
+      ctx.beginPath();
+      ctx.moveTo(sx, ey);
+      for (let k = 1; k <= n; k++) ctx.lineTo(sx + k * st, ey + (k % 2 ? -ih * 0.06 : ih * 0.06));
+      ctx.stroke();
+    }
+    seg(ctx, ix, b.y + b.d * 0.82, ix + iw, b.y + b.d * 0.82);                    // the door
+    const p = phaseOf(anim);
+    if (p != null) {                                                              // the glow breathes
+      const f = ctx.fillStyle, ga = ctx.globalAlpha;
+      ctx.fillStyle = mat("guard", theme);
+      ctx.globalAlpha = 0.3 + 0.4 * (1 - Math.abs(2 * p - 1));
+      ctx.fillRect(ix + 1, iy + 1, iw - 2, ih - 2);
+      ctx.globalAlpha = ga;
+      ctx.fillStyle = f;
+    }
+    ctx.strokeRect(b.x + b.w * 0.44, b.y + b.d * 0.04, b.w * 0.12, b.d * 0.1);    // the flue
+  }
+  function d2CmmInspection(ctx, x, y, w, d, cell, gc, color, theme, anim) {
+    pen(ctx, gc, cell);
+    const m = clampN(Math.min(w, d) * 0.12, 2, 6);
+    const b = machineHousing(ctx, x, y, w, d, m);                                 // the granite table
+    const pw = clampN(b.w * 0.06, 2, 6);
+    ctx.strokeRect(b.x + b.w * 0.1, b.y + b.d * 0.12, pw, b.d * 0.76);            // the left column
+    ctx.strokeRect(b.x + b.w * 0.9 - pw, b.y + b.d * 0.12, pw, b.d * 0.76);       // the right column
+    const t = bounce(anim, 0.5), by = b.y + b.d * (0.3 + t * 0.4);
+    const lw = ctx.lineWidth;
+    ctx.lineWidth = lw * 1.8;
+    seg(ctx, b.x + b.w * 0.1, by, b.x + b.w * 0.9, by);                           // the bridge (travels)
+    ctx.lineWidth = lw;
+    const px = b.x + b.w * (0.35 + t * 0.3);
+    seg(ctx, px, by, px, by + b.d * 0.12);                                        // the probe
+    disc(ctx, px, by + b.d * 0.12, clampN(cell * 0.1, 1.5, 3.5));                // the stylus tip
+    ctx.strokeRect(b.x + b.w * 0.36, b.y + b.d * 0.4, b.w * 0.28, b.d * 0.24);    // the part under inspection
+    for (let i = 1; i < 4; i++) seg(ctx, b.x + b.w * i / 4, b.y + b.d * 0.94, b.x + b.w * i / 4, b.y + b.d); // scale ticks
+  }
+
+  // LOD icons (<= 6 primitives each, so the full glyph always draws more).
+  function icMill(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r * 0.7, r * 2, r * 1.4); ring(ctx, cx, cy + r * 0.1, r * 0.3); seg(ctx, cx, cy - r * 0.7, cx, cy - r * 0.2); }
+  function icMill5(ctx, cx, cy, r) { ring(ctx, cx, cy, r * 0.75); ring(ctx, cx, cy, r * 0.3); seg(ctx, cx - r, cy + r * 0.8, cx + r, cy + r * 0.8); }
+  function icLathe(ctx, cx, cy, r) { ring(ctx, cx - r * 0.5, cy, r * 0.45); seg(ctx, cx - r * 0.05, cy, cx + r * 0.7, cy); ctx.strokeRect(cx + r * 0.7, cy - r * 0.3, r * 0.3, r * 0.6); }
+  function icPress(ctx, cx, cy, r) { seg(ctx, cx - r, cy - r * 0.5, cx + r, cy - r * 0.5); seg(ctx, cx - r * 0.5, cy + r * 0.2, cx, cy + r * 0.7); seg(ctx, cx, cy + r * 0.7, cx + r * 0.5, cy + r * 0.2); seg(ctx, cx, cy - r * 0.5, cx, cy - r * 0.05); }
+  function icMould(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r * 0.55, r * 0.9, r * 1.1); seg(ctx, cx - r * 0.1, cy, cx + r, cy); ctx.strokeRect(cx + r * 0.3, cy - r * 0.8, r * 0.35, r * 0.4); }
+  function icWeld(ctx, cx, cy, r) { seg(ctx, cx - r * 0.7, cy + r * 0.8, cx - r * 0.3, cy - r * 0.2); seg(ctx, cx - r * 0.3, cy - r * 0.2, cx + r * 0.4, cy + r * 0.2); disc(ctx, cx + r * 0.55, cy + r * 0.3, r * 0.18); seg(ctx, cx - r, cy + r * 0.8, cx + r, cy + r * 0.8); }
+  function icCoat(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r * 0.8, r * 2, r * 1.6); seg(ctx, cx, cy + r * 0.5, cx - r * 0.5, cy - r * 0.4); seg(ctx, cx, cy + r * 0.5, cx, cy - r * 0.45); seg(ctx, cx, cy + r * 0.5, cx + r * 0.5, cy - r * 0.4); }
+  function icFurnace(ctx, cx, cy, r) { ctx.strokeRect(cx - r, cy - r * 0.8, r * 2, r * 1.6); ctx.beginPath(); ctx.moveTo(cx - r * 0.6, cy); for (let k = 1; k <= 4; k++) ctx.lineTo(cx - r * 0.6 + k * r * 0.3, cy + (k % 2 ? -r * 0.25 : r * 0.25)); ctx.stroke(); }
+  function icCmm(ctx, cx, cy, r) { seg(ctx, cx - r * 0.8, cy - r * 0.6, cx + r * 0.8, cy - r * 0.6); seg(ctx, cx - r * 0.8, cy - r * 0.6, cx - r * 0.8, cy + r * 0.7); seg(ctx, cx + r * 0.8, cy - r * 0.6, cx + r * 0.8, cy + r * 0.7); seg(ctx, cx, cy - r * 0.6, cx, cy); disc(ctx, cx, cy + r * 0.08, r * 0.14); }
+
+  // 2.5D forms (world cells; z in metres).
+  function guardBand3D(ctx, P, x, y, w, d, z0, z1, theme) {
+    const g = mat("guard", theme);
+    edge(ctx, P, x, y + d, z0, x + w, y + d, z0, g, 2.2);
+    edge(ctx, P, x + w, y, z0, x + w, y + d, z0, g, 2.2);
+    edge(ctx, P, x, y + d, z1, x + w, y + d, z1, g, 1.2);
+    edge(ctx, P, x + w, y, z1, x + w, y + d, z1, g, 1.2);
+  }
+  function ringTop(ctx, P, cx, cy, R, z, color) {
+    let prev = null;
+    for (let i = 0; i <= 12; i++) {
+      const a = i / 12 * TAU, p = P(cx + Math.cos(a) * R, cy + Math.sin(a) * R, z);
+      if (prev) { ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(p.x, p.y); ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.stroke(); }
+      prev = p;
+    }
+  }
+  function animPhase(anim) { return (typeof anim === "number" && isFinite(anim)) ? ((anim % 1) + 1) % 1 : 0; }
+  function d3CncMill(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d * 0.7, h * 0.6, color);                              // the enclosure (front)
+    box3d(ctx, P, x + w * 0.15, y + d * 0.6, w * 0.7, d * 0.4, h, lighten(color, 0.06)); // the column at the back
+    guardBand3D(ctx, P, x, y, w, d * 0.7, h * 0.25, h * 0.3, theme);
+    const bm = beamColor(color, theme), p = animPhase(anim);
+    colBox(ctx, P, x + w * 0.5, y + d * 0.45, Math.min(w, d) * 0.1, h * 0.72, bm); // the spindle
+    edge(ctx, P, x + w * 0.2, y + d * 0.35, h * 0.6, x + w * 0.8, y + d * 0.35, h * 0.6, bm, 1.4); // the X rail
+    edge(ctx, P, x + w * (0.3 + p * 0.4), y + d * 0.2, h * 0.6, x + w * (0.3 + p * 0.4), y + d * 0.5, h * 0.6, bm, 1.6); // the table (travels)
+  }
+  function d3CncMill5axis(ctx, P, x, y, w, d, h, color, theme, anim) {
+    d3CncMill(ctx, P, x, y, w, d, h, color, theme, anim);
+    ringTop(ctx, P, x + w * 0.5, y + d * 0.35, Math.min(w, d) * 0.16, h * 0.62, beamColor(color, theme)); // the trunnion ring
+  }
+  function d3CncLathe(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h * 0.5, color);                                    // the bed
+    box3d(ctx, P, x, y, w * 0.28, d, h, lighten(color, 0.05));                    // the headstock
+    box3d(ctx, P, x + w * 0.78, y + d * 0.25, w * 0.18, d * 0.5, h * 0.7, lighten(color, 0.05)); // the tailstock
+    box3dZ(ctx, P, x + w * 0.28, y + d * 0.85, w * 0.5, d * 0.15, h * 0.5, h * 0.95, mat("guard", theme)); // the sliding chip guard
+    const bm = beamColor(color, theme), p = animPhase(anim);
+    edge(ctx, P, x + w * 0.28, y + d * 0.5, h * 0.72, x + w * 0.78, y + d * 0.5, h * 0.72, bm, 2.4); // the workpiece bar
+    edge(ctx, P, x + w * (0.35 + p * 0.35), y + d * 0.5, h * 0.72, x + w * (0.35 + p * 0.35), y + d * 0.2, h * 0.9, bm, 1.4); // the turret (travels)
+  }
+  function d3PressBrake(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h * 0.3, color);                                    // the bed
+    box3d(ctx, P, x, y, w * 0.12, d, h, lighten(color, 0.05));                    // the left C-frame
+    box3d(ctx, P, x + w * 0.88, y, w * 0.12, d, h, lighten(color, 0.05));         // the right C-frame
+    const bm = beamColor(color, theme), b = (typeof anim === "number" && isFinite(anim)) ? 1 - Math.abs(2 * animPhase(anim) - 1) : 0;
+    const z0 = h * (0.62 - b * 0.18);
+    box3dZ(ctx, P, x + w * 0.12, y + d * 0.35, w * 0.76, d * 0.3, z0, z0 + h * 0.14, bm); // the ram (moves)
+    box3dZ(ctx, P, x + w * 0.12, y + d * 0.42, w * 0.76, d * 0.16, h * 0.3, h * 0.36, bm); // the die
+    guardBand3D(ctx, P, x, y, w, d, h * 0.12, h * 0.16, theme);
+  }
+  function d3MouldingCell(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w * 0.5, d, h, color);                                    // the clamp unit
+    box3d(ctx, P, x + w * 0.5, y + d * 0.2, w * 0.5, d * 0.6, h * 0.62, lighten(color, 0.06)); // the injection unit
+    colBox(ctx, P, x + w * 0.76, y + d * 0.5, Math.min(w, d) * 0.14, h * 0.95, lighten(color, 0.12)); // the hopper
+    const bm = beamColor(color, theme), b = (typeof anim === "number" && isFinite(anim)) ? 1 - Math.abs(2 * animPhase(anim) - 1) : 0.5;
+    edge(ctx, P, x + w * 0.05, y + d * 0.2, h * 0.5, x + w * 0.45, y + d * 0.2, h * 0.5, bm, 1.6); // the tie bars
+    edge(ctx, P, x + w * 0.05, y + d * 0.8, h * 0.5, x + w * 0.45, y + d * 0.8, h * 0.5, bm, 1.6);
+    box3dZ(ctx, P, x + w * (0.3 - b * 0.12), y + d * 0.2, w * 0.04, d * 0.6, h * 0.15, h * 0.85, bm); // the moving platen
+    guardBand3D(ctx, P, x, y, w * 0.5, d, h * 0.42, h * 0.5, theme);
+  }
+  function d3WeldingCell(ctx, P, x, y, w, d, h, color, theme, anim) {
+    const bm = beamColor(color, theme), g = mat("guard", theme), fh = h * 0.85;
+    const cs = [[x + 0.05, y + 0.05], [x + w - 0.05, y + 0.05], [x + w - 0.05, y + d - 0.05], [x + 0.05, y + d - 0.05]];
+    for (let i = 0; i < 4; i++) colBox(ctx, P, cs[i][0], cs[i][1], 0.1, fh, bm);  // the fence posts
+    for (let i = 0; i < 4; i++) {                                                 // the rails
+      const a = cs[i], b = cs[(i + 1) % 4];
+      edge(ctx, P, a[0], a[1], fh, b[0], b[1], fh, bm, 1.2);
+      edge(ctx, P, a[0], a[1], fh * 0.5, b[0], b[1], fh * 0.5, g, 1.6);
+    }
+    box3d(ctx, P, x + w * 0.5, y + d * 0.3, w * 0.38, d * 0.4, h * 0.35, color);  // the fixture table
+    colBox(ctx, P, x + w * 0.24, y + d * 0.7, Math.min(w, d) * 0.16, h * 0.3, color); // the robot base
+    const p = animPhase(anim), sw = Math.sin(p * TAU) * 0.08;
+    edge(ctx, P, x + w * 0.24, y + d * 0.7, h * 0.3, x + w * (0.36 + sw), y + d * 0.45, h * 0.8, bm, 2.2); // the lower arm
+    edge(ctx, P, x + w * (0.36 + sw), y + d * 0.45, h * 0.8, x + w * (0.6 + sw), y + d * 0.5, h * 0.42, bm, 2.2); // the upper arm to the torch
+  }
+  function d3CoatingBooth(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h, color);                                          // the booth
+    box3dZ(ctx, P, x + w * 0.2, y + d * 0.98, w * 0.6, d * 0.02, h * 0.1, h * 0.75, lighten(color, 0.14)); // the front opening
+    const bm = beamColor(color, theme);
+    colBox(ctx, P, x + w * 0.5, y + d * 0.5, Math.min(w, d) * 0.16, h * 1.12, bm); // the exhaust stack
+    edge(ctx, P, x, y + d * 0.5, h * 0.3, x + w, y + d * 0.5, h * 0.3, bm, 1.4);   // the through line
+    guardBand3D(ctx, P, x, y, w, d, h * 0.42, h * 0.5, theme);
+  }
+  function d3HeatTreatment(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h * 0.8, color);                                    // the furnace body
+    box3dZ(ctx, P, x + w * 0.2, y + d * 0.98, w * 0.6, d * 0.02, h * 0.15, h * 0.6, mat("guard", theme)); // the door (hot)
+    const bm = beamColor(color, theme);
+    colBox(ctx, P, x + w * 0.7, y + d * 0.3, Math.min(w, d) * 0.12, h, bm);       // the flue
+    edge(ctx, P, x, y + d, h * 0.8, x + w, y + d, h * 0.8, bm, 1.2);              // the top rim
+    edge(ctx, P, x + w, y, h * 0.8, x + w, y + d, h * 0.8, bm, 1.2);
+  }
+  function d3CmmInspection(ctx, P, x, y, w, d, h, color, theme, anim) {
+    box3d(ctx, P, x, y, w, d, h * 0.35, color);                                   // the granite table
+    box3dZ(ctx, P, x + w * 0.38, y + d * 0.4, w * 0.24, d * 0.2, h * 0.35, h * 0.5, lighten(color, 0.1)); // the part
+    const bm = beamColor(color, theme), b = (typeof anim === "number" && isFinite(anim)) ? 1 - Math.abs(2 * animPhase(anim) - 1) : 0.5;
+    const by = y + d * (0.25 + b * 0.5);
+    colBox(ctx, P, x + w * 0.08, by, Math.min(w, d) * 0.08, h, bm);              // the left column (travels)
+    colBox(ctx, P, x + w * 0.92, by, Math.min(w, d) * 0.08, h, bm);             // the right column
+    box3dZ(ctx, P, x + w * 0.04, by - d * 0.04, w * 0.92, d * 0.08, h * 0.9, h, bm); // the bridge
+    edge(ctx, P, x + w * (0.35 + b * 0.3), by, h * 0.9, x + w * (0.35 + b * 0.3), by, h * 0.45, bm, 1.4); // the probe
+  }
+
   const REG = {
     "selective-racking": { d2: d2Selective, d3: d3Selective, icon: icGrid, g2: "shelf-bay grid (uprights + beams)", f3: "open see-through rack frame (3 levels)" },
     "block-stack": { d2: d2Block, d3: d3Block, icon: icStack, g2: "stacked-square honeycomb pattern", f3: "grid of stacked unit stacks" },
@@ -2710,6 +3009,16 @@
     "mixer": { d2: d2Mixer, d3: d3Mixer, icon: icMixer, g2: "round vessel + rotating 3-blade agitator + in/out ports", f3: "vessel body + full-height drive shaft + rotating impeller blades" },
     "portioner": { d2: d2Portioner, d3: d3Portioner, icon: icPortioner, g2: "fluid inlet + filling nozzle dosing into discrete portion cups + droplet", f3: "filling-head housing + nozzle down-spout + a portion cup scrolling out" },
     "deportioner": { d2: d2DePortioner, d3: d3DePortioner, icon: icDePortioner, g2: "discrete portion cups tipping down a chute into a continuous fluid trough", f3: "emptying-head housing + dump chute into a low fluid trough + incoming cup" },
+    // v3.49 STANDARD TYPES: the typed machine catalogue (DIN 8580 main groups).
+    "cnc-mill": { d2: d2CncMill, d3: d3CncMill, icon: icMill, g2: "guarded enclosure + X rail + table + spindle nose with a rotating cutter + in/out arrows", f3: "front enclosure + rear column + spindle + travelling table + guard band" },
+    "cnc-mill-5axis": { d2: d2CncMill5axis, d3: d3CncMill5axis, icon: icMill5, g2: "the 3-axis glyph + a trunnion ring and a tilt arc round the table", f3: "the 3-axis form + a trunnion ring on the table" },
+    "cnc-lathe": { d2: d2CncLathe, d3: d3CncLathe, icon: icLathe, g2: "bed way + headstock with a rotating chuck + workpiece bar + tailstock + turret tool", f3: "low bed + headstock + tailstock + orange chip guard + workpiece bar + travelling turret" },
+    "press-brake": { d2: d2PressBrake, d3: d3PressBrake, icon: icPress, g2: "two C-frames + a steel ram that descends + V die + bed + sheet", f3: "bed + two C-frames + descending ram + die + guard band" },
+    "moulding-cell": { d2: d2MouldingCell, d3: d3MouldingCell, icon: icMould, g2: "tie bars + fixed and moving platens + tapered injection barrel + hopper", f3: "clamp unit + lower injection unit + hopper + tie bars + moving platen" },
+    "welding-cell": { d2: d2WeldingCell, d3: d3WeldingCell, icon: icWeld, g2: "dashed safety fence + fixture table + two-link robot arm from a base disc + arc flash", f3: "fence posts and rails + fixture table + robot base + two-link arm" },
+    "coating-booth": { d2: d2CoatingBooth, d3: d3CoatingBooth, icon: icCoat, g2: "booth + spray chamber + exhaust louvres + gun with a swaying spray fan + through arrows", f3: "booth + front opening + exhaust stack + through line + guard band" },
+    "heat-treatment": { d2: d2HeatTreatment, d3: d3HeatTreatment, icon: icFurnace, g2: "furnace + chamber with three zigzag heating elements + door + flue + breathing glow", f3: "furnace body + hot door + flue + top rim" },
+    "cmm-inspection": { d2: d2CmmInspection, d3: d3CmmInspection, icon: icCmm, g2: "granite table + two columns + travelling bridge + probe with a stylus tip + part + scale ticks", f3: "granite table + part + travelling bridge on two columns + probe" },
   };
 
   /* ==================================================================

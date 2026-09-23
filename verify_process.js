@@ -263,6 +263,26 @@ for (const k of FACTORY_KEYS) {
     m.wip.toFixed(1) + " parts, lead " + m.leadTimeSec.toFixed(0) + " s, Little residual " + (m.little.residualRel * 100).toFixed(2) + "%");
 }
 
+/* ---- v3.49 STANDARD TYPES: a machine of the catalogue is a station operation -- */
+(() => {
+  const lay = { gridW: 20, gridH: 10, elements: [
+    { id: "s", type: "mfg-source", x: 0, y: 2, w: 2, d: 2, zone: "receiving" },
+    { id: "m", type: "cnc-mill", x: 5, y: 2, w: 3, d: 3, zone: "storage" },
+    { id: "d", type: "mfg-drain", x: 12, y: 2, w: 2, d: 2, zone: "shipping" },
+  ] };
+  const block = P.derive(lay);
+  const op = block && block.operations[1];
+  check("v3.49: source -> cnc-mill -> drain derives 3 operations; the mill is a station at the domain's 300 s teaching cycle with a modelled source",
+    !!block && block.operations.length === 3 && op.kind === "station" && op.elementId === "m" && op.cycleSec === 300 && op.servers === 1 && /modelled/.test(op.source) && block.operations[0].kind === "source" && block.operations[2].kind === "sink",
+    block ? JSON.stringify(block.operations.map((o) => o.kind + ":" + o.cycleSec)) : "null");
+  const rt = P.sanitize(JSON.parse(JSON.stringify(block)));
+  check("v3.49: the block round-trips through sanitize (kind, cycle, servers, source kept)",
+    !!rt && rt.operations.length === 3 && rt.operations[1].kind === "station" && rt.operations[1].cycleSec === 300 && rt.operations[1].source === op.source);
+  const m = P.metrics(block);
+  check("v3.49: metrics() sees the mill as the bottleneck at 300 s -> 12 units/h",
+    !!m && m.bottleneck && m.bottleneck.opId === "op-m" && m.bottleneck.effTimeSec === 300 && Math.abs(m.throughputPerHr - 12) < 1e-9, m ? m.throughputPerHr + "/h" : "no metrics");
+})();
+
 console.log("");
 console.log(failures === 0 ? "ALL PROCESS CHECKS PASSED" : failures + " PROCESS CHECK(S) FAILED");
 process.exit(failures === 0 ? 0 : 1);

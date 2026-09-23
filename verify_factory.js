@@ -183,6 +183,16 @@ check("NL apply: 'add a parallel machining station' -> +1 mfg-parallel-station",
 const rSt = NL.apply(base, "add a machining station", ctx);
 check("NL apply: 'add a machining station' -> +1 mfg-station",
   rSt.ok && count(rSt.layout.elements, "mfg-station", "storage") - baseStation === 1);
+// v3.49 STANDARD TYPES: the machine catalogue is reachable by plain language too.
+const pMill = NL.parse("add a cnc mill", ctx);
+check("v3.49 NL parse: 'add a cnc mill' -> add/cnc-mill/1/storage; '5-axis machining centre' beats 'machining centre'; 'machining station' still means mfg-station",
+  pMill.ok && pMill.op.kind === "add" && pMill.op.type === "cnc-mill" && pMill.op.count === 1 && pMill.op.zone === "storage" &&
+  NL.parse("add a 5-axis machining centre", ctx).op.type === "cnc-mill-5axis" && NL.parse("add 2 machining centres", ctx).op.type === "cnc-mill" &&
+  NL.parse("add a machining station", ctx).op.type === "mfg-station" && NL.parse("add a cmm", ctx).op.zone === "packing",
+  pMill.ok ? JSON.stringify(pMill.op) : pMill.message);
+const rMill = NL.apply(base, "add a cnc mill", ctx);
+check("v3.49 NL apply: 'add a cnc mill' -> +1 cnc-mill on the machining lane, overlap-free",
+  rMill.ok && count(rMill.layout.elements, "cnc-mill", "storage") === 1 && overlapFree(rMill.layout.elements));
 
 const pRes = NL.parse("leave zone packing for manual expansion", ctx);
 check("NL parse: 'leave zone packing for manual expansion' -> reserve/packing",

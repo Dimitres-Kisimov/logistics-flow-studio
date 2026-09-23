@@ -72,6 +72,9 @@
   // MODE switch as PRODUCTION - hidden in Warehouse mode, shown in Factory
   // (a warehouse layout needs no process-industry fluids). Nothing is deleted.
   const FLUIDS = "Fluids / Process";
+  // v3.49 STANDARD TYPES: the typed machine catalogue, classified by DIN 8580
+  // main group and ISA-95 role. Rides the same MODE lever as PRODUCTION.
+  const MACHINES = "Machines (DIN 8580)";
   const GROUP_ORDER = [
     "Storage & Racking",
     "Conveying & Sortation",
@@ -80,6 +83,7 @@
     "Docks & Endpoints",
     "Zones",
     PRODUCTION,
+    MACHINES,
     FLUIDS,
     MY_OBJECTS,
   ];
@@ -107,6 +111,9 @@
     // v2.5 FACTORY-A manufacturing components (Production / Assembly group).
     "mfg-source": PRODUCTION, "mfg-drain": PRODUCTION, "mfg-station": PRODUCTION,
     "mfg-parallel-station": PRODUCTION, "mfg-assembly": PRODUCTION, "mfg-dismantle": PRODUCTION,
+    // v3.49 STANDARD TYPES
+    "cnc-mill": MACHINES, "cnc-mill-5axis": MACHINES, "cnc-lathe": MACHINES, "press-brake": MACHINES, "moulding-cell": MACHINES,
+    "welding-cell": MACHINES, "coating-booth": MACHINES, "heat-treatment": MACHINES, "cmm-inspection": MACHINES,
     // v3.4 FACTORY-A2 flow-geometry components. The conveying / routing nodes
     // group with Conveying & Sortation; the guide paths with Transport. Both
     // groups are always shown (NOT mode-filtered) - generic material-flow geometry.
@@ -138,6 +145,9 @@
     // (Source/Drain -> dock endpoint, the Station family -> station server).
     "mfg-source": "dock", "mfg-drain": "dock", "mfg-station": "station",
     "mfg-parallel-station": "station", "mfg-assembly": "station", "mfg-dismantle": "station",
+    // v3.49 STANDARD TYPES: every machine seeds the station base
+    "cnc-mill": "station", "cnc-mill-5axis": "station", "cnc-lathe": "station", "press-brake": "station", "moulding-cell": "station",
+    "welding-cell": "station", "coating-booth": "station", "heat-treatment": "station", "cmm-inspection": "station",
     // v3.4 FACTORY-A2: the conveying / routing nodes ride the conveyor
     // connector path; the guide paths ride the transporter path.
     "converter": "conveyor", "angular-converter": "conveyor", "turntable": "conveyor",
@@ -367,6 +377,7 @@
     const mode = opts && typeof opts.mode === "string" ? opts.mode : null;
     const hideProduction = mode === "warehouse"; // Factory (and default) shows it
     const hideFluids = mode === "warehouse";     // v3.7: Fluids / Process rides the same mode lever
+    const hideMachines = mode === "warehouse";   // v3.49: the machine catalogue too
     const els = ELEMENTS();
     const order = (D().paletteOrder || []).slice();
     const groups = {};
@@ -392,7 +403,8 @@
       .map((label) => groups[label])
       .filter((g) => g.types.length > 0 || g.label === MY_OBJECTS)
       .filter((g) => !(hideProduction && g.label === PRODUCTION))
-      .filter((g) => !(hideFluids && g.label === FLUIDS));
+      .filter((g) => !(hideFluids && g.label === FLUIDS))
+      .filter((g) => !(hideMachines && g.label === MACHINES));
   }
 
   /* ------------------------------------------------------------------
@@ -521,6 +533,17 @@
    * null for an unknown type. Cycle times and rates are labelled teaching
    * values; nothing here is a vendor specification.
    * ------------------------------------------------------------------ */
+  // v3.49 STANDARD TYPES: one sentence and one chip for a type's `standard`
+  // descriptor (domain.js std()). Classification labels only.
+  function standardText(std) {
+    if (!std) return "";
+    const din = std.din8580 ? "DIN 8580 main group " + std.din8580.group + " - " + std.din8580.name : "no DIN 8580 group (inspection, not a manufacturing process)";
+    return din + " · ISA-95 role: " + String(std.isa95 || "work-cell").replace(/-/g, " ") + " (" + (std.note || "informed by, not a certification") + ")";
+  }
+  function standardChip(std) {
+    if (!std) return "";
+    return std.din8580 ? "DIN 8580 · " + std.din8580.group : "ISA-95 " + String(std.isa95 || "work-cell").replace(/-/g, " ");
+  }
   function describe(type, opts) {
     const els = ELEMENTS();
     const def = els[type];
@@ -545,6 +568,7 @@
     if (def.io) rows.push(["I/O role", String(def.io)]);
     if (def.flow) rows.push(["Flow control", String(def.flow).toUpperCase()]);
     if (def.stage) rows.push(["Chain stage", String(def.stage)]);
+    if (def.standard) rows.push(["Standard", standardText(def.standard)]);
     if (def.levels) rows.push(["Levels", String(def.levels)]);
     if (def.selectivity != null) rows.push(["Selectivity", (def.selectivity * 100).toFixed(0) + "%"]);
     if (def.rotation) rows.push(["Rotation", String(def.rotation)]);
@@ -557,6 +581,7 @@
       handles: G && typeof G.formForType === "function" ? G.formForType(type) : null,
       glyph2d: meta ? meta.glyph2d : null, form3d: meta ? meta.form3d : null,
       rows: rows, desc: def.desc || "",
+      standard: def.standard || null, chip: standardChip(def.standard), // v3.49
     };
   }
 
@@ -567,6 +592,9 @@
     MY_OBJECTS: MY_OBJECTS,
     PRODUCTION: PRODUCTION,
     FLUIDS: FLUIDS,
+    MACHINES: MACHINES, // v3.49
+    standardText: standardText, // v3.49
+    standardChip: standardChip, // v3.49
     BUILTIN_BASE: BUILTIN_BASE,
     describe: describe, // v3.48
     buildDef: buildDef,

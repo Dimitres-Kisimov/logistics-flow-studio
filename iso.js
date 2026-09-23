@@ -122,6 +122,16 @@
     "mfg-parallel-station": 2.2,
     "mfg-assembly": 2.4,
     "mfg-dismantle": 2.4,
+    // v3.49 STANDARD TYPES: the machine catalogue (mirror domain heightM).
+    "cnc-mill": 2.6,
+    "cnc-mill-5axis": 2.8,
+    "cnc-lathe": 2.0,
+    "press-brake": 2.8,
+    "moulding-cell": 2.2,
+    "welding-cell": 2.4,
+    "coating-booth": 3.0,
+    "heat-treatment": 2.6,
+    "cmm-inspection": 2.4,
     // v3.4 FACTORY-A2 "flow-geometry components" (mirror domain heightM).
     "converter": 0.9,
     "angular-converter": 0.9,

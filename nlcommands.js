@@ -62,6 +62,18 @@
     "mfg-station": ["machining stations", "machining station", "process stations", "process station", "inspection station", "qa station", "machine station", "stations", "station"],
     "mfg-assembly": ["assembly stations", "assembly station", "assemblies", "assembly"],
     "mfg-dismantle": ["dismantle stations", "dismantle station", "split stations", "split station", "dismantle"],
+    // v3.49 STANDARD TYPES: the machine catalogue. Longest match wins, so
+    // "5-axis machining centre" beats "machining centre", and the existing
+    // "machining station" (mfg-station) is untouched.
+    "cnc-mill-5axis": ["5-axis machining centres", "5-axis machining centre", "five-axis machining centre", "5-axis mills", "5-axis mill", "five-axis mill", "5 axis mill"],
+    "cnc-mill": ["machining centres", "machining centre", "machining centers", "machining center", "cnc mills", "cnc mill", "milling machines", "milling machine", "vmc"],
+    "cnc-lathe": ["turning centres", "turning centre", "cnc lathes", "cnc lathe", "lathes", "lathe"],
+    "press-brake": ["press brakes", "press brake", "bending machines", "bending machine"],
+    "moulding-cell": ["injection moulding machines", "injection moulding machine", "injection molding machines", "injection molding machine", "moulding cells", "moulding cell", "molding cell"],
+    "welding-cell": ["welding cells", "welding cell", "welding robots", "welding robot", "welder"],
+    "coating-booth": ["coating booths", "coating booth", "paint booths", "paint booth", "powder coating"],
+    "heat-treatment": ["heat treatment furnaces", "heat treatment furnace", "heat-treatment furnace", "furnaces", "furnace", "heat treatment"],
+    "cmm-inspection": ["cmm inspection stations", "cmm inspection station", "coordinate measuring machines", "coordinate measuring machine", "cmm"],
   };
 
   // v2.6 FACTORY-B: a DEFAULT line stage for each factory component, so
@@ -75,6 +87,9 @@
     "mfg-parallel-station": "storage",
     "mfg-assembly": "picking",
     "mfg-dismantle": "picking",
+    // v3.49 STANDARD TYPES: machines land on the machining lane, inspection at the finish.
+    "cnc-mill": "storage", "cnc-mill-5axis": "storage", "cnc-lathe": "storage", "press-brake": "storage", "moulding-cell": "storage", "welding-cell": "storage", "coating-booth": "storage", "heat-treatment": "storage",
+    "cmm-inspection": "packing",
   };
 
   // Number words -> integers.

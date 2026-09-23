@@ -27,7 +27,7 @@
  *   4. Shipped wiring: the viewer loads analytics.js and has the section;
  *      the planner's Analyze card draws the recorded flow beside the stage
  *      model; RunLedger.SQL and tools/run_ledger.py carry v_flow_links;
- *      sw.js at wt-v128; the runner.
+ *      sw.js at wt-v129; the runner.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -199,7 +199,7 @@ console.log("=".repeat(72));
   check("4b. the planner's Analyze card draws the recorded flow beside the stage model, gated on a live ledger", /state\.flow\.ledger && WT\.ledger && typeof WT\.ledger\.sankeyFromLedger === "function"/.test(app) && /WT\.analytics\.sankeySvgLayered\(lm, theme\)/.test(app));
   check("4c. RunLedger.SQL and tools/run_ledger.py carry v_flow_links, and summary() includes it", typeof RL.SQL.v_flow_links === "string" && /CREATE VIEW IF NOT EXISTS v_flow_links AS/.test(py) && /PLANNER_VIEWS = \([^)]*"v_flow_links"/.test(py)); // v3.46.1: in the planner tuple (it was pinned as its LAST entry; v3.45 appended v_staffing)
   check("4d. the linear sankey is frozen by golden hashes in verify_analytics.js", /25c555a5434113107cdb0faa99d71bc5a1bdc229/.test(va) && /a1bbbf8c6820cb119abf3c6557450997a2f59e2c/.test(va) && /f12ec1728898f9021ba1c9cab0a82ce1e507c91e/.test(va));
-  check("4e. sw.js at wt-v128 (previously wt-v127) precaches analytics.js and the viewer", /CACHE_VERSION\s*=\s*"wt-v128"/.test(sw) && /Previously wt-v127/.test(sw) && /"\.\/analytics\.js"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw));
+  check("4e. sw.js at wt-v129 (previously wt-v128) precaches analytics.js and the viewer", /CACHE_VERSION\s*=\s*"wt-v129"/.test(sw) && /Previously wt-v128/.test(sw) && /"\.\/analytics\.js"/.test(sw) && /"\.\/run-ledger\.js"/.test(sw));
   check("4f. test/run-all.mjs lists this harness", /verify_ledger_flow\.js/.test(runall));
   check("4g. no Date / Math.random CALL in the layered layout or ledger.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(read("ledger.js")) && !/Math\.random\(/.test(read("analytics.js")));
 })();

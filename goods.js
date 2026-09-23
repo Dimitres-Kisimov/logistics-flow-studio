@@ -119,8 +119,10 @@
     "tote":        { f: 0.60, l: 0.40, z: 0.32 },  // Euro container tote
     "parcel":      { f: 0.35, l: 0.25, z: 0.22 },  // packed outbound parcel
     "wrapped-pallet": { f: 1.20, l: 0.80, z: 1.45 }, // v3.30: the dispatch pallet after the wrapper - same envelope, film sheen
+    "klt":         { f: 0.60, l: 0.40, z: 0.28 },  // v3.49: VDA 4500 small-load carrier, KLT 6428 nominal 600 x 400 x 280 (a drawing constant)
+    "workpiece":   { f: 0.15, l: 0.15, z: 0.10 },  // v3.49: a machined part between machines (a drawing constant, no part is this size)
   };
-  const FORMS = ["pallet-load", "carton", "tote", "parcel", "pallet", "wrapped-pallet"];
+  const FORMS = ["pallet-load", "carton", "tote", "parcel", "pallet", "wrapped-pallet", "klt", "workpiece"]; // v3.49: + klt, workpiece (appended, nothing renumbered)
 
   // Pallet construction (metres): the bottom blocks/runners and the top
   // deck of the EUR pallet, drawn at the rich tier.
@@ -349,7 +351,18 @@
    * case it still has the form it arrived in - the station transforms it
    * when it SERVES it) or moving on.
    * ================================================================== */
-  function formFor(mu, route) {
+  // v3.49 STANDARD TYPES: on a line with typed machines the units are small-
+  // load carriers and workpieces, not pallets and parcels. Selected ONLY when
+  // the caller says the layout has a machine (ctx.machineLine); every existing
+  // layout keeps STAGE_FORM byte for byte. Same keys as STAGE_FORM.
+  const MACHINE_STAGE_FORM = {
+    receiving: "klt",       // blanks arrive in a KLT
+    storage: "workpiece",   // the part on the machining lane
+    picking: "workpiece",   // still a part at assembly / finish
+    packing: "klt",         // finished parts back in a KLT
+    shipping: "klt",        // the KLT goes out
+  };
+  function formFor(mu, route, ctx) {
     if (!mu) return "carton";
     // v3.30 R3: on a per-order route the OPERATION decides the form. The
     // legacy spine (route 0, or no route at all) keeps the stage chain.
@@ -359,7 +372,8 @@
     let i = STAGE_ORDER.indexOf(mu.stage);
     if (i < 0) i = 0;
     if (mu.status === "queued") i = Math.max(0, i - 1); // still the incoming form
-    return STAGE_FORM[STAGE_ORDER[i]] || "carton";
+    const table = ctx && ctx.machineLine ? MACHINE_STAGE_FORM : STAGE_FORM; // v3.49
+    return table[STAGE_ORDER[i]] || "carton";
   }
   /* ==================================================================
    * v3.48 WHAT A TYPE HANDLES. The goods form a placed type carries, for the
@@ -375,7 +389,8 @@
     "push-station": "tote", "pull-station": "tote", "pack-station": "parcel", "vas-station": "parcel", "returns-station": "parcel",
     "qc-bench": "carton", "depalletiser": "pallet-load", "stretch-wrap": "wrapped-pallet",
     "dock-in": "pallet-load", "staging": "pallet-load", "dock-out": "parcel",
-    "mfg-source": "tote", "mfg-drain": "tote", "mfg-station": "tote", "mfg-parallel-station": "tote", "mfg-assembly": "tote", "mfg-dismantle": "tote",
+    "mfg-source": "klt", "mfg-drain": "klt", "mfg-station": "workpiece", "mfg-parallel-station": "workpiece", "mfg-assembly": "workpiece", "mfg-dismantle": "workpiece", // v3.49: KLT in / out, workpieces between
+    "cnc-mill": "workpiece", "cnc-mill-5axis": "workpiece", "cnc-lathe": "workpiece", "press-brake": "workpiece", "moulding-cell": "workpiece", "welding-cell": "workpiece", "coating-booth": "workpiece", "heat-treatment": "workpiece", "cmm-inspection": "workpiece",
     "charging-station": null, "gate": null, "pipe": null, "fluid-source": null, "fluid-drain": null, "tank": null, "mixer": null, "portioner": null, "deportioner": null,
   };
   function formForType(type) {
@@ -459,7 +474,7 @@
     const plan = (state && state.plan) || {};
     const wp = plan.waypoints || [];
     const route = plan.routes && mu ? plan.routes[mu.route] : null; // v3.30 R3
-    const form = formFor(mu, route);
+    const form = formFor(mu, route, so); // v3.49: so.machineLine selects the KLT / workpiece forms
     const size = sizeOf(form);
     const queued = !!(mu && mu.status === "queued" && mu.station);
     let x, y, heading, qIndex = -1;
@@ -889,6 +904,23 @@
       // denser bands plus a sheen edge - so a wrapped dispatch pallet reads
       // differently from the inbound load it started as.
       if (u.form === "wrapped-pallet") drawFilm(ctx, o, u, cosH, sinH, theme, rich, deck, z0 + u.size.z);
+    } else if (u.form === "klt") {
+      // v3.49 a VDA small-load carrier: straight walls, one plastic colour
+      // (never the tote's red alternation), a rim and two stacking ribs.
+      const S = u.size, plastic = mat("toteBlue", theme);
+      box(ctx, o, { f: 0, l: 0, z: z0 + S.z / 2 }, S, cosH, sinH, u.x, u.y, shadeUp(plastic, theme), plastic, true);
+      if (rich) {
+        const zt = z0 + S.z;
+        line(ctx, o, [-S.f / 2, -S.l / 2, zt - 0.02], [S.f / 2, -S.l / 2, zt - 0.02], cosH, sinH, u.x, u.y);
+        line(ctx, o, [-S.f / 2, S.l / 2, zt - 0.02], [S.f / 2, S.l / 2, zt - 0.02], cosH, sinH, u.x, u.y);
+        line(ctx, o, [-S.f * 0.17, -S.l / 2, z0 + 0.02], [-S.f * 0.17, -S.l / 2, zt], cosH, sinH, u.x, u.y);
+        line(ctx, o, [S.f * 0.17, -S.l / 2, z0 + 0.02], [S.f * 0.17, -S.l / 2, zt], cosH, sinH, u.x, u.y);
+      }
+    } else if (u.form === "workpiece") {
+      // v3.49 a machined workpiece: a steel block with a lighter machined top.
+      const S = u.size, steel = mat("beam", theme);
+      box(ctx, o, { f: 0, l: 0, z: z0 + S.z / 2 }, S, cosH, sinH, u.x, u.y, shadeUp(steel, theme), steel, true);
+      if (rich) line(ctx, o, [-S.f * 0.3, 0, z0 + S.z], [S.f * 0.3, 0, z0 + S.z], cosH, sinH, u.x, u.y);
     } else if (u.form === "tote") {
       const S = u.size;
       const plastic = mat(((u.id | 0) % 5) === 0 ? "toteRed" : "toteBlue", theme);
@@ -996,10 +1028,13 @@
     "cartons is a change of FORM ONLY, one MU stays one MU. Handling-unit sizes " +
     "are NOMINAL generic dimensions used as drawing constants, NOT a specification " +
     "and NOT a capacity claim. NOT CAD/BIM geometry, NOT a survey, NOT a " +
-    "measurement and NOT a certification.";
+    "measurement and NOT a certification. On a line with typed machines (v3.49) " +
+    "the units are drawn as small-load carriers (KLT, VDA 4500 nominal 600 x 400 x 280) " +
+    "and machined workpieces (a drawing constant); the same one-MU-one-unit rule holds.";
 
   WT.goods = {
     NOMINAL, FORMS, STAGE_FORM, STAGE_ORDER, TRANSFORMS, PALLET,
+    MACHINE_STAGE_FORM, // v3.49
     NOSE_GAP, BENCH_TOP, DECK_TOP, MAX_FORM_UNITS, MAX_VEHICLES,
     VEHICLE_TYPES, BELT_TYPES, DECK_TYPES, BENCH_TYPES,
     HONESTY,

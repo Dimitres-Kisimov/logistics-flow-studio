@@ -1,5 +1,42 @@
 # Changelog
 
+## v3.49 — Standard types: a typed machine catalogue
+
+**The catalogue.** Nine machine types, each named by public standards: `cnc-mill` (3-axis
+machining centre), `cnc-mill-5axis`, `cnc-lathe`, `press-brake`, `moulding-cell`, `welding-cell`,
+`coating-booth`, `heat-treatment` and `cmm-inspection`. Every definition carries
+`standard: { din8580: { group, name } | null, isa95: "work-cell", note, source }` - the DIN 8580
+main group (1 Urformen … 6 Stoffeigenschaft ändern; the CMM has none, inspection is not a
+manufacturing process) and the ISA-95 / IEC 62264-1 role - classification labels only,
+informed by, not a certification; no ISA-95 information model. All are single-server
+flow stations (`base: "station"`), so the process model (`OP_KIND` → station), the line
+sim, the workforce pose and the costing (the Workstation teaching kind) treat them as the
+existing Station (process). Cycle times are labelled teaching values, editable.
+
+**Everywhere else.** Own 2D glyph + 2.5D form per type (`shapes.js`: guard bands, steel, a
+moving working part - spindle, ram, platen, arm, bridge), iso heights, the library group
+*Machines (DIN 8580)* after Production / Assembly (hidden in Warehouse mode like the other
+factory groups), plain-language synonyms with default lanes ("add a 5-axis machining
+centre"; "machining station" still means the generic station), a standard chip in the
+Class Library entry and card, a *Standard* row in the Inspector (one sentence from
+`library.standardText`).
+
+**Goods.** Two forms appended: `klt` (VDA 4500 small-load carrier, 600 × 400 × 280 nominal,
+one plastic colour, rim and ribs) and `workpiece` (a steel block, a drawing constant).
+`MACHINE_STAGE_FORM` (KLT in, workpieces on the lane, KLT out) is selected by `formFor` only
+behind a `machineLine` flag the app sets when a placed element carries a standard; every
+layout without one keeps `STAGE_FORM` byte for byte. `formForType`: machines and stations
+handle workpieces, source / drain a KLT (named change of the v3.48 pin).
+
+**Verification.** `verify_library_preview.js` +8 (forms, the table, the flag, draw smoke,
+descriptors), `verify_library.js` +3 (the group in each mode, describe, cloning),
+`verify_process.js` +3 (source → mill → drain derives a 300 s station, sanitize round-trip,
+12 units/h), `verify_factory.js` +2 (NL parse and apply), `verify_examples.js MEGA_EXEMPT`
++9, `verify_forms.js` 7a regex updated, app self-test +1 (`din8580-machines-registered-
+everywhere`). 76 harnesses, 120 Python tests, WT-SELFTEST 184/184 + viewer 31/31. Cache
+wt-v129. Honest limits: the machines cost as the Workstation kind; no new worker pose (an
+operator works two-handed at the panel); the catalogue's cycle times are teaching values.
+
 ## v3.48 — The library shows what you place
 
 **The list.** The Class Library's swatches used to collapse to the 28 px LOD icon (the

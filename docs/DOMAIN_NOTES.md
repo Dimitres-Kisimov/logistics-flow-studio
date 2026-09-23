@@ -275,3 +275,55 @@ Score = **45% cost + 40% service + 15% CO2** (weights shown in the UI). Cost/CO2
 ### Simplifications (deliberate)
 
 Euclidean distances on an abstract grid; single-sourcing shortest-path routing; no capacity constraints; no backhaul; steady-state weekly averages (no day-by-day simulation); normal/independent demand behind the safety-stock formula; fill rates as fixed policy numbers rather than simulated shortages; CO2 as two per-mode factors. It is a teaching game about network trade-offs — not a network design suite, a TMS, or a carbon-accounting tool.
+
+## 10. Standard types — the machine catalogue (v3.49)
+
+Factory mode carries nine machine types whose classes are named by **public standards**. The
+labels are what the standards call the process family and the equipment role; nothing here
+is a conformance claim, and no licensed standard text is reproduced.
+
+### DIN 8580 main groups (Fertigungsverfahren)
+
+| Group | Name | Types in the catalogue |
+|---|---|---|
+| 1 | Urformen (primary shaping) | `moulding-cell` |
+| 2 | Umformen (forming) | `press-brake` |
+| 3 | Trennen (cutting / separating) | `cnc-mill`, `cnc-mill-5axis`, `cnc-lathe` |
+| 4 | Fügen (joining) | `welding-cell` |
+| 5 | Beschichten (coating) | `coating-booth` |
+| 6 | Stoffeigenschaft ändern (changing material properties) | `heat-treatment` |
+| — | *not a manufacturing process* | `cmm-inspection` (inspection is a quality operation) |
+
+Register row, in the convention of `docs/FACTORY_PLATFORM_PLAN.md`: jurisdiction DE; edition
+DIN 8580:2022-12; clause —; use: classification labels only, no conformance; reviewer: the
+author; date 2026-09-23.
+
+### ISA-95 / IEC 62264-1 roles
+
+The equipment hierarchy of IEC 62264-1 is Enterprise → Site → Area → Work Center (Production
+Unit / Production Line / Process Cell / Storage Zone) → Work Unit (Unit / Work Cell / Storage
+Unit). Every catalogue machine carries the role **work cell**; a generated factory lane is a
+production line; the warehouse zones are storage zones. Role labels only — the app implements
+no ISA-95 information model (no B2MML, no equipment definitions, no capability model).
+
+### VDA carriers (drawing constants)
+
+The material flow on a line with a typed machine carries small-load carriers instead of
+pallets and parcels: **KLT** per the VDA 4500 recommendation (600 × 400 × 280 mm and
+400 × 300 × 280 mm are the common R-KLT sizes; 300 × 200 × 147 mm the smallest), drawn as
+the 600 × 400 × 280 nominal; the **GLT** large-load carrier of VDA 4520 (1,200 × 1,000 mm
+footprint, 975 mm side height) is named for context and not drawn. The **workpiece** form is
+a 0.15 m block — a drawing constant, no part is this size. Public nominal dimensions, not a
+specification and not a capacity claim; the one-MU-one-unit rule of the goods layer holds.
+
+### What the catalogue does not change
+
+- **Costing.** The factory cost model prices operations by process kind (`analytics.js`
+  `STATION_KINDS`); every catalogue machine is a *station*, so it costs as the Workstation
+  teaching kind (capex, amortisation, power). A press brake and a five-axis centre therefore
+  cost the same until a per-type table exists — said so here and in the changelog.
+- **Workforce.** No new pose: every `base: "station"` element is staffed with the packer's
+  two-handed bench pose (`workers.js`), which reads as an operator at the control panel.
+- **Cycle times.** Every `cycleSec` of the catalogue is a labelled teaching value (editable
+  in the Factory panel), never a vendor specification. Measured cycle times enter only
+  through a dataset-backed scenario (see the run-ledger and dataset notes).

@@ -261,6 +261,10 @@ if (megaEx) {
     "flow-control": 1, "cycle": 1, "track": 1, "two-lane-track": 1,
     "pipe": 1, "fluid-source": 1, "fluid-drain": 1, "tank": 1,
     "mixer": 1, "portioner": 1, "deportioner": 1,
+    // v3.49 STANDARD TYPES: the machine catalogue is Factory-mode equipment; the
+    // mega showcase is a warehouse plant and stays byte-identical - exempt.
+    "cnc-mill": 1, "cnc-mill-5axis": 1, "cnc-lathe": 1, "press-brake": 1, "moulding-cell": 1,
+    "welding-cell": 1, "coating-booth": 1, "heat-treatment": 1, "cmm-inspection": 1,
   };
   const megaRequired = D.paletteOrder.filter((t) => !MEGA_EXEMPT[t]);
   const missingPalette = megaRequired.filter((t) => !megaTypes[t]);

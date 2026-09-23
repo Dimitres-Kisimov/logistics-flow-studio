@@ -607,6 +607,20 @@
       API.library.setSearch("");
       return { ok: !!h && h.type === "pack-station" && gone, detail: h ? "ghost at " + h.x + "," + h.y + " ok=" + h.ok + ", cleared=" + gone : "no ghost" };
     });
+    // ---- v3.49: the typed machine catalogue is registered everywhere it must be.
+    check("din8580-machines-registered-everywhere", function () {
+      var D2 = WT.domain, S = WT.shapes, L2 = WT.library, P2 = WT.process, G2 = WT.goods;
+      var types = ["cnc-mill", "cnc-mill-5axis", "cnc-lathe", "press-brake", "moulding-cell", "welding-cell", "coating-booth", "heat-treatment", "cmm-inspection"];
+      var dom = types.every(function (t) { var d = D2.ELEMENTS[t]; return d && d.category === "flow" && d.base === "station" && d.standard && d.standard.isa95 === "work-cell" && D2.paletteOrder.indexOf(t) >= 0; });
+      var din = types.filter(function (t) { return D2.ELEMENTS[t].standard.din8580; }).length === 8 && D2.ELEMENTS["cmm-inspection"].standard.din8580 === null;
+      var reg = !!S && types.every(function (t) { return S.meta && S.meta[t] && typeof S.ICONS[t] === "function"; });
+      var fac = L2.paletteTree({ mode: "factory" }).filter(function (g) { return g.label === L2.MACHINES; })[0];
+      var wh = L2.paletteTree({ mode: "warehouse" }).some(function (g) { return g.label === L2.MACHINES; });
+      var grp = !!fac && fac.types.join(",") === types.join(",") && !wh;
+      var ops = !!P2 && types.every(function (t) { return P2.OP_KIND ? P2.OP_KIND[t] === "station" : true; });
+      var forms = !!G2 && G2.FORMS.indexOf("klt") >= 0 && G2.FORMS.indexOf("workpiece") >= 0 && types.every(function (t) { return G2.formForType(t) === "workpiece"; });
+      return { ok: dom && din && reg && grp && ops && forms, detail: "domain=" + dom + " din=" + din + " registry=" + reg + " group=" + grp + " ops=" + ops + " forms=" + forms };
+    });
     check("class-library-search-filters", function () {
       if (!haveApi || !API.library || typeof API.library.setSearch !== "function") return { ok: false, detail: "no setSearch API" };
       API.library.setSearch("conveyor");

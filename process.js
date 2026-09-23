@@ -91,6 +91,10 @@
     "mfg-parallel-station": "parallel",
     "mfg-assembly": "assembly",
     "mfg-dismantle": "dismantle",
+    // v3.49 STANDARD TYPES: every machine of the catalogue is a single-server
+    // station operation (its cycleSec / servers come from the domain def).
+    "cnc-mill": "station", "cnc-mill-5axis": "station", "cnc-lathe": "station", "press-brake": "station", "moulding-cell": "station",
+    "welding-cell": "station", "coating-booth": "station", "heat-treatment": "station", "cmm-inspection": "station",
   };
   const ZONE_STAGE = { receiving: 0, storage: 1, picking: 2, packing: 3, shipping: 4 };
   const PROCESS_KINDS = { station: 1, parallel: 1, assembly: 1, dismantle: 1 };

@@ -23,7 +23,9 @@
  *      the edge, the reserved zone, an unknown type;
  *   6. shipped wiring: the ghost drawer and its events, setDragImage, the
  *      CSS without !important, the view toggle, the self-test names, the
- *      cache pin, the runner.
+ *      cache pin, the runner;
+ *   7. (v3.49) the machine catalogue: the klt / workpiece forms, the
+ *      MACHINE_STAGE_FORM table behind a flag, formForType, describe().
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -134,7 +136,7 @@ const thumbGeometry = helperCtx.thumbGeometry;
   const types = D.paletteOrder;
   const forms = types.map((t) => G.formForType(t));
   check("3a. total over the palette: every type gives null or a FORMS member; at least 40 handle goods", forms.every((f) => f === null || G.FORMS.indexOf(f) >= 0) && forms.filter((f) => f).length >= 40, forms.filter((f) => f).length + " of " + types.length);
-  const pins = { "selective-racking": "pallet-load", "carton-flow": "carton", "conveyor": "carton", "pack-station": "parcel", "push-station": "tote", "mfg-station": "tote", "stretch-wrap": "wrapped-pallet", "forklift": "pallet", "dock-out": "parcel", "pipe": null, "gate": null, "asrs": "pallet-load", "rgv": "pallet-load", "sorter": "carton" };
+  const pins = { "selective-racking": "pallet-load", "carton-flow": "carton", "conveyor": "carton", "pack-station": "parcel", "push-station": "tote", "mfg-station": "workpiece", "mfg-source": "klt", "cnc-mill": "workpiece", "cmm-inspection": "workpiece", "stretch-wrap": "wrapped-pallet", "forklift": "pallet", "dock-out": "parcel", "pipe": null, "gate": null, "asrs": "pallet-load", "rgv": "pallet-load", "sorter": "carton" };
   check("3b. the pairs a reader expects", Object.keys(pins).every((k) => G.formForType(k) === pins[k]), Object.keys(pins).map((k) => k + "=" + G.formForType(k)).join(" "));
   check("3c. deterministic; unknown types are null; the table is not mutated", JSON.stringify(forms) === JSON.stringify(types.map((t) => G.formForType(t))) && G.formForType("nope") === null && G.formForType(undefined) === null && Object.isFrozen(G.TYPE_FORM) === false && JSON.stringify(G.TYPE_FORM).indexOf("nope") < 0);
   check("3d. every handled form has a nominal size", forms.filter((f) => f).every((f) => G.sizeOf(f) && G.sizeOf(f).f > 0 && G.sizeOf(f).l > 0 && G.sizeOf(f).z > 0));
@@ -148,7 +150,7 @@ const thumbGeometry = helperCtx.thumbGeometry;
   check("4a. selective racking: label, group, footprint, height and the pallet-position row taken from the domain", !!r && r.label === def.label && r.group === "Storage & Racking" && r.footprint === def.w + " × " + def.d + " m" && r.heightM === I.elementHeight("selective-racking") &&
     r.rows.some((x) => x[0] === "Pallet positions" && x[1] === cap) && r.handles === "pallet-load" && typeof r.glyph2d === "string" && r.glyph2d.length > 3, r ? r.footprint + " · " + cap : "null");
   const m = L.describe("mfg-station");
-  check("4b. a station: the cycle-time row is labelled a teaching value and the domain's numbers", !!m && m.rows.some((x) => x[0] === "Cycle time" && x[1] === D.ELEMENTS["mfg-station"].cycleSec + " s × " + (D.ELEMENTS["mfg-station"].servers || 1) + " server (teaching value)") && m.handles === "tote" && m.group === L.PRODUCTION);
+  check("4b. a station: the cycle-time row is labelled a teaching value and the domain's numbers", !!m && m.rows.some((x) => x[0] === "Cycle time" && x[1] === D.ELEMENTS["mfg-station"].cycleSec + " s × " + (D.ELEMENTS["mfg-station"].servers || 1) + " server (teaching value)") && m.handles === "workpiece" && m.group === L.PRODUCTION); // v3.49: a station handles workpieces (was tote in v3.48)
   const rs = L.describe("selective-racking", { w: 12, d: 1 });
   check("4c. a resized element describes its own footprint and capacity", !!rs && rs.footprint === "12 × 1 m" && rs.rows.some((x) => x[0] === "Pallet positions" && x[1] === String(D.elementCapacity({ type: "selective-racking", w: 12, d: 1 }))));
   check("4d. unknown -> null; deterministic; every palette type describes", L.describe("nope") === null && JSON.stringify(L.describe("conveyor")) === JSON.stringify(L.describe("conveyor")) && D.paletteOrder.every((t) => L.describe(t) && L.describe(t).desc.length > 0));
@@ -181,8 +183,46 @@ const thumbGeometry = helperCtx.thumbGeometry;
   check("6c. the swatch CSS has no !important and the 56 x 36 thumbnail rule; the card and the view toggle are styled", block.indexOf("!important") < 0 && /\.pal-item \.pal-swatch\.pal-glyph \{ width: 56px; height: 36px/.test(css) && /\.tooltip\.tooltip--card/.test(css) && /\.pal-view/.test(css) && /\.tip-rows/.test(css));
   check("6d. the page has the view toggle and the hint names the ghost and the touch path", /id="palViewToggle"/.test(html) && /data-view="plan"/.test(html) && /data-view="iso"/.test(html) && /a ghost on the floor/.test(html) && /touch screen/.test(html));
   check("6e. the self-test carries the three new checks", /class-library-thumbnails-are-real-glyphs/.test(st) && /placement-ghost-follows-pointer-while-armed/.test(st) && /palette-drag-over-floor-previews-drop/.test(st));
-  check("6f. sw.js at wt-v128 (previously wt-v127); the runner lists this harness", /CACHE_VERSION\s*=\s*"wt-v128"/.test(sw) && /Previously wt-v127/.test(sw) && /verify_library_preview\.js/.test(runall));
+  check("6f. sw.js at wt-v129 (previously wt-v128); the runner lists this harness", /CACHE_VERSION\s*=\s*"wt-v129"/.test(sw) && /Previously wt-v128/.test(sw) && /verify_library_preview\.js/.test(runall));
   check("6g. library.js and goods.js export describe / formForType and reference no URL", typeof L.describe === "function" && typeof G.formForType === "function" && !/https?:\/\//.test(read("library.js")) && !/https?:\/\//.test(read("goods.js")));
+})();
+
+/* ---- 7. v3.49 STANDARD TYPES: the machine catalogue's forms and descriptors --- */
+(function () {
+  const MACH = ["cnc-mill", "cnc-mill-5axis", "cnc-lathe", "press-brake", "moulding-cell", "welding-cell", "coating-booth", "heat-treatment", "cmm-inspection"];
+  const klt = G.sizeOf("klt"), wp = G.sizeOf("workpiece");
+  check("7a. FORMS gained klt and workpiece at the END (the six earlier forms keep their order); the KLT is the VDA 4500 600 x 400 x 280 nominal, the workpiece a small block",
+    G.FORMS.slice(0, 6).join(",") === "pallet-load,carton,tote,parcel,pallet,wrapped-pallet" && G.FORMS.slice(6).join(",") === "klt,workpiece" &&
+    klt.f === 0.6 && klt.l === 0.4 && klt.z === 0.28 && wp.f === 0.15 && wp.l === 0.15 && wp.z === 0.1);
+  check("7b. MACHINE_STAGE_FORM has exactly the STAGE_ORDER keys, KLT in / out and workpieces on the lane; STAGE_FORM is untouched (5 keys, receiving pallet-load)",
+    Object.keys(G.MACHINE_STAGE_FORM).join(",") === G.STAGE_ORDER.join(",") && G.MACHINE_STAGE_FORM.receiving === "klt" && G.MACHINE_STAGE_FORM.storage === "workpiece" &&
+    G.MACHINE_STAGE_FORM.picking === "workpiece" && G.MACHINE_STAGE_FORM.packing === "klt" && G.MACHINE_STAGE_FORM.shipping === "klt" &&
+    Object.keys(G.STAGE_FORM).length === 5 && G.STAGE_FORM.receiving === "pallet-load" && G.STAGE_FORM.picking === "tote");
+  const mu = { stage: "storage", status: "active" }, q = { stage: "picking", status: "queued" };
+  check("7c. formFor without the flag is byte-identical (storage carton, queued-at-picking carton); with machineLine it gives the workpiece / KLT forms",
+    G.formFor(mu, null) === "carton" && G.formFor(mu, null, {}) === "carton" && G.formFor(mu, null, { machineLine: false }) === "carton" && G.formFor(q, null) === "carton" &&
+    G.formFor(mu, null, { machineLine: true }) === "workpiece" && G.formFor({ stage: "receiving", status: "active" }, null, { machineLine: true }) === "klt" &&
+    G.formFor({ stage: "shipping", status: "active" }, null, { machineLine: true }) === "klt" && G.formFor({ stage: "receiving", status: "queued" }, null, { machineLine: true }) === "klt");
+  let bad = null, calls = 0;
+  const project = (x, y, z) => ({ x: 100 + (x - y) * 20, y: 60 + (x + y) * 10 - z * 11 });
+  for (const form of ["klt", "workpiece"]) for (const tier of ["icon", "glyph", "rich"]) for (const theme of ["light", "dark"]) {
+    const c = makeCtx();
+    const ok = G.draw(c, { id: 3, form: form, size: G.sizeOf(form), x: 2, y: 3, z: 0.6, heading: 0.4, stage: "storage", status: "active", hot: tier === "rich", queueIndex: 0 },
+      { project: project, cellPx: 24, tier: tier, theme: theme, stageColor: "#aa5500", congest: "#d00" });
+    if (ok !== true || c._bad.length) { bad = bad || form + "/" + tier + "/" + theme + " ok=" + ok + " bad=" + c._bad.slice(0, 2).join(","); }
+    calls += c._calls;
+  }
+  check("7d. both forms draw through goods.draw in every tier and theme with no throw and only finite coordinates", bad === null && calls > 0, bad || calls + " calls");
+  check("7e. every machine handles a workpiece; source / drain handle a KLT; the warehouse pins of v3.48 are unchanged",
+    MACH.every((t) => G.formForType(t) === "workpiece") && G.formForType("mfg-source") === "klt" && G.formForType("mfg-drain") === "klt" &&
+    G.formForType("selective-racking") === "pallet-load" && G.formForType("pack-station") === "parcel" && G.formForType("conveyor") === "carton");
+  check("7f. describe() for the nine carries the standard descriptor (8 with a DIN 8580 group 1-6, the CMM without), a chip, a Standard row and a footprint from the domain",
+    MACH.every((t) => { const r = L.describe(t); const s = r && r.standard; return s && s.isa95 === "work-cell" && /informed by/.test(s.note) && /DIN 8580:2022-12/.test(s.source) && r.chip.length > 3 && r.rows.some((x) => x[0] === "Standard") && r.footprint === D.ELEMENTS[t].w + " × " + D.ELEMENTS[t].d + " m"; }) &&
+    MACH.filter((t) => D.ELEMENTS[t].standard.din8580).length === 8 && MACH.filter((t) => D.ELEMENTS[t].standard.din8580).every((t) => { const g = D.ELEMENTS[t].standard.din8580.group; return g >= 1 && g <= 6; }) && D.ELEMENTS["cmm-inspection"].standard.din8580 === null);
+  check("7g. the thumbnail tier proof of section 1 covers the nine (they are in paletteOrder) and each has a shape, an iso height and a cycle-time row",
+    MACH.every((t) => D.paletteOrder.indexOf(t) >= 0 && S.has(t) && I.elementHeight(t) === D.ELEMENTS[t].heightM && L.describe(t).rows.some((x) => x[0] === "Cycle time" && /teaching value/.test(x[1]))));
+  check("7h. goods.HONESTY names the KLT and the workpiece; app.js threads machineLine into units() from layoutHasStandardTypes()",
+    /KLT, VDA 4500/.test(G.HONESTY) && /workpieces/.test(G.HONESTY) && /function layoutHasStandardTypes\(/.test(app) && /machineLine: layoutHasStandardTypes\(\)/.test(app) && (app.match(/goodsUnitOpts\(\)/g) || []).length >= 3);
 })();
 
 console.log("");

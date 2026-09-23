@@ -546,6 +546,15 @@
   function invalidateGoods() { _goodsSupport = null; _goodsSupportSig = ""; _goodsFleet = null; _goodsFleetSig = ""; }
 
   // The shared draw options for the goods layer (both views, both themes).
+  // v3.49 STANDARD TYPES: a line with a typed machine carries KLTs and
+  // workpieces instead of the warehouse forms (goods.MACHINE_STAGE_FORM).
+  // False for every layout without one, so nothing else changes.
+  function layoutHasStandardTypes() {
+    return state.elements.some((e) => { const d = ELEMENTS[e.type]; return !!(d && d.standard); });
+  }
+  function goodsUnitOpts() {
+    return { queueMax: WT.shift ? WT.shift.QUEUE_SHOW_MAX : undefined, machineLine: layoutHasStandardTypes() };
+  }
   function goodsOpts(tier) {
     return {
       project: projPx,
@@ -750,8 +759,7 @@
     select(id) { sceneSelection = id || null; render(); },
     snapshot() {
       const sim = state.flow.sim;
-      const units = sim && WT.goods ? WT.goods.units(sim, goodsSupport(),
-        WT.shift ? { queueMax: WT.shift.QUEUE_SHOW_MAX } : undefined) : [];
+      const units = sim && WT.goods ? WT.goods.units(sim, goodsSupport(), goodsUnitOpts()) : [];
       const t = workerAnimT(), busy = workerBusyFn();
       const store = WT.shift && t != null ? _shiftStore : null;
       const people = workerRoster().map(spec => {
@@ -2188,8 +2196,7 @@
     // station that is really backed up shows a nose-to-tail LINE instead of
     // piling every extra unit on the eighth place. Nothing about the queue
     // itself changes - its order, length and service are the sim's.
-    const list = WT.goods.units(s, goodsSupport(),
-      WT.shift ? { queueMax: WT.shift.QUEUE_SHOW_MAX } : undefined);
+    const list = WT.goods.units(s, goodsSupport(), goodsUnitOpts());
     // Top-down culls to the visible world rect; the iso projection moves
     // points off that rect, so the 2.5D path draws them all (the live-unit
     // count is capped by the sim, so the cost is bounded either way).
@@ -4186,7 +4193,7 @@
     const sub = dsc ? dsc.footprint + (dsc.handles ? " · " + String(dsc.handles).replace(/-/g, " ") : "") : "";
     btn.innerHTML =
       `<span class="pal-swatch pal-glyph" aria-hidden="true"></span>` +
-      `<span class="pal-meta"><span class="pal-name">${esc(def.label)}</span>` + (sub ? `<span class="pal-sub">${esc(sub)}</span>` : "") + `</span>` +
+      `<span class="pal-meta"><span class="pal-name">${esc(def.label)}</span>` + (sub ? `<span class="pal-sub">${esc(sub)}</span>` : "") + (dsc && dsc.chip ? `<span class="pal-chip" title="${esc(WT.library.standardText(dsc.standard))}">${esc(dsc.chip)}</span>` : "") + `</span>` +
       (locked ? WT.tiers.padlockSVG() : `<span class="pal-cat">${esc(catLabel)}</span>`);
     // v3.9 REDESIGN-2 (icon-led library) / v3.48: paint the per-type WT.shapes
     // glyph into the swatch so the palette thumbnail MATCHES what lands on the
@@ -4360,7 +4367,7 @@
     if (!d) return null;
     const rows = d.rows.map((r) => "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>").join("");
     const sub = d.footprint + " · " + d.heightM.toFixed(1) + " m high" + (d.handles ? " · handles " + String(d.handles).replace(/-/g, " ") : "");
-    return '<div class="tip-head"><span class="tip-thumb"></span><span><span class="tip-title">' + esc(d.label) + '</span><br><span class="tip-sub">' + esc(sub) + "</span></span></div>" +
+    return '<div class="tip-head"><span class="tip-thumb"></span><span><span class="tip-title">' + esc(d.label) + '</span><br><span class="tip-sub">' + esc(sub) + "</span>" + (d.chip ? '<br><span class="tip-chip">' + esc(d.chip) + "</span>" : "") + "</span></div>" +
       (rows ? '<dl class="tip-rows">' + rows + "</dl>" : "") +
       (d.glyph2d ? '<p class="tip-note">2D: ' + esc(d.glyph2d) + " · 2.5D: " + esc(d.form3d || "") + "</p>" : "") +
       '<p class="tip-note">' + esc(d.desc) + "</p><p class=\"tip-note\">Teaching values, not a vendor specification.</p>";
@@ -4663,6 +4670,7 @@
     if (def.io) behaviour.push(row("I/O role", def.io));
     if (def.flow) behaviour.push(row("Flow control", def.flow.toUpperCase()));
     if (def.stage) behaviour.push(row("Chain stage", def.stage));
+    if (def.standard && WT.library && typeof WT.library.standardText === "function") behaviour.push(row("Standard", WT.library.standardText(def.standard))); // v3.49
     // v3.48: what the type handles and its cycle - the same descriptor the Class Library card reads
     if (WT.goods && typeof WT.goods.formForType === "function") { const hf = WT.goods.formForType(el.type); if (hf) behaviour.push(row("Handles", String(hf).replace(/-/g, " "))); }
     if (def.category !== "storage" && def.cycleSec > 0) behaviour.push(row("Cycle time", def.cycleSec + " s × " + (def.servers > 0 ? def.servers : 1) + " server" + ((def.servers > 0 ? def.servers : 1) > 1 ? "s" : "") + " (teaching value)"));
@@ -10037,7 +10045,7 @@
       // the same path the plant does, in both view modes.
       goods: {
         support: () => goodsSupport(),
-        units: () => (WT.goods && state.flow.sim ? WT.goods.units(state.flow.sim, goodsSupport()) : []),
+        units: () => (WT.goods && state.flow.sim ? WT.goods.units(state.flow.sim, goodsSupport(), { machineLine: layoutHasStandardTypes() }) : []),
         fleet: () => goodsFleet(),
         stock: () => rackStockScale(),
         tier: () => (WT.shapes ? WT.shapes.detailLevel(cellPx * view.scale) : null),
