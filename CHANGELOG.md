@@ -1,5 +1,43 @@
 # Changelog
 
+## v3.65 — Asset shells, AAS-shaped: the identity gap, answered as far as it honestly can be
+
+**The module.** `aas.js` (`WT.aas.fromLayout(layout, { rates, ledger, site })`) writes a
+`wt-aas-shaped/v1` environment in the JSON shape of the Asset Administration Shell metamodel
+(IEC 63278-1:2023, Plattform Industrie 4.0 / IDTA): `assetAdministrationShells` with `modelType`, an id
+in the site's scope, `assetInformation` (assetKind Instance, a globalAssetId that says it is not
+registered) and one model reference per submodel; `submodels` with `semanticId` as an
+ExternalReference and `Property` values as strings, as the metamodel requires. Three submodels per
+element: **Nameplate** (designation, type, the serial that says it is the layout's own element id, the
+DIN 8580 classification and ISA-95 role where the catalogue has them, and `wt:NotModelled` listing the
+nine things a conformant Digital Nameplate needs that a layout planner does not have), **TechnicalData**
+(footprint in metres, height, category, storage capacity from the declared density and levels, cycle
+time, servers, and the equipment class the cost model reads - class, power, capex, amortisation, whether
+it charges labour; both rate shapes are read, the run's exported block and the Analyze panel's in-memory
+one, and an unknown is omitted rather than guessed) and, only for an element a recorded run touched,
+**OperationalData** (the run, events, units, first and last tick, the declared service time, the waits
+that completed and their mean).
+
+**Shaped, not conformant.** The semantic identifiers are `urn:wt:` placeholders instead of the ECLASS
+IRDIs a conformant nameplate carries; the asset ids are this layout's own element ids - which is
+precisely gap 7: a real identifier needs an owner of the register, and that is not a software task. The
+document says so in its own honesty block, and every value carries its source (the catalogue's teaching
+values, the illustrative rates, or the recorded run).
+
+**Where.** The standards card's *Export asset shells (AAS-shaped JSON)*, and
+`node tools/aas_export.mjs --layout <layout.json> [--ledger <run-ledger.json>] --out <aas.json>` - or
+from a run-ledger export alone, where the types are known and the geometry is the catalogue's own
+footprint, which the scope says.
+
+**Verification.** `verify_aas.js` (24 checks: the shape and `validate()`'s four refusals; the nameplate
+by hand on a CNC machining centre - DIN 8580 main group 3, Trennen (cutting), the ISA-95 role, the nine
+missing fields; the technical data by hand - 3 x 3 m, 2.6 m, 300 s, one server; the rack's 48 pallet
+positions; the pack station's 0.6 kW / 6000 EUR / 10 years from both rate shapes; the operational data
+from fixture A - the staging bench's 37 events over 27 units, six completed waits and a mean of 110.33
+ticks, which the harness recomputes from the viewer's own `v_station_wait` rows weighted by their
+completed spans (122.4 over five put-aways, 50 over one replenishment); an untouched element with no
+operational submodel; purity and the honesty; the tool). `docs/AAS_EXPORT.md`. Cache `wt-v143`.
+
 ## v3.64 — The synchronisation contract: how stale an imported record may be (ISO 23247, gap 9)
 
 **The contract.** `tracking.js syncContract(opts)` and the Python twin in `tools/epcis_import.py`: every

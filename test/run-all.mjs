@@ -731,6 +731,7 @@ const HARNESSES = [
   { name: "Ask the ledger: a fixed catalogue answered from the views and the knowledge base by hand on fixture A (stg / putaway 122.4; 29.17 EUR per mis-pick redo), a windowed run with OTIF and a decision, twins, purity, wiring (verify_ask.js)", args: ["verify_ask.js"] },
   { name: "The optional model mode: tools/ask_cli.mjs equals WT.ask, the dry run calls nothing, the number guard refuses an invented number, the page stays offline, the rules are written down (verify_model_mode.js)", args: ["verify_model_mode.js"] },
   { name: "Search over levers: tools/search_levers.mjs on the hand floor by hand for two levers and two seeds (OTIF, cost, t-half-widths, the ranking), the tower's fifth rule on a hand table, the combination lever (verify_search.js)", args: ["verify_search.js"] },
+  { name: "Asset shells, AAS-shaped: the nameplate, technical and operational submodels by hand (DIN 8580 group 3, 48 pallet positions, 110.33 ticks that equal the viewer's own wait rows weighted), what is not modelled listed rather than invented, the tool (verify_aas.js)", args: ["verify_aas.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

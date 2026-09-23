@@ -6583,6 +6583,23 @@
     }
   }
 
+  // v3.65 asset shells, AAS-shaped: this floor (and the run it recorded, when there is one) as an
+  // IEC 63278-1-shaped environment. Shaped, NOT conformant - aas.js says so in the document itself.
+  function exportAssetShells() {
+    if (!WT.aas) { toast("aas.js is not loaded.", "warn"); return; }
+    const layout = { gridW: GRID_W, gridH: GRID_H, cell: CELL_M,
+      elements: state.elements.map((e) => ({ id: e.id, type: e.type, x: e.x, y: e.y, w: e.w, d: e.d })) };
+    if (!layout.elements.length) { toast("Add some elements first, then export the asset shells.", "warn"); return; }
+    const ledger = state.flow.ledger && WT.ledger ? WT.ledger.exportJson(state.flow.ledger) : null;
+    const env = WT.aas.fromLayout(layout, { rates: ensureRates(), ledger: ledger, site: currentScenarioId() });
+    const v = WT.aas.validate(env);
+    if (!v.ok) { toast("The asset shells did not validate: " + v.errors[0], "err"); return; }
+    downloadFile("warehousetwin-asset-shells.json", JSON.stringify(env, null, 1), "application/json");
+    status("Exported " + env.scope.elements + " asset shells, AAS-shaped (IEC 63278-1's JSON shape): " + env.scope.submodels + " submodels" +
+      (env.scope.run ? ", including what each element did in " + env.scope.run : " - no run recorded yet, so nameplate and technical data only") +
+      ". Shaped, not conformant: the semantic ids are placeholders, the asset ids are this layout's own, and nothing is registered.");
+  }
+
   function exportJSON() {
     const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -9848,6 +9865,7 @@
     $("saveBtn").addEventListener("click", saveNow);
     $("loadBtn").addEventListener("click", () => loadSaved(false));
     $("exportBtn").addEventListener("click", exportJSON);
+    { const b = $("aasExportBtn"); if (b) b.addEventListener("click", exportAssetShells); } // v3.65
     $("ifcBtn").addEventListener("click", exportIFC); // W4: gate checked inside
     // P7: consolidated WMS Report (report.js) - print / JSON / CSV.
     $("reportOpenBtn").addEventListener("click", openReportPrintable);

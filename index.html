@@ -1194,6 +1194,10 @@
           <summary class="std-summary">German standards this app is <em>informed by</em></summary>
           <p id="stdAisleLive" class="std-live">Live ASR A1.8 check: —</p>
           <div id="stdList" class="std-list"><!-- filled by app.js --></div>
+          <div class="btn-grid" style="margin-top:8px">
+            <button id="aasExportBtn" class="btn" type="button" title="Downloads every element of this floor as an asset administration shell (IEC 63278-1, Plattform Industrie 4.0): a nameplate, technical data, and - when a run has been recorded - what the element actually did. AAS-SHAPED, not conformant: the semantic ids are placeholders instead of ECLASS IRDIs and nothing is registered (v3.65).">Export asset shells (AAS-shaped JSON)</button>
+          </div>
+          <p class="hint">The <strong>Asset Administration Shell</strong> (IEC 63278-1:2023) is the Industrie 4.0 answer to <em>which</em> asset and <em>what</em> it is. The export is <strong>shaped, not conformant</strong>: the structure and the submodel names are the standard's, the semantic identifiers are <code>urn:wt:</code> placeholders rather than ECLASS IRDIs, and the asset ids are this layout's own element ids - what a real nameplate needs and this app cannot fill is listed rather than invented.</p>
           <p class="std-disclaimer"><strong>This is a guidance-aligned design aid, NOT a certification or a legal-compliance guarantee.</strong> WarehouseTwin references these standards to keep layouts sensible; it does not certify conformance. Verify any real design with the current official texts and a qualified professional.</p>
         </details>
       </section>
@@ -1362,6 +1366,7 @@
 <script src="tracking.js"></script>
 <script src="control.js"></script>
 <script src="ask.js"></script>
+<script src="aas.js"></script>
   <script src="knowledge.js"></script>
   <script src="library.js"></script>
   <script src="tiers.js"></script>
