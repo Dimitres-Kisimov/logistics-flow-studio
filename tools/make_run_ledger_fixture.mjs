@@ -106,6 +106,7 @@ export function reconcileRows(exp) {
       v_dispatch_by_order: v.dispatchByOrder || [], v_staffing: v.staffing || [],
       v_bizstep_dwell: v.bizstepDwell || [], // v3.53: the tracking twins' dwell per business step
       v_quality_by_step: v.quality || [], // v3.54: first pass yield, rework and scrap ratios per operation
+      v_otif: v.otif || [], v_inbound: v.inbound || [], // v3.55: on time in full, the trailers (empty without windows)
     },
   };
 }

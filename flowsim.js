@@ -153,6 +153,86 @@
     queueStackMax: 8, // cap the drawn stack length so a huge queue can't run off-station
   };
 
+
+  /* ------------------------------------------------------------------
+   * v3.55 DELIVERY AND SHIPPING TIMES IN BETWEEN - dock and carrier windows,
+   * a what-if like the staffing policy. Inbound: trailer j is scheduled at
+   * j x P ticks and arrives max(0, late_j) ticks later (an early trailer waits
+   * for its slot); the receiving door is open O ticks from the arrival, and
+   * units spawn only while it is open (the arrival accumulator keeps counting
+   * while it is closed, so a trailer is a burst at the door, capped by the
+   * in-flight cap). Outbound: carriers depart every M ticks; a unit loaded at
+   * the dock waits for the next departure instead of the fixed dwell (never
+   * less than it). The lateness list is NOT a random draw: the caller hands a
+   * list built by windowLateness() - a Weyl sequence u_j = frac(j x 0.618...)
+   * pushed through the piecewise-linear inverse distribution of a public
+   * delivery dataset's quantiles and scaled by a teaching parameter. No PRNG
+   * draw is added anywhere; absent -> no key, no branch, byte-identical.
+   * ------------------------------------------------------------------ */
+  const DELIVERY_HONESTY =
+    "Dock and carrier windows are a what-if: trailers are scheduled every P ticks and arrive late by a deterministic " +
+    "sequence (a Weyl sequence through the quantiles of a public delivery dataset - international pharmaceutical lanes, " +
+    "used for the SHAPE of lateness only - scaled by a teaching parameter; never a random draw); the door is open O ticks " +
+    "from the arrival and an early trailer waits for its slot; carriers depart every M ticks and a loaded unit waits for " +
+    "the next departure; the promised lead and the nominal transit are teaching values. Not a yard, not dock appointments, " +
+    "not a carrier network, not a customer calendar; nothing here is keyed to a person.";
+  const WEYL = 0.6180339887;
+  // u_j = frac(j x 0.6180339887): evenly spread over [0, 1), deterministic, replayable.
+  function weyl(j) { const v = j * WEYL; return v - Math.floor(v); }
+  // The piecewise-linear inverse distribution through (0, min), (0.1, p10), (0.5, median), (0.9, p90), (1, max) at u.
+  function quantileAt(q, u) {
+    const pts = [[0, q.min], [0.1, q.p10], [0.5, q.median], [0.9, q.p90], [1, q.max]];
+    if (!(u > 0)) return q.min;
+    for (let i = 1; i < pts.length; i++) {
+      if (u <= pts[i][0]) { const p0 = pts[i - 1][0], v0 = pts[i - 1][1], p1 = pts[i][0], v1 = pts[i][1]; return v0 + (v1 - v0) * (u - p0) / (p1 - p0); }
+    }
+    return q.max;
+  }
+  // `count` lateness values in TICKS: round(Q(u_j) x scaleTicksPerDay), j = 0 .. count-1 (default 16).
+  function windowLateness(q, scaleTicksPerDay, count) {
+    const n = count > 0 ? Math.floor(count) : 16, out = [];
+    for (let j = 0; j < n; j++) out.push(Math.round(quantileAt(q, weyl(j)) * scaleTicksPerDay));
+    return out;
+  }
+  const posInt = (v, d) => Math.max(1, Math.round(Number(v) > 0 ? Number(v) : d));
+  const intList = (xs, d) => (Array.isArray(xs) && xs.length ? xs.map((v) => Math.round(Number(v) || 0)) : d.slice());
+  function normaliseInbound(x) {
+    const s = x === true ? {} : x || {};
+    return { kind: "dock-windows", periodTicks: posInt(s.periodTicks, 120), openTicks: posInt(s.openTicks, 30), lateness: intList(s.lateness, [0]),
+      mode: s.mode != null ? String(s.mode) : null, scaleTicksPerDay: Number(s.scaleTicksPerDay) > 0 ? Number(s.scaleTicksPerDay) : null, source: s.source != null ? String(s.source) : null, honesty: DELIVERY_HONESTY };
+  }
+  function normaliseOutbound(x) {
+    const s = x === true ? {} : x || {};
+    return { kind: "carrier-windows", periodTicks: posInt(s.periodTicks, 240), promisedLeadTicks: posInt(s.promisedLeadTicks, 480), transit: intList(s.transit, [0]).map((v) => Math.max(0, v)),
+      mode: s.mode != null ? String(s.mode) : null, scaleTicksPerDay: Number(s.scaleTicksPerDay) > 0 ? Number(s.scaleTicksPerDay) : null, source: s.source != null ? String(s.source) : null, honesty: DELIVERY_HONESTY };
+  }
+  // Is the receiving door open at state.tick? Every window whose trailer is up to three
+  // periods late is examined; the first tick a window is seen open logs its trailer.
+  function inboundOpen(plan, state) {
+    const ib = plan.inbound, tick = state.tick, P = ib.periodTicks, O = ib.openTicks, L = ib.lateness;
+    const j = Math.floor(tick / P);
+    let open = null;
+    for (let k = Math.max(0, j - 3); k <= j; k++) {
+      const late = L[k % L.length];
+      const arrival = k * P + Math.max(0, late);
+      if (tick >= arrival && tick < arrival + O) {
+        if (state.inbound && !state.inbound.seen[k]) { state.inbound.seen[k] = 1; state.inbound.trailers.push({ trailer: k, scheduled_tick: k * P, arrival_tick: arrival, late_ticks: late }); }
+        if (open == null) open = k;
+      }
+    }
+    if (state.inbound) state.inbound.open = open;
+    return open != null;
+  }
+  // The dwell of a unit that reached the outbound dock while `tick` was being advanced:
+  // the loading dwell, then the wait for the next carrier departure (departures at every
+  // multiple of M), never less than the dwell. In the ledger's observed ticks (the hook
+  // runs after the tick advances) the unit arrives at tick + 1 and retires exactly at the
+  // departure tick - asserted in verify_delivery.js.
+  function departureDwell(plan, tick) {
+    const M = plan.outbound.periodTicks, arrived = tick + 1, ready = arrived + PARAMS.shipDwellTicks;
+    return Math.max(PARAMS.shipDwellTicks, Math.ceil(ready / M) * M - arrived);
+  }
+
   /* ------------------------------------------------------------------
    * Seeded PRNG (mulberry32), functional form: takes and returns the
    * integer state so the whole sim stays pure/deterministic given state.
@@ -919,6 +999,9 @@
     // (teaching values, quota-dispatched, never keyed to a person). Absent -> no key, no
     // branch, byte-identical to before. It needs a declared mix: the legacy spine never branches.
     const errors = o.errors && WT.routing && typeof WT.routing.normalizeErrors === "function" ? WT.routing.normalizeErrors(o.errors) : null;
+    // v3.55 DELIVERY WINDOWS - a what-if: dock windows in, carrier departures out (see the block above). Absent -> no key.
+    const inbound = o.inbound ? normaliseInbound(o.inbound) : null;
+    const outbound = o.outbound ? normaliseOutbound(o.outbound) : null;
     // v3.25: per-order-type routes. `o.mix` absent -> the single legacy spine.
     const rb = buildRoutes(layout, anchors, waypoints, stations, o.mix != null ? o.mix : null, errors);
 
@@ -1000,6 +1083,8 @@
     if (poolIndex) { plan.pool = pool; plan.poolIndex = poolIndex; plan.poolLines = poolLines; } // v3.44: keys only with a pool
     if (policy) plan.policy = policy; // v3.45: key only with a policy
     if (errors) plan.errors = errors; // v3.54: key only with the error what-if
+    if (inbound) plan.inbound = inbound; // v3.55: keys only with the delivery what-if
+    if (outbound) plan.outbound = outbound;
     return plan;
   }
 
@@ -1080,6 +1165,7 @@
       dataLabel: plan.dataLabel,
     };
     if (plan.policy) { state.staffing = []; state.maxServers = 1; } // v3.45: the change log, keys only with a policy
+    if (plan.inbound) state.inbound = { trailers: [], seen: {}, open: null }; // v3.55: the trailer log, key only with windows
     return state;
   }
 
@@ -1153,6 +1239,7 @@
       // and let plan.routingMessages say why (never a silent wrong path).
       if (!plan.spawnable) { state.spawnAccum = 0; break; }
       if (!plan.loop && state.poolRemaining <= 0) { state.spawnAccum = 0; break; }
+      if (plan.inbound && !inboundOpen(plan, state)) break; // v3.55: the door is closed - the accumulator keeps counting
       if (state.mus.length >= PARAMS.maxInFlight) { break; } // perf soft cap (keeps conservation)
       state.spawnAccum -= 1;
       // WHICH ORDER TYPE this unit is - deterministic quota dispatch, no RNG,
@@ -1174,6 +1261,7 @@
         archetype: (plan.routes[rIdx] && plan.routes[rIdx].routeId) || LEGACY_ROUTE_ID,
         op: rwp[0].op || null,
       };
+      if (state.inbound) mu.trailer = state.inbound.open; // v3.55: the trailer it came off (key only with windows)
       if (plan.pool) { // v3.44: which order line this unit IS (pool order, cycling with loop)
         if (state.poolCursor == null) state.poolCursor = 0;
         const j = state.poolCursor++;
@@ -1253,7 +1341,7 @@
             mu.stage = term.stage;
             mu.stageIndex = STAGES.indexOf(term.stage);
             mu.op = term.op || mu.op;
-            mu.dwell = PARAMS.shipDwellTicks;
+            mu.dwell = plan.outbound && term.op === "load" ? departureDwell(plan, state.tick) : PARAMS.shipDwellTicks; // v3.55: wait for the carrier
           } else {
             mu.stage = rwp[mu.seg].stage;
             mu.stageIndex = STAGES.indexOf(mu.stage);
@@ -1375,6 +1463,8 @@
     buildRoutes: buildRoutes, // the plan's route set + spawn vector + honest gaps
     routingReport: routingReport, // per-archetype fulfillability for a layout
     quotaPick: quotaPick, // the deterministic split rule (shared with process.js)
+    // v3.55 delivery windows: the pure helpers (no PRNG) and the honesty
+    DELIVERY_HONESTY: DELIVERY_HONESTY, weyl: weyl, quantileAt: quantileAt, windowLateness: windowLateness, inboundOpen: inboundOpen, departureDwell: departureDwell,
     LEGACY_STEPS: LEGACY_STEPS,
     LEGACY_ROUTE_ID: LEGACY_ROUTE_ID,
     conveyorCells: conveyorCells,

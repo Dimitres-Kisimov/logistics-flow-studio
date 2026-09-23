@@ -3792,6 +3792,22 @@
         Math.abs(withE.mix.reduce(function (a, m) { return a + m.share; }, 0) - 1) < 1e-9 && WT.kb && WT.kb.get("hf.error.mis-pick") === R2.ERROR_KINDS[0].share;
       return { ok: ok, detail: withE.routes.length + " routes with errors vs " + without.routes.length + " without" };
     });
+    // ---- v3.55: the delivery what-if picker exists; the Weyl / quantile helpers give the hand values; a plan with
+    // windows carries them (defaults filled) and one without carries no key; the dataset twin is loaded.
+    check("delivery-windows-picker-and-otif", function () {
+      var sel = $("flowDeliverySelect"), F = WT.flowsim, EX2 = WT.examples, DS = WT.datasets && WT.datasets.scmsDelivery;
+      if (!sel || !F || !EX2 || typeof F.windowLateness !== "function") return { ok: false, detail: "missing" };
+      var late = F.windowLateness({ min: -2, p10: -1, median: 0, p90: 3, max: 12 }, 60, 5);
+      var b = EX2.build("ecommerce-multichannel-fc");
+      var lay = { gridW: b.gridW, gridH: b.gridH, cell: 1, elements: b.elements, config: b.config };
+      var withW = F.spawnPlan(lay, { seed: 3, mix: lay.config.orderMix, inbound: { periodTicks: 100, openTicks: 20, lateness: late }, outbound: true });
+      var without = F.spawnPlan(lay, { seed: 3, mix: lay.config.orderMix });
+      var ok = sel.options.length === 2 && JSON.stringify(late) === "[-120,53,-40,159,-4]" && !!withW.inbound && withW.inbound.periodTicks === 100 && withW.inbound.lateness.length === 5 &&
+        !!withW.outbound && withW.outbound.periodTicks === 240 && withW.outbound.promisedLeadTicks === 480 && !("inbound" in without) && !("outbound" in without) &&
+        !!DS && DS.modes.length === 5 && DS.by_mode.Truck.lateness_days.median === 0 && DS.source.attribution === "USAID Development Data Library" &&
+        WT.kb && WT.kb.get("delivery.inbound.periodTicks") === 120 && WT.kb.get("delivery.otif.target") === 0.95;
+      return { ok: ok, detail: "lateness " + late.join(",") + "; modes " + (DS ? DS.modes.length : 0) };
+    });
     // ---- v3.53: the tracking database - every package is joined to its handling unit,
     // the twins map the live ledger event for event, and the store round-trips a run.
     // The backend: the memory store by default, IndexedDB when the page is opened with

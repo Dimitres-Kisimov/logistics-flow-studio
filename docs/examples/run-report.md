@@ -192,6 +192,14 @@ Data-quality flags: no holding cost is set (0 per unit-hour): waiting stock cost
 | vas | 1 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
 | wrap | 3 | 0 | 0 | 0 | 1.0 | 0.0 | 0.0 |
 
+### v_otif
+
+(no rows)
+
+### v_inbound
+
+(no rows)
+
 ## Cost detail
 
 | hours | labour_eur | equipment_eur | energy_eur | holding_eur | total_eur |

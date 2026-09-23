@@ -161,7 +161,7 @@
     // ring for the sparkline; `poolDemandFactor` sets the synthetic arrival
     // (order-generation) rate as a multiple of the modelled pick capacity so a
     // live backlog is visible (honest what-if, documented in the readout).
-    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15, errors: "none" },
+    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15, errors: "none", delivery: "instant" },
   };
 
   // ---------------- DOM refs ----------------
@@ -2485,9 +2485,16 @@
         rows.map((q) => q.op + " FPY <strong>" + q.first_pass_yield + "</strong> (" + q.errors + " of " + q.units_through + (q.reworked ? ", reworked " + q.reworked : "") + (q.scrapped_for_damage ? ", scrapped " + q.scrapped_for_damage : "") + ")").join(" · ") +
         " - first pass yield per step; errors belong to a step and a latent condition, never to a person";
     }
+    let deliveryLine = "";
+    if (s.inbound || s.service) { // v3.55: the windows what-if ran
+      const late = s.inbound ? s.inbound.filter((t) => t.late_ticks > 0).length : 0;
+      deliveryLine = "<br>Delivery (what-if): " + (s.inbound ? "<strong>" + s.inbound.length + "</strong> trailers so far, " + late + " late" : "") +
+        (s.service ? (s.inbound ? " · " : "") + "OTIF <strong>" + (s.service.otif == null ? "-" : s.service.otif) + "</strong> (" + s.service.otif_orders + " of " + s.service.delivered_orders + " delivered orders on time in full; shipped on time " + (s.service.shipped_on_time_share == null ? "-" : s.service.shipped_on_time_share) + ")" : "") +
+        " - lateness shape from a public dataset, scaled; promised lead and transit are teaching values";
+    }
     return '<p class="flow-pool-stats"><code>' + rec.run.id + "</code><br>Units <strong>" + s.units + "</strong> · events <strong>" + s.events +
       "</strong> · delivered <strong>" + s.delivered + "</strong> (" + s.delivered_eaches + " eaches · " + s.delivered_pallets + " pallets · " +
-      s.delivered_parcels + " parcels) · profile " + (rec.run.profile || "-") + costLine + qualityLine + "</p>" + (types ? '<div class="flow-chips">' + types + "</div>" : "");
+      s.delivered_parcels + " parcels) · profile " + (rec.run.profile || "-") + costLine + qualityLine + deliveryLine + "</p>" + (types ? '<div class="flow-chips">' + types + "</div>" : "");
   }
   function updateLedgerReadout() {
     const out = $("flowLedgerStats"), sel = $("flowLedgerUnit"), trace = $("flowLedgerTrace");
@@ -2538,6 +2545,23 @@
     return { "mis-pick": g("hf.error.mis-pick", 0.02), "wrong-putaway": g("hf.error.wrong-putaway", 0.003), damage: g("hf.error.damage", 0.005),
       psf: { timePressure: g("hf.psf.timePressure", 1), signalToNoise: g("hf.psf.signalToNoise", 1), familiarity: g("hf.psf.familiarity", 1) }, cap: g("hf.error.cap", 0.5) };
   }
+  // v3.55: the delivery what-if's levers (knowledge base) and the lateness shape (data/scms-delivery.js, aggregates of
+  // a public dataset) turned into the tick lists flowsim reads - a Weyl sequence through the mode's quantiles, scaled.
+  function readDeliveryLevers() {
+    const g = (id, d) => { const v = WT.kb ? WT.kb.get(id) : undefined; return typeof v === "number" && isFinite(v) ? v : d; };
+    const ds = WT.datasets && WT.datasets.scmsDelivery ? WT.datasets.scmsDelivery : null;
+    const modes = ds ? ds.modes : [];
+    const mode = modes[Math.max(0, Math.min(modes.length - 1, Math.round(g("delivery.inbound.modeIndex", 3))))] || null;
+    const q = ds && mode ? ds.by_mode[mode].lateness_days : { min: 0, p10: 0, median: 0, p90: 0, max: 0 };
+    const scale = g("delivery.scaleTicksPerDay", 60);
+    const late = WT.flowsim.windowLateness(q, scale, 16);
+    const nominal = g("delivery.transitTicks", 120);
+    const source = ds ? "USAID SCMS delivery history (aggregates, data/scms-delivery.json), mode " + mode + ", scaled " + scale + " ticks per day" : "no dataset loaded: every trailer on time";
+    return {
+      inbound: { periodTicks: g("delivery.inbound.periodTicks", 120), openTicks: g("delivery.inbound.openTicks", 30), lateness: late, mode: mode, scaleTicksPerDay: scale, source: source },
+      outbound: { periodTicks: g("delivery.outbound.periodTicks", 240), promisedLeadTicks: g("delivery.promisedLeadTicks", 480), transit: late.map((v) => Math.max(0, nominal + v)), mode: mode, scaleTicksPerDay: scale, source: source + "; nominal transit " + nominal + " ticks plus the same lateness shape" },
+    };
+  }
   function flowBuild() {
     if (!WT.flowsim) return false;
     readConfigFromUI();
@@ -2564,6 +2588,8 @@
     if (state.flow.staffing === "adaptive") opts.policy = { kind: "queue-staffing" };
     // v3.54: the human-error what-if - the knowledge base's per-step shares and levers (routing.js normalises them)
     if (state.flow.errors === "declared") opts.errors = readErrorLevers();
+    // v3.55: the delivery what-if - dock and carrier windows from the knowledge base and the dataset's lateness shape
+    if (state.flow.delivery === "windows") { const d = readDeliveryLevers(); opts.inbound = d.inbound; opts.outbound = d.outbound; }
     state.flow.sim = WT.flowsim.state(layout, opts);
     // v3.32 THE RUN LEDGER: a pure observer attached as an after-tick hook.
     // Every unit gets its identities (ids.js) and quantities (pack.js); the
@@ -3110,6 +3136,21 @@
       sel.addEventListener("change", () => {
         state.flow.errors = sel.value === "declared" ? "declared" : "none";
         try { localStorage.setItem("wt-flow-errors", state.flow.errors); } catch (_) { /* ignore */ }
+        state.flow.sig = null;
+        if (state.flow.sim) flowReset();
+      });
+    })();
+    // v3.55: the delivery what-if picker. Remembered on this device; a change rebuilds the run from tick 0.
+    (function wireDelivery() {
+      const sel = $("flowDeliverySelect");
+      if (!sel) return;
+      let saved = "instant";
+      try { saved = localStorage.getItem("wt-flow-delivery") || "instant"; } catch (_) { /* private mode */ }
+      state.flow.delivery = saved === "windows" ? "windows" : "instant";
+      sel.value = state.flow.delivery;
+      sel.addEventListener("change", () => {
+        state.flow.delivery = sel.value === "windows" ? "windows" : "instant";
+        try { localStorage.setItem("wt-flow-delivery", state.flow.delivery); } catch (_) { /* ignore */ }
         state.flow.sig = null;
         if (state.flow.sim) flowReset();
       });

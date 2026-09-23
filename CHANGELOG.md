@@ -1,5 +1,67 @@
 # Changelog
 
+## v3.55 — Delivery and shipping times in between: dock and carrier windows on a public dataset's shape
+
+**The dataset.** `tools/scms_delivery.py` (fetch / reduce / --check / --offline-check, the shape of
+`nist_box_assembly.py`) reduces the USAID SCMS delivery history - 10 324 shipment lines, 2006-2015,
+a public GitHub mirror of the Development Data Library file - to `data/scms-delivery.json` (+ the JS
+twin and `docs/SCMS_DELIVERY.md`): per shipment mode (Air, Air Charter, Ocean, Truck, not captured)
+and overall, rows, usable rows, lateness in days (delivered minus scheduled) as min / p10 / median /
+p90 / max by the nearest-rank rule, the shares late / early / on time, and the PO-to-delivery days the
+same way. THE RULE is stated once in the tool and recorded in the JSON; unparseable dates ("Date Not
+Captured", "N/A - From RDC" - 5 732 of the PO dates) are counted, never filled in; some PO dates are
+written m/d/yy and are read as such; the literal mode "N/A" is "(not captured)". Two findings stated
+rather than smoothed over: every one of the 10 324 rows carries both delivery dates, and the mirror is
+the only reachable copy - the licence is recorded as UNRESOLVED (the DDL issues a Government Work or a
+CC BY-ND 4.0 partner licence per dataset), so only aggregates are committed, with the attribution the
+DDL asks for. No retrieval date anywhere: the reduction reproduces byte for byte.
+
+**The model.** `flowsim.spawnPlan` takes `opts.inbound = { periodTicks, openTicks, lateness[] }` and
+`opts.outbound = { periodTicks, promisedLeadTicks, transit[] }` (or `true` for the defaults 120 / 30 and
+240 / 480). Trailer j is scheduled at j x P and arrives max(0, late_j) later - an early trailer waits
+for its slot - and the door is open O ticks from the arrival; units spawn only while it is open (one
+`break` between the pool guard and the in-flight cap; the arrival accumulator keeps counting, so a
+trailer is a burst at the door), and every window's first open tick logs the trailer. The lateness
+list is not a random draw: `windowLateness(quantiles, scale, 16)` pushes the Weyl sequence
+u_j = frac(j x 0.6180339887) through the piecewise-linear inverse distribution of the chosen mode's
+quantiles and scales by the knowledge base's ticks-per-day (60: one dataset day = one plant hour, a
+teaching scaling said so wherever it shows); the spawn loop draws the PRNG exactly as before. A unit
+loaded at the outbound dock waits for the next carrier departure (every M ticks, never less than the
+eight-tick dwell) and retires exactly at it. Absent keys -> no branch: the plan, the state and fixture
+A are byte for byte what they were.
+
+**The ledger.** With windows every unit carries `trailer`, `due_tick` (spawn + the promised lead),
+`transit_ticks` (a nominal transit plus the same lateness shape, by sequence) and, at delivery,
+`customer_tick`, `on_time_shipped`, `on_time`; `run.inbound` / `run.outbound` carry the windows and
+the ledger's honesty and join the run id; the trailer log is exported as `inbound`; `serviceOf(export)`
+gives orders, delivered orders, OTIF orders and share (an order is on time in full when every unit
+was delivered by its due tick - synthetic one-line orders unless a pool was loaded), the shipped-on-
+time share and the mean transit; `inboundRows` the trailers with the units each brought. The tracking
+twins carry `wt:delivery` (the trailer on the first event; promise, transit and outcome on the
+shipping event).
+
+**SQL, viewer, app.** `run.inbound` / `run.outbound`, six `hu` columns, `inbound_event`, the planner
+views `v_otif` and `v_inbound` (reconciled), guarded ALTERs; the four replication views (and the
+viewer's twin) now key their groups on the error and delivery levers as well - the gap v3.54 stated is
+closed. The viewer's *Delivery* block (OTIF cards, the trailers at the door) and a *Delivery* glance
+card; the planner's *Delivery* picker (instant | windows), a knowledge-base `delivery` category (eight
+seeds: the periods, the mode index, the scale, the promised lead, the nominal transit, the OTIF
+target - a commonly quoted target, not a standard) and a delivery line in the flow readout.
+
+**Limits, stated.** The lateness shape is international pharmaceutical lanes, not a warehouse's dock,
+and the scale is a teaching choice; not a yard, not dock appointments, not a carrier network, not a
+customer calendar; every spawn is gated by the inbound windows (order types that start in stock too);
+OTIF counts synthetic one-line orders; a trailer more than three periods late is not looked for.
+
+**Verification.** `verify_delivery.js` (25 checks: the Weyl values and the inverse distribution by hand, the
+window openings and the trailer log by hand, spawns only inside windows, no new PRNG draw, a drained pool,
+retirements at departures, OTIF on a six-unit pool by independent arithmetic, the dataset twin, the keys,
+the twins, the wiring), `test/test_scms_delivery.py` (a twelve-row hand CSV, nearest rank by hand, the
+committed reduction, the offline check), +4 Python ledger tests (OTIF and the trailers by hand, no rows
+without windows, the guarded ALTERs, replication groups keyed on the levers), both self-tests. 80
+harnesses, 150 Python tests, WT-SELFTEST 188/188 + viewer 35/35. Cache wt-v134. The four run exports are
+byte-identical.
+
 ## v3.54 — Human error, honestly: declared shares per step, quota-dispatched branches, an unrolled rework
 
 **The model.** `flowsim.spawnPlan` takes `opts.errors` - `true` for the three kinds at their defaults,

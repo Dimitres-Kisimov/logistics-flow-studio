@@ -870,7 +870,7 @@ class Tracking(unittest.TestCase):
         self.assertIn("v_tracking_gaps", RL.INVARIANT_VIEWS)
         self.assertTrue({"v_epcis_events", "v_unit_history"} <= set(RL.DETAIL_VIEWS))
         self.assertTrue(set(RL.TRACKING_VIEWS) <= set(RL.VIEWS))
-        self.assertEqual(len(RL.VIEWS), 34)
+        self.assertEqual(len(RL.VIEWS), 36)
         self.assertEqual(RL.RECONCILE_KEYS["v_bizstep_dwell"], ("biz_step",))
         data = json.loads((FIX / "run-ledger.json").read_text(encoding="utf-8"))
         js = json.loads((FIX / "run-ledger.tracking.views.json").read_text(encoding="utf-8"))
@@ -975,6 +975,96 @@ class Quality(unittest.TestCase):
         sql = RL.rows(db, "SELECT version, disposition, error_kind, error_step, error_detected FROM tracking_event WHERE hu_id LIKE '%000001-1' ORDER BY version")
         self.assertEqual([(r["version"], r["disposition"], r["error_kind"], r["error_detected"]) for r in sql if r["error_kind"]], [(3, "mismatch_class", "mis-pick", 0), (4, "in_progress", "mis-pick", 1)])
         self.assertEqual(RL.rows(db, "SELECT * FROM v_tracking_gaps"), [])
+
+
+def hand_ledger_with_windows():
+    """The hand ledger with dock and carrier windows (v3.55): two trailers, promised leads, transits, outcomes by hand."""
+    data = hand_ledger()
+    data["run"]["inbound"] = {"kind": "dock-windows", "periodTicks": 100, "openTicks": 20, "lateness": [0, 53], "mode": "Truck", "scaleTicksPerDay": 60, "source": "hand", "honesty": "hand"}
+    data["run"]["outbound"] = {"kind": "carrier-windows", "periodTicks": 100, "promisedLeadTicks": 25, "transit": [10, 200], "mode": "Truck", "scaleTicksPerDay": 60, "source": "hand", "honesty": "hand"}
+    data["inbound"] = [{"trailer": 0, "scheduled_tick": 0, "arrival_tick": 0, "late_ticks": 0}, {"trailer": 1, "scheduled_tick": 100, "arrival_tick": 153, "late_ticks": 53}]
+    a, b, c = data["hus"]
+    # A: spawned 0, due 25, delivered 30 (shipped late), transit 10 -> customer 40: not on time
+    a.update(trailer=0, due_tick=25, transit_ticks=10, customer_tick=40, on_time_shipped=False, on_time=False)
+    # B: spawned 5, due 30, delivered 20 (shipped on time), transit 10 -> customer 30: on time in full
+    b.update(trailer=0, due_tick=30, transit_ticks=10, customer_tick=30, on_time_shipped=True, on_time=True)
+    # C: still in flight, promised 35, transit 200
+    c.update(trailer=1, due_tick=35, transit_ticks=200, customer_tick=None, on_time_shipped=None, on_time=None)
+    return data
+
+
+class Delivery(unittest.TestCase):
+    """v3.55 delivery windows: v_otif and v_inbound by hand, the columns, replication groups keyed on the levers."""
+
+    def test_otif_and_inbound_by_hand(self):
+        db = fresh_with(hand_ledger_with_windows())
+        run = "RUN-hand-s1-h00000000"
+        o = RL.rows(db, "SELECT * FROM v_otif WHERE run_id = ?", (run,))
+        self.assertEqual(len(o), 1)
+        self.assertEqual((o[0]["orders"], o[0]["delivered_orders"], o[0]["otif_orders"], o[0]["otif"], o[0]["shipped_on_time_share"], o[0]["avg_transit_ticks"]), (3, 2, 1, 0.5, 0.5, 10.0))
+        i = RL.rows(db, "SELECT * FROM v_inbound WHERE run_id = ? ORDER BY trailer", (run,))
+        self.assertEqual([(r["trailer"], r["scheduled_tick"], r["arrival_tick"], r["late_ticks"], r["units"]) for r in i], [(0, 0, 0, 0, 2), (1, 100, 153, 53, 1)])
+        hu = RL.rows(db, "SELECT due_tick, trailer, transit_ticks, customer_tick, on_time_shipped, on_time FROM hu WHERE id LIKE '%000002-1'")[0]
+        self.assertEqual(hu, {"due_tick": 30, "trailer": 0, "transit_ticks": 10, "customer_tick": 30, "on_time_shipped": 1, "on_time": 1})
+        self.assertIn('"kind": "dock-windows"', RL.rows(db, "SELECT inbound FROM run")[0]["inbound"])
+        self.assertEqual(RL.summary(db, run)["invariants"], {n: 0 for n in RL.INVARIANT_VIEWS})
+
+    def test_no_windows_no_rows(self):
+        db = fresh_with(hand_ledger())
+        self.assertEqual(RL.rows(db, "SELECT * FROM v_otif"), [])
+        self.assertEqual(RL.rows(db, "SELECT * FROM v_inbound"), [])
+        self.assertIsNone(RL.rows(db, "SELECT outbound FROM run")[0]["outbound"])
+        self.assertIn("v_otif", RL.PLANNER_VIEWS)
+        self.assertIn("v_inbound", RL.PLANNER_VIEWS)
+        self.assertEqual((RL.RECONCILE_KEYS["v_otif"], RL.RECONCILE_KEYS["v_inbound"]), ((), ("trailer",)))
+
+    def test_old_database_gains_the_delivery_columns_and_table(self):
+        db = fresh()
+        for name in RL.VIEWS:
+            db.execute(f"DROP VIEW IF EXISTS {name}")
+        db.execute("DROP TABLE inbound_event")
+        for table, col in (("run", "inbound"), ("run", "outbound"), ("hu", "due_tick"), ("hu", "trailer"), ("hu", "transit_ticks"), ("hu", "customer_tick"), ("hu", "on_time_shipped"), ("hu", "on_time")):
+            db.execute(f"ALTER TABLE {table} DROP COLUMN {col}")
+        RL.initialize(db)
+        RL.initialize(db)
+        self.assertTrue({"inbound", "outbound"} <= {r["name"] for r in RL.rows(db, "PRAGMA table_info(run)")})
+        self.assertTrue({"due_tick", "trailer", "transit_ticks", "customer_tick", "on_time_shipped", "on_time"} <= {r["name"] for r in RL.rows(db, "PRAGMA table_info(hu)")})
+        RL.import_ledger(db, hand_ledger_with_windows())
+        self.assertEqual(RL.rows(db, "SELECT otif FROM v_otif")[0]["otif"], 0.5)
+
+    def test_replication_groups_key_on_the_levers(self):
+        db = fresh()
+        base = hand_ledger("RUN-hand-s1-h00000001")
+        base["run"]["seed"], base["run"]["ticks"] = 1, 40
+        RL.import_ledger(db, base)
+        same = hand_ledger("RUN-hand-s2-h00000002")
+        same["run"]["seed"], same["run"]["ticks"] = 2, 40
+        RL.import_ledger(db, same)
+        err = hand_ledger("RUN-hand-s3-h00000003")
+        err["run"]["seed"], err["run"]["ticks"] = 3, 40
+        err["run"]["errors"] = {"kind": "human-error", "kinds": [{"kind": "mis-pick", "share": 0.02, "effective": 0.02}], "psf": {}, "multiplier": 1, "latent": [], "cap": 0.5, "honesty": "hand"}
+        RL.import_ledger(db, err)
+        win = hand_ledger_with_windows()
+        win["run"]["id"] = "RUN-hand-s4-h00000004"
+        for h in win["hus"]:
+            h["id"] = h["id"].replace("RUN-hand-s1-h00000000", "RUN-hand-s4-h00000004")
+            h["order_id"] = h["order_id"].replace("RUN-hand-s1-h00000000", "RUN-hand-s4-h00000004")
+        for e in win["events"]:
+            e["id"] = e["id"].replace("RUN-hand-s1-h00000000", "RUN-hand-s4-h00000004")
+            e["hu_id"] = e["hu_id"].replace("RUN-hand-s1-h00000000", "RUN-hand-s4-h00000004")
+        win["run"]["seed"], win["run"]["ticks"] = 4, 40
+        RL.import_ledger(db, win)
+        groups = RL.rows(db, "SELECT n, seeds, errors, inbound, outbound FROM v_replication_groups ORDER BY seeds")
+        self.assertEqual(len(groups), 3)
+        self.assertEqual([(g["n"], g["seeds"]) for g in groups], [(2, "1,2"), (1, "3"), (1, "4")])
+        self.assertEqual((groups[0]["errors"], groups[0]["inbound"], groups[0]["outbound"]), ("", "", ""))
+        self.assertIn("mis-pick", groups[1]["errors"])
+        self.assertIn("dock-windows", groups[2]["inbound"])
+        cyc = RL.rows(db, "SELECT n, seeds FROM v_replication_groups WHERE errors = '' AND inbound = '' ORDER BY seeds")
+        self.assertEqual([(r["n"], r["seeds"]) for r in cyc], [(2, "1,2")])
+        for view in ("v_replication_cycle_by_type", "v_replication_cost_by_type", "v_replication_summary"):
+            rows_ = RL.rows(db, f"SELECT DISTINCT n FROM {view} WHERE errors = '' AND inbound = '' AND outbound = ''")
+            self.assertEqual([r["n"] for r in rows_], [2], view)
 
 
 if __name__ == "__main__":

@@ -221,7 +221,11 @@
     ev.bizTransactionList = [{ type: h.archetype === "returns" ? "rma" : "po", bizTransaction: h.order_id }];
     if (h.order_ref != null) ev.bizTransactionList.push({ type: "wt:order_ref", bizTransaction: String(h.order_ref) });
     ev["wt:error"] = error;
-    ev["wt:delivery"] = null;
+    // v3.55: the delivery facts ride on the first event (the trailer) and the shipping event (promise, transit, outcome)
+    let delivery = null;
+    if (e.kind === "created" && h.trailer != null) delivery = { trailer: h.trailer };
+    else if (e.kind === "delivered" && h.due_tick != null) delivery = { due_tick: h.due_tick, transit_ticks: h.transit_ticks, customer_tick: h.customer_tick, on_time_shipped: h.on_time_shipped, on_time: h.on_time };
+    ev["wt:delivery"] = delivery;
     return ev;
   }
   function runBlock(run) {

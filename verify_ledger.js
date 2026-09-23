@@ -25,7 +25,7 @@
  *   7. Simulated time: minute = tick x 60 / ticks-per-hour.
  *   8. Shipped wiring: the after-tick hook, station elementId and anchor ids
  *      in flowsim.js; the app creating the ledger and its export button; the
- *      flow card block; sw.js precaching ledger.js at wt-v133.
+ *      flow card block; sw.js precaching ledger.js at wt-v134.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -192,7 +192,7 @@ const huIds = Object.keys(rec.hus);
   check("8b. app.js creates the ledger on every run and wires the export button",
     /WT\.ledger\.create\(/.test(app) && /flowLedgerExport/.test(app) && /afterTick: \(st\) => \{ WT\.ledger\.observe/.test(app)); // v3.53: the hook multiplexes the tracker after the ledger
   check("8c. index.html ships the run-ledger block and loads ledger.js", /id="flowLedger"/.test(html) && /<script src="ledger\.js"><\/script>/.test(html));
-  check("8d. sw.js precaches ledger.js at wt-v133 (trail preserved: previously wt-v132)", /"\.\/ledger\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v133"/.test(sw) && /Previously wt-v132/.test(sw));
+  check("8d. sw.js precaches ledger.js at wt-v134 (trail preserved: previously wt-v133)", /"\.\/ledger\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v134"/.test(sw) && /Previously wt-v133/.test(sw));
   check("8e. test/run-all.mjs lists verify_ledger.js", /verify_ledger\.js/.test(runall));
   check("8f. honesty label: synthetic, not telemetry, not a WMS", /not telemetry/.test(L.HONESTY) && /not a WMS/.test(L.HONESTY) && /SYNTHETIC|synthetic/.test(L.HONESTY));
   check("8g. no Date / Math.random CALL in ledger.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(read("ledger.js")));

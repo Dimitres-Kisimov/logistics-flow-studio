@@ -71,6 +71,8 @@
       desc: "Per storage-system capacity/height assumptions (order-of-magnitude teaching values)." },
     { key: "automation", label: "Automation throughput params",
       desc: "Per automation-system cycle-time / throughput assumptions the automation model (WT.automation) and the WMS capacity layer read (informed by VDI 4480 / VDI 2510)." },
+    { key: "delivery", label: "Delivery windows (what-if)",
+      desc: "Dock and carrier windows the flow's delivery what-if reads (Simulate -> Live material flow -> Delivery): the inbound period and door-open time, the shipment mode whose lateness shape (a public USAID SCMS delivery dataset, aggregates only) is scaled to plant ticks by a declared teaching parameter, the carrier period, the promised lead, the nominal transit and the OTIF target. Teaching values; the dataset's lanes are international pharmaceutical shipments, not a warehouse's dock." },
     { key: "human-factors", label: "Human factors (error what-if)",
       desc: "Per-step error shares and performance-shaping multipliers the flow's error what-if reads (Simulate -> Live material flow -> Human error). Errors belong to a process step and a latent condition, never to a person; nothing here is keyed to a worker (BetrVG § 87(1)6, GDPR Art. 88). Anchored on HEART / SPAR-H generic values - teaching values, not warehouse measurements." },
   ];
@@ -271,6 +273,25 @@
     source: "HEART error-producing condition: unfamiliarity with a situation which is potentially important but which only occurs infrequently or which is novel - maximum effect x17.", note: HF_NOTE, editable: true, kind: "number", min: 1, max: 17 });
   seed({ id: "hf.error.cap", category: "human-factors", label: "Cap on any effective error share", value: 0.5, unit: "share",
     source: "WarehouseTwin choice: the levers' product cannot push a step's share above one in two; when the cap binds the readout says so.", note: HF_NOTE, editable: true, kind: "number", min: 0.01, max: 1 });
+
+  /* ---- v3.55 delivery windows: the what-if's levers (teaching values; the lateness SHAPE comes from data/scms-delivery.js) ---- */
+  const DL_NOTE = "Teaching value for the delivery what-if. The lateness shape comes from the USAID SCMS delivery history (aggregates only, data/scms-delivery.json); the scale to plant ticks, the periods, the promised lead and the nominal transit are choices, not measurements.";
+  seed({ id: "delivery.inbound.periodTicks", category: "delivery", label: "Inbound trailer period (ticks between scheduled trailers)", value: 120, unit: "ticks",
+    source: "WarehouseTwin choice: one scheduled trailer every two plant hours at 60 ticks per hour.", note: DL_NOTE, editable: true, kind: "number", min: 10, max: 100000 });
+  seed({ id: "delivery.inbound.openTicks", category: "delivery", label: "Door open time per trailer (ticks)", value: 30, unit: "ticks",
+    source: "WarehouseTwin choice: half an hour of unloading at 60 ticks per hour.", note: DL_NOTE, editable: true, kind: "number", min: 1, max: 100000 });
+  seed({ id: "delivery.inbound.modeIndex", category: "delivery", label: "Shipment mode whose lateness shape is used (0 Air, 1 Air Charter, 2 Ocean, 3 Truck, 4 not captured)", value: 3, unit: "index",
+    source: "The modes of data/scms-delivery.json in its order; 3 = Truck, the mode of a road-served dock.", note: DL_NOTE, editable: true, kind: "number", min: 0, max: 4 });
+  seed({ id: "delivery.scaleTicksPerDay", category: "delivery", label: "Ticks per dataset day (the scale of the lateness shape)", value: 60, unit: "ticks/day",
+    source: "WarehouseTwin choice: one day of the international dataset's lateness becomes one plant hour (60 ticks) - a teaching scaling, so the shape shows on a shift's clock.", note: DL_NOTE, editable: true, kind: "number", min: 1, max: 10000 });
+  seed({ id: "delivery.outbound.periodTicks", category: "delivery", label: "Carrier departure period (ticks)", value: 240, unit: "ticks",
+    source: "WarehouseTwin choice: a carrier every four plant hours.", note: DL_NOTE, editable: true, kind: "number", min: 10, max: 100000 });
+  seed({ id: "delivery.promisedLeadTicks", category: "delivery", label: "Promised lead from order to customer (ticks)", value: 480, unit: "ticks",
+    source: "WarehouseTwin choice: eight plant hours from spawn to the customer's door.", note: DL_NOTE, editable: true, kind: "number", min: 1, max: 1000000 });
+  seed({ id: "delivery.transitTicks", category: "delivery", label: "Nominal transit from departure to customer (ticks; the lateness shape is added)", value: 120, unit: "ticks",
+    source: "WarehouseTwin choice: two plant hours of nominal transit; the dataset's lateness shape (scaled) is added on top.", note: DL_NOTE, editable: true, kind: "number", min: 0, max: 1000000 });
+  seed({ id: "delivery.otif.target", category: "delivery", label: "On-time-in-full target (share of delivered orders)", value: 0.95, unit: "share",
+    source: "A commonly quoted OTIF target in logistics guides - not a standard, not a measurement; the control tower (v3.56) compares against it.", note: DL_NOTE, editable: true, kind: "number", min: 0, max: 1 });
 
   // ------------------------------------------------------------------
   // Build the store. `defaults` is a frozen id -> default-value map;

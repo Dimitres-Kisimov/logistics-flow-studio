@@ -162,6 +162,7 @@
     return { summary, cycle, touches, wait, wip, byOp, dispatch, dispatchByOrder, staffing,
       bizstepDwell: m.dwell || null, dispositionCounts: m.dispositions || null, // v3.53: the same rows as v_bizstep_dwell (reconciled)
       quality: m.quality || null, // v3.54: first pass yield, rework and scrap ratios per operation (reconciled)
+      otif: m.service ? [m.service] : [], inbound: m.inbound || [], // v3.55: on time in full, the trailers (reconciled)
       invariants: invariants,
       flowLinks: m.flowLinks,
       rates: exp.rates || null, spans: cost ? cost.spans : null, costByHu: cost ? cost.byHu : null,
@@ -184,6 +185,8 @@
     m.dispositions = m.tracking ? T.dispositionCounts(m.tracking.events) : null;
     m.trackGaps = m.tracking ? T.gaps(exp, m.tracking) : null;
     m.quality = Lg && typeof Lg.qualityByStep === "function" ? Lg.qualityByStep(exp) : null; // v3.54: the same rows as v_quality_by_step
+    m.service = Lg && typeof Lg.serviceOf === "function" ? Lg.serviceOf(exp) : null; // v3.55: v_otif's row (null without carrier windows)
+    m.inbound = Lg && typeof Lg.inboundRows === "function" ? Lg.inboundRows(exp) : []; // v3.55: v_inbound's rows
     m.views = computeViews(exp, m);
     m.ribbon = ribbon(exp);
     m.costByHu = {};
@@ -286,8 +289,11 @@
     for (const exp of exps || []) {
       const r = exp.run;
       const mixKey = JSON.stringify(r.mix == null ? null : (Array.isArray(r.mix) ? r.mix : Object.keys(r.mix).sort().map((k) => [k, r.mix[k]])));
-      const key = [r.scenario, mixKey, r.ticks, r.policy ? JSON.stringify([r.policy.kind, r.policy.threshold, r.policy.maxServers, r.policy.cooldownTicks]) : ""].join("|");
-      const g = groups[key] || (groups[key] = { key: key, scenario: r.scenario, mix: r.mix, ticks: r.ticks, policy: r.policy || null, seeds: [], runs: [], n: 0, cyc: {}, cost: {}, summ: { units: [], delivered: [], total_eur: [] } });
+      // v3.55: the error and delivery levers key the group too (runs with different levers are different days)
+      const leverKey = (x, drop) => (x ? JSON.stringify(Object.keys(x).filter((k) => drop.indexOf(k) < 0).sort().map((k) => [k, x[k]])) : "");
+      const key = [r.scenario, mixKey, r.ticks, r.policy ? JSON.stringify([r.policy.kind, r.policy.threshold, r.policy.maxServers, r.policy.cooldownTicks]) : "",
+        leverKey(r.errors, ["honesty"]), leverKey(r.inbound, ["honesty", "source"]), leverKey(r.outbound, ["honesty", "source"])].join("|");
+      const g = groups[key] || (groups[key] = { key: key, scenario: r.scenario, mix: r.mix, ticks: r.ticks, policy: r.policy || null, errors: r.errors || null, inbound: r.inbound || null, outbound: r.outbound || null, seeds: [], runs: [], n: 0, cyc: {}, cost: {}, summ: { units: [], delivered: [], total_eur: [] } });
       g.n++; g.seeds.push(r.seed); g.runs.push(r.id);
       const v = views(exp);
       for (const row of v.cycle) if (row.avg_cycle_ticks != null) (g.cyc[row.archetype] = g.cyc[row.archetype] || []).push(row.avg_cycle_ticks);
@@ -296,7 +302,7 @@
     }
     const rowsOf = (map, key) => Object.keys(map).sort().map((k) => { const row = {}; row[key] = k; return Object.assign(row, repStats(map[k])); });
     return { groups: Object.keys(groups).sort().map((k) => { const g = groups[k];
-      return { key: g.key, scenario: g.scenario, mix: g.mix, ticks: g.ticks, policy: g.policy, n: g.n, seeds: g.seeds.slice().sort((a, b) => a - b), runs: g.runs.slice(),
+      return { key: g.key, scenario: g.scenario, mix: g.mix, ticks: g.ticks, policy: g.policy, errors: g.errors, inbound: g.inbound, outbound: g.outbound, n: g.n, seeds: g.seeds.slice().sort((a, b) => a - b), runs: g.runs.slice(),
         cycle: rowsOf(g.cyc, "archetype"), cost: rowsOf(g.cost, "archetype"), summary: rowsOf(g.summ, "metric"), values: { cycle: g.cyc, cost: g.cost } }; }) };
   }
 
@@ -396,6 +402,9 @@
       // v3.54: the human-error what-if, if any
       errors: r.errors ? { text: "declared error shares (what-if)", sub: (r.errors.kinds || []).map((k) => k.kind + " " + k.effective).join(" · ") + (r.errors.multiplier > 1 ? " · levers x" + r.errors.multiplier : "") + " · teaching values per step, never per person" }
         : { text: "every step perfect", sub: "no error what-if ran: first pass yield 1 at every operation" },
+      // v3.55: the delivery what-if, if any
+      delivery: r.inbound || r.outbound ? { text: "dock and carrier windows (what-if)", sub: (r.inbound ? "trailers every " + r.inbound.periodTicks + " ticks, " + (r.inbound.mode || "-") + " lateness shape" : "") + (r.outbound ? (r.inbound ? "; " : "") + "carriers every " + r.outbound.periodTicks + ", promised in " + r.outbound.promisedLeadTicks : "") + " · teaching values on a public dataset's shape" }
+        : { text: "instantaneous dock and carrier", sub: "no delivery what-if ran: every trailer on time, no promise to miss" },
       invariantCount: Object.keys(v.invariants).length,
       // v3.44: where the order stream came from
       dataset: r.dataset ? { text: "own data: " + r.dataset.orders + " orders / " + r.dataset.lines + " lines", sub: (r.dataset.source || "pool") + (r.dataset.skus != null ? " · " + r.dataset.skus + " articles" : "") + " · one unit per order line, the line's quantity on the unit; order types from the mix" }
@@ -509,6 +518,7 @@
       { label: "Order stream", value: g.dataset.text, sub: g.dataset.sub },
       { label: "Staffing", value: g.policy.text, sub: g.policy.sub },
       { label: "Human error", value: g.errors.text, sub: g.errors.sub },
+      { label: "Delivery", value: g.delivery.text, sub: g.delivery.sub },
       { label: "Simulated", value: r.ticks + " ticks · " + g.minutes + " min", sub: r.minutes_per_tick + " min per tick" },
       { label: "Units · events", value: g.units + " · " + g.events, sub: g.retired + " retired · " + g.inFlight + " in flight" },
       { label: "Delivered", value: g.delivered + " units · " + g.delivered_eaches + " eaches", sub: g.delivered_pallets + " pallets · " + g.delivered_parcels + " parcels · " + g.trailers + " trailer" + (g.trailers === 1 ? "" : "s") },
@@ -724,6 +734,23 @@
     return "<p class=\"note\">The adaptive-staffing what-if: a second worker joined a bench when its queue reached " + p.threshold + " and left after " + p.cooldownTicks + " ticks with an empty queue (at most " + p.maxServers + " workers). This adds capacity the declared floor does not have; a unit is still charged one worker's service time, and the extra worker's idle time is not charged.</p>" +
       (rows.length ? s + table(rows, STAFFING_COLS, "Staffing changes by bench") : "<p class=\"note\">The policy never had to act: no bench reached the threshold.</p>") + sqlBlock("v_staffing");
   }
+  // v3.55 delivery: the trailers the door logged and on time in full; a note says the run had no windows.
+  const INBOUND_COLS = ["trailer", "scheduled_tick", "arrival_tick", "late_ticks", "units"];
+  function deliveryHtml(exp) {
+    const v = views(exp), ib = exp.run.inbound, ob = exp.run.outbound;
+    if (!ib && !ob) return "<p class=\"note\">Instantaneous dock and carrier in this run (no delivery what-if): every trailer on time, every unit gone eight ticks after loading, no promise to be late against. Switch on <em>Delivery - Dock and carrier windows</em> in the planner's flow card.</p>" + sqlBlock("v_inbound") + sqlBlock("v_otif");
+    const s = v.otif && v.otif.length ? v.otif[0] : null;
+    let html = "<p class=\"note\">" + (ib ? "Inbound trailers every " + ib.periodTicks + " ticks, the door open " + ib.openTicks + " ticks from the arrival, lateness by the " + esc(ib.mode || "-") + " shape of a public delivery dataset (" + esc(ib.source || "") + "). " : "") +
+      (ob ? "Carriers every " + ob.periodTicks + " ticks; promised lead " + ob.promisedLeadTicks + " ticks; transit = a nominal time plus the same shape. " : "") + "Teaching values; the dataset's lanes are international pharmaceutical shipments, used for the shape only.</p>";
+    if (s) html += cards([
+      { label: "On time in full", value: s.otif == null ? "-" : String(s.otif), sub: s.otif_orders + " of " + s.delivered_orders + " delivered orders (" + s.orders + " orders spawned)" },
+      { label: "Shipped on time", value: s.shipped_on_time_share == null ? "-" : String(s.shipped_on_time_share), sub: "delivered units that left by their due tick" },
+      { label: "Average transit", value: s.avg_transit_ticks == null ? "-" : s.avg_transit_ticks + " ticks", sub: "nominal transit plus the lateness shape" },
+    ]);
+    html += sqlBlock("v_otif");
+    html += (v.inbound && v.inbound.length ? table(v.inbound, INBOUND_COLS, "Trailers at the door", { minutes: ["late_ticks"], mpt: exp.run.minutes_per_tick }) : "<p class=\"note\">No trailer was logged.</p>") + sqlBlock("v_inbound");
+    return html;
+  }
   function renderPlanner(exp) {
     const v = views(exp), mpt = exp.run.minutes_per_tick;
     $("rlCycle").innerHTML = table(v.cycle, ["archetype", "units", "retired", "avg_cycle_ticks", "avg_cycle_minutes", "min_cycle_ticks", "max_cycle_ticks"], "Cycle time by order type") + sqlBlock("v_cycle_time_by_type");
@@ -738,6 +765,7 @@
     $("rlByOp").innerHTML = table(v.byOp, ["op", "kind", "events", "pallets", "cases", "eaches", "parcels", "retained", "scrapped"], "Quantities at each operation") + sqlBlock("v_quantities_by_op");
     $("rlStaffing").innerHTML = staffingHtml(exp); // v3.45
     $("rlQuality").innerHTML = qualityHtml(exp); // v3.54
+    $("rlDelivery").innerHTML = deliveryHtml(exp); // v3.55
   }
 
   /* ---------------- dispatch ------------------------------------------ */
@@ -781,10 +809,10 @@
     let html = "";
     if (!multi.length) {
       html += "<p class=\"note\">Load two or more runs of one scenario, seed by seed - <code>node tools/replicate.mjs &lt;scenario-id|hand&gt; --seeds 1-10 --ticks 300 --out runs/</code>, then the file input above with all of the files - to see the mean, the sample standard deviation and a Student-t 95 % interval per order type." +
-        (exps.length ? " " + exps.length + " run" + (exps.length === 1 ? "" : "s") + " loaded, no two of one scenario, order mix, tick count and policy." : "") + "</p>";
+        (exps.length ? " " + exps.length + " run" + (exps.length === 1 ? "" : "s") + " loaded, no two of one scenario, order mix, tick count, policy and levers." : "") + "</p>";
     }
     for (const g of multi) {
-      html += "<h3>" + esc(g.scenario) + " · " + g.n + " runs (seeds " + esc(g.seeds.join(", ")) + ") · " + g.ticks + " ticks" + (g.policy ? " · adaptive staffing (what-if)" : "") + "</h3>" + stripPlot(g) +
+      html += "<h3>" + esc(g.scenario) + " · " + g.n + " runs (seeds " + esc(g.seeds.join(", ")) + ") · " + g.ticks + " ticks" + (g.policy ? " · adaptive staffing (what-if)" : "") + (g.errors ? " · error what-if" : "") + (g.inbound || g.outbound ? " · delivery windows (what-if)" : "") + "</h3>" + stripPlot(g) +
         table(g.cycle, REP_COLS("archetype"), "Cycle time by order type (average ticks per run)") + table(g.cost, REP_COLS("archetype"), "Cost by order type (EUR per run)") + table(g.summary, REP_COLS("metric"), "Run totals");
     }
     html += "<p class=\"note\">Seeds only: the same floor, order mix and tick count, a different seed each; no warm-up removal, no validation against a real plant. Student's t, two-sided 95 % (df above 30 uses 1.960). In SQLite the same four views read every run in one database: <code>python tools/run_ledger.py replications --database run.sqlite</code>.</p>";

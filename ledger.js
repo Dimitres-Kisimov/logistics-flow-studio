@@ -127,6 +127,15 @@
     return { kind: errors.kind, kinds: errors.kinds.map((k) => ({ kind: k.kind, ops: k.ops.slice(), share: k.share, effective: k.effective, disposition: k.disposition, rework: !!k.rework, source: k.source })),
       psf: Object.assign({}, errors.psf), multiplier: errors.multiplier, latent: errors.latent.slice(), cap: errors.cap, honesty: ERRORS_HONESTY };
   }
+  // v3.55: recorded on run.inbound / run.outbound (only a run that used the delivery what-if carries them).
+  const DELIVERY_HONESTY =
+    "Delivery windows are a what-if: inbound trailers scheduled every P ticks arrive late by a deterministic sequence (a Weyl " +
+    "sequence through the quantiles of a public delivery dataset, scaled by a teaching parameter - never a random draw), the " +
+    "door is open O ticks from the arrival; carriers depart every M ticks and a loaded unit waits for the next departure. Every " +
+    "unit is promised at spawn + the promised lead (a teaching value); its transit is the same lateness shape on top of a nominal " +
+    "transit; on time in full counts synthetic one-line orders (an order is OTIF when every unit was delivered on time). Not a " +
+    "yard, not appointments, not a carrier network, not a customer calendar.";
+  function deliveryBlock(x) { return Object.assign({}, x, { honesty: DELIVERY_HONESTY }); }
   const STAFFING_HONESTY =
     "Adaptive staffing is a what-if: a second worker joins a bench when its queue reaches the threshold and leaves after the " +
     "cool-down with an empty queue. It adds capacity the declared floor does not have. A unit is still charged one worker's " +
@@ -190,7 +199,8 @@
     const pool = (Array.isArray(m.pool) && m.pool.length ? m.pool : null) || (plan && plan.pool) || null;
     const policy = (plan && plan.policy) || null; // v3.45: a run input too - it joins the id hash when present
     const errors = (plan && plan.errors) || null; // v3.54: the error what-if joins the id hash too (only when present)
-    const runId = I ? I.runId(scenario, seed, layout, mix, pool, policy, errors) : "RUN-" + scenario + "-s" + seed;
+    const inbound = (plan && plan.inbound) || null, outbound = (plan && plan.outbound) || null; // v3.55: the delivery what-if joins it too
+    const runId = I ? I.runId(scenario, seed, layout, mix, pool, policy, errors, inbound, outbound) : "RUN-" + scenario + "-s" + seed;
     const dataset = pool ? {
       source: (m.dataset && m.dataset.source) || "pool", orders: pool.length,
       lines: plan && plan.poolLines != null ? plan.poolLines : pool.reduce((a, o) => a + ((o.lines && o.lines.length) || 0), 0),
@@ -230,6 +240,8 @@
     if (dataset) rec.run.dataset = dataset; // key only when a pool was used (older exports unchanged)
     if (policy) { rec.run.policy = Object.assign({}, policy, { honesty: STAFFING_HONESTY }); rec.staffing = []; } // v3.45: the what-if and its change log, keys only with a policy
     if (errors) rec.run.errors = errorsBlock(errors); // v3.54: the error what-if, key only when it ran
+    if (inbound) { rec.run.inbound = deliveryBlock(inbound); rec.inbound = []; } // v3.55: the windows and the trailer log, keys only with them
+    if (outbound) rec.run.outbound = deliveryBlock(outbound);
     return rec;
   }
 
@@ -316,6 +328,12 @@
           hu.sku = line && line.sku != null ? String(line.sku) : null;
           hu.line_qty = line && Number(line.qty) > 0 ? Math.round(Number(line.qty)) : null;
         }
+        if (plan.inbound) hu.trailer = mu.trailer != null ? mu.trailer : null; // v3.55: the trailer it came off
+        if (plan.outbound) { // v3.55: promised at spawn + lead; the transit shape by sequence; the outcome filled at delivery
+          hu.due_tick = state.tick + plan.outbound.promisedLeadTicks;
+          hu.transit_ticks = plan.outbound.transit[mu.id % plan.outbound.transit.length];
+          hu.customer_tick = null; hu.on_time_shipped = null; hu.on_time = null;
+        }
         if (route.error) { // v3.54: the declared error this unit's branch realises (keys only on an error branch)
           hu.error_kind = route.error.kind; hu.error_op = route.error.op; hu.error_outcome = route.error.rework ? "rework" : "scrap"; hu.error_latent = (route.error.latent || []).slice();
         }
@@ -389,6 +407,11 @@
         const ev = push(rec, hu, kind, finalOp, null, state, false, null, ops.length ? ops.length - 1 : null);
         hu.retired_tick = state.tick;
         hu.final_kind = kind;
+        if (plan.outbound && kind === "delivered") { // v3.55: shipped on time? delivered on time (with the transit)?
+          hu.customer_tick = hu.retired_tick + hu.transit_ticks;
+          hu.on_time_shipped = hu.retired_tick <= hu.due_tick;
+          hu.on_time = hu.customer_tick <= hu.due_tick;
+        }
         hu.final = { pallets: ev.pallets, cases: ev.cases, eaches: ev.eaches, parcels: ev.parcels, form: ev.form, retained: ev.retained, scrapped: ev.scrapped };
       }
       delete rec.last[key];
@@ -399,6 +422,10 @@
         const s = state.staffing[i];
         rec.staffing.push({ tick: s.tick, location_id: s.elementId != null ? String(s.elementId) : s.station, servers: s.servers });
       }
+    }
+    // v3.55: copy the trailers the door logged since the last observation
+    if (rec.inbound && state.inbound) {
+      for (let i = rec.inbound.length; i < state.inbound.trailers.length; i++) rec.inbound.push(Object.assign({}, state.inbound.trailers[i]));
     }
     rec.run.ticks = state.tick;
     return rec;
@@ -424,6 +451,7 @@
     };
     if (rec.rates) out.rates = JSON.parse(JSON.stringify(rec.rates));
     if (rec.staffing) out.staffing = rec.staffing.slice(); // v3.45: only when a policy ran
+    if (rec.inbound) out.inbound = rec.inbound.slice(); // v3.55: only with dock windows
     return out;
   }
 
@@ -550,7 +578,40 @@
     const out = { units: rec.order.length, events: rec.events.length, delivered: delivered, delivered_eaches: deliveredEaches,
       delivered_pallets: pallets, delivered_cases: cases, delivered_parcels: parcels, types: types };
     if (rec.plan && rec.plan.errors) out.quality = qualityByStep({ hus: rec.order.map((id) => rec.hus[id]), events: rec.events }); // v3.54: only when the what-if ran
+    if (rec.plan && rec.plan.outbound) out.service = serviceOf({ run: rec.run, hus: rec.order.map((id) => rec.hus[id]) }); // v3.55: only with carrier windows
+    if (rec.inbound) out.inbound = inboundRows({ inbound: rec.inbound, hus: rec.order.map((id) => rec.hus[id]) });
     return out;
+  }
+
+  /* ---------------- service (v3.55) ------------------------------------------ */
+  // On time in full over an EXPORT with carrier windows (null without): orders =
+  // distinct orders spawned; delivered orders = those whose every unit retired
+  // delivered; OTIF orders = delivered orders whose every unit reached the customer
+  // by its due tick; otif = OTIF / delivered; shipped on time = delivered units that
+  // left by their due tick; the mean transit of the delivered units. The same
+  // definition as v_otif. Synthetic one-line orders unless a pool was loaded.
+  function serviceOf(exp) {
+    if (!exp || !exp.run || !exp.run.outbound) return null;
+    const orders = {};
+    let delivered = 0, shippedOnTime = 0, transit = 0;
+    for (const h of exp.hus || []) {
+      const o = orders[h.order_id] || (orders[h.order_id] = { all: true, onTime: true });
+      const d = h.final_kind === "delivered";
+      if (!d) o.all = false;
+      if (!(d && h.on_time === true)) o.onTime = false;
+      if (d) { delivered++; if (h.on_time_shipped === true) shippedOnTime++; transit += h.transit_ticks || 0; }
+    }
+    const ids = Object.keys(orders);
+    const deliveredOrders = ids.filter((k) => orders[k].all).length, otifOrders = ids.filter((k) => orders[k].all && orders[k].onTime).length;
+    return { orders: ids.length, delivered_orders: deliveredOrders, otif_orders: otifOrders, otif: deliveredOrders ? r4(otifOrders / deliveredOrders) : null,
+      shipped_on_time_share: delivered ? r4(shippedOnTime / delivered) : null, avg_transit_ticks: delivered ? Math.round((transit / delivered) * 100) / 100 : null };
+  }
+  // The trailer log with the units each trailer brought (the same rows as v_inbound); [] without windows.
+  function inboundRows(exp) {
+    if (!exp || !Array.isArray(exp.inbound)) return [];
+    const units = {};
+    for (const h of exp.hus || []) if (h.trailer != null) units[h.trailer] = (units[h.trailer] || 0) + 1;
+    return exp.inbound.map((t) => ({ trailer: t.trailer, scheduled_tick: t.scheduled_tick, arrival_tick: t.arrival_tick, late_ticks: t.late_ticks, units: units[t.trailer] || 0 }));
   }
 
   /* ---------------- quality by step (v3.54) ------------------------------- */
@@ -632,6 +693,8 @@
     RATES_HONESTY, STAFFING_HONESTY, CLASS_LABOUR, TRANSPORT_ORDER, classOfType, ratesBlock, spans, costs, nsum,
     // v3.54 human error, honestly
     ERRORS_HONESTY, qualityByStep,
+    // v3.55 delivery and shipping times in between
+    DELIVERY_HONESTY, serviceOf, inboundRows,
     // v3.36 the flow as recorded
     FLOW_HONESTY, flowLinks, sankeyFromLedger };
 })();

@@ -37,10 +37,15 @@ CREATE TABLE IF NOT EXISTS run(
   id TEXT PRIMARY KEY NOT NULL, scenario TEXT NOT NULL, seed INTEGER NOT NULL, hash TEXT, mix TEXT,
   profile TEXT, ticks_per_hour INTEGER NOT NULL, minutes_per_tick REAL NOT NULL, ticks INTEGER NOT NULL, honesty TEXT,
   dataset_source TEXT, dataset_orders INTEGER, dataset_lines INTEGER, dataset_skus INTEGER,
-  policy TEXT, errors TEXT);
+  policy TEXT, errors TEXT, inbound TEXT, outbound TEXT);
 -- run.dataset_*: v3.44, the order pool's provenance (NULL for a synthetic stream);
 -- run.policy: v3.45, the adaptive-staffing what-if as JSON (NULL when the run had none);
--- run.errors: v3.54, the human-error what-if as JSON (NULL when the run had none).
+-- run.errors: v3.54, the human-error what-if as JSON (NULL when the run had none);
+-- run.inbound / run.outbound: v3.55, the dock and carrier windows as JSON (NULL when the run had none).
+-- v3.55 the trailers the receiving door logged (one row per trailer whose window opened)
+CREATE TABLE IF NOT EXISTS inbound_event(
+  run_id TEXT NOT NULL REFERENCES run(id) ON DELETE CASCADE, trailer INTEGER NOT NULL, scheduled_tick INTEGER NOT NULL,
+  arrival_tick INTEGER NOT NULL, late_ticks INTEGER NOT NULL, PRIMARY KEY(run_id, trailer));
 -- (No trailing comment before a closing parenthesis: ALTER TABLE ... DROP COLUMN rewrites that text.)
 -- v3.45 the staffing changes the what-if made (one row per change at a bench)
 CREATE TABLE IF NOT EXISTS staffing_event(
@@ -63,6 +68,7 @@ CREATE TABLE IF NOT EXISTS hu(
   final_retained INTEGER, final_scrapped INTEGER,
   order_ref TEXT, sku TEXT, line_qty INTEGER,  -- v3.44: the order line as the file gave it, NULL for a synthetic stream
   error_kind TEXT, error_op TEXT, error_outcome TEXT, error_latent TEXT,  -- v3.54: the declared error this unit's branch realised (NULL on a perfect route)
+  due_tick INTEGER, trailer INTEGER, transit_ticks INTEGER, customer_tick INTEGER, on_time_shipped INTEGER, on_time INTEGER,  -- v3.55: the delivery what-if (NULL without windows)
   CHECK(retired_tick IS NULL OR retired_tick >= spawned_tick), UNIQUE(run_id, sscc));
 CREATE TABLE IF NOT EXISTS handling_event(
   id TEXT PRIMARY KEY NOT NULL, hu_id TEXT NOT NULL REFERENCES hu(id) ON DELETE CASCADE,
@@ -381,64 +387,65 @@ GROUP BY ev.run_id, ev.location_id;"""
 
 
 # ---- v3.46 replications over seeds ---------------------------------------------------------
-# Runs that share scenario, order mix, ticks and policy but differ in seed form a group; per
+# Runs that share scenario, order mix, ticks, policy and (v3.55) the error and delivery levers but
+# differ in seed form a group; per
 # group and order type: n, the mean, the SAMPLE standard deviation (two-pass, mean first),
 # a Student-t two-sided 95 % half-width t(n-1) x s / sqrt(n), min and max. df > 30 uses
 # 1.960. Not keyed by run_id (a group spans runs). Seeds only: no warm-up removal, no
 # validation against a real plant.
 VIEWS["v_replication_groups"] = """
 CREATE VIEW IF NOT EXISTS v_replication_groups AS
-SELECT scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy, COUNT(*) AS n, GROUP_CONCAT(seed, ',') AS seeds
-FROM (SELECT scenario, mix, ticks, policy, seed FROM run ORDER BY scenario, seed)
-GROUP BY scenario, COALESCE(mix, ''), ticks, COALESCE(policy, '');"""
+SELECT scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy, COALESCE(errors, '') AS errors, COALESCE(inbound, '') AS inbound, COALESCE(outbound, '') AS outbound, COUNT(*) AS n, GROUP_CONCAT(seed, ',') AS seeds
+FROM (SELECT scenario, mix, ticks, policy, errors, inbound, outbound, seed FROM run ORDER BY scenario, seed)
+GROUP BY scenario, COALESCE(mix, ''), ticks, COALESCE(policy, ''), COALESCE(errors, ''), COALESCE(inbound, ''), COALESCE(outbound, '');"""
 VIEWS["v_replication_cycle_by_type"] = """
 CREATE VIEW IF NOT EXISTS v_replication_cycle_by_type AS
-WITH g AS (SELECT id AS run_id, scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy FROM run),
-     x AS (SELECT g.scenario, g.mix, g.ticks, g.policy, c.archetype AS k, c.avg_cycle_ticks AS v
+WITH g AS (SELECT id AS run_id, scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy, COALESCE(errors, '') AS errors, COALESCE(inbound, '') AS inbound, COALESCE(outbound, '') AS outbound FROM run),
+     x AS (SELECT g.scenario, g.mix, g.ticks, g.policy, g.errors, g.inbound, g.outbound, c.archetype AS k, c.avg_cycle_ticks AS v
            FROM v_cycle_time_by_type c JOIN g ON g.run_id = c.run_id WHERE c.avg_cycle_ticks IS NOT NULL),
-     m AS (SELECT scenario, mix, ticks, policy, k, COUNT(*) AS n, AVG(v) AS mean, MIN(v) AS min, MAX(v) AS max
-           FROM x GROUP BY scenario, mix, ticks, policy, k),
-     s AS (SELECT x.scenario, x.mix, x.ticks, x.policy, x.k, SUM((x.v - m.mean) * (x.v - m.mean)) AS ss
-           FROM x JOIN m ON m.scenario = x.scenario AND m.mix = x.mix AND m.ticks = x.ticks AND m.policy = x.policy AND m.k = x.k
-           GROUP BY x.scenario, x.mix, x.ticks, x.policy, x.k)
-SELECT m.scenario, m.mix, m.ticks, m.policy, m.k AS archetype, m.n, ROUND(m.mean, 4) AS mean,
+     m AS (SELECT scenario, mix, ticks, policy, errors, inbound, outbound, k, COUNT(*) AS n, AVG(v) AS mean, MIN(v) AS min, MAX(v) AS max
+           FROM x GROUP BY scenario, mix, ticks, policy, errors, inbound, outbound, k),
+     s AS (SELECT x.scenario, x.mix, x.ticks, x.policy, x.errors, x.inbound, x.outbound, x.k, SUM((x.v - m.mean) * (x.v - m.mean)) AS ss
+           FROM x JOIN m ON m.scenario = x.scenario AND m.mix = x.mix AND m.ticks = x.ticks AND m.policy = x.policy AND m.errors = x.errors AND m.inbound = x.inbound AND m.outbound = x.outbound AND m.k = x.k
+           GROUP BY x.scenario, x.mix, x.ticks, x.policy, x.errors, x.inbound, x.outbound, x.k)
+SELECT m.scenario, m.mix, m.ticks, m.policy, m.errors, m.inbound, m.outbound, m.k AS archetype, m.n, ROUND(m.mean, 4) AS mean,
        CASE WHEN m.n > 1 THEN ROUND(sqrt(s.ss / (m.n - 1)), 4) END AS stdev,
        CASE WHEN m.n > 1 THEN ROUND(COALESCE(t.t975, 1.960) * sqrt(s.ss / (m.n - 1)) / sqrt(m.n), 4) END AS ci95_half,
        ROUND(m.min, 4) AS min, ROUND(m.max, 4) AS max
-FROM m JOIN s ON s.scenario = m.scenario AND s.mix = m.mix AND s.ticks = m.ticks AND s.policy = m.policy AND s.k = m.k
+FROM m JOIN s ON s.scenario = m.scenario AND s.mix = m.mix AND s.ticks = m.ticks AND s.policy = m.policy AND s.errors = m.errors AND s.inbound = m.inbound AND s.outbound = m.outbound AND s.k = m.k
 LEFT JOIN t_critical t ON t.df = m.n - 1;"""
 VIEWS["v_replication_cost_by_type"] = """
 CREATE VIEW IF NOT EXISTS v_replication_cost_by_type AS
-WITH g AS (SELECT id AS run_id, scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy FROM run),
-     x AS (SELECT g.scenario, g.mix, g.ticks, g.policy, c.archetype AS k, c.total_eur AS v
+WITH g AS (SELECT id AS run_id, scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy, COALESCE(errors, '') AS errors, COALESCE(inbound, '') AS inbound, COALESCE(outbound, '') AS outbound FROM run),
+     x AS (SELECT g.scenario, g.mix, g.ticks, g.policy, g.errors, g.inbound, g.outbound, c.archetype AS k, c.total_eur AS v
            FROM v_cost_by_type c JOIN g ON g.run_id = c.run_id),
-     m AS (SELECT scenario, mix, ticks, policy, k, COUNT(*) AS n, AVG(v) AS mean, MIN(v) AS min, MAX(v) AS max
-           FROM x GROUP BY scenario, mix, ticks, policy, k),
-     s AS (SELECT x.scenario, x.mix, x.ticks, x.policy, x.k, SUM((x.v - m.mean) * (x.v - m.mean)) AS ss
-           FROM x JOIN m ON m.scenario = x.scenario AND m.mix = x.mix AND m.ticks = x.ticks AND m.policy = x.policy AND m.k = x.k
-           GROUP BY x.scenario, x.mix, x.ticks, x.policy, x.k)
-SELECT m.scenario, m.mix, m.ticks, m.policy, m.k AS archetype, m.n, ROUND(m.mean, 4) AS mean,
+     m AS (SELECT scenario, mix, ticks, policy, errors, inbound, outbound, k, COUNT(*) AS n, AVG(v) AS mean, MIN(v) AS min, MAX(v) AS max
+           FROM x GROUP BY scenario, mix, ticks, policy, errors, inbound, outbound, k),
+     s AS (SELECT x.scenario, x.mix, x.ticks, x.policy, x.errors, x.inbound, x.outbound, x.k, SUM((x.v - m.mean) * (x.v - m.mean)) AS ss
+           FROM x JOIN m ON m.scenario = x.scenario AND m.mix = x.mix AND m.ticks = x.ticks AND m.policy = x.policy AND m.errors = x.errors AND m.inbound = x.inbound AND m.outbound = x.outbound AND m.k = x.k
+           GROUP BY x.scenario, x.mix, x.ticks, x.policy, x.errors, x.inbound, x.outbound, x.k)
+SELECT m.scenario, m.mix, m.ticks, m.policy, m.errors, m.inbound, m.outbound, m.k AS archetype, m.n, ROUND(m.mean, 4) AS mean,
        CASE WHEN m.n > 1 THEN ROUND(sqrt(s.ss / (m.n - 1)), 4) END AS stdev,
        CASE WHEN m.n > 1 THEN ROUND(COALESCE(t.t975, 1.960) * sqrt(s.ss / (m.n - 1)) / sqrt(m.n), 4) END AS ci95_half,
        ROUND(m.min, 4) AS min, ROUND(m.max, 4) AS max
-FROM m JOIN s ON s.scenario = m.scenario AND s.mix = m.mix AND s.ticks = m.ticks AND s.policy = m.policy AND s.k = m.k
+FROM m JOIN s ON s.scenario = m.scenario AND s.mix = m.mix AND s.ticks = m.ticks AND s.policy = m.policy AND s.errors = m.errors AND s.inbound = m.inbound AND s.outbound = m.outbound AND s.k = m.k
 LEFT JOIN t_critical t ON t.df = m.n - 1;"""
 VIEWS["v_replication_summary"] = """
 CREATE VIEW IF NOT EXISTS v_replication_summary AS
-WITH g AS (SELECT id AS run_id, scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy FROM run),
-     x AS (SELECT g.scenario, g.mix, g.ticks, g.policy, 'units' AS k, CAST(r.units AS REAL) AS v FROM v_run_summary r JOIN g ON g.run_id = r.run_id
-           UNION ALL SELECT g.scenario, g.mix, g.ticks, g.policy, 'delivered', CAST(r.delivered AS REAL) FROM v_run_summary r JOIN g ON g.run_id = r.run_id
-           UNION ALL SELECT g.scenario, g.mix, g.ticks, g.policy, 'total_eur', COALESCE((SELECT SUM(c.total_eur) FROM v_cost_by_type c WHERE c.run_id = g.run_id), 0) FROM g),
-     m AS (SELECT scenario, mix, ticks, policy, k, COUNT(*) AS n, AVG(v) AS mean, MIN(v) AS min, MAX(v) AS max
-           FROM x GROUP BY scenario, mix, ticks, policy, k),
-     s AS (SELECT x.scenario, x.mix, x.ticks, x.policy, x.k, SUM((x.v - m.mean) * (x.v - m.mean)) AS ss
-           FROM x JOIN m ON m.scenario = x.scenario AND m.mix = x.mix AND m.ticks = x.ticks AND m.policy = x.policy AND m.k = x.k
-           GROUP BY x.scenario, x.mix, x.ticks, x.policy, x.k)
-SELECT m.scenario, m.mix, m.ticks, m.policy, m.k AS metric, m.n, ROUND(m.mean, 4) AS mean,
+WITH g AS (SELECT id AS run_id, scenario, COALESCE(mix, '') AS mix, ticks, COALESCE(policy, '') AS policy, COALESCE(errors, '') AS errors, COALESCE(inbound, '') AS inbound, COALESCE(outbound, '') AS outbound FROM run),
+     x AS (SELECT g.scenario, g.mix, g.ticks, g.policy, g.errors, g.inbound, g.outbound, 'units' AS k, CAST(r.units AS REAL) AS v FROM v_run_summary r JOIN g ON g.run_id = r.run_id
+           UNION ALL SELECT g.scenario, g.mix, g.ticks, g.policy, g.errors, g.inbound, g.outbound, 'delivered', CAST(r.delivered AS REAL) FROM v_run_summary r JOIN g ON g.run_id = r.run_id
+           UNION ALL SELECT g.scenario, g.mix, g.ticks, g.policy, g.errors, g.inbound, g.outbound, 'total_eur', COALESCE((SELECT SUM(c.total_eur) FROM v_cost_by_type c WHERE c.run_id = g.run_id), 0) FROM g),
+     m AS (SELECT scenario, mix, ticks, policy, errors, inbound, outbound, k, COUNT(*) AS n, AVG(v) AS mean, MIN(v) AS min, MAX(v) AS max
+           FROM x GROUP BY scenario, mix, ticks, policy, errors, inbound, outbound, k),
+     s AS (SELECT x.scenario, x.mix, x.ticks, x.policy, x.errors, x.inbound, x.outbound, x.k, SUM((x.v - m.mean) * (x.v - m.mean)) AS ss
+           FROM x JOIN m ON m.scenario = x.scenario AND m.mix = x.mix AND m.ticks = x.ticks AND m.policy = x.policy AND m.errors = x.errors AND m.inbound = x.inbound AND m.outbound = x.outbound AND m.k = x.k
+           GROUP BY x.scenario, x.mix, x.ticks, x.policy, x.errors, x.inbound, x.outbound, x.k)
+SELECT m.scenario, m.mix, m.ticks, m.policy, m.errors, m.inbound, m.outbound, m.k AS metric, m.n, ROUND(m.mean, 4) AS mean,
        CASE WHEN m.n > 1 THEN ROUND(sqrt(s.ss / (m.n - 1)), 4) END AS stdev,
        CASE WHEN m.n > 1 THEN ROUND(COALESCE(t.t975, 1.960) * sqrt(s.ss / (m.n - 1)) / sqrt(m.n), 4) END AS ci95_half,
        ROUND(m.min, 4) AS min, ROUND(m.max, 4) AS max
-FROM m JOIN s ON s.scenario = m.scenario AND s.mix = m.mix AND s.ticks = m.ticks AND s.policy = m.policy AND s.k = m.k
+FROM m JOIN s ON s.scenario = m.scenario AND s.mix = m.mix AND s.ticks = m.ticks AND s.policy = m.policy AND s.errors = m.errors AND s.inbound = m.inbound AND s.outbound = m.outbound AND s.k = m.k
 LEFT JOIN t_critical t ON t.df = m.n - 1;"""
 REPLICATION_VIEWS = ("v_replication_groups", "v_replication_cycle_by_type", "v_replication_cost_by_type", "v_replication_summary")
 
@@ -485,6 +492,33 @@ SELECT t.run_id, t.handling_event_id, 'disposition ' || t.disposition FROM track
 WHERE t.disposition NOT IN ('in_progress','returned','in_transit','sellable_accessible','sellable_not_accessible','non_sellable_other','mismatch_class','damaged');"""
 TRACKING_VIEWS = ("v_epcis_events", "v_unit_history", "v_bizstep_dwell", "v_tracking_gaps")
 
+# ---- v3.55 delivery: on time in full, the trailers ------------------------------------------
+# v_otif (only for a run with carrier windows): orders = distinct orders; delivered orders = those
+# whose every unit retired delivered; OTIF orders = delivered orders whose every unit reached the
+# customer by its due tick; otif = OTIF / delivered; shipped on time = delivered units that left by
+# their due tick over delivered units; the mean transit of the delivered units. v_inbound: one row
+# per trailer the door logged, with the units it brought. The same definitions as ledger.js
+# serviceOf / inboundRows (reconciled). Synthetic one-line orders unless a pool was loaded.
+VIEWS["v_otif"] = """
+CREATE VIEW IF NOT EXISTS v_otif AS
+WITH o AS (SELECT run_id, order_id, MIN(CASE WHEN final_kind = 'delivered' THEN 1 ELSE 0 END) AS delivered,
+                  MIN(CASE WHEN final_kind = 'delivered' AND on_time = 1 THEN 1 ELSE 0 END) AS on_time
+           FROM hu GROUP BY run_id, order_id),
+     u AS (SELECT run_id, COUNT(*) AS delivered_units, SUM(COALESCE(on_time_shipped, 0)) AS shipped_on_time, AVG(transit_ticks) AS avg_transit
+           FROM hu WHERE final_kind = 'delivered' GROUP BY run_id)
+SELECT r.id AS run_id, COUNT(o.order_id) AS orders, SUM(o.delivered) AS delivered_orders, SUM(o.delivered * o.on_time) AS otif_orders,
+       CASE WHEN SUM(o.delivered) > 0 THEN ROUND(SUM(o.delivered * o.on_time) * 1.0 / SUM(o.delivered), 4) END AS otif,
+       CASE WHEN u.delivered_units > 0 THEN ROUND(u.shipped_on_time * 1.0 / u.delivered_units, 4) END AS shipped_on_time_share,
+       ROUND(u.avg_transit, 2) AS avg_transit_ticks
+FROM run r JOIN o ON o.run_id = r.id LEFT JOIN u ON u.run_id = r.id
+WHERE r.outbound IS NOT NULL GROUP BY r.id;"""
+VIEWS["v_inbound"] = """
+CREATE VIEW IF NOT EXISTS v_inbound AS
+SELECT i.run_id, i.trailer, i.scheduled_tick, i.arrival_tick, i.late_ticks,
+       (SELECT COUNT(*) FROM hu h WHERE h.run_id = i.run_id AND h.trailer = i.trailer) AS units
+FROM inbound_event i;"""
+DELIVERY_VIEWS = ("v_otif", "v_inbound")
+
 # ---- v3.54 quality by step (ISO 22400-2 names) ----------------------------------------------
 # Per operation: units through = distinct units with a non-queued handling event at the step;
 # errors = those whose declared error (hu.error_op) is this step - realised when they passed it;
@@ -512,7 +546,7 @@ T975 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8
 
 INVARIANT_VIEWS = ("v_conservation_violations", "v_cross_dock_violations", "v_version_gaps", "v_terminal_violations", "v_tracking_gaps")
 PLANNER_VIEWS = ("v_run_summary", "v_cycle_time_by_type", "v_touches_by_type", "v_station_wait", "v_quantities_by_op", "v_dispatch",
-                 "v_cost_by_type", "v_cost_by_location", "v_flow_links", "v_staffing", "v_bizstep_dwell", "v_quality_by_step")
+                 "v_cost_by_type", "v_cost_by_location", "v_flow_links", "v_staffing", "v_bizstep_dwell", "v_quality_by_step", "v_otif", "v_inbound")
 DETAIL_VIEWS = ("v_wip_by_tick", "v_spans", "v_span_cost", "v_cost_by_hu", "v_dispatch_by_order", "v_epcis_events", "v_unit_history")  # long or per-row views: `views --all`
 COMPARE_VIEWS = ("v_compare_summary", "v_compare_cycle", "v_compare_touches", "v_compare_wait", "v_compare_dispatch", "v_compare_cost")
 
@@ -544,6 +578,8 @@ def initialize(db: sqlite3.Connection) -> None:
         ("run", "policy", "TEXT"),  # v3.45
         ("run", "errors", "TEXT"), ("hu", "error_kind", "TEXT"), ("hu", "error_op", "TEXT"), ("hu", "error_outcome", "TEXT"), ("hu", "error_latent", "TEXT"),  # v3.54
         ("tracking_event", "error_detected", "INTEGER"),  # v3.54
+        ("run", "inbound", "TEXT"), ("run", "outbound", "TEXT"), ("hu", "due_tick", "INTEGER"), ("hu", "trailer", "INTEGER"), ("hu", "transit_ticks", "INTEGER"),
+        ("hu", "customer_tick", "INTEGER"), ("hu", "on_time_shipped", "INTEGER"), ("hu", "on_time", "INTEGER"),  # v3.55
     ):
         try:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {typ}")
@@ -586,13 +622,17 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
         ds = run.get("dataset") or {}
         db.execute(
             "INSERT INTO run(id, scenario, seed, hash, mix, profile, ticks_per_hour, minutes_per_tick, ticks, honesty, "
-            "dataset_source, dataset_orders, dataset_lines, dataset_skus, policy, errors) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+            "dataset_source, dataset_orders, dataset_lines, dataset_skus, policy, errors, inbound, outbound) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
             run["id"], run["scenario"], int(run["seed"]), run.get("hash"),
             json.dumps(run.get("mix"), sort_keys=True) if run.get("mix") is not None else None,
             run.get("profile"), int(run["ticks_per_hour"]), float(run["minutes_per_tick"]), int(run["ticks"]), run.get("honesty"),
             ds.get("source"), ds.get("orders"), ds.get("lines"), ds.get("skus"),
             json.dumps(run.get("policy"), sort_keys=True) if run.get("policy") is not None else None,
-            json.dumps(run.get("errors"), sort_keys=True) if run.get("errors") is not None else None))
+            json.dumps(run.get("errors"), sort_keys=True) if run.get("errors") is not None else None,
+            json.dumps(run.get("inbound"), sort_keys=True) if run.get("inbound") is not None else None,
+            json.dumps(run.get("outbound"), sort_keys=True) if run.get("outbound") is not None else None))
+        db.executemany("INSERT INTO inbound_event(run_id, trailer, scheduled_tick, arrival_tick, late_ticks) VALUES(?,?,?,?,?)", [
+            (run["id"], int(t["trailer"]), int(t["scheduled_tick"]), int(t["arrival_tick"]), int(t["late_ticks"])) for t in data.get("inbound") or []])
         db.executemany("INSERT INTO staffing_event(run_id, tick, location_id, servers) VALUES(?,?,?,?)", [
             (run["id"], int(s["tick"]), str(s["location_id"]), int(s["servers"])) for s in data.get("staffing") or []])
         prof = data.get("profile")
@@ -622,14 +662,17 @@ def import_ledger(db: sqlite3.Connection, data: dict) -> str:
             db.execute(
                 "INSERT INTO hu(id, run_id, order_id, seq, archetype, outcome, route_id, sscc, gtin13, gtin14, pallet, box, eaches_per_case, "
                 "cases_per_pallet, received_eaches, spawned_tick, retired_tick, final_kind, final_pallets, final_cases, final_eaches, final_parcels, "
-                "final_form, final_retained, final_scrapped, order_ref, sku, line_qty, error_kind, error_op, error_outcome, error_latent) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+                "final_form, final_retained, final_scrapped, order_ref, sku, line_qty, error_kind, error_op, error_outcome, error_latent, "
+                "due_tick, trailer, transit_ticks, customer_tick, on_time_shipped, on_time) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
                 h["id"], run["id"], h["order_id"], int(h["seq"]), h["archetype"], h.get("outcome"), h["route_id"],
                 h["sscc"], h["gtin13"], h["gtin14"], h.get("pallet"), h.get("box"), h.get("eaches_per_case"), h.get("cases_per_pallet"),
                 int(h["received_eaches"]), int(h["spawned_tick"]), h.get("retired_tick"), h.get("final_kind"),
                 f.get("pallets"), f.get("cases"), f.get("eaches"), f.get("parcels"), f.get("form"), f.get("retained"), f.get("scrapped"),
                 h.get("order_ref"), h.get("sku"), h.get("line_qty"),
-                h.get("error_kind"), h.get("error_op"), h.get("error_outcome"), json.dumps(h.get("error_latent")) if h.get("error_latent") is not None else None))
+                h.get("error_kind"), h.get("error_op"), h.get("error_outcome"), json.dumps(h.get("error_latent")) if h.get("error_latent") is not None else None,
+                h.get("due_tick"), h.get("trailer"), h.get("transit_ticks"), h.get("customer_tick"),
+                None if h.get("on_time_shipped") is None else int(bool(h.get("on_time_shipped"))), None if h.get("on_time") is None else int(bool(h.get("on_time")))))
         db.executemany("INSERT INTO handling_event VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [(
             e["id"], e["hu_id"], int(e["version"]), e["kind"], e["op"], e.get("anchor"), e["location"], int(e["tick"]), float(e["minute"]),
             e.get("stage"), e.get("form"), int(e["pallets"]), int(e["cases"]), int(e["eaches"]), int(e["parcels"]), int(e["retained"]), int(e["scrapped"]))
@@ -944,6 +987,7 @@ RECONCILE_KEYS = {
     "v_dispatch_by_order": ("order_id",), "v_staffing": ("location_id",),
     "v_bizstep_dwell": ("biz_step",),  # v3.53
     "v_quality_by_step": ("op",),  # v3.54
+    "v_otif": (), "v_inbound": ("trailer",),  # v3.55
 }
 RAW_VIEWS = ("v_spans", "v_span_cost")
 

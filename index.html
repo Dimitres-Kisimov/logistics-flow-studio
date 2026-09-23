@@ -889,6 +889,14 @@
           </select>
           <p id="flowErrorsHint" class="hint">Errors are attributed to a process step and a latent condition (the knowledge base's time-pressure, signal-to-noise and unfamiliarity levers), never to a person. Teaching values anchored on HEART / SPAR-H generic probabilities, not warehouse measurements; dispatched by quota, so a run replays exactly. A mis-pick or a wrong put-away is caught at a verification step and done again once; a damage is written off at the returns bench. Needs a declared order mix. Remembered on this device.</p>
         </div>
+        <div class="flow-mix-pick">
+          <label for="flowDeliverySelect">Delivery</label>
+          <select id="flowDeliverySelect" aria-describedby="flowDeliveryHint">
+            <option value="instant">Instantaneous dock and carrier (as before)</option>
+            <option value="windows">Dock and carrier windows (what-if): trailers every 120 ticks, late by the SCMS shape; carriers every 240; promised in 480</option>
+          </select>
+          <p id="flowDeliveryHint" class="hint">Inbound trailers arrive late (or early) by a deterministic sequence through the lateness quantiles of a public delivery dataset (USAID SCMS, aggregates only; international pharmaceutical lanes, used for the shape only and scaled by the knowledge base's ticks-per-day teaching value); units spawn only while the door is open. Carriers depart on a period and a loaded unit waits for the next one; every unit is promised at spawn + a teaching lead, and on time in full is counted per order. Not a yard, not appointments, not a carrier network. Remembered on this device.</p>
+        </div>
         <section class="route-review" aria-labelledby="routeReviewHeading">
           <div class="route-review-heading"><span class="route-review-kicker">Before you run</span><h3 id="routeReviewHeading">Can this floor handle the order?</h3></div>
           <p class="hint">Review each recipe against the equipment on your floor. Both returns outcomes are listed separately.</p>
@@ -1346,6 +1354,7 @@
   <script src="advisor.js"></script>
   <script src="compliance.js"></script>
   <script src="data/nist-box-assembly.js"></script>
+  <script src="data/scms-delivery.js"></script>
   <script src="generate.js"></script>
   <script src="nlcommands.js"></script>
   <script src="examples.js"></script>

@@ -43,7 +43,7 @@
  *   8. SHIPPED WIRING: the picker and its hint, app.js opts.errors and the
  *      readout, SQL columns / view / planner group / reconcile key, the Python
  *      twin's error logic, the viewer section + glance card, both self-tests,
- *      the runner, sw.js at wt-v133, README / CHANGELOG / CREDITS.
+ *      the runner, sw.js at wt-v134, README / CHANGELOG / CREDITS.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -304,13 +304,13 @@ const Q = record({ seed: 31, mix: ["piece-pick"], errors: { "mis-pick": 0.02 }, 
   check("8b. app.js remembers the choice (wt-flow-errors), reads the levers from the knowledge base, hands opts.errors to the flow, nulls the signature on change and shows the quality line",
     /wt-flow-errors/.test(app) && /function readErrorLevers\(/.test(app) && /opts\.errors = readErrorLevers\(\)/.test(app) && /hf\.psf\.familiarity/.test(app) && /s\.quality/.test(app) && /first pass yield per step/.test(app));
   check("8c. tools/run_ledger.py: run.errors, hu.error_kind / error_op / error_outcome / error_latent, tracking_event.error_detected with guarded ALTERs, the Python twin's detection, v_quality_by_step in PLANNER_VIEWS, the reconcile key",
-    /policy TEXT, errors TEXT\);/.test(py) && /error_kind TEXT, error_op TEXT, error_outcome TEXT, error_latent TEXT,/.test(py) && /\("tracking_event", "error_detected", "INTEGER"\)/.test(py) && /\("hu", "error_outcome", "TEXT"\)/.test(py) &&
+    /policy TEXT, errors TEXT/.test(py) && /error_kind TEXT, error_op TEXT, error_outcome TEXT, error_latent TEXT,/.test(py) && /\("tracking_event", "error_detected", "INTEGER"\)/.test(py) && /\("hu", "error_outcome", "TEXT"\)/.test(py) &&
     /ERROR_DISPOSITION = \{"mis-pick": "mismatch_class"/.test(py) && /VERIFY_OPS = \("verify-pick", "verify-put"\)/.test(py) && /CREATE VIEW IF NOT EXISTS v_quality_by_step AS/.test(py) && /PLANNER_VIEWS = \([^)]*"v_quality_by_step"/.test(py) && /"v_quality_by_step": \("op",\)/.test(py));
   check("8d. the viewer: the Quality section, qualityHtml with the perfect-run note, the glance card, the invariant count no longer says four; the fixture script reconciles v_quality_by_step",
     /id="rlQuality"/.test(rl) && /function qualityHtml/.test(js) && /Every step was perfect/.test(js) && /label: "Human error"/.test(js) && !/all four hold/.test(js) && /v_quality_by_step: v\.quality/.test(mk));
   check("8e. both self-tests cover it; run-all lists this harness; the knowledge base has the category",
-    /human-error-what-if-picker-and-branches/.test(st) && /quality-section-without-errors/.test(vst) && /"rlQuality"/.test(vst) && /Object\.keys\(R\.SQL\)\.length === 34/.test(vst) && /verify_errors\.js/.test(runall) && /key: "human-factors"/.test(kb));
-  check("8f. sw.js at wt-v133 (previously wt-v132)", /CACHE_VERSION\s*=\s*"wt-v133"/.test(sw) && /Previously wt-v132/.test(sw));
+    /human-error-what-if-picker-and-branches/.test(st) && /quality-section-without-errors/.test(vst) && /"rlQuality"/.test(vst) && /Object\.keys\(R\.SQL\)\.length === (3[4-9]|[4-9]\d)/.test(vst) && /verify_errors\.js/.test(runall) && /key: "human-factors"/.test(kb));
+  check("8f. sw.js at wt-v134 (previously wt-v133)", /CACHE_VERSION\s*=\s*"wt-v134"/.test(sw) && /Previously wt-v133/.test(sw));
   check("8g. README names the what-if and step-not-person; CHANGELOG has v3.54 and the cosmetic formAlong limit; CREDITS names HEART / SPAR-H as anchors; the schema page has the error columns and the view",
     /Human error, honestly \(v3\.54\)/.test(readme) && /never to a person/.test(readme) && /## v3\.54/.test(changelog) && /formAlong/.test(changelog) && /HEART/.test(credits) && /SPAR-H/.test(credits) &&
     /v_quality_by_step/.test(schema) && /error_outcome/.test(schema));
