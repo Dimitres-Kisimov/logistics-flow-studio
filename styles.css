@@ -1349,6 +1349,11 @@ input:focus, select:focus { outline: 2px solid var(--accent-ink); outline-offset
 .kb-badge.custom { color: var(--ok-ink); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 .kb-badge.measured { color: var(--ok-ink); background: color-mix(in srgb, var(--ok) 14%, transparent); border-color: color-mix(in srgb, var(--ok) 55%, transparent); } /* v3.59 a value from the plant's own record */
 .kb-source.kb-measured { color: var(--ok-ink); }
+/* v3.60 ask the ledger (the Simulate drawer) */
+.ask-form { margin-top: 10px; } .ask-form label { display: block; font-weight: 600; margin-bottom: 4px; } .ask-form > div { display: flex; gap: 6px; } .ask-form input { flex: 1; min-width: 0; }
+.ask-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; } .ask-chip { font: inherit; font-size: 0.78rem; padding: 3px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: transparent; color: var(--accent-ink); cursor: pointer; } .ask-chip:hover, .ask-chip:focus-visible { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.ask-out .ask-text { margin: 8px 0 4px; } .ask-out .ask-unanswered { color: var(--muted); } .ask-out .ask-read { font-size: 0.82rem; color: var(--muted); margin: 4px 0; } .ask-table { overflow-x: auto; } .ask-table table { font-size: 0.8rem; border-collapse: collapse; } .ask-table th, .ask-table td { padding: 2px 8px; border-bottom: 1px solid color-mix(in srgb, var(--fg, #000) 12%, transparent); text-align: left; } .ask-more { font-size: 0.78rem; color: var(--muted); }
+.ask-sources { font-size: 0.8rem; padding-left: 18px; margin: 6px 0; } .ask-sources li { margin: 2px 0; } .ask-catalogue { margin: 6px 0; }
 .kb-edit { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
 .kb-input { flex: 1 1 90px; min-width: 60px; padding: 4px 8px; font-size: 0.8rem; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
 .kb-unit { font-size: 0.74rem; color: var(--text-dim); min-width: 34px; }

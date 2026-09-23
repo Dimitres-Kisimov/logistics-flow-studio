@@ -3259,6 +3259,23 @@
         if (state.flow.sim) flowReset();
       });
     })();
+    // v3.60 ask the ledger: the live run's export through WT.ask (offline, rule-based; every answer names its view,
+    // rows and sources). The chips are the catalogue; the output is rendered by ask.js so the viewer looks the same.
+    (function wireAsk() {
+      const form = $("flowAskForm"), input = $("flowAsk"), out = $("flowAskOut"), chips = $("flowAskChips");
+      if (!form || !input || !out || !WT.ask) return;
+      if (chips) chips.innerHTML = WT.ask.chips();
+      const run = (q) => {
+        const a = state.flow.ledger && WT.ledger ? WT.ask.answer(q, { exp: WT.ledger.exportJson(state.flow.ledger), kb: WT.kb }) : WT.ask.answer(q, { exp: null, kb: WT.kb });
+        out.innerHTML = WT.ask.html(a);
+        status("Ask the ledger: " + (a.unanswered ? "outside the catalogue" : a.id) + (a.view ? " - read " + a.view : "") + ".");
+        return a;
+      };
+      form.addEventListener("submit", (ev) => { ev.preventDefault(); run(input.value); });
+      const onChip = (ev) => { const b = ev.target && ev.target.closest ? ev.target.closest("button[data-ask]") : null; if (!b) return; input.value = b.getAttribute("data-ask"); run(input.value); };
+      if (chips) chips.addEventListener("click", onChip);
+      out.addEventListener("click", onChip);
+    })();
     // v3.56: the control tower's decisions. Decline and snooze write the log; accept is the only path that
     // writes elsewhere - the lever, exactly as the picker would, and the day re-runs from tick 0.
     (function wireControl() {
@@ -10288,6 +10305,7 @@
       // v3.53: the tracking database (the live tracker and the store)
       tracking: { store: trackingStore, current: () => state.flow.track },
       levers: { error: readErrorLevers, delivery: readDeliveryLevers }, // v3.59: the what-ifs' inputs as the knowledge base holds them
+      ask: (q) => WT.ask.answer(q, { exp: state.flow.ledger && WT.ledger ? WT.ledger.exportJson(state.flow.ledger) : null, kb: WT.kb }), // v3.60
       renderKnowledgeBase: renderKnowledgeBase,
       // v3.56: the control tower (the live tower and the audit log across runs)
       control: { current: () => state.flow.control, log: () => state.flow.controlLog, render: renderControlTower, revert: revertLastAccepted, lastRevertable: lastRevertable },

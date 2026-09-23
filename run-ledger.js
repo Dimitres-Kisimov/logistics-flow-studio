@@ -992,6 +992,23 @@
   }
 
   /* ---------------- appendix ------------------------------------------ */
+  // v3.60 ask the ledger: the question box over the loaded export (ask.js renders the answer; the chips are the catalogue)
+  function renderAsk(exp) {
+    const out = $("rlAskOut"), form = $("rlAskForm"), input = $("rlAsk"), chips = $("rlAskChips");
+    const ASK = window.WT && window.WT.ask;
+    if (!out) return;
+    if (!ASK) { out.innerHTML = "<p class=\"note\">ask.js is not loaded.</p>"; return; }
+    if (chips && !chips.innerHTML) chips.innerHTML = ASK.chips();
+    const run = (q) => { out.innerHTML = ASK.html(ASK.answer(q, { exp: EXP, kb: window.WT && window.WT.kb })); };
+    if (form && !form.dataset.wired) {
+      form.dataset.wired = "1";
+      form.addEventListener("submit", (ev) => { ev.preventDefault(); run(input ? input.value : ""); });
+      const onChip = (ev) => { const b = ev.target && ev.target.closest ? ev.target.closest("button[data-ask]") : null; if (!b) return; if (input) input.value = b.getAttribute("data-ask"); run(b.getAttribute("data-ask")); };
+      if (chips) chips.addEventListener("click", onChip);
+      out.addEventListener("click", onChip);
+    }
+    run(input && input.value ? input.value : "how many units were delivered");
+  }
   function renderAppendix(exp) {
     const id = exp.run.id, b = EXP_B ? EXP_B.run.id : "<RUN-B>";
     const guide = [
@@ -1062,7 +1079,7 @@
     CSV_REG = {}; csvSeq = 0;
     $("rlStatus").textContent = "Loaded " + exp.hus.length + " units and " + exp.events.length + " events from " + exp.run.id + ".";
     $("rlView").hidden = false;
-    renderGlance(exp); renderRibbon(exp); renderFlow(exp); renderPlanner(exp); renderCost(exp); renderDispatch(exp);
+    renderGlance(exp); renderAsk(exp); renderRibbon(exp); renderFlow(exp); renderPlanner(exp); renderCost(exp); renderDispatch(exp);
     renderPackaging(exp); renderOptimise(exp); renderYourCase(exp); renderTrace(exp); renderTracking(exp); renderCompare(); renderReplications(); renderInvariants(exp); renderAppendix(exp);
     $("rlNav").hidden = false;
     setCurrentNav("secGlance");

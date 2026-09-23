@@ -3839,6 +3839,19 @@
       renderKnowledgeBaseForTest();
       return { ok: okApplied && okReset && !!badge, detail: "applied " + r.measured + ", mode " + lev.inbound.mode + " -> " + lev2.inbound.mode + ", lateness[0] " + lev.inbound.lateness[0] + ", badge " + (badge ? "shown" : "missing") };
     });
+    // ---- v3.60 ask the ledger: the same question twice over the live run is byte-identical, names its view and rows;
+    // an unknown question is unanswered with the catalogue; the drawer's form answers through the shipped handler.
+    check("ask-the-ledger-deterministic", function () {
+      if (!WT.ask || !API || typeof API.ask !== "function" || !$("flowAskForm") || !$("flowAsk") || !$("flowAskOut")) return { ok: false, detail: "missing" };
+      var a1 = API.ask("which step waits longest"), a2 = API.ask("which step waits longest"), u = API.ask("what is the meaning of life"), s = API.ask("how many units were delivered");
+      $("flowAsk").value = "how many units were delivered";
+      $("flowAskForm").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      var outText = $("flowAskOut").textContent;
+      var okA = a1.id === "wait" && JSON.stringify(a1) === JSON.stringify(a2) && a1.read.length === 1 && a1.read[0].view === "v_station_wait" && a1.honesty === WT.ask.HONESTY &&
+        u.unanswered === true && u.catalogue && u.catalogue.length === 12 && s.id === "summary" && s.read[0].rows[0].units === (API.state.flow.ledger ? API.state.flow.ledger.order.length : -1) &&
+        /v_run_summary/.test(outText) && /handling units/.test(outText) && $("flowAskChips").querySelectorAll("button[data-ask]").length === 11;
+      return { ok: okA, detail: "wait -> " + (a1.numbers ? a1.numbers.location + "/" + a1.numbers.op : "no wait yet") + "; units " + (s.read[0].rows[0] ? s.read[0].rows[0].units : "-") + "; unknown unanswered " + u.unanswered };
+    });
     // ---- v3.56: the control tower - on the hand floor (seed 31, the default mix; here the stations serve at the
     // floor's DECLARED capacities because wms.js is loaded, so the tick-140 fact of verify_control.js does not
     // apply) a threshold-1 tower proposes at the first evaluation that sees a queue, naming the element; declining

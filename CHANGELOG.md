@@ -1,5 +1,37 @@
 # Changelog
 
+## v3.60 — Ask the ledger: a deterministic question box over the views and the knowledge base
+
+**The module.** `ask.js` (`WT.ask.answer(question, { exp, kb })`): a rule-based matcher over a FIXED
+catalogue of twelve planner questions, in English with German synonyms - which step waits longest,
+why did OTIF fall, what did the control tower propose, what does a mis-pick cost, what is the first
+pass yield, where do the error shares come from, were the trailers late, how long does an order take,
+what does the run cost, how many units were delivered, is the run consistent, what can I ask. Every
+answer carries the text, `read` (the SQL view(s) it read and the rows it used - the same rows the
+viewer and `tools/run_ledger.py` show), `sources` (the knowledge-base entries behind any threshold with
+their label - a teaching value with its citation, or `measured on <source>, n = ...` after a site
+profile - and the recorded rates where money is involved) and `unanswered: true` with the catalogue
+when the question is outside it: never a guess. The aggregates it computes itself (station wait,
+cycle time, the run summary, the invariants) are twins of the viewer's `computeViews` and the SQL
+views, pinned equal; costs, quality, service and the trailer log come from `ledger.js`, the tower's
+audit from `control.js`. The matching order is fixed so a mis-pick's cost reaches the mis-pick answer,
+not the cost answer. `html()` renders an answer (escaped; a table capped at eight rows; the catalogue
+as chips) so the drawer and the viewer look the same. No Date, no Math.random, no language model.
+
+**The pages.** Simulate → Run ledger → *Ask the ledger* (over the live run's export; the chips are the
+catalogue); the viewer's new *Ask* section after the glance (over the loaded export), which now loads
+`domain.js` + `knowledge.js` so the sources are named there too.
+
+**Verification.** `verify_ask.js` (the catalogue routes in both languages and the matching order; the
+hand answers on fixture A - stg / putaway 122.4 ticks over 23 waits, 39 / 157 / 8 / 2461 / 6 / 3, the
+cycle times, OTIF not measured with the target's source, no decision, first pass yield 1 at 20
+operations, the redo of a mis-pick at 50 ticks × 35 EUR/h = 29.17 EUR, the six human-factors sources,
+349.74 EUR, five invariants at 0; a windowed run with errors, dock and carrier windows and a declined
+proposal - OTIF from v_otif's own numbers, the trailer counts against `control.inbound.lateTicks`, the
+decision with its rule's threshold, the realised mis-picks; the twins on fixtures A, C, D; purity; the
+renderer's escaping; the wiring), the in-app self-test `ask-the-ledger-deterministic` (192/192) and the
+viewer's `ask-section-answers-on-example-a` (37/37). `docs/ASK_THE_LEDGER.md`. Cache `wt-v139`.
+
 ## v3.59 — The plant's own rates: a site profile fitted from recorded events
 
 **The tool.** `tools/fit_rates.py fit --document <epcis.json> ... [--deliveries <trailers.csv>] --out

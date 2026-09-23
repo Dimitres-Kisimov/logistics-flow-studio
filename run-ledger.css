@@ -2,6 +2,11 @@
 h2{margin:36px 0 10px;font-size:24px}h3{margin:22px 0 8px;font-size:18px}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:15px}
 .cards{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+/* v3.60 ask the ledger */
+.ask-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}.ask-form input{flex:1;min-width:220px;background:#1b211d;color:#e9e8e4;border:1px solid #455149;border-radius:6px;padding:6px 8px;font:inherit;font-size:13px}.ask-form button{font:inherit;padding:6px 12px}
+.ask-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.ask-chip{font:inherit;font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid #455149;background:transparent;color:#e9e8e4;cursor:pointer}.ask-chip:hover{background:#2a332d}
+.ask-out .ask-text{margin:8px 0 4px}.ask-out .ask-unanswered{color:#b6c0ba}.ask-out .ask-read{font-size:12px;color:#b6c0ba;margin:4px 0}.ask-table{overflow-x:auto}.ask-table table{font-size:12px}.ask-more{font-size:12px;color:#b6c0ba}.ask-sources{font-size:12px;padding-left:18px}.ask-sources li{margin:2px 0}
+
 .cards article.good{border-top-color:#8fd3a4}.cards article.bad{border-top-color:#e58a7c}
 .cards article strong+span{display:block;margin-top:4px;font-size:12px;color:#b6c0ba}
 .an-sankey{margin:8px 0;border:1px solid #455149;border-radius:8px;padding:4px 6px;background:#1b211d;overflow-x:auto}.an-sankey-svg{display:block;width:100%;height:auto}

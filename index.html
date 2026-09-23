@@ -951,6 +951,11 @@
           <label for="flowLedgerUnit">Trace a unit</label>
           <select id="flowLedgerUnit" aria-label="Handling unit to trace"></select>
           <div id="flowLedgerTrace" class="flow-ledger-trace" aria-live="off"></div>
+          <!-- v3.60 ask the ledger: a fixed catalogue of planner questions answered from the run's own views and the knowledge base; offline, rule-based, no model -->
+          <form id="flowAskForm" class="ask-form" autocomplete="off"><label for="flowAsk">Ask the ledger</label><div><input id="flowAsk" type="text" maxlength="200" placeholder="Which step waits longest?" aria-describedby="flowAskHint" /><button class="btn small" type="submit">Ask</button></div></form>
+          <p id="flowAskHint" class="hint">Offline and rule-based: every answer names the SQL view it read, the rows it used and the source of any threshold. No language model is connected; a question outside the catalogue gets the catalogue.</p>
+          <div id="flowAskChips" class="ask-chips"></div>
+          <div id="flowAskOut" class="ask-out" aria-live="polite"></div>
           <p class="flow-pool-cap"><strong>SYNTHETIC ledger</strong> — recorded from the teaching simulation, not telemetry and not a WMS. Quantities are the synthetic order-line quantities of the scenario's packaging profile; GS1 numbers use GS1's documentation prefix. The same file feeds <code>tools/run_ledger.py</code> (SQLite views) and the run-ledger viewer. Its <strong>tracking twins</strong> (v3.53) are derived from the same events in the GS1 EPCIS 2.0 / CBV 2.0 vocabulary — EPCIS-shaped, not conformant (no wall clock) — and keyed to a handling unit, an element and a business step, never to a person; <em>Save to tracking store</em> keeps the last 20 runs in this browser.</p>
         </div>
         <!-- P3.1: Live KPI dashboard — a compact "plant-sim cockpit" strip
@@ -1354,6 +1359,7 @@
 <script src="ledger.js"></script>
 <script src="tracking.js"></script>
 <script src="control.js"></script>
+<script src="ask.js"></script>
   <script src="knowledge.js"></script>
   <script src="library.js"></script>
   <script src="tiers.js"></script>

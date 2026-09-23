@@ -40,7 +40,7 @@
   }
   function clickAndWait(id, side) { var p = nextLoaded(side); $(id).click(); return p; }
   function wait(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
-  var SECTIONS = ["rlGlance", "rlRibbon", "rlFlow", "rlCycle", "rlTouches", "rlWait", "rlWip", "rlStaffing", "rlQuality", "rlDelivery", "rlControl", "rlByOp", "rlCost", "rlDispatch", "rlPack", "rlOptimise", "rlYourCase", "rlTrace", "rlTracking", "rlReplications", "rlInvariants", "rlAppendix"];
+  var SECTIONS = ["rlGlance", "rlAskOut", "rlRibbon", "rlFlow", "rlCycle", "rlTouches", "rlWait", "rlWip", "rlStaffing", "rlQuality", "rlDelivery", "rlControl", "rlByOp", "rlCost", "rlDispatch", "rlPack", "rlOptimise", "rlYourCase", "rlTrace", "rlTracking", "rlReplications", "rlInvariants", "rlAppendix"];
   var BAD_TEXT = /\[FAIL\]|Could not|is not loaded|not a factory-run-ledger|\bNaN\b|\bundefined\b/;
 
   function runSuite() {
@@ -116,6 +116,19 @@
         var el = $("rlControl"), v = R.views(exp);
         return { ok: !!el && /No control-tower decision in this run/.test(el.textContent) && !!el.querySelector('details.sql[data-view="v_control"]') && Array.isArray(v.control) && v.control.length === 0 &&
           $("rlGlance").textContent.indexOf("no proposal decided") >= 0 && !!(window.WT && window.WT.control), detail: "no decisions" };
+      });
+      check("ask-section-answers-on-example-a", function () {
+        var out = $("rlAskOut"), form = $("rlAskForm"), inp = $("rlAsk");
+        if (!out || !form || !inp || !window.WT || !window.WT.ask) return { ok: false, detail: "missing" };
+        var dflt = out.textContent;
+        inp.value = "which step waits longest";
+        form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        var t = out.textContent, a = window.WT.ask.answer("which step waits longest", { exp: exp, kb: window.WT.kb });
+        var chip = $("rlAskChips").querySelector("button[data-ask]");
+        if (chip) chip.click();
+        var afterChip = out.textContent;
+        return { ok: /v_run_summary/.test(dflt) && /stg/.test(t) && /122\.4/.test(t) && /v_station_wait/.test(t) && a.id === "wait" && a.numbers.location === "stg" && !!window.WT.kb && afterChip !== t && !BAD_TEXT.test(t) && $("rlAskChips").querySelectorAll("button[data-ask]").length === 11,
+          detail: "wait -> " + (a.numbers ? a.numbers.location + "/" + a.numbers.op + " " + a.numbers.avg_wait_ticks : "-") };
       });
       check("tracking-invariant-and-export-shape", function () {
         var T = window.WT.tracking, v = R.views(exp), doc = T.fromLedger(exp);
