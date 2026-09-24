@@ -73,8 +73,11 @@
     if (Array.isArray(pool) && pool.length) parts.push(poolDigest(pool));
     // v3.45: the staffing what-if is a run input too (only when present)
     if (policy && policy.kind) parts.push(["policy", String(policy.kind), policy.threshold | 0, policy.maxServers | 0, policy.cooldownTicks | 0]);
-    // v3.54: the error what-if is a run input too (only when present): the kinds with their effective shares, the three levers
-    if (errors && Array.isArray(errors.kinds) && errors.kinds.length) parts.push(["errors", errors.kinds.map((k) => [k.kind, k.effective]), errors.psf ? [errors.psf.timePressure, errors.psf.signalToNoise, errors.psf.familiarity] : null]);
+    // v3.54: the error what-if is a run input too (only when present): the kinds with their effective shares and the levers.
+    // v3.67: the levers enter as [name, value] pairs for the NON-NOMINAL ones only, so that a lever left at 1 never changes
+    // a run id - which is what let the lever set grow from three to seven without moving any run that had not set one.
+    if (errors && Array.isArray(errors.kinds) && errors.kinds.length) parts.push(["errors", errors.kinds.map((k) => [k.kind, k.effective]),
+      errors.psf ? Object.keys(errors.psf).filter((k) => errors.psf[k] !== 1).map((k) => [k, errors.psf[k]]) : null]);
     // v3.55: the delivery what-if is a run input too (only when present)
     if (inbound && inbound.kind) parts.push(["inbound", inbound.periodTicks | 0, inbound.openTicks | 0, inbound.lateness || []]);
     if (outbound && outbound.kind) parts.push(["outbound", outbound.periodTicks | 0, outbound.promisedLeadTicks | 0, outbound.transit || []]);

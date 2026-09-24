@@ -3878,6 +3878,23 @@
         p.evidence.table.length === 2 && !!row && row.status === "declined" && JSON.stringify(plan) === planBefore && C3.RULES.length === 5 && WT.kb && WT.kb.get("control.search.minGainHalfWidths") === 1 && ctl.search === table;
       return { ok: ok, detail: p ? p.rule + "@" + p.tick + " with " + p.lever.levers.length + " levers" : "no proposal" };
     });
+    // ---- v3.67 the rest of SPAR-H: seven levers and one refusal, the method's own adjustment factor
+    // once three stand above nominal, and the credits that let a design be declared better than nominal.
+    check("spar-h-levers-and-the-adjustment-factor", function () {
+      var R7 = WT.routing, KB7 = WT.kb;
+      if (!R7 || !KB7 || !R7.PSF || !API || !API.levers || typeof API.levers.error !== "function") return { ok: false, detail: "missing" };
+      var keys = Object.keys(R7.PSF), lv = API.levers.error().psf || {};
+      var neg = R7.normalizeErrors({ "mis-pick": 0.02, psf: { stressors: 2, complexity: 2, procedures: 5 } });
+      var pos = R7.normalizeErrors({ "mis-pick": 0.02, psf: { signalToNoise: 0.5, familiarity: 0.5, workProcesses: 0.5 } });
+      var two = R7.normalizeErrors({ "mis-pick": 0.02, psf: { complexity: 2, procedures: 5 } });
+      var ok = keys.length === 7 && keys.indexOf("stressors") > 0 && keys.indexOf("workProcesses") > 0 && !("fitnessForDuty" in R7.PSF) &&
+        R7.PSF_NOT_MODELLED && R7.PSF_NOT_MODELLED[0].factor === "Fitness for duty" && /BetrVG/.test(R7.PSF_NOT_MODELLED[0].refused) &&
+        neg.adjusted === true && neg.composite === 20 && neg.kinds[0].effective === 0.289855 &&
+        two.adjusted === false && two.kinds[0].effective === 0.2 &&
+        pos.adjusted === false && pos.kinds[0].effective === 0.0025 && pos.credit.length === 3 &&
+        keys.every(function (k) { return lv[k] === 1 && KB7.get("hf.psf." + k) === 1; }) && KB7.list("human-factors").length === 11;
+      return { ok: ok, detail: keys.length + " levers, refused " + (R7.PSF_NOT_MODELLED ? R7.PSF_NOT_MODELLED[0].factor : "?") + ", three above nominal -> " + neg.kinds[0].effective + " (the plain product would say 0.4)" };
+    });
     // ---- v3.66 learning and fatigue: the two declared curves on a step and a shift. The picker, the
     // knowledge base's six values, the arithmetic by hand (0.9 -> 0.729 at the eighth unit; 1.0375 after
     // an hour; the clock reading zero through a break) and a plan that carries them only when asked.

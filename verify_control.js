@@ -35,7 +35,7 @@
  *      multiplexer (ledger, tracker, then the tower), accept = set the lever
  *      + re-run, the knowledge base's control category, SQL table / view /
  *      group / reconcile key, the viewer block + glance card, both self-tests,
- *      the runner, sw.js at wt-v144, README / CHANGELOG / the deep dive's
+ *      the runner, sw.js at wt-v145, README / CHANGELOG / the deep dive's
  *      chapter 3 rewritten for v3.56.
  * ===================================================================== */
 "use strict";
@@ -210,9 +210,9 @@ function record(opts, ticks, tower, thresholds, controlLog) {
   check("6d. tools/run_ledger.py: control_event, v_control in PLANNER_VIEWS with the reconcile key on rule; the fixture script reconciles it; ledger_env loads control.js",
     /CREATE TABLE IF NOT EXISTS control_event\(/.test(py) && /CREATE VIEW IF NOT EXISTS v_control AS/.test(py) && /PLANNER_VIEWS = \([^)]*"v_control"/.test(py) && /"v_control": \("rule",\)/.test(py) && /v_control: v\.control/.test(mk) && /"control\.js"/.test(env) &&
     /'accepted','declined','snoozed','reverted'/.test(py) && /AS reverted/.test(py)); // v3.57
-  check("6e. the viewer: the Control tower block with its note, the glance card; both self-tests; run-all; sw.js precaches control.js at wt-v144 (previously wt-v143)",
+  check("6e. the viewer: the Control tower block with its note, the glance card; both self-tests; run-all; sw.js precaches control.js at wt-v145 (previously wt-v144)",
     /id="rlControl"/.test(rl) && /function controlHtml/.test(js) && /label: "Control tower"/.test(js) && /control-tower-proposes-and-decline-keeps-the-run/.test(st) && /control-section-without-decisions/.test(vst) && /"rlControl"/.test(vst) &&
-    /Object\.keys\(R\.SQL\)\.length === 37/.test(vst) && /verify_control\.js/.test(runall) && /"\.\/control\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v144"/.test(sw) && /Previously wt-v143/.test(sw));
+    /Object\.keys\(R\.SQL\)\.length === 37/.test(vst) && /verify_control\.js/.test(runall) && /"\.\/control\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v145"/.test(sw) && /Previously wt-v144/.test(sw));
   check("6f. README names the tower (proposes, a person decides, re-run the day); CHANGELOG has v3.56; the deep dive's chapter 3 is rewritten as what exists at v3.56 and its Reproduce lists this harness",
     /The control tower \(v3\.56\)/.test(readme) && /[Aa] person decides/.test(readme) && /## v3\.56/.test(changelog) && /state at v3\.56/.test(dd) && /node verify_control\.js/.test(dd));
 })();

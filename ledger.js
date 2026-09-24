@@ -120,12 +120,18 @@
   const ERRORS_HONESTY =
     "Human error is a what-if: declared shares per process step, realised as branches dispatched by quota (exact to " +
     "within one unit, replayable) - never a random draw and never a person. The shares are teaching values anchored on " +
-    "generic human-error probabilities from the nuclear industry (HEART, SPAR-H), not warehouse measurements. A rework " +
+    "generic human-error probabilities from the nuclear industry (HEART, SPAR-H), not warehouse measurements. Seven " +
+    "performance-shaping levers shape them, and where three or more stand above nominal the product is replaced by " +
+    "SPAR-H's own adjustment factor (NUREG/CR-6883); the cap binds last. The eighth factor, fitness for duty, is refused: " +
+    "it is defined on the individual, not on the step. A rework " +
     "is one detection and one redo (charged as one more service at the bench), a damage a write-off; a unit errs at most " +
     "once. Errors belong to a step and a latent condition, and nothing here is keyed to a worker (BetrVG § 87(1)6, GDPR Art. 88).";
   function errorsBlock(errors) {
     return { kind: errors.kind, kinds: errors.kinds.map((k) => ({ kind: k.kind, ops: k.ops.slice(), share: k.share, effective: k.effective, disposition: k.disposition, rework: !!k.rework, source: k.source })),
-      psf: Object.assign({}, errors.psf), multiplier: errors.multiplier, latent: errors.latent.slice(), cap: errors.cap, honesty: ERRORS_HONESTY };
+      psf: Object.assign({}, errors.psf), multiplier: errors.multiplier, composite: errors.composite,
+      negatives: errors.negatives, adjusted: !!errors.adjusted, adjustment: errors.adjustment || null,
+      latent: errors.latent.slice(), credit: (errors.credit || []).slice(), cap: errors.cap, honesty: ERRORS_HONESTY,
+      not_modelled: (WT.routing && WT.routing.PSF_NOT_MODELLED) || null };
   }
   // v3.55: recorded on run.inbound / run.outbound (only a run that used the delivery what-if carries them).
   const DELIVERY_HONESTY =

@@ -29,7 +29,7 @@
  *      the audit); the html renderer escapes.
  *   6. SHIPPED WIRING: the drawer's form and output, the viewer's section,
  *      nav and scripts (domain.js + knowledge.js for the sources), both
- *      self-tests, run-all, sw.js at wt-v144, README, CHANGELOG, the doc.
+ *      self-tests, run-all, sw.js at wt-v145, README, CHANGELOG, the doc.
  * Deterministic + ASCII-only. Exit code 0 = all green.
  * ===================================================================== */
 "use strict";
@@ -95,8 +95,8 @@ const FLOOR = { gridW: 40, gridH: 24, cell: 1, elements: [
     m.id === "mispick-cost" && /pick station \(face, carton-flow\) the service time is 50 ticks with labour and the recorded labour rate 35 EUR\/h, so the redo costs 29\.17 EUR in station labour per reworked unit/.test(m.text) && m.numbers.labour_eur_per_rework === 29.1667 && m.numbers.errors === 0 &&
     /hf\.error\.mis-pick = 0\.02 share \(teaching value - HEART/.test(m.text) && m.sources.length === 2 && m.sources[1].id === "rates.labour_per_hour" && m.sources[1].value === 35 && m.read[0].view === "v_quality_by_step" && m.read[0].rows.every((r) => /pick/.test(r.op)));
   const e = ask("where do the error shares come from");
-  check("2h. the error shares' origin: the six human-factors entries with their sources, all teaching values (HEART / SPAR-H), never a person; this run did not run the what-if",
-    e.id === "errors-source" && e.sources.length === 6 && e.sources.every((x) => x.measured === false) && /All are teaching values anchored on public human-reliability literature \(HEART \/ SPAR-H\)/.test(e.text) && /never to a person \(BetrVG 87\(1\)6, GDPR Art\. 88\)/.test(e.text) && /This run did not run the what-if/.test(e.text) && e.read[0].view === "knowledge base (human-factors)");
+  check("2h. the error shares' origin: the ten human-factors entries with their sources - the three shares and all seven performance-shaping levers (v3.67) - all teaching values (HEART / SPAR-H), never a person; this run did not run the what-if",
+    e.id === "errors-source" && e.sources.length === 10 && e.sources.every((x) => x.measured === false) && /All are teaching values anchored on public human-reliability literature \(HEART \/ SPAR-H\)/.test(e.text) && /never to a person \(BetrVG 87\(1\)6, GDPR Art\. 88\)/.test(e.text) && /This run did not run the what-if/.test(e.text) && e.read[0].view === "knowledge base (human-factors)");
   const k = ask("what does the run cost");
   check("2i. the run's cost on fixture A: 349.74 EUR total (labour 320.83, equipment 11.75, energy 17.16), 8.97 EUR per unit, the dearest type vas at 15.38 EUR; the recorded rates as the source",
     k.id === "cost" && /The run cost 349\.74 EUR at the recorded rates: labour 320\.83 EUR, equipment 11\.75 EUR, energy 17\.16 EUR, holding 0\.00 EUR; 8\.97 EUR per handling unit/.test(k.text) && /The dearest type per unit: vas at 15\.38 EUR/.test(k.text) && k.read[0].view === "v_cost_by_type" && k.read[0].rows.length === 7 && k.sources[0].id === "rates.labour_per_hour");
@@ -176,8 +176,8 @@ const FLOOR = { gridW: 40, gridH: 24, cell: 1, elements: [
   check("6b. run-ledger.html loads domain.js + knowledge.js (the sources) and ask.js after control.js; the Ask section with its nav anchor, form and output; run-ledger.js renders it in load() and answers over the loaded export",
     /<script src="domain\.js"><\/script><script src="knowledge\.js"><\/script>/.test(rl) && rl.indexOf('<script src="ask.js"></script>') > rl.indexOf('<script src="control.js"></script>') && rl.indexOf('<script src="ask.js"></script>') < rl.indexOf('<script src="run-ledger.js"></script>') &&
     /id="secAsk"/.test(rl) && /href="#secAsk"/.test(rl) && /id="rlAskForm"/.test(rl) && /id="rlAskOut"/.test(rl) && /function renderAsk\(exp\)/.test(rljs) && /renderAsk\(exp\)/.test(rljs.slice(rljs.indexOf("function load(exp)"))) && /ASK\.answer\(q, \{ exp: EXP, kb: window\.WT && window\.WT\.kb \}\)/.test(rljs));
-  check("6c. both self-tests, run-all, sw.js precaches ask.js at wt-v144 (previously wt-v143), the styles, README and CHANGELOG name v3.60, docs/ASK_THE_LEDGER.md exists",
-    /ask-the-ledger-deterministic/.test(st) && /ask-section-answers-on-example-a/.test(rlst) && /"rlAskOut"/.test(rlst) && /verify_ask\.js/.test(runall) && /"\.\/ask\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v144"/.test(sw) && /Previously wt-v143/.test(sw) &&
+  check("6c. both self-tests, run-all, sw.js precaches ask.js at wt-v145 (previously wt-v144), the styles, README and CHANGELOG name v3.60, docs/ASK_THE_LEDGER.md exists",
+    /ask-the-ledger-deterministic/.test(st) && /ask-section-answers-on-example-a/.test(rlst) && /"rlAskOut"/.test(rlst) && /verify_ask\.js/.test(runall) && /"\.\/ask\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v145"/.test(sw) && /Previously wt-v144/.test(sw) &&
     /\.ask-chip/.test(css) && /\.ask-chip/.test(rlcss) && /v3\.60/.test(readme) && /## v3\.60/.test(changelog) && fs.existsSync(path.join(__dirname, "docs", "ASK_THE_LEDGER.md")));
 })();
 

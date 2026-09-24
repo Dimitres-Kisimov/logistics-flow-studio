@@ -2481,7 +2481,9 @@
     if (s.quality) { // v3.54: the what-if ran - ISO 22400-2 names per step, shares per step and never per person
       const rows = s.quality.filter((q) => q.errors > 0 || /^(pick|case-pick|piece-pick|pallet-pick|putaway|depalletise|pack|palletise)$/.test(q.op));
       const binds = rec.plan && rec.plan.errors && rec.plan.errors.kinds.some((k) => k.effective >= rec.plan.errors.cap);
-      qualityLine = "<br>Human error (what-if, teaching shares x levers" + (rec.plan.errors.multiplier > 1 ? " " + rec.plan.errors.multiplier + "x: " + rec.plan.errors.latent.join(", ") : "") + (binds ? "; the cap binds" : "") + "): " +
+      const err = rec.plan.errors;
+      qualityLine = "<br>Human error (what-if, teaching shares x levers" + (err.multiplier !== 1 ? " " + err.multiplier + "x: " + err.latent.concat((err.credit || []).map((c) => c + " (credit)")).join(", ") : "") +
+        (err.adjusted ? "; SPAR-H's adjustment factor applies, " + err.negatives + " levers above nominal" : "") + (binds ? "; the cap binds" : "") + "): " +
         rows.map((q) => q.op + " FPY <strong>" + q.first_pass_yield + "</strong> (" + q.errors + " of " + q.units_through + (q.reworked ? ", reworked " + q.reworked : "") + (q.scrapped_for_damage ? ", scrapped " + q.scrapped_for_damage : "") + ")").join(" · ") +
         " - first pass yield per step; errors belong to a step and a latent condition, never to a person";
     }
@@ -2543,7 +2545,9 @@
   function readErrorLevers() {
     const g = (id, d) => { const v = WT.kb ? WT.kb.get(id) : undefined; return typeof v === "number" && isFinite(v) ? v : d; };
     return { "mis-pick": g("hf.error.mis-pick", 0.02), "wrong-putaway": g("hf.error.wrong-putaway", 0.003), damage: g("hf.error.damage", 0.005),
-      psf: { timePressure: g("hf.psf.timePressure", 1), signalToNoise: g("hf.psf.signalToNoise", 1), familiarity: g("hf.psf.familiarity", 1) }, cap: g("hf.error.cap", 0.5) };
+      psf: { timePressure: g("hf.psf.timePressure", 1), signalToNoise: g("hf.psf.signalToNoise", 1), familiarity: g("hf.psf.familiarity", 1),
+        stressors: g("hf.psf.stressors", 1), complexity: g("hf.psf.complexity", 1), procedures: g("hf.psf.procedures", 1), workProcesses: g("hf.psf.workProcesses", 1) },
+      cap: g("hf.error.cap", 0.5) };
   }
   // v3.55: the delivery what-if's levers (knowledge base) and the lateness shape (data/scms-delivery.js, aggregates of
   // a public dataset) turned into the tick lists flowsim reads - a Weyl sequence through the mode's quantiles, scaled.

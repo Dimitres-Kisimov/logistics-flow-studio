@@ -151,7 +151,8 @@
     { id: "errors-source", ask: "Where do the error shares come from?", de: "Woher kommen die Fehleranteile?", view: "knowledge base (human-factors)",
       match: /(where|woher|source|quelle|teaching|measured|anchor|heart|spar).*(\berror|share|rate|fehler|anteil)|(\berror|share|rate|fehler|anteil).*(come from|source|quelle|teaching|measured|anchor|heart|spar)/,
       answer: (exp, kb) => {
-        const ids = ["hf.error.mis-pick", "hf.error.wrong-putaway", "hf.error.damage", "hf.psf.timePressure", "hf.psf.signalToNoise", "hf.psf.familiarity"];
+        const ids = ["hf.error.mis-pick", "hf.error.wrong-putaway", "hf.error.damage", "hf.psf.timePressure", "hf.psf.signalToNoise", "hf.psf.familiarity",
+          "hf.psf.stressors", "hf.psf.complexity", "hf.psf.procedures", "hf.psf.workProcesses"];
         const s = ids.map((id) => kbSource(kb, id));
         const measured = s.filter((x) => x.measured).length;
         const text = "The error what-if reads its shares from the knowledge base: " + s.slice(0, 3).map(srcText).join("; ") + ". The multipliers: " + s.slice(3).map((x) => x.id + " = " + num(x.value)).join(", ") + ". " +

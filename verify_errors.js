@@ -43,7 +43,7 @@
  *   8. SHIPPED WIRING: the picker and its hint, app.js opts.errors and the
  *      readout, SQL columns / view / planner group / reconcile key, the Python
  *      twin's error logic, the viewer section + glance card, both self-tests,
- *      the runner, sw.js at wt-v144, README / CHANGELOG / CREDITS.
+ *      the runner, sw.js at wt-v145, README / CHANGELOG / CREDITS.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -268,19 +268,20 @@ const Q = record({ seed: 31, mix: ["piece-pick"], errors: { "mis-pick": 0.02 }, 
 
 /* ---- 6. the knowledge base ------------------------------------------------------------ */
 (function () {
-  const ids = ["hf.error.mis-pick", "hf.error.wrong-putaway", "hf.error.damage", "hf.psf.timePressure", "hf.psf.signalToNoise", "hf.psf.familiarity", "hf.error.cap"];
+  const ids = ["hf.error.mis-pick", "hf.error.wrong-putaway", "hf.error.damage", "hf.psf.timePressure", "hf.psf.signalToNoise", "hf.psf.familiarity",
+    "hf.psf.stressors", "hf.psf.complexity", "hf.psf.procedures", "hf.psf.workProcesses", "hf.error.cap"];
   const kinds = {};
   for (const k of R.ERROR_KINDS) kinds[k.kind] = k;
-  check("6a. the seven human-factors seeds equal routing's defaults (shares, levers at 1 with HEART's maxima, the cap)",
+  check("6a. the eleven human-factors seeds equal routing's defaults: the three shares, all seven levers at nominal with the module's own [min, max], the cap (v3.67)",
     KB.get("hf.error.mis-pick") === kinds["mis-pick"].share && KB.get("hf.error.wrong-putaway") === kinds["wrong-putaway"].share && KB.get("hf.error.damage") === kinds.damage.share &&
-    KB.get("hf.psf.timePressure") === 1 && KB.get("hf.psf.signalToNoise") === 1 && KB.get("hf.psf.familiarity") === 1 && KB.get("hf.error.cap") === R.ERROR_CAP &&
-    KB.entry("hf.psf.timePressure").max === R.PSF.timePressure.max && KB.entry("hf.psf.signalToNoise").max === R.PSF.signalToNoise.max && KB.entry("hf.psf.familiarity").max === R.PSF.familiarity.max &&
+    KB.get("hf.error.cap") === R.ERROR_CAP && Object.keys(R.PSF).length === 7 &&
+    Object.keys(R.PSF).every((k) => KB.get("hf.psf." + k) === 1 && KB.entry("hf.psf." + k).max === R.PSF[k].max && KB.entry("hf.psf." + k).min === R.PSF[k].min) &&
     KB.list("human-factors").map((e) => e.id).join(",") === ids.join(","));
   const cats = typeof KB.categories === "function" ? KB.categories() : KB.categories;
   const cat = (cats || []).find((c) => c.key === "human-factors");
   check("6b. the category says step-not-person, names BetrVG and GDPR, HEART / SPAR-H as anchors and teaching values; every seed's source names its HEART anchor or says it has none",
     !!cat && /never to a person/.test(cat.desc) && /BetrVG/.test(cat.desc) && /GDPR/.test(cat.desc) && /HEART/.test(cat.desc) && /teaching values/.test(cat.desc) &&
-    KB.list("human-factors").every((e) => /HEART|no generic human-error probability|WarehouseTwin choice/.test(e.source) && /never to a person/.test(e.note)));
+    KB.list("human-factors").every((e) => /HEART|SPAR-H|no generic human-error probability|WarehouseTwin choice/.test(e.source) && /never to a person/.test(e.note)));
 })();
 
 /* ---- 7. honesty ----------------------------------------------------------------------- */
@@ -310,7 +311,7 @@ const Q = record({ seed: 31, mix: ["piece-pick"], errors: { "mis-pick": 0.02 }, 
     /id="rlQuality"/.test(rl) && /function qualityHtml/.test(js) && /Every step was perfect/.test(js) && /label: "Human error"/.test(js) && !/all four hold/.test(js) && /v_quality_by_step: v\.quality/.test(mk));
   check("8e. both self-tests cover it; run-all lists this harness; the knowledge base has the category",
     /human-error-what-if-picker-and-branches/.test(st) && /quality-section-without-errors/.test(vst) && /"rlQuality"/.test(vst) && /Object\.keys\(R\.SQL\)\.length === (3[4-9]|[4-9]\d)/.test(vst) && /verify_errors\.js/.test(runall) && /key: "human-factors"/.test(kb));
-  check("8f. sw.js at wt-v144 (previously wt-v143)", /CACHE_VERSION\s*=\s*"wt-v144"/.test(sw) && /Previously wt-v143/.test(sw));
+  check("8f. sw.js at wt-v145 (previously wt-v144)", /CACHE_VERSION\s*=\s*"wt-v145"/.test(sw) && /Previously wt-v144/.test(sw));
   check("8g. README names the what-if and step-not-person; CHANGELOG has v3.54 and the cosmetic formAlong limit; CREDITS names HEART / SPAR-H as anchors; the schema page has the error columns and the view",
     /Human error, honestly \(v3\.54\)/.test(readme) && /never to a person/.test(readme) && /## v3\.54/.test(changelog) && /formAlong/.test(changelog) && /HEART/.test(credits) && /SPAR-H/.test(credits) &&
     /v_quality_by_step/.test(schema) && /error_outcome/.test(schema));

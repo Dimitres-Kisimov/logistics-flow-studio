@@ -132,7 +132,14 @@
     const levers = Object.keys(errors.psf || {}).filter((k) => errors.psf[k] > 1).sort((a, b) => errors.psf[b] - errors.psf[a] || a.localeCompare(b));
     if (!levers.length) return; // the burden is the declared base share: nothing to remove
     const lever = levers[0], from = errors.psf[lever];
-    const effect = errors.kinds.map((k) => ({ kind: k.kind, from: k.effective, to: r6(Math.min(errors.cap, k.share * errors.multiplier / from)) }));
+    // v3.67: the arithmetic goes through routing's own combiner, so the tower quotes what the
+    // re-run would actually declare - including SPAR-H's adjustment factor dropping away when
+    // resetting this lever leaves fewer than three above nominal.
+    const alt = Object.assign({}, errors.psf); alt[lever] = 1;
+    const effect = errors.kinds.map((k) => ({ kind: k.kind, from: k.effective,
+      to: WT.routing && typeof WT.routing.applyLevers === "function"
+        ? WT.routing.applyLevers(k.share, alt, errors.cap).effective
+        : r6(Math.min(errors.cap, k.share * errors.multiplier / from)) }));
     propose(ctl, "rework-burden", tick, { units_through: through, reworked: reworked, scrapped_for_damage: scrapped, share: r4(share), max_share: T.maxShare, lever: lever, from: from, to: 1, kinds: effect },
       { kind: "kb", key: "hf.psf." + lever, value: 1 },
       "the declared effective shares fall " + effect.map((e) => e.kind + " " + e.from + " -> " + e.to).join(", ") + " (arithmetic on the knowledge base's values); the rework spans leave the cost",

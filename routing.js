@@ -712,17 +712,89 @@
       tail: ["scrap"], disposition: "damaged",
       source: "Teaching value: no generic human-error probability covers handling damage (HEART and SPAR-H give none); to be replaced by a site's own damage log." },
   ];
+  // THE PERFORMANCE-SHAPING LEVERS (v3.54: three; v3.67: seven of the eight, and one refusal).
+  // SPAR-H (NUREG/CR-6883) modifies its nominal human error probabilities by EIGHT performance-
+  // shaping factors; HEART (Williams 1986) by 38 error-producing conditions. Seven of the eight
+  // can be declared about a STEP, a WORKPLACE or a SHIFT, and those are the levers below. The
+  // eighth - fitness for duty - is defined on the individual and is refused: see PSF_NOT_MODELLED.
+  // Each lever names ONE method and ONE factor. `min` is below 1 only where that method publishes
+  // a level below 1 on its ACTION worksheet: a lever that can only make a floor worse cannot model
+  // a poka-yoke, and three of these can now model one. `max` is the method's worst published level.
+  // NOTE, stated wherever the product is shown: the three levers of v3.54 carry HEART's maxima and
+  // the four of v3.67 carry SPAR-H's. Multiplying values from two methods is this app's own choice,
+  // not something either method provides for; the two disagree (SPAR-H's ergonomics reaches x50
+  // where HEART's signal-to-noise reaches x10).
   const PSF = {
-    timePressure: { label: "Time pressure", max: 11, source: "HEART error-producing condition: a shortage of time available for error detection and correction - maximum effect x11" },
-    signalToNoise: { label: "Low signal-to-noise (label contrast, lighting, look-alike articles)", max: 10, source: "HEART error-producing condition: a low signal-to-noise ratio - maximum effect x10" },
-    familiarity: { label: "Unfamiliarity (training, a novel or infrequent task)", max: 17, source: "HEART error-producing condition: unfamiliarity with a situation which is potentially important but which only occurs infrequently or which is novel - maximum effect x17" },
+    timePressure: { label: "Time pressure", factor: "SPAR-H Available Time / HEART shortage of time", min: 1, max: 11,
+      levels: "Worse: HEART's maximum x11. No credit below 1 is offered, because SPAR-H's positive levels for this factor (x0.1 at five times the time the task requires, x0.01 at fifty times) are defined as multiples of a REQUIRED time, and this app declares none.",
+      source: "HEART error-producing condition: a shortage of time available for error detection and correction - maximum effect x11" },
+    signalToNoise: { label: "Low signal-to-noise (label contrast, lighting, look-alike articles)", factor: "SPAR-H Ergonomics/HMI / HEART low signal-to-noise", min: 0.5, max: 10,
+      levels: "Worse: HEART's maximum x10. Better: x0.5, SPAR-H's 'Good' for ergonomics and the human-machine interface on an action task - a label, a light or a pick-to-light display better than nominal.",
+      source: "HEART error-producing condition: a low signal-to-noise ratio - maximum effect x10; the credit x0.5 from SPAR-H Ergonomics/HMI level 'Good' (NUREG/CR-6883, action worksheet)" },
+    familiarity: { label: "Unfamiliarity (training, a novel or infrequent task)", factor: "SPAR-H Experience/Training / HEART unfamiliarity", min: 0.5, max: 17,
+      levels: "Worse: HEART's maximum x17. Better: x0.5, SPAR-H's 'High' experience and training on an action task.",
+      source: "HEART error-producing condition: unfamiliarity with a situation which is potentially important but which only occurs infrequently or which is novel - maximum effect x17; the credit x0.5 from SPAR-H Experience/Training level 'High' (NUREG/CR-6883, action worksheet)" },
+    stressors: { label: "Workplace stressors (cold store, noise, cramped aisle, glare)", factor: "SPAR-H Stress/Stressors - the ENVIRONMENTAL reading only", min: 1, max: 5,
+      levels: "Worse: x2 high, x5 extreme (SPAR-H action worksheet). No credit below 1: the method publishes none.",
+      source: "SPAR-H Stress/Stressors (NUREG/CR-6883, action worksheet: High x2, Extreme x5). Declared here in the method's OWN environmental reading and no other: 'Environmental factors often referred to as stressors, such as excessive heat, noise, poor ventilation, or radiation' (2.4.4.2). SPAR-H's peer reviewers asked for the factor to be renamed from Stress to Stressors precisely so that it would not claim knowledge of what a particular individual feels, and the authors agreed. This app declares the WORKPLACE (a cold store at -22 C, a depalletiser's noise, a cramped aisle, glare on a label) and never a state of mind." },
+    complexity: { label: "Task complexity (mixed-SKU pallets, multi-touch picks, look-alike families)", factor: "SPAR-H Complexity", min: 1, max: 5,
+      levels: "Worse: x2 moderately complex, x5 highly complex (SPAR-H action worksheet). No credit below 1 on the action worksheet: the x0.1 'obvious diagnosis' level belongs to the diagnosis column.",
+      source: "SPAR-H Complexity (NUREG/CR-6883, action worksheet: Moderately complex x2, Highly complex x5). 'Complexity refers to how difficult the task is to perform in the given context. Complexity considers both the task and the environment in which it is to be performed' (2.4.4.3) - a property of the step, which is why it can be a lever here." },
+    procedures: { label: "Procedures (a written instruction, a scan verification, a check)", factor: "SPAR-H Procedures", min: 1, max: 50,
+      levels: "Worse: x5 available but poor, x20 incomplete, x50 not available (SPAR-H action worksheet). No credit below 1 on the action worksheet: the x0.5 'diagnostic / symptom oriented' level belongs to the diagnosis column.",
+      source: "SPAR-H Procedures (NUREG/CR-6883, action worksheet: Available but poor x5, Incomplete x20, Not available x50). 'This PSF refers to the existence and use of formal operating procedures for the tasks under consideration' (2.4.4.5) - a property of the step." },
+    workProcesses: { label: "Work processes (shift handover, work planning, communication)", factor: "SPAR-H Work Processes", min: 0.5, max: 5,
+      levels: "Worse: x5 poor. Better: x0.5 good (SPAR-H action worksheet).",
+      source: "SPAR-H Work Processes (NUREG/CR-6883, action worksheet: Poor x5, Nominal x1, Good x0.5). 'Work processes refer to aspects of doing work, including inter-organizational, safety culture, work planning, communication, and management support and policies ... Examples seen in event investigations are problems due to information not being communicated during shift turnover' (2.4.4.8) - a property of the organisation and the shift, not of a person." },
   };
+  // THE EIGHTH FACTOR, AND WHY IT IS NOT A LEVER. Kept here so that the refusal is part of the
+  // model and travels with every export, rather than being a line in a document nobody reads.
+  const PSF_NOT_MODELLED = [{
+    factor: "Fitness for duty",
+    published: "SPAR-H action worksheet: Unfit P(failure) = 1.0, Degraded fitness x5, Nominal x1 (NUREG/CR-6883).",
+    definition: "SPAR-H 2.4.4.7: 'Fitness for duty refers to whether or not the individual performing the task is physically and mentally fit to perform the task at the time. Things that may affect fitness include fatigue, sickness, drug use (legal or illegal), overconfidence, personal problems, and distractions. Fitness for duty includes factors associated with individuals.'",
+    refused: "Refused, and of the eight it is the one that must be. Every other factor can be declared about a step, a workplace or a shift; this one is defined on the individual. A lever for it would be an assertion about a named worker's health, and a tool that held or implied one would be a technical device capable of monitoring performance (BetrVG 87(1)6) processing health data (GDPR Art. 9 and Art. 88). The only part of this factor the app models is the part that belongs to a shift rather than to a person: the fatigue curve of v3.66, which reads the minutes since a break assumed staggered and knows nothing about who is standing at the bench.",
+  }];
+  // SPAR-H's OWN arithmetic for a strongly negative context, quoted from the action worksheet,
+  // part C: "When 3 or more negative PSF influences are present, in lieu of the equation above,
+  // you must compute a composite PSF score used in conjunction with the adjustment factor.
+  // Negative PSFs are present anytime a multiplier greater than 1 is selected."
+  //       HEP = NHEP x composite / (NHEP x (composite - 1) + 1)
+  // The composite is the product of ALL the assigned levers, the ones below 1 included; the
+  // method's nominal HEP is this app's declared share for the step. Below three negative levers
+  // the method multiplies, and so does this. The formula cannot reach 1, which is why the method
+  // has it; the app's cap is a separate, cruder limit of its own and still binds afterwards.
+  // Reproduced by the harness on SPAR-H's own two worked examples (0.81 and 6.41E-5).
+  const SPARH_ADJUSTMENT =
+    "SPAR-H adjustment factor for three or more negative performance-shaping factors (NUREG/CR-6883, " +
+    "action worksheet part C): share x composite / (share x (composite - 1) + 1), used in place of the " +
+    "plain product. Below three negative levers the plain product applies. The app's cap binds afterwards.";
+  // applyLevers(share, psf, cap) -> what a declared share becomes in the levers' context.
+  function applyLevers(share, psf, cap) {
+    const capN = Number(cap);
+    const c = isFinite(capN) && capN > 0 && capN <= 1 ? capN : ERROR_CAP;
+    const s = Math.max(0, Math.min(1, Number(share) || 0));
+    let composite = 1, negatives = 0, credits = 0;
+    for (const k of Object.keys(PSF)) {
+      const v = psf && isFinite(Number(psf[k])) && Number(psf[k]) > 0 ? Number(psf[k]) : 1;
+      composite *= v;
+      if (v > 1) negatives += 1;
+      else if (v < 1) credits += 1;
+    }
+    const adjusted = negatives >= 3;
+    const denom = s * (composite - 1) + 1;
+    const raw = adjusted && denom > 0 ? (s * composite) / denom : s * composite;
+    return { composite: r6(composite), negatives: negatives, credits: credits, adjusted: adjusted,
+      raw: r6(raw), effective: r6(Math.min(c, raw)), capped: raw > c };
+  }
   const ERROR_CAP = 0.5;
   const ERRORS_HONESTY =
     "Human error is a what-if: declared shares per process step, realised as branches dispatched by quota (exact to within " +
     "one unit, replayable) - never a random draw and never a person. The shares are teaching values anchored on generic " +
-    "human-error probabilities from the nuclear industry (HEART, SPAR-H), not warehouse measurements; the levers multiply " +
-    "them and the cap binds. A rework is one detection and one redo, a damage a write-off; a unit errs at most once. " +
+    "human-error probabilities from the nuclear industry (HEART, SPAR-H), not warehouse measurements; seven levers shape " +
+    "them - SPAR-H's own adjustment factor replaces their product once three or more stand above nominal - and the cap " +
+    "binds last. Fitness for duty is the eighth performance-shaping factor and the one this app refuses: it is defined on " +
+    "the individual, not on the step. A rework is one detection and one redo, a damage a write-off; a unit errs at most once. " +
     "Errors belong to a step and a latent condition, and nothing here is keyed to a worker (BetrVG 87(1)6, GDPR Art. 88).";
   const r6 = (v) => Math.round(v * 1e6) / 1e6;
   function errorLabel(kind) {
@@ -733,19 +805,23 @@
   //   spec = true                       every kind at its default share, levers 1
   //   spec = { "mis-pick": 0.02, damage: { share: 0.005 }, psf: { timePressure: 2 }, cap: 0.5 }
   //   a kind that is not named, false, null or 0 is OFF; a share above 1 is clamped;
-  //   a lever below 1 is 1, above its maximum is the maximum; effective = min(cap, share x product of levers).
+  //   a lever is clamped into its own [min, max] - below 1 only where the method publishes a level
+  //   below 1 (see PSF); effective = min(cap, the levers applied to the share by applyLevers()).
   function normalizeErrors(spec) {
     if (!spec) return null;
     const s = spec === true ? {} : spec;
     const psfIn = (s && s.psf) || {};
     const psf = {}, latent = [];
     let mult = 1;
+    const credit = [];
     for (const k of Object.keys(PSF)) {
+      const def = PSF[k];
       const raw = Number(psfIn[k]);
-      const v = isFinite(raw) && raw > 1 ? Math.min(PSF[k].max, raw) : 1;
+      const v = isFinite(raw) && raw > 0 ? Math.min(def.max, Math.max(def.min, raw)) : 1;
       psf[k] = v;
       mult *= v;
       if (v > 1) latent.push(k);
+      else if (v < 1) credit.push(k);
     }
     const capRaw = Number(s.cap);
     const cap = isFinite(capRaw) && capRaw > 0 && capRaw <= 1 ? capRaw : ERROR_CAP;
@@ -758,11 +834,16 @@
       else if (raw && typeof raw === "object" && typeof raw.share === "number") share = raw.share;
       if (!(share > 0)) continue;
       share = Math.min(1, share);
-      kinds.push({ kind: def.kind, label: def.label, ops: def.ops.slice(), share: r6(share), effective: r6(Math.min(cap, share * mult)),
+      const applied = applyLevers(share, psf, cap);
+      kinds.push({ kind: def.kind, label: def.label, ops: def.ops.slice(), share: r6(share), effective: applied.effective,
+        raw: applied.raw, capped: applied.capped,
         disposition: def.disposition, rework: def.rework ? def.rework.slice() : null, tail: def.tail ? def.tail.slice() : null, source: def.source });
     }
     if (!kinds.length) return null;
-    return { kind: "human-error", kinds: kinds, psf: psf, multiplier: r6(mult), latent: latent, cap: cap, honesty: ERRORS_HONESTY };
+    const shape = applyLevers(1, psf, cap);
+    return { kind: "human-error", kinds: kinds, psf: psf, multiplier: r6(mult), composite: shape.composite,
+      negatives: shape.negatives, adjusted: shape.adjusted, adjustment: shape.adjusted ? SPARH_ADJUSTMENT : null,
+      latent: latent, credit: credit, cap: cap, honesty: ERRORS_HONESTY };
   }
   // branchesFor(archetypeId, errors) -> the branch list flowsim builds routes from:
   // without errors exactly the static outcome list; with them, per base branch, the
@@ -853,6 +934,8 @@
   WT.routing = {
     // v3.54 human error, honestly
     ERROR_KINDS: ERROR_KINDS, PSF: PSF, ERROR_CAP: ERROR_CAP, ERRORS_HONESTY: ERRORS_HONESTY, SAME_OP: SAME_OP,
+    // v3.67 the rest of SPAR-H: four more levers, one refusal, the method's own adjustment factor
+    PSF_NOT_MODELLED: PSF_NOT_MODELLED, SPARH_ADJUSTMENT: SPARH_ADJUSTMENT, applyLevers: applyLevers,
     normalizeErrors: normalizeErrors, branchesFor: branchesFor, errorLabel: errorLabel,
     LEGACY_ID: LEGACY_ID,
     ANCHORS: ANCHORS,

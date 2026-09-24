@@ -32,7 +32,7 @@
  *   4. SHIPPED WIRING: the app applies a combination lever (and the delivery
  *      and error pickers) and reverts it, creates the tower with the loaded
  *      table, imports the table; the knowledge-base threshold; the self-test;
- *      run-all; sw.js at wt-v144; verify_control updated; README, CHANGELOG,
+ *      run-all; sw.js at wt-v145; verify_control updated; README, CHANGELOG,
  *      docs/LEVER_SEARCH.md.
  * Deterministic + ASCII-only. Exit code 0 = all green.
  * ===================================================================== */
@@ -164,8 +164,8 @@ const S = r1.status === 0 ? JSON.parse(fs.readFileSync(path.join(outA, "search.j
     /search: \{ minGainHalfWidths: g\("control\.search\.minGainHalfWidths", 1\) \}/.test(app) && /lever\.kind === "combo" \? lever\.levers\.map\(leverText\)\.join\("; "\)/.test(app) && /Array\.isArray\(r\.lever\.from\)/.test(app));
   check("3b. the control card: an Import lever search button with its hidden input, the loaded table's line; the handler validates wt-lever-search, keeps it on state.flow.search and re-runs the day",
     /id="controlSearchImport"/.test(html) && /id="controlSearchImportInput" type="file"/.test(html) && /id="controlSearchInfo"/.test(html) && /obj\.kind !== "wt-lever-search"/.test(app) && /state\.flow\.search = obj/.test(app) && /controlSearchImportInput/.test(app));
-  check("3c. the knowledge base's control category carries control.search.minGainHalfWidths (1); the self-test lever-search-rule-proposes-from-a-table; run-all lists verify_search.js; sw.js at wt-v144 (previously wt-v143); verify_control pins five rules and eight thresholds",
-    /id: "control\.search\.minGainHalfWidths"/.test(kb) && WT.kb.get("control.search.minGainHalfWidths") === 1 && /lever-search-rule-proposes-from-a-table/.test(st) && /verify_search\.js/.test(runall) && /CACHE_VERSION\s*=\s*"wt-v144"/.test(sw) && /Previously wt-v143/.test(sw) &&
+  check("3c. the knowledge base's control category carries control.search.minGainHalfWidths (1); the self-test lever-search-rule-proposes-from-a-table; run-all lists verify_search.js; sw.js at wt-v145 (previously wt-v144); verify_control pins five rules and eight thresholds",
+    /id: "control\.search\.minGainHalfWidths"/.test(kb) && WT.kb.get("control.search.minGainHalfWidths") === 1 && /lever-search-rule-proposes-from-a-table/.test(st) && /verify_search\.js/.test(runall) && /CACHE_VERSION\s*=\s*"wt-v145"/.test(sw) && /Previously wt-v144/.test(sw) &&
     /C\.RULES\.length === 5/.test(vc) && /"control\.search\.minGainHalfWidths"/.test(vc));
   check("3d. control.js: the rule reads the table the person loaded, never a live feed; README and CHANGELOG name v3.62; docs/LEVER_SEARCH.md states the three conditions and the honesty",
     /function ruleSearch\(/.test(ctl) && /function comboOf\(/.test(ctl) && /ctl\.search/.test(ctl) && /v3\.62/.test(readme) && /## v3\.62/.test(changelog) && fs.existsSync(path.join(__dirname, "docs", "LEVER_SEARCH.md")) &&

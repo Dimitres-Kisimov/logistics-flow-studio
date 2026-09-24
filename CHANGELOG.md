@@ -1,5 +1,57 @@
 # Changelog
 
+## v3.67 — The rest of SPAR-H: four more levers, one refusal, and the method's own arithmetic
+
+**The four.** v3.54 gave the error what-if three performance-shaping levers and the deep dive recorded the
+other five of SPAR-H's eight as documented only. Four of them are levers now, each clamped to the levels
+NUREG/CR-6883 publishes on its ACTION worksheet (the right column for a warehouse: a picker acts, a picker
+does not diagnose a reactor): **workplace stressors** x2 high / x5 extreme, **task complexity** x2 / x5,
+**procedures** x5 available but poor / x20 incomplete / x50 not available, **work processes** x5 poor with a
+x0.5 credit for good. Each lever names ONE method and ONE factor, and carries the sentence of the standard
+that makes it a property of a step, a workplace or a shift.
+
+**The one that is refused.** Fitness for duty is defined by SPAR-H on "factors associated with individuals -
+fatigue, sickness, drug use (legal or illegal), overconfidence, personal problems". A lever for it would be
+an assertion about a named worker's health, and a tool holding one would be a technical device capable of
+monitoring performance (BetrVG § 87(1)6) processing health data (GDPR Art. 9, Art. 88). It is refused in
+`routing.js` itself as `PSF_NOT_MODELLED`, with the definition, the reason and a pointer to the only part of
+that factor this app models: v3.66's fatigue curve, which belongs to a shift and knows nothing about who is
+at the bench. The refusal is recorded on every export that used the what-if.
+
+**A correction, kept.** The deep dive's chapter 5.3 had said that *stress and fitness for duty* could not be
+represented without representing a person. Half of that was wrong, and SPAR-H says why: stressors are defined
+to include "environmental factors ... such as excessive heat, noise, poor ventilation", and the method's peer
+reviewers asked for the rename from Stress to Stressors precisely so it would stop claiming knowledge of what
+an individual feels. A cold store is a property of a workplace. The chapter now says so and says what it had
+said before.
+
+**The adjustment factor.** Multiplying seven levers into a share produces nonsense quickly - a nominal 0.01
+at a composite of 400 gives 4, which is not a probability. Where three or more levers stand above nominal,
+`applyLevers` now uses SPAR-H's own formula in place of the product: share x composite / (share x (composite
+- 1) + 1). The trigger is a COUNT, not a size; below three the plain product applies; the app's cap binds
+afterwards as the cruder limit it always was. Checked against the standard's own worked example (composite
+400 on 0.01 -> 0.801603; the document prints 0.81, which is a rounding in the document). Where the standard
+is inconsistent - its worksheet says three or more NEGATIVE factors, its body text applies the formula to an
+all-positive example - the app follows the worksheet and says so.
+
+**A design can now be declared good.** Three levers gained the credit their method publishes: ergonomics and
+the human-machine interface *good*, experience and training *high*, work processes *good*, each x0.5. A scan
+verification, a trained crew and a clean shift handover are a poka-yoke the model can finally describe. On
+the hand floor the three together take a declared mis-pick share of 0.02 to 0.0025 and no pick errs in 600
+ticks. On the same floor a context going badly in three ways (cold store x2, mixed pallets x2, a poor
+procedure x5) declares **0.289855** where the plain product would have declared 0.4.
+
+**One deliberate change to run ids.** The levers now enter the run-id hash as [name, value] pairs for the
+NON-NOMINAL ones only. A lever left at nominal never changes an id, which is what let the set grow from three
+to seven without moving a single run - and will let it grow again. Runs that used the error what-if before
+this release hash differently; no fixture uses the what-if, so every committed fixture is byte-identical.
+
+**Where.** The four new values sit in the knowledge base's *human-factors* category (eleven entries now), the
+readout names the credits and says when the adjustment applied, the control tower's expected effect goes
+through the same combiner so it quotes what the re-run would actually declare, and the ask panel lists all
+seven. `verify_psf.js` (24 checks), the in-app self-test `spar-h-levers-and-the-adjustment-factor` (195/195),
+`docs/PSF_LEVERS.md`, cache `wt-v145`.
+
 ## v3.66 — Learning and fatigue: the benches change, and still nobody is watched
 
 **The module.** `people.js` (`WT.people`): two declared curves on the service time of a step, both
