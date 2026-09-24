@@ -27,7 +27,7 @@
  *   6. HUMAN: aggregates only - the tool has no per-person key, the
  *      honesty names BetrVG / GDPR, the fixture says SYNTHETIC.
  *   7. SHIPPED WIRING: the card's badge and label, the hint, the self-test,
- *      run-all, sw.js at wt-v143, README, CHANGELOG, docs/SITE_PROFILE.md.
+ *      run-all, sw.js at wt-v144, README, CHANGELOG, docs/SITE_PROFILE.md.
  * Deterministic + ASCII-only. Exit code 0 = all green.
  * ===================================================================== */
 "use strict";
@@ -162,7 +162,7 @@ const v = (id) => (prof && prof.values[id]) || {};
     late.length === 16 && late[0] === -30 && late.every((x) => x >= -30 && x <= 90 && x === Math.round(x)) && Math.max.apply(null, late) <= 90);
   check("5b. app.js: readDeliveryLevers uses delivery.site.* at scale 1 with mode 'site' when delivery.site.n > 0 and names the measured label as the source; readErrorLevers reads hf.error.* from the knowledge base (so a measured share flows into the error what-if); the test API exposes the levers",
     /const siteN = g\("delivery\.site\.n", 0\);/.test(app) && /const scale = site \? 1 : g\("delivery\.scaleTicksPerDay", 60\);/.test(app) && /const mode = site \? "site" :/.test(app) && /site profile: /.test(app) &&
-    /g\("hf\.error\.mis-pick", 0\.02\)/.test(app) && /levers: \{ error: readErrorLevers, delivery: readDeliveryLevers \}/.test(app));
+    /g\("hf\.error\.mis-pick", 0\.02\)/.test(app) && /levers: \{ error: readErrorLevers, delivery: readDeliveryLevers/.test(app));
 })();
 
 /* ---- 6. human ---------------------------------------------------------- */
@@ -182,8 +182,8 @@ const v = (id) => (prof && prof.values[id]) || {};
     typeof KB.applyProfile === "function" && typeof KB.profile === "function" && KB.PROFILE_SCHEMA === "wt-site-profile/v1" && /if \(data && data\.schema === PROFILE_SCHEMA\) return applyProfile\(data\);/.test(kb) && /profileInfo = null; \/\/ v3\.59/.test(kb) && /the stamp survives a reload/.test(kb));
   check("7b. the card shows the measured badge and label above the teaching default; the import handler reports a site profile; the hint names it; the badge is styled",
     /kb-badge measured/.test(app) && /Measured:<\/span>/.test(app) && /Teaching default:/.test(app) && /Site profile applied:/.test(app) && /site profile/.test(html) && /measured on …, n = …/.test(html) && /\.kb-badge\.measured/.test(css));
-  check("7c. selftest.js has site-profile-measured-labels; run-all lists verify_fit_rates.js; sw.js at wt-v143 (previously wt-v142); README and CHANGELOG name v3.59; docs/SITE_PROFILE.md exists and names the rule",
-    /site-profile-measured-labels/.test(st) && /verify_fit_rates\.js/.test(runall) && /CACHE_VERSION\s*=\s*"wt-v143"/.test(sw) && /Previously wt-v142/.test(sw) && /v3\.59/.test(readme) && /## v3\.59/.test(changelog) &&
+  check("7c. selftest.js has site-profile-measured-labels; run-all lists verify_fit_rates.js; sw.js at wt-v144 (previously wt-v143); README and CHANGELOG name v3.59; docs/SITE_PROFILE.md exists and names the rule",
+    /site-profile-measured-labels/.test(st) && /verify_fit_rates\.js/.test(runall) && /CACHE_VERSION\s*=\s*"wt-v144"/.test(sw) && /Previously wt-v143/.test(sw) && /v3\.59/.test(readme) && /## v3\.59/.test(changelog) &&
     fs.existsSync(path.join(__dirname, "docs", "SITE_PROFILE.md")) && /nearest-rank/.test(read(path.join("docs", "SITE_PROFILE.md"))) && /never per person|never a person|nothing is keyed to a person/.test(read(path.join("docs", "SITE_PROFILE.md"))));
 })();
 

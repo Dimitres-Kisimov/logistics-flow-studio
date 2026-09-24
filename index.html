@@ -895,6 +895,12 @@
             <option value="instant">Instantaneous dock and carrier (as before)</option>
             <option value="windows">Dock and carrier windows (what-if): trailers every 120 ticks, late by the SCMS shape; carriers every 240; promised in 480</option>
           </select>
+          <label for="flowPeopleSelect">Learning &amp; fatigue (v3.66)</label>
+          <select id="flowPeopleSelect" aria-describedby="flowPeopleHint">
+            <option value="none">Benches never learn and never tire (as before)</option>
+            <option value="declared">Declared curves (what-if): a step gets faster as its units accumulate, slower as the minutes since the last break add up</option>
+          </select>
+          <p class="hint" id="flowPeopleHint">Wright's learning rate in Crawford's unit-time form and a rest-allowance-shaped fatigue uplift, both editable in the knowledge base (<em>Learning and fatigue</em>). The curves belong to a <strong>step and a shift, never to a person</strong>: the count is the station's units in this run, and the break is assumed staggered - it resets the fatigue clock without stopping the bench. Teaching values, not measurements. Remembered on this device.</p>
           <p id="flowDeliveryHint" class="hint">Inbound trailers arrive late (or early) by a deterministic sequence through the lateness quantiles of a public delivery dataset (USAID SCMS, aggregates only; international pharmaceutical lanes, used for the shape only and scaled by the knowledge base's ticks-per-day teaching value); units spawn only while the door is open. Carriers depart on a period and a loaded unit waits for the next one; every unit is promised at spawn + a teaching lead, and on time in full is counted per order. Not a yard, not appointments, not a carrier network. Remembered on this device.</p>
         </div>
         <section class="route-review" aria-labelledby="routeReviewHeading">
@@ -1367,6 +1373,7 @@
 <script src="control.js"></script>
 <script src="ask.js"></script>
 <script src="aas.js"></script>
+<script src="people.js"></script>
   <script src="knowledge.js"></script>
   <script src="library.js"></script>
   <script src="tiers.js"></script>

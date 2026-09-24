@@ -191,9 +191,9 @@ const src = (sm, idShort) => { const e = (sm.submodelElements || []).find((x) =>
 /* ---- 7. shipped wiring -------------------------------------------------------- */
 (function () {
   const html = read("index.html"), app = read("app.js"), sw = read("sw.js"), runall = read("test/run-all.mjs"), readme = read("README.md"), changelog = read("CHANGELOG.md");
-  check("7a. index.html loads aas.js before app.js; sw.js precaches it at wt-v143 (trail preserved: previously wt-v142); test/run-all.mjs lists this harness",
+  check("7a. index.html loads aas.js before app.js; sw.js precaches it at wt-v144 (trail preserved: previously wt-v143); test/run-all.mjs lists this harness",
     html.indexOf('<script src="aas.js"></script>') > 0 && html.indexOf('<script src="aas.js"></script>') < html.indexOf('<script src="app.js"></script>') &&
-    /"\.\/aas\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v143"/.test(sw) && /Previously wt-v142/.test(sw) && /verify_aas\.js/.test(runall));
+    /"\.\/aas\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v144"/.test(sw) && /Previously wt-v143/.test(sw) && /verify_aas\.js/.test(runall));
   check("7b. the standards card offers the export and app.js builds it from the live floor with the Analyze panel's rates and the live run when there is one",
     /id="aasExportBtn"/.test(html) && /WT\.aas\.fromLayout\(layout, \{ rates: ensureRates\(\), ledger: ledger, site: currentScenarioId\(\) \}\)/.test(app) && /WT\.aas\.validate\(env\)/.test(app) &&
     /downloadFile\("warehousetwin-asset-shells\.json"/.test(app) && /Shaped, not conformant/.test(app) && /Asset Administration Shell/.test(html) && /ECLASS IRDIs/.test(html));

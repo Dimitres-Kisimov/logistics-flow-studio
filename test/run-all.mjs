@@ -732,6 +732,7 @@ const HARNESSES = [
   { name: "The optional model mode: tools/ask_cli.mjs equals WT.ask, the dry run calls nothing, the number guard refuses an invented number, the page stays offline, the rules are written down (verify_model_mode.js)", args: ["verify_model_mode.js"] },
   { name: "Search over levers: tools/search_levers.mjs on the hand floor by hand for two levers and two seeds (OTIF, cost, t-half-widths, the ranking), the tower's fifth rule on a hand table, the combination lever (verify_search.js)", args: ["verify_search.js"] },
   { name: "Asset shells, AAS-shaped: the nameplate, technical and operational submodels by hand (DIN 8580 group 3, 48 pallet positions, 110.33 ticks that equal the viewer's own wait rows weighted), what is not modelled listed rather than invented, the tool (verify_aas.js)", args: ["verify_aas.js"] },
+  { name: "Learning and fatigue: Wright's rate in Crawford's unit form and a rest-allowance-shaped uplift by hand (0.9 -> 0.81 -> 0.729, the floor, 1.075 at two hours), byte-identical without the what-if, per step and shift and never per person (verify_people.js)", args: ["verify_people.js"] },
   { name: "offline guard (tools/offline-guard.mjs)", args: [path.join("tools", "offline-guard.mjs")] },
 ];
 

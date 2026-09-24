@@ -161,7 +161,7 @@
     // ring for the sparkline; `poolDemandFactor` sets the synthetic arrival
     // (order-generation) rate as a multiple of the modelled pick capacity so a
     // live backlog is visible (honest what-if, documented in the readout).
-    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15, errors: "none", delivery: "instant", control: null, controlLog: [], search: null /* v3.62: the loaded lever-search table */ },
+    flow: { on: false, playing: false, speed: 60, sim: null, raf: null, sig: null, kpiHist: [], kpiBase: 0, kpiLastDraw: 0, pool: null, poolPrevSpawned: 0, poolPrevCompleted: 0, poolHist: [], poolDemandFactor: 1.15, errors: "none", delivery: "instant", control: null, controlLog: [], people: "none", search: null /* v3.62: the loaded lever-search table */ },
   };
 
   // ---------------- DOM refs ----------------
@@ -2567,6 +2567,13 @@
       outbound: { periodTicks: g("delivery.outbound.periodTicks", 240), promisedLeadTicks: g("delivery.promisedLeadTicks", 480), transit: late.map((v) => Math.max(0, nominal + v)), mode: mode, scaleTicksPerDay: scale, source: source + "; nominal transit " + nominal + " ticks plus the same lateness shape" },
     };
   }
+  // v3.66: the learning and fatigue curves as the knowledge base holds them (people.js normalises them)
+  function readPeopleLevers() {
+    const g = (id, d) => { const v = WT.kb ? WT.kb.get(id) : undefined; return typeof v === "number" && isFinite(v) ? v : d; };
+    return { learning: { rate: g("people.learning.rate", 0.95), floor: g("people.learning.floor", 0.7) },
+      fatigue: { maxUplift: g("people.fatigue.maxUplift", 0.15), toPeakMinutes: g("people.fatigue.toPeakMinutes", 240),
+        breakEveryMinutes: g("people.fatigue.breakEveryMinutes", 120), breakMinutes: g("people.fatigue.breakMinutes", 15) } };
+  }
   // v3.56: the control tower's thresholds as the knowledge base holds them (the queue threshold is the sim's
   // congestion threshold, the OTIF target the delivery category's).
   function readControlThresholds() {
@@ -2693,6 +2700,7 @@
     if (state.flow.errors === "declared") opts.errors = readErrorLevers();
     // v3.55: the delivery what-if - dock and carrier windows from the knowledge base and the dataset's lateness shape
     if (state.flow.delivery === "windows") { const d = readDeliveryLevers(); opts.inbound = d.inbound; opts.outbound = d.outbound; }
+    if (state.flow.people === "declared") opts.people = readPeopleLevers(); // v3.66
     state.flow.sim = WT.flowsim.state(layout, opts);
     // v3.32 THE RUN LEDGER: a pure observer attached as an after-tick hook.
     // Every unit gets its identities (ids.js) and quantities (pack.js); the
@@ -3027,6 +3035,14 @@
       '<p class="flow-stats">In-flight <strong>' + s.inflight + "</strong> · Shipped <strong>" + s.completed +
       "</strong> · tick " + s.tick + " · bottleneck throughput ~" + s.plan.lineThroughput.toFixed(0) + " units/hr" +
       queueTxt + (state.flow.playing ? "" : " · paused") + "</p>";
+    // v3.66: what the two curves are doing right now, per bench - the station's own count, never a person's
+    if (s.plan.people && WT.people && s.stations && s.stations.length) {
+      const mpt = 60 / (s.plan.ticksPerHour || 60);
+      const parts = s.stations.map((st) => { const f = WT.people.serviceFactor((st.served || 0) + 1, s.tick * mpt, s.plan.people);
+        return esc(st.id) + " " + (st.served || 0) + " units \u00b7 learning " + f.learning.toFixed(2) + "x \u00b7 fatigue " + f.fatigue.toFixed(2) + "x"; });
+      out.innerHTML += '<p class="flow-stats">Learning &amp; fatigue (declared curves, per bench - never per person): ' + parts.join(" | ") +
+        " \u00b7 " + Math.round(WT.people.minutesSinceBreak(s.tick * mpt, s.plan.people.fatigue)) + " min since the last break</p>";
+    }
     updateLedgerReadout(); // v3.32
     renderControlTower(); // v3.56
   }
@@ -3298,6 +3314,22 @@
       sel.addEventListener("change", () => {
         state.flow.delivery = sel.value === "windows" ? "windows" : "instant";
         try { localStorage.setItem("wt-flow-delivery", state.flow.delivery); } catch (_) { /* ignore */ }
+        state.flow.sig = null;
+        if (state.flow.sim) flowReset();
+      });
+    })();
+    // v3.66: the learning and fatigue what-if. Remembered on this device; a change re-runs the day from tick 0
+    // (a different set of curves is a different day, and the run id is a hash of its inputs).
+    (function wirePeople() {
+      const sel = $("flowPeopleSelect");
+      if (!sel) return;
+      let saved = "none";
+      try { saved = localStorage.getItem("wt-flow-people") || "none"; } catch (_) { /* private mode */ }
+      state.flow.people = saved === "declared" ? "declared" : "none";
+      sel.value = state.flow.people;
+      sel.addEventListener("change", () => {
+        state.flow.people = sel.value === "declared" ? "declared" : "none";
+        try { localStorage.setItem("wt-flow-people", state.flow.people); } catch (_) { /* ignore */ }
         state.flow.sig = null;
         if (state.flow.sim) flowReset();
       });
@@ -10391,7 +10423,7 @@
       loadExample: loadExample,
       // v3.53: the tracking database (the live tracker and the store)
       tracking: { store: trackingStore, current: () => state.flow.track },
-      levers: { error: readErrorLevers, delivery: readDeliveryLevers }, // v3.59: the what-ifs' inputs as the knowledge base holds them
+      levers: { error: readErrorLevers, delivery: readDeliveryLevers, people: readPeopleLevers }, // v3.59/v3.66: the what-ifs' inputs as the knowledge base holds them
       ask: (q) => WT.ask.answer(q, { exp: state.flow.ledger && WT.ledger ? WT.ledger.exportJson(state.flow.ledger) : null, kb: WT.kb }), // v3.60
       renderKnowledgeBase: renderKnowledgeBase,
       // v3.56: the control tower (the live tower and the audit log across runs)

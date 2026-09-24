@@ -3878,6 +3878,28 @@
         p.evidence.table.length === 2 && !!row && row.status === "declined" && JSON.stringify(plan) === planBefore && C3.RULES.length === 5 && WT.kb && WT.kb.get("control.search.minGainHalfWidths") === 1 && ctl.search === table;
       return { ok: ok, detail: p ? p.rule + "@" + p.tick + " with " + p.lever.levers.length + " levers" : "no proposal" };
     });
+    // ---- v3.66 learning and fatigue: the two declared curves on a step and a shift. The picker, the
+    // knowledge base's six values, the arithmetic by hand (0.9 -> 0.729 at the eighth unit; 1.0375 after
+    // an hour; the clock reading zero through a break) and a plan that carries them only when asked.
+    check("learning-and-fatigue-curves", function () {
+      var PP = WT.people, sel = $("flowPeopleSelect"), F4 = WT.flowsim, R4 = WT.routing;
+      if (!PP || !sel || !F4 || !R4 || !API || !API.levers || typeof API.levers.people !== "function") return { ok: false, detail: "missing" };
+      var d = PP.normalise(API.levers.people()), nine = PP.normalise({ learning: { rate: 0.9, floor: 0.1 } });
+      var FLOOR4 = { gridW: 40, gridH: 24, cell: 1, elements: [
+        { id: "in", type: "dock-in", x: 2, y: 0, w: 2, d: 1 }, { id: "stg", type: "staging", x: 14, y: 2, w: 4, d: 2 }, { id: "qc", type: "qc-bench", x: 6, y: 2, w: 3, d: 2 },
+        { id: "dep", type: "depalletiser", x: 10, y: 2, w: 3, d: 3 }, { id: "ret", type: "returns-station", x: 30, y: 2, w: 3, d: 2 }, { id: "rack", type: "selective-racking", x: 4, y: 8, w: 20, d: 1 },
+        { id: "face", type: "carton-flow", x: 4, y: 12, w: 12, d: 1 }, { id: "belt", type: "conveyor", x: 4, y: 15, w: 14, d: 1 }, { id: "pack", type: "pack-station", x: 20, y: 18, w: 3, d: 2 },
+        { id: "wrap", type: "stretch-wrap", x: 24, y: 18, w: 2, d: 2 }, { id: "vas", type: "vas-station", x: 28, y: 18, w: 3, d: 2 }, { id: "out", type: "dock-out", x: 30, y: 23, w: 2, d: 1 }] };
+      var mix4 = R4.defaultMix();
+      var withC = F4.spawnPlan(FLOOR4, { seed: 31, mix: mix4, people: API.levers.people() });
+      var without = F4.spawnPlan(FLOOR4, { seed: 31, mix: mix4 });
+      var ok = sel.options.length === 2 && d.learning.rate === 0.95 && d.learning.floor === 0.7 && d.fatigue.maxUplift === 0.15 && d.fatigue.breakEveryMinutes === 120 &&
+        PP.learningFactor(2, nine.learning) === 0.9 && PP.learningFactor(8, nine.learning) === 0.729 && PP.learningFactor(1000, d.learning) === 0.7 &&
+        PP.fatigueFactor(60, d.fatigue) === 1.0375 && PP.fatigueFactor(240, d.fatigue) === 1.15 && PP.minutesSinceBreak(125, d.fatigue) === 0 && PP.minutesSinceBreak(60, d.fatigue) === 60 &&
+        withC.people.kind === "declared-curves" && !("people" in without) && WT.kb && WT.kb.get("people.learning.rate") === 0.95 && WT.kb.list("people").length === 6 &&
+        /never on a person/.test(PP.HONESTY);
+      return { ok: ok, detail: "rate " + d.learning.rate + ", uplift " + d.fatigue.maxUplift + ", eighth unit " + PP.learningFactor(8, nine.learning) + "x" };
+    });
     // ---- v3.56: the control tower - on the hand floor (seed 31, the default mix; here the stations serve at the
     // floor's DECLARED capacities because wms.js is loaded, so the tick-140 fact of verify_control.js does not
     // apply) a threshold-1 tower proposes at the first evaluation that sees a queue, naming the element; declining

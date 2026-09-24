@@ -1,5 +1,42 @@
 # Changelog
 
+## v3.66 — Learning and fatigue: the benches change, and still nobody is watched
+
+**The module.** `people.js` (`WT.people`): two declared curves on the service time of a step, both
+absent by default. LEARNING - the n-th unit through a station costs `n^log2(rate)` of the first
+(Wright's 1936 rate in Crawford's unit-time form: at 0.9 the second unit takes 0.9, the fourth 0.81,
+the eighth 0.729), clamped by a floor where a bench stops improving (0.7 by default). FATIGUE -
+`1 + maxUplift x min(1, minutesSinceBreak / toPeakMinutes)`, the uplift and its peak teaching values in
+the spirit of work-study rest allowances (ILO, Introduction to Work Study), with a break rhythm that
+resets the clock. `normalise` clamps what a person can type; `serviceFactor(n, minute, people)` returns
+both curves, their product and the reciprocal the service RATE is scaled by; `block()` is what the
+ledger records, with every source.
+
+**In the simulation.** `flowsim.spawnPlan` takes `opts.people` and keys `plan.people` only when it is
+there; the serving loop scales the station's rate by the factor, evaluated once a tick on the station's
+next unit, and counts `st.served` only with the what-if on - so a run without it is byte-identical, and
+the hand floor still records fixture A's own run id. The curves join the run-id hash (`ids.inputHash`)
+and the ledger records `run.people`. On the hand floor at seed 31 over 1200 ticks: 56 units shipped
+with no curves, 61 with learning alone, 55 with fatigue alone, 58 with both.
+
+**The line that keeps it lawful.** The curves belong to a STEP and a SHIFT: the learning count is the
+station's units in this run, the fatigue clock the minutes since the last break. Nothing reads the
+app's illustrative staffing figures and nothing may be keyed to a worker - a per-person learning curve
+would be exactly the technical device BetrVG § 87(1)6 makes co-determinable. The count resets every run
+(a crew does not start from zero every morning) and breaks are assumed staggered (a break resets the
+clock, it does not stop the bench); both limits are stated in the module, the knowledge base, the
+picker's hint and `docs/PEOPLE_CURVES.md`.
+
+**Where.** Simulate → *Learning & fatigue* (none | declared curves), six editable values in the
+knowledge base's own *Learning and fatigue* category, and a readout line that shows each bench's count
+and its two factors live.
+
+**Verification.** `verify_people.js` (17 checks: both curves and the break clock by hand, what
+`normalise` clamps, the byte-identical run without the what-if, the recorded block and its sources, the
+four directions at 1200 ticks, the run-id hash, the module's purity and honesty, the six knowledge-base
+seeds equal to the module's defaults, the wiring), the in-app self-test `learning-and-fatigue-curves`
+(194/194). Cache `wt-v144`.
+
 ## v3.65 — Asset shells, AAS-shaped: the identity gap, answered as far as it honestly can be
 
 **The module.** `aas.js` (`WT.aas.fromLayout(layout, { rates, ledger, site })`) writes a

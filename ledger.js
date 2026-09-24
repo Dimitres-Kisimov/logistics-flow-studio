@@ -200,7 +200,8 @@
     const policy = (plan && plan.policy) || null; // v3.45: a run input too - it joins the id hash when present
     const errors = (plan && plan.errors) || null; // v3.54: the error what-if joins the id hash too (only when present)
     const inbound = (plan && plan.inbound) || null, outbound = (plan && plan.outbound) || null; // v3.55: the delivery what-if joins it too
-    const runId = I ? I.runId(scenario, seed, layout, mix, pool, policy, errors, inbound, outbound) : "RUN-" + scenario + "-s" + seed;
+    const people = (plan && plan.people) || null; // v3.66: the learning / fatigue what-if joins it too
+    const runId = I ? I.runId(scenario, seed, layout, mix, pool, policy, errors, inbound, outbound, people) : "RUN-" + scenario + "-s" + seed;
     const dataset = pool ? {
       source: (m.dataset && m.dataset.source) || "pool", orders: pool.length,
       lines: plan && plan.poolLines != null ? plan.poolLines : pool.reduce((a, o) => a + ((o.lines && o.lines.length) || 0), 0),
@@ -244,6 +245,7 @@
     // v3.56: the control tower's audit log the app keeps across runs (the same array; exported only when a decision exists)
     if (Array.isArray(m.control)) rec.control = m.control;
     if (outbound) rec.run.outbound = deliveryBlock(outbound);
+    if (people && WT.people && typeof WT.people.block === "function") rec.run.people = WT.people.block(people); // v3.66: the learning / fatigue curves, key only when they ran
     return rec;
   }
 

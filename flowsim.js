@@ -1001,6 +1001,9 @@
     const errors = o.errors && WT.routing && typeof WT.routing.normalizeErrors === "function" ? WT.routing.normalizeErrors(o.errors) : null;
     // v3.55 DELIVERY WINDOWS - a what-if: dock windows in, carrier departures out (see the block above). Absent -> no key.
     const inbound = o.inbound ? normaliseInbound(o.inbound) : null;
+    // v3.66 LEARNING AND FATIGUE - a what-if: two declared curves on a step and a shift (people.js;
+    // never on a person). Absent -> no key, no factor, byte-identical to every run before it.
+    const people = o.people && WT.people && typeof WT.people.normalise === "function" ? WT.people.normalise(o.people) : null;
     const outbound = o.outbound ? normaliseOutbound(o.outbound) : null;
     // v3.25: per-order-type routes. `o.mix` absent -> the single legacy spine.
     const rb = buildRoutes(layout, anchors, waypoints, stations, o.mix != null ? o.mix : null, errors);
@@ -1085,6 +1088,7 @@
     if (errors) plan.errors = errors; // v3.54: key only with the error what-if
     if (inbound) plan.inbound = inbound; // v3.55: keys only with the delivery what-if
     if (outbound) plan.outbound = outbound;
+    if (people) plan.people = people; // v3.66: key only with the learning / fatigue what-if
     return plan;
   }
 
@@ -1281,14 +1285,21 @@
     // move on the same tick). Each station releases floor(serviceAccum)
     // head-of-line MUs; an idle station banks at most ~1 unit of service.
     if (plan.policy) staffStations(state, plan.policy); // v3.45: before serving, so a joining worker serves this tick
+    // v3.66: with the learning / fatigue what-if the service RATE is scaled by the reciprocal of the two
+    // curves, evaluated once a tick on the station's next unit (not re-evaluated inside a tick - a stated
+    // simplification). Without the what-if the arithmetic below is exactly what it was.
+    const peopleMinute = plan.people ? state.tick * (60 / (plan.ticksPerHour || 60)) : 0;
     for (const st of state.stations) {
-      st.serviceAccum += st.serviceRatePerTick * (st.servers || 1); // v3.45: x 1 exactly without a policy
+      let perTick = st.serviceRatePerTick * (st.servers || 1); // v3.45: x 1 exactly without a policy
+      if (plan.people) perTick *= WT.people.serviceFactor((st.served || 0) + 1, peopleMinute, plan.people).factor;
+      st.serviceAccum += perTick;
       while (st.serviceAccum >= 1 && st.queue.length) {
         const mu = st.queue.shift();
         mu.status = "active";
         mu.station = null;
         mu.stationId = null;
         st.serviceAccum -= 1;
+        if (plan.people) st.served = (st.served || 0) + 1; // the station's own count - never a person's
       }
       if (st.queue.length === 0 && st.serviceAccum > 1) st.serviceAccum = 1;
     }
