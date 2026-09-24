@@ -102,6 +102,17 @@
  *         once more - or a write-off. A unit that errs twice is not modelled,
  *         a second error kind on one unit is not modelled, and the detour is
  *         a list for the same reason the loops above are: cycles need a graph.
+ *       * (v3.68) THE GRAPH EXISTS NOW. A route is a directed graph and the
+ *         list is its walk (graphOf / walk below, docs/ROUTE_GRAPH.md), so
+ *         the detour above is a check edge and a REWORK back edge rather
+ *         than a splice. Every limit above that ended "cycles need a graph"
+ *         is therefore a missing DECLARATION from here on, not a missing
+ *         model: no archetype declares an optional step, an alternative
+ *         path, a blocked-stock branch or a replenishment loop. And the
+ *         reason a unit that errs twice is still not modelled is now
+ *         precise - the check edge is entered only on the FIRST visit to a
+ *         step, so a second error would be a second draw from the quota
+ *         dispatcher, not a second lap of the loop.
  *       * Not modelled at all: dangerous goods, the cold chain as a routed
  *         zone, the empties counter-flow, second-stage batch sortation and
  *         dispatch-label (SSCC) application.
@@ -570,11 +581,163 @@
     return outcomeId ? archetypeId + ":" + outcomeId : archetypeId;
   }
 
-  function opsFor(arch, outcomeId) {
+  /* ---- v3.68 THE ROUTE AS A DECLARED GRAPH ---------------------------------
+   * Every limit in the KNOWN LIMITS list above that ends "cycles need a graph"
+   * ends there because a route was a LIST. A list cannot say "do this step
+   * again", so v3.54's rework had to be UNROLLED - the operation, its check,
+   * the operation once more, spliced into a flat array - and a unit that erred
+   * twice could not be expressed at all.
+   *
+   * A route is now a directed graph, and the list is what you get by WALKING
+   * it. The graph is built from the same archetype declarations as before, so
+   * there is one source of truth and no drift: `opsFor` and `branchesFor` both
+   * go through `walk()`, and the harness pins every resulting list literally
+   * against the lists v3.67 produced. Nothing a caller sees changes in this
+   * release - the plan, the routes, the run ids and the fixtures are byte for
+   * byte what they were. What changes is what the model can SAY.
+   *
+   * EDGE KINDS
+   *   then       the ordinary sequence: the next step of the recipe.
+   *   outcome    a declared split (returns: restocked or written off).
+   *   check      entered only when a declared error was realised at this step.
+   *   rework     a BACK EDGE. The step is done again after its check. This is
+   *              the cycle the list could not express; it is bounded by the
+   *              target node's `maxVisits`, which is 2 in this release - one
+   *              redo, exactly the unrolled detour v3.54 produced by hand.
+   *   write-off  a terminal edge: the unit leaves the route at a bench.
+   *
+   * WHAT IS STILL A LIMIT, so the honesty survives the refactor:
+   *   - A UNIT THAT ERRS TWICE IS STILL NOT MODELLED, and the graph now says
+   *     precisely why, which the old flat list could not. Raising a node's
+   *     `maxVisits` from 2 to 3 changes nothing on its own: the CHECK edge is
+   *     entered only on the first visit to the step, so a unit that has been
+   *     reworked once is never offered a second verification. A second error
+   *     is a second draw from the quota dispatcher, not a second lap of the
+   *     loop, and closing it needs the dispatcher and the check rule to change
+   *     together. The visit bound is the guard rail, not the model.
+   *   - Quality control is still a PASS-THROUGH node with one `then` edge out.
+   *     The graph can hold the branch to blocked stock; nothing declares it.
+   *   - Replenishment is still a node in the each-pick chain, not the
+   *     order-independent loop it is in a real building.
+   *   - The walk is DETERMINISTIC and takes no random draw: which branch a
+   *     unit takes is decided by the quota dispatcher, as before.
+   */
+  const GRAPH_SCHEMA = "wt-route-graph/v1";
+  const EDGE_KINDS = {
+    then: "the ordinary sequence: the next step of the recipe",
+    outcome: "a declared split - the route takes one outcome and not the others",
+    check: "a verification step, entered only when a declared error was realised at this step",
+    rework: "a BACK EDGE - the step is done again after its check, bounded by the target's maxVisits",
+    "write-off": "a terminal edge - the unit leaves the route at a write-off bench",
+  };
+  const GRAPH_HONESTY =
+    "A declared route graph, not an observed one: the nodes are this app's teaching operations and the edges are " +
+    "the recipe's own order, informed by ordinary distribution-centre practice (VDI 4490's process decomposition, " +
+    "VDI 3590's unit-transformation chain) and by nothing measured in any plant. The walk is deterministic and takes " +
+    "no random draw. A rework is a bounded back edge - one redo in this release - and a unit that errs twice is still " +
+    "not modelled. A node is a process step and never a person, and nothing here is keyed to one (BetrVG 87(1)6, GDPR Art. 88).";
+
+  function graphNode(opId, maxVisits) {
+    const op = OPERATIONS[opId] || {};
+    return { id: opId, op: opId, label: op.label || opId, stage: op.stage || null, anchor: op.anchor || null, maxVisits: maxVisits || 1 };
+  }
+  // graphOf(archetypeId, opts) -> the declared graph of a route.
+  //   opts.error = { kind, op }  adds that error branch's check / rework / write-off edges.
+  // Node ids are operation ids: no archetype's own list repeats an operation (asserted in
+  // the harness), so a node is a step of the recipe and a repeat is a second VISIT to it.
+  function graphOf(archetypeId, opts) {
+    const o = opts || {};
+    const arch = ARCHETYPE_BY_ID[archetypeId];
+    if (!arch) return null;
+    const nodes = [], edges = [], byId = {};
+    const add = (opId, maxVisits) => {
+      if (!byId[opId]) { byId[opId] = graphNode(opId, maxVisits); nodes.push(byId[opId]); }
+      else if (maxVisits && maxVisits > byId[opId].maxVisits) byId[opId].maxVisits = maxVisits;
+      return opId;
+    };
     const base = (arch.ops || []).slice();
-    if (!arch.outcomes || !arch.outcomes.length) return base;
-    const oc = arch.outcomes.find((o) => o.id === outcomeId) || arch.outcomes[0];
-    return base.concat(oc.ops || []);
+    for (let i = 0; i < base.length; i++) {
+      add(base[i]);
+      if (i) edges.push({ from: base[i - 1], to: base[i], kind: "then" });
+    }
+    const outs = outcomesOf(arch);
+    const last = base.length ? base[base.length - 1] : null;
+    if (outs) {
+      for (const oc of outs) {
+        let prev = last;
+        const ops = oc.ops || [];
+        for (let i = 0; i < ops.length; i++) {
+          add(ops[i]);
+          edges.push({ from: prev, to: ops[i], kind: i === 0 ? "outcome" : "then", outcome: oc.id });
+          prev = ops[i];
+        }
+      }
+    }
+    // The error branch's own edges: a check and a back edge, or a terminal write-off.
+    const err = o.error && o.error.kind && o.error.op ? o.error : null;
+    const def = err ? ERROR_KINDS.find((k) => k.kind === err.kind) : null;
+    if (def && byId[err.op]) {
+      if (def.tail && def.tail.length) {
+        let prev = err.op;
+        for (let i = 0; i < def.tail.length; i++) {
+          add(def.tail[i]);
+          edges.push({ from: prev, to: def.tail[i], kind: i === 0 ? "write-off" : "then", error: def.kind });
+          prev = def.tail[i];
+        }
+      } else if (def.rework && def.rework.length === 2) {
+        const checkOp = def.rework[0];
+        const backOp = def.rework[1] === SAME_OP ? err.op : def.rework[1];
+        add(checkOp);
+        add(backOp, 2); // the bound: one redo
+        edges.push({ from: err.op, to: checkOp, kind: "check", error: def.kind });
+        edges.push({ from: checkOp, to: backOp, kind: "rework", error: def.kind });
+        // The graph must be TOTAL. If the visit bound ever refuses the rework - it cannot in this
+        // release, where the bound is 2 and the step has been visited once - the unit must still
+        // have a way onward, or it would stand at the verification bench for ever and never ship.
+        // The fallback is the step the recipe would have gone to anyway. It is never taken today
+        // (the rework edge is tried first and always wins), and the harness pins that it exists.
+        const after = edges.find((e) => e.from === err.op && e.kind === "then");
+        if (after) edges.push({ from: checkOp, to: after.to, kind: "then", error: def.kind });
+      }
+    }
+    return { schema: GRAPH_SCHEMA, id: arch.id, label: arch.label, start: base.length ? base[0] : null,
+      nodes: nodes, edges: edges, outcomes: outs ? outs.map((x) => ({ id: x.id, label: x.label, share: x.share })) : null,
+      error: err ? { kind: err.kind, op: err.op } : null, honesty: GRAPH_HONESTY };
+  }
+  // Which edge a unit takes out of a node, given how often it has been here already.
+  // Order matters and is the model: leave the route, then check, then go back, then
+  // the declared outcome, then the ordinary next step.
+  function chooseEdge(out, visits, byId, o) {
+    const err = o.error || null;
+    for (const e of out) if (e.kind === "write-off" && err && e.error === err.kind && visits[e.from] === 1) return e;
+    for (const e of out) if (e.kind === "check" && err && e.error === err.kind && visits[e.from] === 1) return e;
+    for (const e of out) if (e.kind === "rework" && (visits[e.to] || 0) < ((byId[e.to] && byId[e.to].maxVisits) || 1)) return e;
+    let firstOutcome = null;
+    for (const e of out) if (e.kind === "outcome") { if (e.outcome === o.outcome) return e; if (!firstOutcome) firstOutcome = e; }
+    if (firstOutcome) return firstOutcome; // no outcome named: the first declared one, as the list builder always did
+    for (const e of out) if (e.kind === "then") return e;
+    return null;
+  }
+  // walk(graph, opts) -> the operation list a unit performs. opts: { outcome, error }.
+  function walk(graph, opts) {
+    const o = opts || {};
+    if (!graph || !graph.nodes || !graph.nodes.length || !graph.start) return [];
+    const byId = {}, out = {}, visits = {}, list = [];
+    for (const n of graph.nodes) byId[n.id] = n;
+    for (const e of graph.edges) (out[e.from] = out[e.from] || []).push(e);
+    let id = graph.start, guard = 0;
+    while (id && byId[id] && guard++ < 512) {
+      list.push(byId[id].op);
+      visits[id] = (visits[id] || 0) + 1;
+      const next = chooseEdge(out[id] || [], visits, byId, o);
+      id = next ? next.to : null;
+    }
+    return list;
+  }
+  // v3.68: the list is what you get by walking the graph. Pinned equal to every list
+  // v3.67 produced, for every archetype and every outcome, by verify_routegraph.js.
+  function opsFor(arch, outcomeId) {
+    return walk(graphOf(arch.id), { outcome: outcomeId });
   }
 
   function outcomesOf(arch) {
@@ -866,8 +1029,9 @@
       const scale = total > 1 ? 1 / total : 1; // the levers can push the sum past one: the base branch then gets nothing, said in the readout
       out.push({ outcome: b.outcome, share: b.share * (1 - total * scale) });
       for (const e of errs) {
-        const head = ops.slice(0, e.at + 1);
-        const spliced = e.kind.tail ? head.concat(e.kind.tail) : head.concat(e.kind.rework.map((r) => (r === SAME_OP ? e.op : r)), ops.slice(e.at + 1));
+        // v3.68: the detour is no longer spliced into an array by hand - it is the walk of a
+        // graph whose check edge leads to the verification and whose REWORK edge leads back.
+        const spliced = walk(graphOf(arch.id, { error: { kind: e.kind.kind, op: e.op } }), { outcome: b.outcome, error: { kind: e.kind.kind, op: e.op } });
         out.push({ outcome: b.outcome, share: b.share * e.kind.effective * scale, ops: spliced,
           error: { kind: e.kind.kind, op: e.op, disposition: e.kind.disposition, rework: !e.kind.tail, latent: errors.latent.slice() } });
       }
@@ -936,6 +1100,8 @@
     ERROR_KINDS: ERROR_KINDS, PSF: PSF, ERROR_CAP: ERROR_CAP, ERRORS_HONESTY: ERRORS_HONESTY, SAME_OP: SAME_OP,
     // v3.67 the rest of SPAR-H: four more levers, one refusal, the method's own adjustment factor
     PSF_NOT_MODELLED: PSF_NOT_MODELLED, SPARH_ADJUSTMENT: SPARH_ADJUSTMENT, applyLevers: applyLevers,
+    // v3.68 the route as a declared graph: the list is the walk
+    GRAPH_SCHEMA: GRAPH_SCHEMA, EDGE_KINDS: EDGE_KINDS, GRAPH_HONESTY: GRAPH_HONESTY, graphOf: graphOf, walk: walk,
     normalizeErrors: normalizeErrors, branchesFor: branchesFor, errorLabel: errorLabel,
     LEGACY_ID: LEGACY_ID,
     ANCHORS: ANCHORS,

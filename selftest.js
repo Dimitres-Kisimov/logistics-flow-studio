@@ -3878,6 +3878,23 @@
         p.evidence.table.length === 2 && !!row && row.status === "declined" && JSON.stringify(plan) === planBefore && C3.RULES.length === 5 && WT.kb && WT.kb.get("control.search.minGainHalfWidths") === 1 && ctl.search === table;
       return { ok: ok, detail: p ? p.rule + "@" + p.tick + " with " + p.lever.levers.length + " levers" : "no proposal" };
     });
+    // ---- v3.68 the route as a declared graph: the list is the walk, the rework is a back edge with
+    // a visit bound, and nothing a caller sees changed (the lists are pinned against v3.67's).
+    check("route-graph-walks-the-loop", function () {
+      var R8 = WT.routing;
+      if (!R8 || typeof R8.graphOf !== "function" || typeof R8.walk !== "function") return { ok: false, detail: "missing" };
+      var g = R8.graphOf("piece-pick"), ge = R8.graphOf("piece-pick", { error: { kind: "mis-pick", op: "piece-pick" } });
+      var plain = R8.walk(g, {}).join(" "), looped = R8.walk(ge, { error: { kind: "mis-pick", op: "piece-pick" } }).join(" ");
+      var back = ge.edges.filter(function (e) { return e.kind === "rework"; })[0];
+      var node = ge.nodes.filter(function (n) { return n.id === "piece-pick"; })[0];
+      var ok = plain === "receive depalletise putaway replen piece-pick consolidate pack load" &&
+        looped === "receive depalletise putaway replen piece-pick verify-pick piece-pick consolidate pack load" &&
+        back && back.from === "verify-pick" && back.to === "piece-pick" && node.maxVisits === 2 &&
+        R8.walk(R8.graphOf("returns"), { outcome: "scrap" }).join(" ") === "receive inspect scrap" &&
+        Object.keys(R8.EDGE_KINDS).length === 5 && /never a person/.test(R8.GRAPH_HONESTY) &&
+        g.nodes.every(function (n) { return n.maxVisits === 1; });
+      return { ok: ok, detail: "8 graphs, the rework edge " + (back ? back.from + " -> " + back.to : "?") + ", bound " + (node ? node.maxVisits : "?") };
+    });
     // ---- v3.67 the rest of SPAR-H: seven levers and one refusal, the method's own adjustment factor
     // once three stand above nominal, and the credits that let a design be declared better than nominal.
     check("spar-h-levers-and-the-adjustment-factor", function () {

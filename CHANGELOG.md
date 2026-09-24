@@ -1,5 +1,52 @@
 # Changelog
 
+## v3.68 — The route as a declared graph: the list is the walk
+
+**Why.** Four of the limits this module documents about itself ended with the same sentence -
+*cycles need a graph* - because a route was a LIST of operations. A list cannot say "do that step
+again", so v3.54's rework had to be UNROLLED: the operation, its verification, the operation once
+more, spliced into a flat array by `branchesFor`. A unit that erred twice could not be expressed.
+
+**What.** A route is now a directed graph, and the list is what you get by WALKING it. Five edge
+kinds, each with a sentence saying what it means: `then` (the ordinary sequence), `outcome` (a
+declared split - the returns grading), `check` (a verification entered only when a declared error was
+realised at that step), `rework` (a BACK EDGE, bounded by the target node's `maxVisits`) and
+`write-off` (terminal). `graphOf(archetypeId, {error})` builds it from the same archetype
+declarations as before - one source of truth, no drift - and `walk(graph, {outcome, error})` derives
+the list. Both list builders go through the walk, so a list that disagreed with the graph could not be
+produced at all.
+
+**Nothing a caller sees changed, and that is the point.** Every route, every run id, every pinned
+digest and every committed fixture is byte for byte what it was. `verify_routegraph.js` pins all nine
+archetype-and-outcome walks and all fourteen error-branch walks LITERALLY against the lists v3.67
+produced - the two rework shapes and the write-off included. The resolved route carries no new key:
+the graph is asked for, never attached.
+
+**Two things the harness found rather than confirmed.** (1) The graph was not TOTAL: if a visit bound
+ever refused a rework edge, the unit was left standing at the verification bench with no way onward
+and the rest of its route silently dropped. A check node now also carries the step the recipe would
+have gone to anyway. It is never taken today - the rework edge is tried first and always wins - and it
+is pinned so it cannot be lost. (2) Raising a node's `maxVisits` from 2 to 3 does NOT give a second
+redo, which is what the first draft of the harness asserted. The check edge is entered only on the
+FIRST visit to a step, so a unit that has been reworked once is never offered a second verification.
+The measured behaviour is now the pinned one, and the limit is stated precisely instead of vaguely: a
+second error is a second draw from the quota dispatcher, not a second lap of the loop. The visit bound
+is a guard rail, not the model.
+
+**The documentation is generated.** `tools/route_graph.mjs --out docs/ROUTE_GRAPH.md` renders every
+archetype and both error shapes as mermaid diagrams, with the loop drawn as a node a unit may visit
+twice; `--check` fails if the page has drifted from `routing.js`, and the harness runs it. `--json`
+writes the graphs as data.
+
+**What is still a limit**, restated in the module and on the page rather than quietly dropped: no
+archetype declares an optional step or an alternative path (VDI 3590 says the sequence is not
+necessarily determined), quality control is still a pass-through node, replenishment is still a node
+in the each-pick chain rather than the order-independent loop it is in a real building, and the walk
+still takes no random draw. From here on those are missing DECLARATIONS, not a missing model.
+
+`verify_routegraph.js` (27 checks), the self-test `route-graph-walks-the-loop` (196/196), cache
+`wt-v146`.
+
 ## v3.67 — The rest of SPAR-H: four more levers, one refusal, and the method's own arithmetic
 
 **The four.** v3.54 gave the error what-if three performance-shaping levers and the deep dive recorded the
