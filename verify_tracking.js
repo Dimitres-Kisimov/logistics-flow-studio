@@ -32,7 +32,7 @@
  *   7. HUMAN + NO CLOCK: no worker / roster reference, no Date / Math.random;
  *      HONESTY names step-not-person, BetrVG and GDPR, and "not conformant".
  *   8. SHIPPED WIRING: index.html + run-ledger.html load tracking.js after
- *      ledger.js; sw.js precaches it at wt-v147; run-all lists this file; the
+ *      ledger.js; sw.js precaches it at wt-v148; run-all lists this file; the
  *      app's after-tick multiplexer, the save / export buttons, the joined
  *      scene snapshot, the assistant's text; the viewer section; the fresh
  *      committed fixture; the Python twin's table, views and reconcile key.
@@ -294,7 +294,7 @@ async function storeChecks() {
   check("8a. index.html and run-ledger.html load tracking.js after ledger.js (and before app.js / run-ledger.js)",
     html.indexOf('<script src="tracking.js"></script>') > html.indexOf('<script src="ledger.js"></script>') && html.indexOf('<script src="tracking.js"></script>') < html.indexOf('<script src="app.js"></script>') &&
     rl.indexOf('<script src="tracking.js"></script>') > rl.indexOf('<script src="ledger.js"></script>') && rl.indexOf('<script src="tracking.js"></script>') < rl.indexOf('<script src="run-ledger.js"></script>'));
-  check("8b. sw.js precaches ./tracking.js at wt-v147 (trail preserved: previously wt-v146)", /"\.\/tracking\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v147"/.test(sw) && /Previously wt-v146/.test(sw));
+  check("8b. sw.js precaches ./tracking.js at wt-v148 (trail preserved: previously wt-v147)", /"\.\/tracking\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v148"/.test(sw) && /Previously wt-v147/.test(sw));
   check("8c. test/run-all.mjs lists verify_tracking.js", /verify_tracking\.js/.test(runall));
   check("8d. app.js: the after-tick multiplexer observes the ledger first and then the tracker; the save and export buttons; the store opened by name",
     /afterTick: \(st\) => \{ WT\.ledger\.observe\(state\.flow\.ledger, st\); if \(state\.flow\.track\) WT\.tracking\.observe\(state\.flow\.track, state\.flow\.ledger\);/.test(app) &&

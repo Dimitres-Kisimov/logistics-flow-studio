@@ -26,7 +26,7 @@
  *   6. BYTE-IDENTITY: the resolved route has no new key, the hand floor
  *      still builds nine routes, and fixture A is unchanged.
  *   7. HONESTY AND WIRING: no clock, no roster, the generated page fresh
- *      against the code, the tool, the runner, wt-v147.
+ *      against the code, the tool, the runner, wt-v148.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -271,9 +271,9 @@ function freshCheck() {
     freshCheck().indexOf("is fresh") >= 0, freshCheck());
   check("7d. the page shows every archetype and the two error shapes, with the loop drawn as a node a unit may visit twice",
     R.ARCHETYPES.every((a) => doc.indexOf(a.label) >= 0) && /up to 2 visits/.test(doc) && /write-off/.test(doc) && /flowchart LR/.test(doc));
-  check("7e. shipped: the runner lists this harness, the tool exists, the service worker is at wt-v147 (previously wt-v146), README and CHANGELOG carry v3.68",
+  check("7e. shipped: the runner lists this harness, the tool exists, the service worker is at wt-v148 (previously wt-v147), README and CHANGELOG carry v3.68",
     /verify_routegraph\.js/.test(read(path.join("test", "run-all.mjs"))) && fs.existsSync(path.join(__dirname, "tools", "route_graph.mjs")) &&
-    /wt-v147/.test(read("sw.js")) && /Previously wt-v146/.test(read("sw.js")) && /v3\.68/.test(read("README.md")) && /## v3\.68/.test(read("CHANGELOG.md")));
+    /wt-v148/.test(read("sw.js")) && /Previously wt-v147/.test(read("sw.js")) && /v3\.68/.test(read("README.md")) && /## v3\.68/.test(read("CHANGELOG.md")));
 })();
 
 console.log("=".repeat(72));

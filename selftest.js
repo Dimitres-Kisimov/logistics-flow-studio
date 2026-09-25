@@ -3878,6 +3878,30 @@
         p.evidence.table.length === 2 && !!row && row.status === "declined" && JSON.stringify(plan) === planBefore && C3.RULES.length === 5 && WT.kb && WT.kb.get("control.search.minGainHalfWidths") === 1 && ctl.search === table;
       return { ok: ok, detail: p ? p.rule + "@" + p.tick + " with " + p.lever.levers.length + " levers" : "no proposal" };
     });
+    // ---- v3.70 one place where a speed is declared: the registry is in the page, it still agrees
+    // with the live modules, and the conversions that surface the two disagreements are exact.
+    check("units-registry-agrees-with-the-live-modules", function () {
+      var U = WT.units, F0 = WT.flowsim, W0 = WT.wms, S0 = WT.sim, D0 = WT.domain;
+      if (!U || !F0 || !F0.PARAMS) return { ok: false, detail: "WT.units or flowsim PARAMS missing" };
+      var q = function (v, u) { return U.quantity(v, u); };
+      var live = [
+        ["flowsim.ticksPerHour", F0.PARAMS.ticksPerHour], ["flowsim.cellsPerTick", F0.PARAMS.cellsPerTick],
+        ["flowsim.minStationServicePerTick", F0.PARAMS.minStationServicePerTick],
+        ["flowsim.spawnNoiseLo", F0.PARAMS.spawnNoiseLo], ["flowsim.spawnNoiseHi", F0.PARAMS.spawnNoiseHi],
+        ["domain.metresPerCell", D0.METRES_PER_CELL], ["domain.conveyor.unitsPerHr", D0.ELEMENTS.conveyor.unitsPerHr]
+      ];
+      if (W0 && W0.PARAMS) live.push(["wms.ticksPerHour", W0.PARAMS.ticksPerHour], ["wms.packUnitsPerStationHr", W0.PARAMS.packUnitsPerStationHr]);
+      if (S0 && S0.PARAMS) live.push(["simulation.pickerSpeedMps", S0.PARAMS.pickerSpeedMps]);
+      var drift = live.filter(function (r) { return !U.agrees(r[0], r[1]); });
+      var ratio = U.to(q(1.2, "m/s"), "m/min") / U.to(q(0.35, "cells/tick"), "m/min");
+      var ok = drift.length === 0 && U.ids().length === 38 && U.FINDINGS.length === 6 &&
+        U.perTick(65.8, 60) === 1.0966666666666667 && U.ticksPerUnit(0.02) === 50 && U.takt(28800, 480) === 60 &&
+        U.minutesPerTick(60) === 1 && U.minutesPerTick(4) === 15 && ratio === 205.71428571428572 &&
+        U.get("flowsim.arrivalCv.fromEndpoints").value === 0.17320508075688776 &&
+        U.get("flowsim.arrivalCv.fromVariance").value === 0.17320508075688773 &&
+        /never to a person/.test(U.HONESTY);
+      return { ok: ok, detail: live.length + " entries checked against the running modules, " + drift.length + " drifted; the two travel speeds differ by " + ratio.toFixed(2) + "x" };
+    });
     // ---- v3.69 the demo's demand is a public record: the dataset twin is loaded in the page, its
     // licence and citation travel with it, and the numbers the app quotes are the reduced ones.
     check("real-order-book-is-loaded-and-attributed", function () {

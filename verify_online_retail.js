@@ -23,7 +23,7 @@
  *      no country, no weight - and a caveat that says the building, the
  *      staffing and the rates of that retailer are not used.
  *   6. HONESTY AND WIRING: the docs page generated fresh, the dataset
- *      twin loaded before the app, CREDITS, the runner, wt-v147.
+ *      twin loaded before the app, CREDITS, the runner, wt-v148.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -161,8 +161,8 @@ function check(name, ok, detail) {
     html.indexOf('<script src="data/online-retail.js"></script>') >= 0 &&
     html.indexOf('<script src="data/online-retail.js"></script>') < html.indexOf('<script src="app.js"></script>') &&
     /"\.\/data\/online-retail\.js"/.test(sw));
-  check("6e. shipped: the runner lists this harness, the service worker is at wt-v147 (previously wt-v146), README and CHANGELOG carry v3.69",
-    /verify_online_retail\.js/.test(runall) && /wt-v147/.test(sw) && /Previously wt-v146/.test(sw) &&
+  check("6e. shipped: the runner lists this harness, the service worker is at wt-v148 (previously wt-v147), README and CHANGELOG carry v3.69",
+    /verify_online_retail\.js/.test(runall) && /wt-v148/.test(sw) && /Previously wt-v147/.test(sw) &&
     /v3\.69/.test(read("README.md")) && /## v3\.69/.test(read("CHANGELOG.md")));
   check("6f. the tool is pure and offline-checkable: no network call outside fetch, the offline check is what the tests run, and the cache is git-ignored",
     /def offline_check/.test(read(path.join("tools", "online_retail.py"))) &&

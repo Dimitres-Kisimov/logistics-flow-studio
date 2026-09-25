@@ -29,7 +29,7 @@
  *   6. DRAWING smoke: a wrapped pallet draws at every tier through a mock
  *      context with finite coordinates and no throw.
  *   7. Shipped wiring: sample() passes the route, makeRoute carries
- *      startsInStock, run-all lists this file, sw.js bumped to wt-v147.
+ *      startsInStock, run-all lists this file, sw.js bumped to wt-v148.
  *
  * Deterministic + ASCII-only. Exit code 0 = all green.
  * ===================================================================== */
@@ -210,8 +210,8 @@ console.log("=".repeat(72));
   check("7a. sample() hands the unit's own route to formFor, and makeRoute carries startsInStock",
     /formFor\(mu, route, so\)/.test(goods) /* v3.49: the opts ride along for MACHINE_STAGE_FORM */ && /startsInStock: !!res\.startsInStock/.test(flow));
   check("7b. test/run-all.mjs lists verify_forms.js", /verify_forms\.js/.test(runall));
-  check("7c. sw.js cache bumped to wt-v147 (trail preserved: previously wt-v146)",
-    /CACHE_VERSION\s*=\s*"wt-v147"/.test(sw) && /Previously wt-v146/.test(sw));
+  check("7c. sw.js cache bumped to wt-v148 (trail preserved: previously wt-v147)",
+    /CACHE_VERSION\s*=\s*"wt-v148"/.test(sw) && /Previously wt-v147/.test(sw));
   check("7d. no Date / Math.random CALL in goods.js", !/new Date\(|Date\.now\(|Math\.random\(/.test(goods));
   check("7e. nothing above mutated the hand-built floor", JSON.stringify(FLOOR) === snapshot);
 })();

@@ -27,10 +27,10 @@
  *   7.  app.js exposes window.__WT_TEST_API__ ONLY under the ?selftest=1
  *       guard (never on a normal load).
  *   8.  sw.js precaches errors.js + selftest.js and the cache is bumped to
- *       wt-v147 (v3.25 every package takes its own path: order-driven
+ *       wt-v148 (v3.25 every package takes its own path: order-driven
  *       per-unit routing - each order archetype declares the operations
  *       it needs and a station the floor lacks is REPORTED, never routed
- *       around; previously wt-v146, v3.24 the plant reads like a shift).
+ *       around; previously wt-v147, v3.24 the plant reads like a shift).
  *   9.  Offline guard on the two new files: no external hosts referenced.
  *
  * Everything is deterministic. Usage:  node verify_hardening.js
@@ -233,9 +233,9 @@ check(
   "both in APP_SHELL"
 );
 check(
-  "sw.js cache bumped to wt-v147 (and no longer wt-v146)",
-  /CACHE_VERSION\s*=\s*"wt-v147"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v146"/.test(swJs),
-  "CACHE_VERSION = wt-v147"
+  "sw.js cache bumped to wt-v148 (and no longer wt-v147)",
+  /CACHE_VERSION\s*=\s*"wt-v148"/.test(swJs) && !/CACHE_VERSION\s*=\s*"wt-v147"/.test(swJs),
+  "CACHE_VERSION = wt-v148"
 );
 
 // ---- 9. the two new files reference no external hosts -------------------
