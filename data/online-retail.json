@@ -1,0 +1,440 @@
+{
+ "abc": {
+  "articles": 4939,
+  "curve": [
+   {
+    "share_of_units": 0.1925,
+    "skus": 50,
+    "top_share_of_skus": 0.01
+   },
+   {
+    "share_of_units": 0.4519,
+    "skus": 247,
+    "top_share_of_skus": 0.05
+   },
+   {
+    "share_of_units": 0.6132,
+    "skus": 494,
+    "top_share_of_skus": 0.1
+   },
+   {
+    "share_of_units": 0.7829,
+    "skus": 988,
+    "top_share_of_skus": 0.2
+   },
+   {
+    "share_of_units": 0.9644,
+    "skus": 2470,
+    "top_share_of_skus": 0.5
+   }
+  ],
+  "cuts": {
+   "A": {
+    "at_share_of_units": 0.8,
+    "share_of_skus": 0.2154,
+    "skus": 1064
+   },
+   "B": {
+    "at_share_of_units": 0.95,
+    "share_of_skus": 0.4515,
+    "skus": 2230
+   }
+  },
+  "total_units": 11635495
+ },
+ "administrative_codes": [
+  {
+   "code": "POST",
+   "lines": 1893
+  },
+  {
+   "code": "DOT",
+   "lines": 1443
+  },
+  {
+   "code": "15056BL",
+   "lines": 911
+  },
+  {
+   "code": "M",
+   "lines": 883
+  },
+  {
+   "code": "C2",
+   "lines": 275
+  },
+  {
+   "code": "79323LP",
+   "lines": 170
+  },
+  {
+   "code": "15056bl",
+   "lines": 93
+  },
+  {
+   "code": "79323GR",
+   "lines": 83
+  },
+  {
+   "code": "ADJUST",
+   "lines": 36
+  },
+  {
+   "code": "BANK CHARGES",
+   "lines": 35
+  },
+  {
+   "code": "DCGS0058",
+   "lines": 31
+  },
+  {
+   "code": "gift_0001_20",
+   "lines": 29
+  },
+  {
+   "code": "gift_0001_30",
+   "lines": 29
+  },
+  {
+   "code": "DCGSSGIRL",
+   "lines": 24
+  },
+  {
+   "code": "DCGSSBOY",
+   "lines": 22
+  },
+  {
+   "code": "PADS",
+   "lines": 18
+  },
+  {
+   "code": "gift_0001_10",
+   "lines": 16
+  },
+  {
+   "code": "DCGS0076",
+   "lines": 15
+  },
+  {
+   "code": "DCGS0003",
+   "lines": 13
+  },
+  {
+   "code": "TEST001",
+   "lines": 11
+  }
+ ],
+ "article_master": {
+  "by_class": {
+   "A": 1064,
+   "B": 936
+  },
+  "cap": 2000,
+  "share_of_units": 0.9321,
+  "skus": 2000
+ },
+ "busiest_days": [
+  {
+   "date": "2010-12-06",
+   "invoices": 108,
+   "lines": 7620,
+   "units": 43842,
+   "weekday": "Mon"
+  },
+  {
+   "date": "2010-12-01",
+   "invoices": 136,
+   "lines": 6140,
+   "units": 53954,
+   "weekday": "Wed"
+  },
+  {
+   "date": "2010-12-07",
+   "invoices": 84,
+   "lines": 5812,
+   "units": 50676,
+   "weekday": "Tue"
+  },
+  {
+   "date": "2010-12-09",
+   "invoices": 131,
+   "lines": 5560,
+   "units": 41358,
+   "weekday": "Thu"
+  },
+  {
+   "date": "2010-12-05",
+   "invoices": 88,
+   "lines": 5388,
+   "units": 32714,
+   "weekday": "Sun"
+  },
+  {
+   "date": "2011-12-05",
+   "invoices": 131,
+   "lines": 5284,
+   "units": 43837,
+   "weekday": "Mon"
+  },
+  {
+   "date": "2010-12-08",
+   "invoices": 123,
+   "lines": 5128,
+   "units": 46144,
+   "weekday": "Wed"
+  },
+  {
+   "date": "2011-12-08",
+   "invoices": 123,
+   "lines": 4860,
+   "units": 35627,
+   "weekday": "Thu"
+  },
+  {
+   "date": "2010-12-03",
+   "invoices": 73,
+   "lines": 4282,
+   "units": 32872,
+   "weekday": "Fri"
+  },
+  {
+   "date": "2011-11-29",
+   "invoices": 138,
+   "lines": 4281,
+   "units": 30911,
+   "weekday": "Tue"
+  },
+  {
+   "date": "2011-11-16",
+   "invoices": 137,
+   "lines": 4131,
+   "units": 33113,
+   "weekday": "Wed"
+  },
+  {
+   "date": "2010-12-02",
+   "invoices": 142,
+   "lines": 4116,
+   "units": 62632,
+   "weekday": "Thu"
+  },
+  {
+   "date": "2011-11-11",
+   "invoices": 102,
+   "lines": 4046,
+   "units": 29006,
+   "weekday": "Fri"
+  },
+  {
+   "date": "2009-12-14",
+   "invoices": 87,
+   "lines": 4042,
+   "units": 45372,
+   "weekday": "Mon"
+  },
+  {
+   "date": "2011-11-08",
+   "invoices": 108,
+   "lines": 3965,
+   "units": 26488,
+   "weekday": "Tue"
+  }
+ ],
+ "demo_day": {
+  "date": "2011-11-16",
+  "lines": 3533,
+  "lines_before_master_restriction": 4131,
+  "lines_dropped_by_restriction": 598,
+  "orders": 132,
+  "units": 30999,
+  "weekday": "Wed"
+ },
+ "honesty": "A UK-based, non-store online gift retailer, 2009-12-01 to 2011-12-09. What is used here is the SHAPE of demand - lines per order, the concentration of picks across articles, the time of day orders arrive. Nothing about this retailer's building, staffing, rates or geography is used or implied, and no claim is made that a German distribution centre would see this demand. An invoice beginning with C is a CANCELLATION, which is not a customer return: this dataset contains no returns, so the app's returns share remains a teaching value.",
+ "id": "online-retail-ii",
+ "lines_per_order": {
+  "max": 1348,
+  "mean": 25.11,
+  "median": 15,
+  "min": 1,
+  "n": 41349,
+  "p10": 1,
+  "p90": 52
+ },
+ "orders_by_hour": [
+  {
+   "hour": 6,
+   "orders": 1,
+   "share": 0.0
+  },
+  {
+   "hour": 7,
+   "orders": 76,
+   "share": 0.0018
+  },
+  {
+   "hour": 8,
+   "orders": 998,
+   "share": 0.0241
+  },
+  {
+   "hour": 9,
+   "orders": 2829,
+   "share": 0.0684
+  },
+  {
+   "hour": 10,
+   "orders": 4786,
+   "share": 0.1157
+  },
+  {
+   "hour": 11,
+   "orders": 5047,
+   "share": 0.1221
+  },
+  {
+   "hour": 12,
+   "orders": 6572,
+   "share": 0.1589
+  },
+  {
+   "hour": 13,
+   "orders": 5828,
+   "share": 0.1409
+  },
+  {
+   "hour": 14,
+   "orders": 5171,
+   "share": 0.1251
+  },
+  {
+   "hour": 15,
+   "orders": 4829,
+   "share": 0.1168
+  },
+  {
+   "hour": 16,
+   "orders": 2802,
+   "share": 0.0678
+  },
+  {
+   "hour": 17,
+   "orders": 1527,
+   "share": 0.0369
+  },
+  {
+   "hour": 18,
+   "orders": 499,
+   "share": 0.0121
+  },
+  {
+   "hour": 19,
+   "orders": 331,
+   "share": 0.008
+  },
+  {
+   "hour": 20,
+   "orders": 53,
+   "share": 0.0013
+  }
+ ],
+ "orders_by_weekday": [
+  {
+   "name": "Mon",
+   "orders": 6620,
+   "share": 0.1601,
+   "weekday": 0
+  },
+  {
+   "name": "Tue",
+   "orders": 7624,
+   "share": 0.1844,
+   "weekday": 1
+  },
+  {
+   "name": "Wed",
+   "orders": 7440,
+   "share": 0.1799,
+   "weekday": 2
+  },
+  {
+   "name": "Thu",
+   "orders": 8505,
+   "share": 0.2057,
+   "weekday": 3
+  },
+  {
+   "name": "Fri",
+   "orders": 6302,
+   "share": 0.1524,
+   "weekday": 4
+  },
+  {
+   "name": "Sat",
+   "orders": 30,
+   "share": 0.0007,
+   "weekday": 5
+  },
+  {
+   "name": "Sun",
+   "orders": 4828,
+   "share": 0.1168,
+   "weekday": 6
+  }
+ ],
+ "quantity_per_line": {
+  "max": 80995,
+  "mean": 11.21,
+  "median": 3,
+  "min": 1,
+  "n": 1038310,
+  "p10": 1,
+  "p90": 24
+ },
+ "rejected": {
+  "administrative stock code, not a picked article": 6110,
+  "cancellation line (invoice begins with C)": 19494,
+  "non-positive quantity outside a cancellation": 3457
+ },
+ "rule": [
+  "a row is usable when Invoice and StockCode are non-empty and Quantity and InvoiceDate parse",
+  "an invoice beginning with C is a CANCELLATION (the dataset's own documentation); its lines are counted and excluded, and a cancellation is not a customer return",
+  "a non-positive quantity outside a cancellation is counted and excluded",
+  "a stock code is a physical article only in the documented form of five digits with an optional letter; every other code is administrative, listed and excluded",
+  "quantiles are nearest-rank on the sorted usable values, never interpolated",
+  "ABC is cut on the measured cumulative share of units: A to 80 %, B to 95 %, C the rest",
+  "weekly_picks is LINES per week (a line is one pick), the SKU's usable lines over the whole weeks the dataset spans",
+  "the article master is the top 2000 SKUs by units (the app's article cap); the demo day's lines are restricted to it and the drop is reported"
+ ],
+ "scale": {
+  "administrative_codes": 45,
+  "articles_picked": 4939,
+  "cancellation_invoices": 8292,
+  "cancellation_share_of_invoices": 0.167,
+  "first": "2009-12-01 07:45:00",
+  "last": "2011-12-09 12:50:00",
+  "rows": 1067371,
+  "sales_invoices": 41349,
+  "usable_lines": 1038310,
+  "weeks": 105
+ },
+ "schema": "wt-online-retail/v1",
+ "single_line_order_share": 0.1173,
+ "source": {
+  "bytes": 45622418,
+  "caveat": "A UK-based, non-store online gift retailer, 2009-12-01 to 2011-12-09. What is used here is the SHAPE of demand - lines per order, the concentration of picks across articles, the time of day orders arrive. Nothing about this retailer's building, staffing, rates or geography is used or implied, and no claim is made that a German distribution centre would see this demand. An invoice beginning with C is a CANCELLATION, which is not a customer return: this dataset contains no returns, so the app's returns share remains a teaching value.",
+  "citation": "Chen, D. (2012). Online Retail II [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5CG6D",
+  "licence": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+  "sha256": "572e36277c2390fbfde10664750731e0a86f55e33470d91919085f0408e67bfb",
+  "url": "https://archive.ics.uci.edu/static/public/502/online+retail+ii.zip"
+ },
+ "title": "Online Retail II - a public record of real order lines",
+ "units_per_order": {
+  "max": 87167,
+  "mean": 281.4,
+  "median": 144,
+  "min": 1,
+  "n": 41349,
+  "p10": 15,
+  "p90": 522
+ }
+}

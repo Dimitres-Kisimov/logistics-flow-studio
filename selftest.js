@@ -3878,6 +3878,22 @@
         p.evidence.table.length === 2 && !!row && row.status === "declined" && JSON.stringify(plan) === planBefore && C3.RULES.length === 5 && WT.kb && WT.kb.get("control.search.minGainHalfWidths") === 1 && ctl.search === table;
       return { ok: ok, detail: p ? p.rule + "@" + p.tick + " with " + p.lever.levers.length + " levers" : "no proposal" };
     });
+    // ---- v3.69 the demo's demand is a public record: the dataset twin is loaded in the page, its
+    // licence and citation travel with it, and the numbers the app quotes are the reduced ones.
+    check("real-order-book-is-loaded-and-attributed", function () {
+      var OR = WT.datasets && WT.datasets.onlineRetail;
+      if (!OR) return { ok: false, detail: "WT.datasets.onlineRetail missing" };
+      var s = OR.scale, twenty = null, i;
+      for (i = 0; i < OR.abc.curve.length; i++) if (OR.abc.curve[i].top_share_of_skus === 0.2) twenty = OR.abc.curve[i];
+      var ok = OR.schema === "wt-online-retail/v1" && s.rows === 1067371 && s.usable_lines === 1038310 &&
+        OR.demo_day.orders === 132 && OR.demo_day.lines === 3533 && OR.demo_day.units === 30999 &&
+        OR.demo_day.date === "2011-11-16" && OR.article_master.skus === 2000 &&
+        OR.abc.cuts.A.skus === 1064 && twenty && Math.abs(twenty.share_of_units - 0.7829) < 5e-5 &&
+        /CC BY 4\.0/.test(OR.source.licence) && /10\.24432\/C5CG6D/.test(OR.source.citation) &&
+        /not a customer return/i.test(OR.honesty) && OR.rule.length === 8;
+      return { ok: ok, detail: s.rows.toLocaleString("en") + " rows reduced; " + OR.demo_day.lines + " real lines on " + OR.demo_day.date +
+        "; top 20% of articles carry " + (twenty ? (100 * twenty.share_of_units).toFixed(2) : "?") + "% of units" };
+    });
     // ---- v3.68 the route as a declared graph: the list is the walk, the rework is a back edge with
     // a visit bound, and nothing a caller sees changed (the lists are pinned against v3.67's).
     check("route-graph-walks-the-loop", function () {

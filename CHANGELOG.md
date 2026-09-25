@@ -1,5 +1,57 @@
 # Changelog
 
+## v3.69 — A real order book behind the demo
+
+**Why.** Every order this simulation had ever seen was DECLARED: an order mix with illustrative
+shares, a synthetic article list, quantities drawn from a teaching distribution. For a demo meant to
+be as close to a real operation as the public record allows, the demand side was the weakest link.
+
+**The source.** *Online Retail II* — "all the transactions occurring for a UK-based and registered,
+non-store online retail between 01/12/2009 and 09/12/2011" — 1 067 371 rows, UCI Machine Learning
+Repository dataset 502, licensed **CC BY 4.0**, which is what permits derived data to be committed
+here at all. Cite as: Chen, D. (2012). Online Retail II [Dataset]. UCI Machine Learning Repository.
+https://doi.org/10.24432/C5CG6D
+
+**The tool.** `tools/online_retail.py` (standard library only, like every other dataset tool here)
+streams the two 150 MB sheets of the workbook with `zipfile` and `iterparse` and reduces them under a
+rule stated once and recorded in the output: a usable row; a cancellation excluded and counted; a
+non-positive quantity excluded and counted; a physical article only in the five-digit form the dataset
+documents, every administrative code listed and excluded; nearest-rank quantiles; ABC cut on the
+measured cumulative share of units; `weekly_picks` as LINES per week; the article master capped at the
+app's own 2 000 and the demo day's lines restricted to it with the drop reported.
+
+**What is committed.** Four small reviewable files. `data/online-retail.json` and its JS twin hold the
+reduction. `data/demo-skus.csv` holds **2 000 real articles** — the real stock codes, the real
+descriptions, real lines per week, the measured class. `data/demo-orders.csv` holds **one real trading
+day**, Wednesday 16 November 2011: **132 orders, 3 533 lines, 30 999 units**, chosen as a busy mid-week
+day because a planner sizes a floor for a peak and the busiest days in this record are pre-Christmas
+outliers. Both parse through the app's OWN parsers with zero errors.
+
+**What the record gives that a declared curve cannot.** The top 1 % of articles carry 19.25 % of units
+and the top fifth carry **78.29 %** — the textbook says 20/80 and the measurement says 21.5/80, which is
+close and is now a measurement rather than a slogan. Orders peak at **noon** and there are none
+overnight. The retailer **barely trades on Saturday** and **does trade on Sunday**. The largest single
+order line in the record is **80 995 units** and the largest order is 1 348 lines; both are kept, which
+is why the tool uses nearest-rank quantiles and not means.
+
+**What was deliberately not taken.** No invoice number, no customer id, no price, no country, and no
+invented weight, volume or storage type for articles the dataset does not describe. Order ids are
+renumbered. And the **16.7 % of invoices beginning with C are cancellations** — the dataset's own
+documentation says so — which is *not* a customer return: this dataset contains no returns, so the
+app's returns share remains a teaching value and the cancellation rate is reported as what it is. The
+harness asserts that nothing in the output calls it a return rate.
+
+**Two things found while building it.** The generated docs page was stale against its own JSON because
+a rejection table was ordered by insertion and a JSON round-trip sorts keys; the row order is now
+explicit. And the first pin for the ABC curve used 78.44 %, measured before the administrative codes
+were excluded — the rule moves the number, so the pin is now taken after the rule and the commit says
+which.
+
+`verify_online_retail.js` (26 checks), `test/test_online_retail.py` (15 tests, including a workbook
+built by hand to exercise the streaming reader), the self-test
+`real-order-book-is-loaded-and-attributed` (197/197), `docs/ONLINE_RETAIL.md` generated, CREDITS,
+cache `wt-v147`.
+
 ## v3.68 — The route as a declared graph: the list is the walk
 
 **Why.** Four of the limits this module documents about itself ended with the same sentence -

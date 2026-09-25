@@ -30,7 +30,7 @@
  *      all in the export, so a reader sees what shaped the shares.
  *   6. ON THE HAND FLOOR: a negative context and a good design, measured.
  *   7. HONESTY AND WIRING: no clock, no roster, the tower's arithmetic
- *      through the same combiner, the knowledge base, the docs, wt-v146.
+ *      through the same combiner, the knowledge base, the docs, wt-v147.
  * ===================================================================== */
 "use strict";
 const fs = require("fs");
@@ -237,8 +237,8 @@ function record(opts, ticks) {
   const deep = read(path.join("docs", "DIGITAL_TWIN_DEEP_DIVE.md"));
   check("7f. the deep dive's chapter 5.3 no longer says the five are documented only, and corrects itself where it had lumped stressors in with fitness for duty",
     /v3.67/.test(deep) && /PSF_LEVERS.md/.test(deep) && !/Three of the eight become editable multipliers in the knowledge base \(R20\); the other five are documented and not modelled/.test(deep));
-  check("7g. shipped: the runner lists this harness, the service worker is at wt-v146 (previously wt-v145), README and CHANGELOG carry v3.67",
-    /verify_psf\.js/.test(read(path.join("test", "run-all.mjs"))) && /wt-v146/.test(read("sw.js")) && /Previously wt-v145/.test(read("sw.js")) &&
+  check("7g. shipped: the runner lists this harness, the service worker is at wt-v147 (previously wt-v146), README and CHANGELOG carry v3.67",
+    /verify_psf\.js/.test(read(path.join("test", "run-all.mjs"))) && /wt-v147/.test(read("sw.js")) && /Previously wt-v146/.test(read("sw.js")) &&
     /v3\.67/.test(read("README.md")) && /## v3\.67/.test(read("CHANGELOG.md")));
 })();
 

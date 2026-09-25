@@ -154,10 +154,10 @@ function record(opts, ticks) {
 (function () {
   const html = read("index.html"), app = read("app.js"), flow = read("flowsim.js"), sw = read("sw.js"), runall = read("test/run-all.mjs"), st = read("selftest.js");
   const readme = read("README.md"), changelog = read("CHANGELOG.md");
-  check("6a. index.html loads people.js before app.js and offers the picker with its two options and the hint that names the step-and-shift rule; sw.js precaches it at wt-v146 (previously wt-v145); run-all lists this harness",
+  check("6a. index.html loads people.js before app.js and offers the picker with its two options and the hint that names the step-and-shift rule; sw.js precaches it at wt-v147 (previously wt-v146); run-all lists this harness",
     html.indexOf('<script src="people.js"></script>') > 0 && html.indexOf('<script src="people.js"></script>') < html.indexOf('<script src="app.js"></script>') &&
     /id="flowPeopleSelect"/.test(html) && /Benches never learn and never tire/.test(html) && /never to a person/.test(html) && /"\.\/people\.js"/.test(sw) &&
-    /CACHE_VERSION\s*=\s*"wt-v146"/.test(sw) && /Previously wt-v145/.test(sw) && /verify_people\.js/.test(runall));
+    /CACHE_VERSION\s*=\s*"wt-v147"/.test(sw) && /Previously wt-v146/.test(sw) && /verify_people\.js/.test(runall));
   check("6b. flowsim applies the factor to the service rate only when the plan carries the curves, counts each station's own units, and keys the plan only then; app.js reads the six knowledge-base values, passes them as opts.people and shows what the curves are doing per bench",
     /const people = o\.people && WT\.people/.test(flow) && /if \(people\) plan\.people = people;/.test(flow) && /perTick \*= WT\.people\.serviceFactor\(\(st\.served \|\| 0\) \+ 1, peopleMinute, plan\.people\)\.factor;/.test(flow) &&
     /if \(plan\.people\) st\.served = \(st\.served \|\| 0\) \+ 1;/.test(flow) && /function readPeopleLevers\(/.test(app) && /opts\.people = readPeopleLevers\(\)/.test(app) &&

@@ -27,7 +27,7 @@
  *   6. HUMAN: aggregates only - the tool has no per-person key, the
  *      honesty names BetrVG / GDPR, the fixture says SYNTHETIC.
  *   7. SHIPPED WIRING: the card's badge and label, the hint, the self-test,
- *      run-all, sw.js at wt-v146, README, CHANGELOG, docs/SITE_PROFILE.md.
+ *      run-all, sw.js at wt-v147, README, CHANGELOG, docs/SITE_PROFILE.md.
  * Deterministic + ASCII-only. Exit code 0 = all green.
  * ===================================================================== */
 "use strict";
@@ -182,8 +182,8 @@ const v = (id) => (prof && prof.values[id]) || {};
     typeof KB.applyProfile === "function" && typeof KB.profile === "function" && KB.PROFILE_SCHEMA === "wt-site-profile/v1" && /if \(data && data\.schema === PROFILE_SCHEMA\) return applyProfile\(data\);/.test(kb) && /profileInfo = null; \/\/ v3\.59/.test(kb) && /the stamp survives a reload/.test(kb));
   check("7b. the card shows the measured badge and label above the teaching default; the import handler reports a site profile; the hint names it; the badge is styled",
     /kb-badge measured/.test(app) && /Measured:<\/span>/.test(app) && /Teaching default:/.test(app) && /Site profile applied:/.test(app) && /site profile/.test(html) && /measured on …, n = …/.test(html) && /\.kb-badge\.measured/.test(css));
-  check("7c. selftest.js has site-profile-measured-labels; run-all lists verify_fit_rates.js; sw.js at wt-v146 (previously wt-v145); README and CHANGELOG name v3.59; docs/SITE_PROFILE.md exists and names the rule",
-    /site-profile-measured-labels/.test(st) && /verify_fit_rates\.js/.test(runall) && /CACHE_VERSION\s*=\s*"wt-v146"/.test(sw) && /Previously wt-v145/.test(sw) && /v3\.59/.test(readme) && /## v3\.59/.test(changelog) &&
+  check("7c. selftest.js has site-profile-measured-labels; run-all lists verify_fit_rates.js; sw.js at wt-v147 (previously wt-v146); README and CHANGELOG name v3.59; docs/SITE_PROFILE.md exists and names the rule",
+    /site-profile-measured-labels/.test(st) && /verify_fit_rates\.js/.test(runall) && /CACHE_VERSION\s*=\s*"wt-v147"/.test(sw) && /Previously wt-v146/.test(sw) && /v3\.59/.test(readme) && /## v3\.59/.test(changelog) &&
     fs.existsSync(path.join(__dirname, "docs", "SITE_PROFILE.md")) && /nearest-rank/.test(read(path.join("docs", "SITE_PROFILE.md"))) && /never per person|never a person|nothing is keyed to a person/.test(read(path.join("docs", "SITE_PROFILE.md"))));
 })();
 

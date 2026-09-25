@@ -29,7 +29,7 @@
  *      the audit); the html renderer escapes.
  *   6. SHIPPED WIRING: the drawer's form and output, the viewer's section,
  *      nav and scripts (domain.js + knowledge.js for the sources), both
- *      self-tests, run-all, sw.js at wt-v146, README, CHANGELOG, the doc.
+ *      self-tests, run-all, sw.js at wt-v147, README, CHANGELOG, the doc.
  * Deterministic + ASCII-only. Exit code 0 = all green.
  * ===================================================================== */
 "use strict";
@@ -176,8 +176,8 @@ const FLOOR = { gridW: 40, gridH: 24, cell: 1, elements: [
   check("6b. run-ledger.html loads domain.js + knowledge.js (the sources) and ask.js after control.js; the Ask section with its nav anchor, form and output; run-ledger.js renders it in load() and answers over the loaded export",
     /<script src="domain\.js"><\/script><script src="knowledge\.js"><\/script>/.test(rl) && rl.indexOf('<script src="ask.js"></script>') > rl.indexOf('<script src="control.js"></script>') && rl.indexOf('<script src="ask.js"></script>') < rl.indexOf('<script src="run-ledger.js"></script>') &&
     /id="secAsk"/.test(rl) && /href="#secAsk"/.test(rl) && /id="rlAskForm"/.test(rl) && /id="rlAskOut"/.test(rl) && /function renderAsk\(exp\)/.test(rljs) && /renderAsk\(exp\)/.test(rljs.slice(rljs.indexOf("function load(exp)"))) && /ASK\.answer\(q, \{ exp: EXP, kb: window\.WT && window\.WT\.kb \}\)/.test(rljs));
-  check("6c. both self-tests, run-all, sw.js precaches ask.js at wt-v146 (previously wt-v145), the styles, README and CHANGELOG name v3.60, docs/ASK_THE_LEDGER.md exists",
-    /ask-the-ledger-deterministic/.test(st) && /ask-section-answers-on-example-a/.test(rlst) && /"rlAskOut"/.test(rlst) && /verify_ask\.js/.test(runall) && /"\.\/ask\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v146"/.test(sw) && /Previously wt-v145/.test(sw) &&
+  check("6c. both self-tests, run-all, sw.js precaches ask.js at wt-v147 (previously wt-v146), the styles, README and CHANGELOG name v3.60, docs/ASK_THE_LEDGER.md exists",
+    /ask-the-ledger-deterministic/.test(st) && /ask-section-answers-on-example-a/.test(rlst) && /"rlAskOut"/.test(rlst) && /verify_ask\.js/.test(runall) && /"\.\/ask\.js"/.test(sw) && /CACHE_VERSION\s*=\s*"wt-v147"/.test(sw) && /Previously wt-v146/.test(sw) &&
     /\.ask-chip/.test(css) && /\.ask-chip/.test(rlcss) && /v3\.60/.test(readme) && /## v3\.60/.test(changelog) && fs.existsSync(path.join(__dirname, "docs", "ASK_THE_LEDGER.md")));
 })();
 
